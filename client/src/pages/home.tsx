@@ -149,6 +149,121 @@ const VIDEO_SCENES = [
   },
 ];
 
+function CartoonPerson({
+  className = "",
+  shirt = "bg-[hsl(var(--accent))]",
+}: {
+  className?: string;
+  shirt?: string;
+}) {
+  return (
+    <div className={`absolute w-12 ${className}`}>
+      <div className="mx-auto size-7 rounded-full border border-white/80 bg-[#f1c9a8] shadow-sm" />
+      <div className={`mt-1 h-11 rounded-t-3xl border border-white/70 ${shirt} shadow-lg`} />
+      <div className="mx-auto mt-1 h-5 w-8 rounded-b-xl bg-slate-700" />
+    </div>
+  );
+}
+
+function HomepageVideoVisual({ isPlaying }: { isPlaying: boolean }) {
+  return (
+    <div
+      className={`overview-visual ${isPlaying ? "overview-visual-playing" : ""} relative min-h-[270px] overflow-hidden rounded-3xl border border-white/15 bg-black/25 shadow-2xl`}
+    >
+      <div className="absolute inset-0 bg-[linear-gradient(135deg,#dfe9f3_0%,#fff8e8_48%,#d8efe6_100%)]" />
+      <div className="absolute inset-0 opacity-60 nh-fine-grid" />
+      <div className="absolute inset-x-0 bottom-0 h-20 bg-[linear-gradient(180deg,transparent,rgba(16,42,70,.32))]" />
+
+      <div className="overview-scene overview-scene-1 absolute inset-0">
+        <div className="absolute left-6 top-6 rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-[hsl(var(--primary))] shadow-xl backdrop-blur">
+          <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/45">Scene 1</div>
+          <div className="mt-1 text-sm font-semibold">E-2 investor owns the franchise</div>
+        </div>
+        <CartoonPerson className="bottom-8 left-12 overview-float" shirt="bg-[hsl(var(--primary))]" />
+        <div className="absolute bottom-16 left-28 h-28 w-40 rounded-2xl border border-white/75 bg-white/85 p-3 shadow-xl">
+          <div className="h-3 w-24 rounded-full bg-slate-300" />
+          <div className="mt-3 h-2 w-full rounded-full bg-slate-200" />
+          <div className="mt-2 h-2 w-4/5 rounded-full bg-slate-200" />
+          <div className="mt-4 inline-flex rounded-full bg-[hsl(var(--accent))] px-3 py-1 text-[10px] font-bold text-[hsl(var(--primary))]">
+            OWNER CONTROL
+          </div>
+        </div>
+        <div className="absolute bottom-8 right-12 rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-sm font-semibold text-[hsl(var(--primary))] shadow-xl">
+          You own it
+        </div>
+      </div>
+
+      <div className="overview-scene overview-scene-2 absolute inset-0">
+        <div className="absolute left-6 top-6 rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-[hsl(var(--primary))] shadow-xl backdrop-blur">
+          <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/45">Scene 2</div>
+          <div className="mt-1 text-sm font-semibold">Our team handles daily operations</div>
+        </div>
+        <CartoonPerson className="bottom-8 left-10 overview-float" shirt="bg-emerald-500" />
+        <CartoonPerson className="bottom-8 left-24 overview-float-delayed" shirt="bg-sky-500" />
+        <CartoonPerson className="bottom-8 left-[9.5rem] overview-float" shirt="bg-amber-400" />
+        <div className="absolute bottom-14 right-8 w-48 rounded-2xl border border-white/70 bg-[hsl(var(--primary))]/90 p-4 text-white shadow-xl">
+          <div className="text-[10px] uppercase tracking-[0.16em] text-white/55">Operations board</div>
+          <div className="mt-3 space-y-2">
+            <div className="h-2 rounded-full bg-white/20"><div className="h-2 w-[82%] rounded-full bg-[hsl(var(--accent))]" /></div>
+            <div className="h-2 rounded-full bg-white/20"><div className="h-2 w-[64%] rounded-full bg-emerald-400" /></div>
+            <div className="h-2 rounded-full bg-white/20"><div className="h-2 w-[72%] rounded-full bg-sky-300" /></div>
+          </div>
+        </div>
+      </div>
+
+      <div className="overview-scene overview-scene-3 absolute inset-0">
+        <div className="absolute left-6 top-6 rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-[hsl(var(--primary))] shadow-xl backdrop-blur">
+          <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/45">Scene 3</div>
+          <div className="mt-1 text-sm font-semibold">10 starting management contracts</div>
+        </div>
+        {[0, 1, 2, 3, 4].map((row) =>
+          [0, 1].map((col) => (
+            <div
+              key={`${row}-${col}`}
+              className="absolute h-12 w-20 rounded-xl border border-white/75 bg-white/90 shadow-lg"
+              style={{ left: `${42 + col * 112}px`, bottom: `${34 + row * 22}px` }}
+            >
+              <div className="mx-auto mt-3 h-2 w-12 rounded-full bg-[hsl(var(--primary))]/25" />
+              <div className="mx-auto mt-2 h-2 w-8 rounded-full bg-[hsl(var(--accent))]" />
+            </div>
+          )),
+        )}
+        <div className="absolute bottom-10 right-10 grid size-24 place-items-center rounded-full border border-white/80 bg-[hsl(var(--primary))] text-center text-white shadow-2xl">
+          <div>
+            <div className="text-3xl font-bold text-[hsl(var(--accent))]">10</div>
+            <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70">contracts</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="overview-scene overview-scene-4 absolute inset-0">
+        <div className="absolute left-6 top-6 rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-[hsl(var(--primary))] shadow-xl backdrop-blur">
+          <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/45">Scene 4</div>
+          <div className="mt-1 text-sm font-semibold">Escrow and replacement protections</div>
+        </div>
+        <div className="absolute bottom-10 left-10 grid size-28 place-items-center rounded-3xl border border-white/75 bg-white/85 shadow-xl">
+          <ShieldCheck className="size-12 text-emerald-600" />
+        </div>
+        <div className="absolute bottom-16 left-40 rounded-2xl border border-white/75 bg-white/90 px-5 py-4 text-[hsl(var(--primary))] shadow-xl">
+          <div className="text-3xl font-bold text-[hsl(var(--accent))]">90</div>
+          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-foreground/55">day replacement</div>
+        </div>
+        <CartoonPerson className="bottom-8 right-28 overview-float" shirt="bg-[hsl(var(--primary))]" />
+        <CartoonPerson className="bottom-8 right-14 overview-float-delayed" shirt="bg-[hsl(var(--accent))]" />
+      </div>
+
+      <div className="absolute inset-0 grid place-items-center">
+        <div className="grid size-20 place-items-center rounded-full border border-white/50 bg-white/20 shadow-[0_0_0_12px_rgba(255,255,255,0.10)] backdrop-blur transition group-hover:scale-105">
+          {isPlaying ? <Pause className="size-9 fill-white text-white" /> : <Play className="ml-1 size-9 fill-white text-white" />}
+        </div>
+      </div>
+      <div className="absolute bottom-4 left-4 rounded-full border border-white/20 bg-black/35 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
+        Watch the illustrated 30-second overview
+      </div>
+    </div>
+  );
+}
+
 function HomepageOverviewVideo() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [audioUrl, setAudioUrl] = useState("");
@@ -242,51 +357,7 @@ function HomepageOverviewVideo() {
                   </div>
                 </div>
 
-                <div className="relative mt-6 overflow-hidden rounded-3xl border border-white/15 bg-black/25 shadow-2xl">
-                  <div className="grid min-h-[230px] grid-cols-[1.2fr_0.8fr]">
-                    <div className="relative overflow-hidden bg-[linear-gradient(135deg,#dfe9f3_0%,#fff8e8_55%,#d8efe6_100%)]">
-                      <div className="absolute inset-x-0 bottom-0 h-20 bg-[linear-gradient(180deg,transparent,rgba(16,42,70,.28))]" />
-                      <div className="absolute left-6 top-7 rounded-2xl border border-white/70 bg-white/75 px-4 py-3 text-[hsl(var(--primary))] shadow-xl backdrop-blur">
-                        <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/45">Texas territory</div>
-                        <div className="mt-1 text-sm font-semibold">Long-term rental portfolio</div>
-                      </div>
-                      <div className="absolute bottom-8 left-10 h-20 w-28 rounded-t-2xl border border-white/80 bg-white shadow-lg" />
-                      <div className="absolute bottom-8 left-36 h-16 w-24 rounded-t-2xl border border-white/70 bg-[#f4ead6] shadow-lg" />
-                      <div className="absolute bottom-8 left-60 h-24 w-32 rounded-t-3xl border border-white/70 bg-[#e8f0f4] shadow-lg" />
-                      <div className="absolute bottom-28 left-20 h-10 w-10 rounded-full bg-[hsl(var(--accent))]/80 blur-[1px]" />
-                      <div className="absolute bottom-5 left-0 right-0 h-10 bg-[#486a4c]/30" />
-                    </div>
-                    <div className="relative border-l border-white/10 bg-white/[0.07] p-4">
-                      <div className="rounded-2xl border border-white/15 bg-white/[0.08] p-3">
-                        <div className="text-[10px] uppercase tracking-[0.16em] text-white/45">Owner dashboard</div>
-                        <div className="mt-3 space-y-2">
-                          <div className="h-2 rounded-full bg-white/20"><div className="h-2 w-[82%] rounded-full bg-[hsl(var(--accent))]" /></div>
-                          <div className="h-2 rounded-full bg-white/20"><div className="h-2 w-[64%] rounded-full bg-emerald-400" /></div>
-                          <div className="h-2 rounded-full bg-white/20"><div className="h-2 w-[72%] rounded-full bg-sky-300" /></div>
-                        </div>
-                      </div>
-                      <div className="mt-3 grid grid-cols-2 gap-2">
-                        <div className="rounded-xl border border-white/10 bg-white/[0.08] p-3">
-                          <div className="text-lg font-bold text-[hsl(var(--accent))]">10</div>
-                          <div className="text-[10px] text-white/55">starting contracts</div>
-                        </div>
-                        <div className="rounded-xl border border-white/10 bg-white/[0.08] p-3">
-                          <div className="text-lg font-bold text-[hsl(var(--accent))]">90</div>
-                          <div className="text-[10px] text-white/55">days</div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="absolute inset-0 grid place-items-center">
-                    <div className="grid size-20 place-items-center rounded-full border border-white/50 bg-white/20 shadow-[0_0_0_12px_rgba(255,255,255,0.10)] backdrop-blur transition group-hover:scale-105">
-                      {isPlaying ? <Pause className="size-9 fill-white text-white" /> : <Play className="ml-1 size-9 fill-white text-white" />}
-                    </div>
-                  </div>
-                  <div className="absolute bottom-4 left-4 rounded-full border border-white/20 bg-black/35 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
-                    Watch the 30-second overview
-                  </div>
-                </div>
+                <HomepageVideoVisual isPlaying={isPlaying} />
 
                 <div className="relative mt-5 grid gap-3 md:grid-cols-2">
                   {VIDEO_SCENES.map((scene, index) => (

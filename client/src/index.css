@@ -208,6 +208,68 @@
       width: 100%;
     }
   }
+
+  .overview-scene {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+    transition: opacity 300ms ease, transform 300ms ease;
+  }
+
+  .overview-scene-1 {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  .overview-visual-playing .overview-scene {
+    animation: overview-scene-cycle 30s linear infinite;
+  }
+
+  .overview-visual-playing .overview-scene-1 {
+    animation-delay: 0s;
+  }
+
+  .overview-visual-playing .overview-scene-2 {
+    animation-delay: 7.5s;
+  }
+
+  .overview-visual-playing .overview-scene-3 {
+    animation-delay: 15s;
+  }
+
+  .overview-visual-playing .overview-scene-4 {
+    animation-delay: 22.5s;
+  }
+
+  .overview-float {
+    animation: overview-float 3s ease-in-out infinite;
+  }
+
+  .overview-float-delayed {
+    animation: overview-float 3s ease-in-out 0.8s infinite;
+  }
+
+  @keyframes overview-scene-cycle {
+    0%,
+    21% {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+    25%,
+    100% {
+      opacity: 0;
+      transform: translateY(10px) scale(0.98);
+    }
+  }
+
+  @keyframes overview-float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-5px);
+    }
+  }
 }
 
 /* Utility: hide scrollbar while keeping scroll functionality */

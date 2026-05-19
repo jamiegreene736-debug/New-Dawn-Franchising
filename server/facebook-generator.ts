@@ -1,10 +1,7 @@
-import OpenAI from "openai";
 import { storage } from "./storage";
+import { createLazyOpenAIClient } from "./openai-client";
 
-const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-});
+const openai = createLazyOpenAIClient();
 
 const POST_THEMES = [
   "E-2 visa investment opportunity through property management",

@@ -1,4 +1,3 @@
-import OpenAI from "openai";
 import { scrapeTeamPage, type ScrapedPerson } from "./website-scraper";
 import { apolloSearchByDomain, apolloSearchByCompanyName, apolloMatchPerson } from "./apollo-service";
 import { hunterFindEmail, hunterDomainPattern, buildEmailFromPattern } from "./hunter-service";
@@ -7,11 +6,9 @@ import { searchProspects, searchByFreeQuery } from "./prospect-search";
 import { verifyEmailBatch } from "./zerobounce-service";
 import { lookupPhoneBatch, validateAddressFormat } from "./twilio-lookup";
 import { findAllPeopleAtCompany, type FoundPerson } from "./people-finder";
+import { createLazyOpenAIClient } from "./openai-client";
 
-const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-});
+const openai = createLazyOpenAIClient();
 
 export interface EnrichedContact {
   id: string; // temporary local ID for UI

@@ -1,11 +1,8 @@
-import OpenAI from "openai";
 import cron from "node-cron";
 import { storage } from "./storage";
+import { createLazyOpenAIClient } from "./openai-client";
 
-const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-});
+const openai = createLazyOpenAIClient();
 
 const BLOG_TOPICS = [
   "Benefits of E-2 visa investment through property management franchises",

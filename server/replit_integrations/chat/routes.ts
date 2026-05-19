@@ -1,11 +1,8 @@
 import type { Express, Request, Response } from "express";
-import OpenAI from "openai";
 import { chatStorage } from "./storage";
+import { createLazyOpenAIClient } from "../../openai-client";
 
-const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-});
+const openai = createLazyOpenAIClient();
 
 export function registerChatRoutes(app: Express): void {
   // Get all conversations
@@ -115,4 +112,3 @@ export function registerChatRoutes(app: Express): void {
     }
   });
 }
-

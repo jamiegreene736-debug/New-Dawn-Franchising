@@ -5,7 +5,6 @@ import { sendEmailFromSender } from "./email-service";
 import { verifyEmail } from "./zerobounce-service";
 import { lookupPhone } from "./twilio-lookup";
 import { extractPhoneFromText } from "./people-finder";
-import OpenAI from "openai";
 import { ImapFlow } from "imapflow";
 import { monitorReddit, monitorQuora } from "./apify-service";
 import { scanForumsForOpportunities } from "./forum-scanner";
@@ -15,11 +14,9 @@ import {
 } from "./slack-service";
 import { sendAgentSms } from "./agent-sms-service";
 import { buildLanguageInstructions, getLanguageLabel } from "./language-detection";
+import { createLazyOpenAIClient } from "./openai-client";
 
-const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-});
+const openai = createLazyOpenAIClient();
 
 const DYLAN_EMAIL = "dylan@newdawnfranchising.com";
 const FROM_EMAIL = "dylan@newdawnfranchising.com";

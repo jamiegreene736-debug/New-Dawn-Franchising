@@ -264,7 +264,7 @@ function HomepageVideoVisual({ isPlaying }: { isPlaying: boolean }) {
   );
 }
 
-function HomepageOverviewVideo() {
+function HomepageVideoCard({ hero = false }: { hero?: boolean }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [audioUrl, setAudioUrl] = useState("");
   const [isPlaying, setIsPlaying] = useState(false);
@@ -304,87 +304,63 @@ function HomepageOverviewVideo() {
   };
 
   return (
-    <section data-testid="section-homepage-video" className="relative overflow-hidden border-b bg-[linear-gradient(180deg,#ffffff_0%,#f5f8fb_48%,#eef4f1_100%)] py-10 md:py-24">
-      <div className="nh-container">
-        <div className="grid items-center gap-8 lg:grid-cols-[0.9fr_1.1fr]">
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-[0.22em] text-foreground/55">30-second overview</div>
-            <h2 className="mt-3 text-balance text-3xl font-semibold leading-tight md:text-5xl">
-              See the New Dawn model in half a minute.
-            </h2>
-            <p className="mt-4 max-w-xl text-pretty text-base leading-relaxed text-muted-foreground md:text-lg">
-              A short homepage explainer covering the E-2 structure, owner control, managed operations, investor protections, and the senior team behind the platform.
-            </p>
-
-            <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-              <Button data-testid="button-video-play" className="gap-2" onClick={togglePlayback} disabled={status === "loading"}>
-                {isPlaying ? <Pause className="size-4" /> : <Play className="size-4" />}
-                {status === "loading" ? "Loading voiceover..." : isPlaying ? "Pause voiceover" : "Play 30-sec overview"}
-              </Button>
-              <Button data-testid="button-video-fdd" variant="secondary" className="gap-2" asChild>
-                <a href="/contact">Request FDD & overview</a>
-              </Button>
-            </div>
-            {status === "error" && (
-              <p className="mt-3 text-sm text-red-600">
-                Voiceover is not available yet. Check `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` in Railway.
-              </p>
-            )}
+    <div className="relative">
+      <button
+        type="button"
+        data-testid={hero ? "hero-video-preview-card" : "video-preview-card"}
+        onClick={togglePlayback}
+        disabled={status === "loading"}
+        className="group block w-full overflow-hidden rounded-[2rem] border border-white/70 bg-[hsl(var(--primary))] text-left shadow-2xl transition hover:-translate-y-0.5 hover:shadow-[0_30px_80px_rgba(15,23,42,0.26)] disabled:cursor-wait"
+      >
+        <div className={`relative p-4 text-white md:p-6 ${hero ? "min-h-[560px]" : "min-h-[520px]"}`}>
+          <div className="absolute inset-0 opacity-25 nh-fine-grid" />
+          <div className="absolute inset-x-0 top-0 h-36 bg-[linear-gradient(180deg,rgba(255,255,255,.16),transparent)]" />
+          <div className="absolute right-5 top-5 z-20 rounded-full border border-white/20 bg-black/25 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/80 backdrop-blur">
+            {isPlaying ? "Playing" : "Video overview"}
           </div>
 
-          <div className="relative">
-            <button
-              type="button"
-              data-testid="video-preview-card"
-              onClick={togglePlayback}
-              disabled={status === "loading"}
-              className="group block w-full overflow-hidden rounded-[2rem] border border-white/70 bg-[hsl(var(--primary))] text-left shadow-2xl transition hover:-translate-y-0.5 hover:shadow-[0_30px_80px_rgba(15,23,42,0.26)] disabled:cursor-wait"
-            >
-              <div className="relative min-h-[520px] p-4 text-white md:p-6">
-                <div className="absolute inset-0 opacity-25 nh-fine-grid" />
-                <div className="absolute inset-x-0 top-0 h-36 bg-[linear-gradient(180deg,rgba(255,255,255,.16),transparent)]" />
-                <div className="absolute right-5 top-5 z-20 rounded-full border border-white/20 bg-black/25 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/80 backdrop-blur">
-                  {isPlaying ? "Playing" : "Video preview"}
-                </div>
+          <div className="relative flex items-center justify-between">
+            <div>
+              <div className="text-xs uppercase tracking-[0.2em] text-white/55">New Dawn Franchising</div>
+              <div className="mt-1 font-serif text-2xl text-white md:text-3xl">You Own It. You Direct It. We Run It.</div>
+            </div>
+            <div className="grid size-12 place-items-center rounded-full border border-white/20 bg-white/10">
+              <Volume2 className="size-5 text-[hsl(var(--accent))]" />
+            </div>
+          </div>
 
-                <div className="relative flex items-center justify-between">
-                  <div>
-                    <div className="text-xs uppercase tracking-[0.2em] text-white/55">New Dawn Franchising</div>
-                    <div className="mt-1 font-serif text-2xl text-white">You Own It. You Direct It. We Run It.</div>
-                  </div>
-                  <div className="grid size-12 place-items-center rounded-full border border-white/20 bg-white/10">
-                    <Volume2 className="size-5 text-[hsl(var(--accent))]" />
-                  </div>
-                </div>
+          <div className="mt-6">
+            <HomepageVideoVisual isPlaying={isPlaying} />
+          </div>
 
-                <HomepageVideoVisual isPlaying={isPlaying} />
-
-                <div className="relative mt-5 grid gap-3 md:grid-cols-2">
-                  {VIDEO_SCENES.map((scene, index) => (
-                    <div
-                      key={scene.time}
-                      className={`rounded-2xl border border-white/15 bg-white/[0.08] p-4 backdrop-blur transition ${
-                        isPlaying ? "animate-[pulse_2.8s_ease-in-out_infinite]" : ""
-                      }`}
-                      style={{ animationDelay: `${index * 0.35}s` }}
-                    >
-                      <div className="text-xs font-semibold text-[hsl(var(--accent))]">{scene.time}</div>
-                      <div className="mt-2 text-sm font-semibold">{scene.title}</div>
-                      <div className="mt-2 text-xs leading-relaxed text-white/65">{scene.copy}</div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="relative mt-6 h-2 overflow-hidden rounded-full bg-white/15">
-                  <div className={`h-full rounded-full bg-[hsl(var(--accent))] ${isPlaying ? "animate-[overview-progress_30s_linear_forwards]" : "w-[18%]"}`} />
-                </div>
+          <div className="relative mt-5 grid gap-3 md:grid-cols-2">
+            {VIDEO_SCENES.map((scene, index) => (
+              <div
+                key={scene.time}
+                className={`rounded-2xl border border-white/15 bg-white/[0.08] p-4 backdrop-blur transition ${
+                  isPlaying ? "animate-[pulse_2.8s_ease-in-out_infinite]" : ""
+                }`}
+                style={{ animationDelay: `${index * 0.35}s` }}
+              >
+                <div className="text-xs font-semibold text-[hsl(var(--accent))]">{scene.time}</div>
+                <div className="mt-2 text-sm font-semibold">{scene.title}</div>
+                <div className="mt-2 text-xs leading-relaxed text-white/65">{scene.copy}</div>
               </div>
-            </button>
-            <audio ref={audioRef} onEnded={() => setIsPlaying(false)} preload="none" />
+            ))}
+          </div>
+
+          <div className="relative mt-6 h-2 overflow-hidden rounded-full bg-white/15">
+            <div className={`h-full rounded-full bg-[hsl(var(--accent))] ${isPlaying ? "animate-[overview-progress_30s_linear_forwards]" : "w-[18%]"}`} />
           </div>
         </div>
-      </div>
-    </section>
+      </button>
+      {status === "error" && (
+        <p className="mt-3 text-sm text-red-600">
+          Voiceover is not available yet. Check `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` in Railway.
+        </p>
+      )}
+      <audio ref={audioRef} onEnded={() => setIsPlaying(false)} preload="none" />
+    </div>
   );
 }
 
@@ -436,6 +412,76 @@ function ProtectionStrip() {
   );
 }
 
+const HOMEPAGE_TEAM = [
+  {
+    name: "Dylan Delaney",
+    role: "Founding Member",
+    focus: "Franchise development and investor launch",
+    image: "/dylan-headshot.png",
+  },
+  {
+    name: "Chris von Pohlot",
+    role: "Managing Director",
+    focus: "Alternative finance, real estate, and capital markets",
+    image: "/chris-von-pohlot.jpg",
+  },
+  {
+    name: "Tom Meister",
+    role: "Founding Member",
+    focus: "Fintech, specialty finance, and legal strategy",
+    image: "/tom-meister.jpg",
+  },
+];
+
+function HomepageTeamRow() {
+  return (
+    <section data-testid="section-homepage-team" className="border-b bg-[linear-gradient(180deg,#ffffff_0%,#f7faf8_100%)] py-10 md:py-18">
+      <div className="nh-container">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-[0.22em] text-foreground/55">Senior team</div>
+            <h2 className="mt-2 text-3xl font-semibold tracking-tight md:text-4xl">
+              The people behind the platform.
+            </h2>
+          </div>
+          <p className="max-w-xl text-sm leading-relaxed text-muted-foreground md:text-right">
+            New Dawn combines franchise development, real estate, finance, and legal experience so investors are backed by operators who understand both the business and the visa pathway.
+          </p>
+        </div>
+
+        <div className="mt-8 grid gap-4 md:grid-cols-3">
+          {HOMEPAGE_TEAM.map((member) => (
+            <div key={member.name} className="overflow-hidden rounded-3xl border bg-white shadow-sm">
+              <div className="aspect-[4/3] overflow-hidden bg-[hsl(var(--primary))]">
+                <img
+                  src={member.image}
+                  alt={`${member.name} — ${member.role}`}
+                  className="h-full w-full object-cover object-center transition duration-500 hover:scale-105"
+                  loading="lazy"
+                />
+              </div>
+              <div className="p-5">
+                <div className="text-lg font-semibold">{member.name}</div>
+                <div className="mt-1 text-sm font-medium text-[hsl(var(--primary))]">{member.role}</div>
+                <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{member.focus}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-7 flex justify-center">
+          <Button data-testid="button-homepage-team" variant="secondary" className="gap-2" asChild>
+            <Link href="/team">
+              Meet the full team
+              <ArrowRight className="size-4" />
+            </Link>
+          </Button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 // ── E-2 FAQ Accordion ─────────────────────────────────────────────────────────
 const E2_FAQ_ITEMS = [
   { q: "How much do I need to invest?", a: "There is no fixed minimum, but the investment must be \"substantial\" relative to the cost of the business. Most E-2 investors invest $100,000 or more. Our franchise packages start at $250,000, which is designed to clearly meet the substantiality requirement." },
@@ -483,7 +529,7 @@ export default function Home() {
           <div className="absolute inset-0 -z-10 nh-hero-bg" />
           <div className="absolute inset-0 -z-10 opacity-60 nh-fine-grid" />
           <div className="nh-container py-4 md:py-14">
-            <div className="grid items-start gap-10 md:grid-cols-[1.1fr_.9fr]">
+            <div className="grid items-start gap-10 lg:grid-cols-[0.82fr_1.18fr]">
               <motion.div
                 initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -602,100 +648,17 @@ export default function Home() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.7, ease: "easeOut", delay: 0.05 }}
-                className="relative md:sticky md:top-24"
+                className="relative order-first lg:order-none"
               >
-                <div className="nh-surface nh-noise relative overflow-hidden rounded-3xl border border-card-border/80 p-6">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <div
-                        data-testid="text-card-title"
-                        className="text-sm font-semibold tracking-wide text-foreground/80"
-                      >
-                        Franchise snapshot
-                      </div>
-                      <div
-                        data-testid="text-card-subtitle"
-                        className="mt-1 text-2xl font-semibold"
-                      >
-                        Simple, investor-ready operations
-                      </div>
-                    </div>
-                    <div className="rounded-2xl border bg-white/70 p-3 shadow-sm">
-                      <Landmark className="size-6 text-[hsl(var(--accent))]" />
-                    </div>
-                  </div>
-
-                  <div className="mt-6 grid gap-3">
-                    {[
-                      {
-                        k: "Location",
-                        v: "El Paso, Texas",
-                        id: "territory",
-                      },
-                      {
-                        k: "Initial portfolio",
-                        v: "10 long-term rental management contracts",
-                        id: "network",
-                      },
-                      {
-                        k: "Operating model",
-                        v: "Professionally operated with full owner control",
-                        id: "model",
-                      },
-                      { k: "Ideal owner", v: "E-2 visa investor", id: "owner" },
-                    ].map((row) => (
-                      <div
-                        key={row.id}
-                        data-testid={`row-snapshot-${row.id}`}
-                        className="flex items-start justify-between gap-4 rounded-2xl border bg-white/60 px-4 py-3 backdrop-blur"
-                      >
-                        <div className="text-sm font-semibold text-foreground/80">{row.k}</div>
-                        <div className="text-right text-sm text-muted-foreground">{row.v}</div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="mt-6 rounded-2xl border bg-[hsl(var(--primary))] p-4 text-[hsl(var(--primary-foreground))] shadow-sm">
-                    <div data-testid="text-card-cta" className="text-sm font-semibold">
-                      Want a territory in Texas?
-                    </div>
-                    <div className="mt-1 text-sm opacity-90">
-                      Get the overview deck + next steps.
-                    </div>
-                    <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                      <Button
-                        data-testid="button-card-email"
-                        variant="secondary"
-                        className="gap-2 bg-white/90 text-foreground hover:bg-white"
-                        asChild
-                      >
-                        <a href="/contact">
-                          <Mail className="size-4" />
-                          Contact us
-                        </a>
-                      </Button>
-                      <Button
-                        data-testid="button-card-scroll"
-                        className="gap-2 bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))] hover:bg-[hsl(var(--accent))]/90"
-                        asChild
-                      >
-                        <a href="#contact">
-                          Request info
-                          <ArrowRight className="size-4" />
-                        </a>
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-
+                <HomepageVideoCard hero />
                 <div className="pointer-events-none absolute -inset-6 -z-10 rounded-[2.5rem] bg-gradient-to-tr from-[hsl(var(--accent))]/15 via-transparent to-[hsl(var(--primary))]/15 blur-2xl" />
               </motion.div>
             </div>
           </div>
         </section>
 
-        <HomepageOverviewVideo />
         <ProtectionStrip />
+        <HomepageTeamRow />
 
         {/* ── Embassy Wait Time Checker ── */}
         <section data-testid="section-embassy" className="border-b bg-gradient-to-br from-[#0f172a] via-[#0f2744] to-[#0a3d2e] py-8 md:py-18 relative overflow-hidden">

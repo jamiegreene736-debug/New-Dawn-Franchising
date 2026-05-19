@@ -219,10 +219,19 @@ function HomepageOverviewVideo() {
           </div>
 
           <div className="relative">
-            <div className="overflow-hidden rounded-[2rem] border border-white/70 bg-[hsl(var(--primary))] shadow-2xl">
-              <div className="relative min-h-[430px] p-5 text-white md:p-7">
+            <button
+              type="button"
+              data-testid="video-preview-card"
+              onClick={togglePlayback}
+              disabled={status === "loading"}
+              className="group block w-full overflow-hidden rounded-[2rem] border border-white/70 bg-[hsl(var(--primary))] text-left shadow-2xl transition hover:-translate-y-0.5 hover:shadow-[0_30px_80px_rgba(15,23,42,0.26)] disabled:cursor-wait"
+            >
+              <div className="relative min-h-[520px] p-4 text-white md:p-6">
                 <div className="absolute inset-0 opacity-25 nh-fine-grid" />
                 <div className="absolute inset-x-0 top-0 h-36 bg-[linear-gradient(180deg,rgba(255,255,255,.16),transparent)]" />
+                <div className="absolute right-5 top-5 z-20 rounded-full border border-white/20 bg-black/25 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/80 backdrop-blur">
+                  {isPlaying ? "Playing" : "Video preview"}
+                </div>
 
                 <div className="relative flex items-center justify-between">
                   <div>
@@ -234,7 +243,53 @@ function HomepageOverviewVideo() {
                   </div>
                 </div>
 
-                <div className="relative mt-7 grid gap-3 md:grid-cols-2">
+                <div className="relative mt-6 overflow-hidden rounded-3xl border border-white/15 bg-black/25 shadow-2xl">
+                  <div className="grid min-h-[230px] grid-cols-[1.2fr_0.8fr]">
+                    <div className="relative overflow-hidden bg-[linear-gradient(135deg,#dfe9f3_0%,#fff8e8_55%,#d8efe6_100%)]">
+                      <div className="absolute inset-x-0 bottom-0 h-20 bg-[linear-gradient(180deg,transparent,rgba(16,42,70,.28))]" />
+                      <div className="absolute left-6 top-7 rounded-2xl border border-white/70 bg-white/75 px-4 py-3 text-[hsl(var(--primary))] shadow-xl backdrop-blur">
+                        <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/45">Texas territory</div>
+                        <div className="mt-1 text-sm font-semibold">Long-term rental portfolio</div>
+                      </div>
+                      <div className="absolute bottom-8 left-10 h-20 w-28 rounded-t-2xl border border-white/80 bg-white shadow-lg" />
+                      <div className="absolute bottom-8 left-36 h-16 w-24 rounded-t-2xl border border-white/70 bg-[#f4ead6] shadow-lg" />
+                      <div className="absolute bottom-8 left-60 h-24 w-32 rounded-t-3xl border border-white/70 bg-[#e8f0f4] shadow-lg" />
+                      <div className="absolute bottom-28 left-20 h-10 w-10 rounded-full bg-[hsl(var(--accent))]/80 blur-[1px]" />
+                      <div className="absolute bottom-5 left-0 right-0 h-10 bg-[#486a4c]/30" />
+                    </div>
+                    <div className="relative border-l border-white/10 bg-white/[0.07] p-4">
+                      <div className="rounded-2xl border border-white/15 bg-white/[0.08] p-3">
+                        <div className="text-[10px] uppercase tracking-[0.16em] text-white/45">Owner dashboard</div>
+                        <div className="mt-3 space-y-2">
+                          <div className="h-2 rounded-full bg-white/20"><div className="h-2 w-[82%] rounded-full bg-[hsl(var(--accent))]" /></div>
+                          <div className="h-2 rounded-full bg-white/20"><div className="h-2 w-[64%] rounded-full bg-emerald-400" /></div>
+                          <div className="h-2 rounded-full bg-white/20"><div className="h-2 w-[72%] rounded-full bg-sky-300" /></div>
+                        </div>
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        <div className="rounded-xl border border-white/10 bg-white/[0.08] p-3">
+                          <div className="text-lg font-bold text-[hsl(var(--accent))]">300+</div>
+                          <div className="text-[10px] text-white/55">contracts</div>
+                        </div>
+                        <div className="rounded-xl border border-white/10 bg-white/[0.08] p-3">
+                          <div className="text-lg font-bold text-[hsl(var(--accent))]">90</div>
+                          <div className="text-[10px] text-white/55">days</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="absolute inset-0 grid place-items-center">
+                    <div className="grid size-20 place-items-center rounded-full border border-white/50 bg-white/20 shadow-[0_0_0_12px_rgba(255,255,255,0.10)] backdrop-blur transition group-hover:scale-105">
+                      {isPlaying ? <Pause className="size-9 fill-white text-white" /> : <Play className="ml-1 size-9 fill-white text-white" />}
+                    </div>
+                  </div>
+                  <div className="absolute bottom-4 left-4 rounded-full border border-white/20 bg-black/35 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
+                    Watch the 30-second overview
+                  </div>
+                </div>
+
+                <div className="relative mt-5 grid gap-3 md:grid-cols-2">
                   {VIDEO_SCENES.map((scene, index) => (
                     <div
                       key={scene.time}
@@ -250,33 +305,64 @@ function HomepageOverviewVideo() {
                   ))}
                 </div>
 
-                <div className="relative mt-7 rounded-3xl border border-white/15 bg-white/[0.09] p-5">
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <div>
-                      <div className="text-2xl font-bold text-[hsl(var(--accent))]">300+</div>
-                      <div className="text-xs text-white/60">active contracts</div>
-                    </div>
-                    <div>
-                      <div className="text-2xl font-bold text-[hsl(var(--accent))]">90 days</div>
-                      <div className="text-xs text-white/60">contract replacement</div>
-                    </div>
-                    <div>
-                      <div className="text-2xl font-bold text-[hsl(var(--accent))]">10+ yrs</div>
-                      <div className="text-xs text-white/60">team experience</div>
-                    </div>
-                  </div>
-                </div>
-
                 <div className="relative mt-6 h-2 overflow-hidden rounded-full bg-white/15">
                   <div className={`h-full rounded-full bg-[hsl(var(--accent))] ${isPlaying ? "animate-[overview-progress_30s_linear_forwards]" : "w-[18%]"}`} />
                 </div>
               </div>
-            </div>
+            </button>
             <audio ref={audioRef} onEnded={() => setIsPlaying(false)} preload="none" />
           </div>
         </div>
       </div>
     </section>
+  );
+}
+
+function ProtectionStrip() {
+  const items = [
+    {
+      title: "Your funds",
+      text: "Held in escrow until your E-2 visa is approved",
+      icon: <Landmark className="size-5" />,
+      tone: "bg-blue-50 text-blue-700 border-blue-100",
+    },
+    {
+      title: "Your business",
+      text: "Operational and earning before funds are released",
+      icon: <TrendingUp className="size-5" />,
+      tone: "bg-emerald-50 text-emerald-700 border-emerald-100",
+    },
+    {
+      title: "If your visa isn't approved",
+      text: "Your investment is returned from escrow",
+      icon: <RotateCcw className="size-5" />,
+      tone: "bg-amber-50 text-amber-700 border-amber-100",
+    },
+  ];
+
+  return (
+    <div data-testid="section-trust-strip" className="border-y bg-white/90 py-7 shadow-sm md:py-10">
+      <div className="nh-container">
+        <div className="mx-auto max-w-5xl">
+          <div className="grid gap-4 md:grid-cols-3">
+            {items.map((item) => (
+              <div key={item.title} className="flex items-start gap-4 rounded-2xl border bg-white p-5 shadow-sm">
+                <div className={`grid size-12 shrink-0 place-items-center rounded-2xl border ${item.tone}`}>
+                  {item.icon}
+                </div>
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{item.title}</div>
+                  <div className="mt-1 text-base font-semibold leading-snug text-foreground">{item.text}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="mt-5 text-center text-sm text-muted-foreground">
+            Structured investment with built-in investor protection. Full details provided in the Franchise Disclosure Document.
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -544,44 +630,8 @@ export default function Home() {
           </div>
         </section>
 
-        {/* ── Addition 1: Escrow Trust Strip ── */}
-        <div data-testid="section-trust-strip" className="border-y bg-white/80 py-6 shadow-sm md:py-8">
-          <div className="nh-container">
-            <div className="mx-auto max-w-4xl">
-              <div className="flex flex-col divide-y md:flex-row md:divide-x md:divide-y-0 divide-border">
-                {/* Item 1 */}
-                <div className="flex flex-1 items-start gap-4 px-4 py-4 md:py-2 md:px-8 first:pl-0 last:pr-0">
-                  <Shield className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
-                  <div>
-                    <div className="text-xs text-muted-foreground">Your funds</div>
-                    <div className="text-sm text-foreground">Held in escrow until your visa is approved</div>
-                  </div>
-                </div>
-                {/* Item 2 */}
-                <div className="flex flex-1 items-start gap-4 px-4 py-4 md:py-2 md:px-8">
-                  <TrendingUp className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
-                  <div>
-                    <div className="text-xs text-muted-foreground">Your business</div>
-                    <div className="text-sm text-foreground">Operational and earning before funds are released</div>
-                  </div>
-                </div>
-                {/* Item 3 */}
-                <div className="flex flex-1 items-start gap-4 px-4 py-4 md:py-2 md:px-8 last:pr-0">
-                  <RotateCcw className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
-                  <div>
-                    <div className="text-xs text-muted-foreground">If your visa isn't approved</div>
-                    <div className="text-sm text-foreground">Your investment is returned from escrow</div>
-                  </div>
-                </div>
-              </div>
-              <p className="mt-5 text-center text-xs text-muted-foreground">
-                Structured investment with built-in investor protection. Full details provided in the Franchise Disclosure Document.
-              </p>
-            </div>
-          </div>
-        </div>
-
         <HomepageOverviewVideo />
+        <ProtectionStrip />
 
         {/* ── Embassy Wait Time Checker ── */}
         <section data-testid="section-embassy" className="border-b bg-gradient-to-br from-[#0f172a] via-[#0f2744] to-[#0a3d2e] py-8 md:py-18 relative overflow-hidden">

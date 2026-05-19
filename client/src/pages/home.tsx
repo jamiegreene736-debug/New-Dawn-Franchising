@@ -198,7 +198,7 @@ function HomepageOverviewVideo() {
               See the New Dawn model in half a minute.
             </h2>
             <p className="mt-4 max-w-xl text-pretty text-base leading-relaxed text-muted-foreground md:text-lg">
-              A short homepage explainer with your ElevenLabs voiceover: E-2 structure, owner control, managed operations, investor protections, and the senior team behind the platform.
+              A short homepage explainer covering the E-2 structure, owner control, managed operations, investor protections, and the senior team behind the platform.
             </p>
 
             <div className="mt-7 flex flex-col gap-3 sm:flex-row">

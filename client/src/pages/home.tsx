@@ -36,7 +36,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { Link } from "wouter";
 import { EmbassyCheckerModal } from "@/components/embassy-checker";
 
@@ -492,45 +491,39 @@ export default function Home() {
                   Franchise Disclosure Document (FDD) available upon request. New Dawn Franchising is a registered franchisor.
                 </p>
 
-                <div className="mt-7 grid gap-3 rounded-2xl border bg-white/60 p-4 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/40 md:max-w-xl">
-                  <div className="flex items-start gap-3">
-                    <Wallet className="mt-0.5 size-5 text-[hsl(var(--primary))]" />
-                    <div>
-                      <div data-testid="text-hero-proof-1" className="text-sm font-semibold">
-                        You keep financial control
+                <div className="mt-6 grid gap-3 rounded-2xl border bg-white/70 p-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/50 md:max-w-3xl md:grid-cols-3">
+                  {[
+                    {
+                      id: "1",
+                      icon: <Wallet className="size-4 text-[hsl(var(--primary))]" />,
+                      title: "Financial control",
+                      desc: "Direct oversight of accounts and reporting.",
+                    },
+                    {
+                      id: "2",
+                      icon: <Building2 className="size-4 text-[hsl(var(--primary))]" />,
+                      title: "Portfolio-first",
+                      desc: "~10 long-term rental contracts per territory rep.",
+                    },
+                    {
+                      id: "3",
+                      icon: <ClipboardCheck className="size-4 text-[hsl(var(--primary))]" />,
+                      title: "Managed daily ops",
+                      desc: "Territory manager handles execution.",
+                    },
+                  ].map((item) => (
+                    <div key={item.id} className="flex items-start gap-2.5 rounded-xl bg-white/60 p-3">
+                      <div className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg bg-[hsl(var(--primary))]/8">
+                        {item.icon}
                       </div>
-                      <div className="text-sm text-muted-foreground">
-                        Operate your business with direct oversight of accounts and reporting — while
-                        your territory representative handles execution.
-                      </div>
-                    </div>
-                  </div>
-                  <Separator />
-                  <div className="flex items-start gap-3">
-                    <Building2 className="mt-0.5 size-5 text-[hsl(var(--primary))]" />
-                    <div>
-                      <div data-testid="text-hero-proof-2" className="text-sm font-semibold">
-                        Portfolio-first structure
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        Each approved territory representative manages an initial portfolio of ~10
-                        long-term single-family rental management contracts.
-                      </div>
-                    </div>
-                  </div>
-                  <Separator />
-                  <div className="flex items-start gap-3">
-                    <ClipboardCheck className="mt-0.5 size-5 text-[hsl(var(--primary))]" />
-                    <div>
-                      <div data-testid="text-hero-proof-3" className="text-sm font-semibold">
-                        Territory-approved manager
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        We implement a territory-approved manager who handles the day-to-day operations
-                        of your franchise — while you maintain full control of the business and its finances.
+                      <div>
+                        <div data-testid={`text-hero-proof-${item.id}`} className="text-sm font-semibold leading-tight">
+                          {item.title}
+                        </div>
+                        <div className="mt-1 text-xs leading-snug text-muted-foreground">{item.desc}</div>
                       </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
               </motion.div>
 

@@ -73,7 +73,7 @@ const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "dylan@newdawnfranchising.com").
 const ADMIN_PASSWORD = (process.env.ADMIN_PASSWORD || "NewHorizons@12").trim();
 
 const HOMEPAGE_OVERVIEW_VOICEOVER =
-  "New Dawn Franchising was built for E-2 visa investors. You own the business, control the finances, and direct the strategy, while our team handles daily property management operations. Your Texas franchise is backed by more than three hundred active management contracts, escrow protection, and a ninety day contract replacement guarantee. With senior leadership across real estate, finance, law, and proprietary AI technology, New Dawn gives you a structured path to live anywhere in the United States while building a real operating business.";
+  "New Dawn Franchising was built for E-2 visa investors. You own the business, control the finances, and direct the strategy, while our team handles daily property management operations. Your Texas franchise starts with ten long-term rental management contracts, plus escrow protection and a ninety day contract replacement guarantee. With senior leadership across real estate, finance, law, and proprietary AI technology, New Dawn gives you a structured path to live anywhere in the United States while building a real operating business.";
 
 function getElevenLabsConfig() {
   const apiKey =

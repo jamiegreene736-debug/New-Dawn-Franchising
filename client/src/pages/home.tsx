@@ -140,7 +140,7 @@ const VIDEO_SCENES = [
   {
     time: "0:13",
     title: "Texas property management",
-    copy: "Long-term rental operations backed by 300+ active management contracts.",
+    copy: "Each franchise territory starts with 10 long-term rental management contracts.",
   },
   {
     time: "0:20",
@@ -267,8 +267,8 @@ function HomepageOverviewVideo() {
                       </div>
                       <div className="mt-3 grid grid-cols-2 gap-2">
                         <div className="rounded-xl border border-white/10 bg-white/[0.08] p-3">
-                          <div className="text-lg font-bold text-[hsl(var(--accent))]">300+</div>
-                          <div className="text-[10px] text-white/55">contracts</div>
+                          <div className="text-lg font-bold text-[hsl(var(--accent))]">10</div>
+                          <div className="text-[10px] text-white/55">starting contracts</div>
                         </div>
                         <div className="rounded-xl border border-white/10 bg-white/[0.08] p-3">
                           <div className="text-lg font-bold text-[hsl(var(--accent))]">90</div>
@@ -562,8 +562,8 @@ export default function Home() {
                         id: "territory",
                       },
                       {
-                        k: "Network size",
-                        v: "300+ active management contracts",
+                        k: "Initial portfolio",
+                        v: "10 long-term rental management contracts",
                         id: "network",
                       },
                       {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
@@ -20,7 +20,9 @@ import {
   Landmark,
   Mail,
   MapPin,
+  Pause,
   Plane,
+  Play,
   Printer,
   Quote,
   RefreshCw,
@@ -29,6 +31,7 @@ import {
   ShieldCheck,
   TrendingUp,
   Users,
+  Volume2,
   Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -124,6 +127,159 @@ function FeatureCard({
   );
 }
 
+const VIDEO_SCENES = [
+  {
+    time: "0:00",
+    title: "Built for E-2 investors",
+    copy: "A real operating U.S. franchise structured around owner control.",
+  },
+  {
+    time: "0:06",
+    title: "You direct it. We run daily ops.",
+    copy: "You control the finances and decisions while our team handles execution.",
+  },
+  {
+    time: "0:13",
+    title: "Texas property management",
+    copy: "Long-term rental operations backed by 300+ active management contracts.",
+  },
+  {
+    time: "0:20",
+    title: "Protections and senior team",
+    copy: "Escrow, contract replacement, and leadership across real estate, finance, law, and AI.",
+  },
+];
+
+function HomepageOverviewVideo() {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [audioUrl, setAudioUrl] = useState("");
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
+
+  const playVoiceover = async () => {
+    try {
+      setStatus("loading");
+      let nextUrl = audioUrl;
+      if (!nextUrl) {
+        const res = await fetch("/api/homepage-overview-voiceover");
+        if (!res.ok) throw new Error("Voiceover unavailable");
+        const blob = await res.blob();
+        nextUrl = URL.createObjectURL(blob);
+        setAudioUrl(nextUrl);
+      }
+      const audio = audioRef.current;
+      if (!audio) return;
+      audio.src = nextUrl;
+      await audio.play();
+      setIsPlaying(true);
+      setStatus("idle");
+    } catch {
+      setStatus("error");
+      setIsPlaying(false);
+    }
+  };
+
+  const togglePlayback = async () => {
+    const audio = audioRef.current;
+    if (isPlaying && audio) {
+      audio.pause();
+      setIsPlaying(false);
+      return;
+    }
+    await playVoiceover();
+  };
+
+  return (
+    <section data-testid="section-homepage-video" className="relative overflow-hidden border-b bg-[linear-gradient(180deg,#ffffff_0%,#f5f8fb_48%,#eef4f1_100%)] py-10 md:py-24">
+      <div className="nh-container">
+        <div className="grid items-center gap-8 lg:grid-cols-[0.9fr_1.1fr]">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-[0.22em] text-foreground/55">30-second overview</div>
+            <h2 className="mt-3 text-balance text-3xl font-semibold leading-tight md:text-5xl">
+              See the New Dawn model in half a minute.
+            </h2>
+            <p className="mt-4 max-w-xl text-pretty text-base leading-relaxed text-muted-foreground md:text-lg">
+              A short homepage explainer with your ElevenLabs voiceover: E-2 structure, owner control, managed operations, investor protections, and the senior team behind the platform.
+            </p>
+
+            <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+              <Button data-testid="button-video-play" className="gap-2" onClick={togglePlayback} disabled={status === "loading"}>
+                {isPlaying ? <Pause className="size-4" /> : <Play className="size-4" />}
+                {status === "loading" ? "Loading voiceover..." : isPlaying ? "Pause voiceover" : "Play 30-sec overview"}
+              </Button>
+              <Button data-testid="button-video-fdd" variant="secondary" className="gap-2" asChild>
+                <a href="/contact">Request FDD & overview</a>
+              </Button>
+            </div>
+            {status === "error" && (
+              <p className="mt-3 text-sm text-red-600">
+                Voiceover is not available yet. Check `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` in Railway.
+              </p>
+            )}
+          </div>
+
+          <div className="relative">
+            <div className="overflow-hidden rounded-[2rem] border border-white/70 bg-[hsl(var(--primary))] shadow-2xl">
+              <div className="relative min-h-[430px] p-5 text-white md:p-7">
+                <div className="absolute inset-0 opacity-25 nh-fine-grid" />
+                <div className="absolute inset-x-0 top-0 h-36 bg-[linear-gradient(180deg,rgba(255,255,255,.16),transparent)]" />
+
+                <div className="relative flex items-center justify-between">
+                  <div>
+                    <div className="text-xs uppercase tracking-[0.2em] text-white/55">New Dawn Franchising</div>
+                    <div className="mt-1 font-serif text-2xl text-white">You Own It. You Direct It. We Run It.</div>
+                  </div>
+                  <div className="grid size-12 place-items-center rounded-full border border-white/20 bg-white/10">
+                    <Volume2 className="size-5 text-[hsl(var(--accent))]" />
+                  </div>
+                </div>
+
+                <div className="relative mt-7 grid gap-3 md:grid-cols-2">
+                  {VIDEO_SCENES.map((scene, index) => (
+                    <div
+                      key={scene.time}
+                      className={`rounded-2xl border border-white/15 bg-white/[0.08] p-4 backdrop-blur transition ${
+                        isPlaying ? "animate-[pulse_2.8s_ease-in-out_infinite]" : ""
+                      }`}
+                      style={{ animationDelay: `${index * 0.35}s` }}
+                    >
+                      <div className="text-xs font-semibold text-[hsl(var(--accent))]">{scene.time}</div>
+                      <div className="mt-2 text-sm font-semibold">{scene.title}</div>
+                      <div className="mt-2 text-xs leading-relaxed text-white/65">{scene.copy}</div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="relative mt-7 rounded-3xl border border-white/15 bg-white/[0.09] p-5">
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div>
+                      <div className="text-2xl font-bold text-[hsl(var(--accent))]">300+</div>
+                      <div className="text-xs text-white/60">active contracts</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-[hsl(var(--accent))]">90 days</div>
+                      <div className="text-xs text-white/60">contract replacement</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-[hsl(var(--accent))]">10+ yrs</div>
+                      <div className="text-xs text-white/60">team experience</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="relative mt-6 h-2 overflow-hidden rounded-full bg-white/15">
+                  <div className={`h-full rounded-full bg-[hsl(var(--accent))] ${isPlaying ? "animate-[overview-progress_30s_linear_forwards]" : "w-[18%]"}`} />
+                </div>
+              </div>
+            </div>
+            <audio ref={audioRef} onEnded={() => setIsPlaying(false)} preload="none" />
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 // ── E-2 FAQ Accordion ─────────────────────────────────────────────────────────
 const E2_FAQ_ITEMS = [
   { q: "How much do I need to invest?", a: "There is no fixed minimum, but the investment must be \"substantial\" relative to the cost of the business. Most E-2 investors invest $100,000 or more. Our franchise packages start at $250,000, which is designed to clearly meet the substantiality requirement." },
@@ -166,7 +322,7 @@ export default function Home() {
       <main data-testid="main-content" id="top">
         <section
           data-testid="section-hero"
-          className="relative isolate overflow-hidden border-b"
+          className="relative isolate overflow-hidden border-b bg-[linear-gradient(180deg,#f8fbff_0%,#eef5f4_100%)]"
         >
           <div className="absolute inset-0 -z-10 nh-hero-bg" />
           <div className="absolute inset-0 -z-10 opacity-60 nh-fine-grid" />
@@ -389,7 +545,7 @@ export default function Home() {
         </section>
 
         {/* ── Addition 1: Escrow Trust Strip ── */}
-        <div data-testid="section-trust-strip" className="border-y bg-background/60 py-6 md:py-8">
+        <div data-testid="section-trust-strip" className="border-y bg-white/80 py-6 shadow-sm md:py-8">
           <div className="nh-container">
             <div className="mx-auto max-w-4xl">
               <div className="flex flex-col divide-y md:flex-row md:divide-x md:divide-y-0 divide-border">
@@ -424,6 +580,8 @@ export default function Home() {
             </div>
           </div>
         </div>
+
+        <HomepageOverviewVideo />
 
         {/* ── Embassy Wait Time Checker ── */}
         <section data-testid="section-embassy" className="border-b bg-gradient-to-br from-[#0f172a] via-[#0f2744] to-[#0a3d2e] py-8 md:py-18 relative overflow-hidden">
@@ -523,7 +681,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section data-testid="section-tech" className="border-b bg-[hsl(var(--primary))] py-8 md:py-20">
+        <section data-testid="section-tech" className="border-b bg-[linear-gradient(180deg,hsl(var(--primary))_0%,#102a46_100%)] py-10 md:py-24">
           <div className="nh-container">
             <div className="mx-auto max-w-3xl text-center text-white">
               <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[hsl(var(--accent))]">Proprietary Technology. Built Exclusively for New Dawn Franchisees.</div>
@@ -552,7 +710,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section data-testid="section-how" id="how-it-works" className="py-8 md:py-20">
+        <section data-testid="section-how" id="how-it-works" className="bg-[linear-gradient(180deg,#f6f9fb_0%,#ffffff_100%)] py-10 md:py-24">
           <div className="nh-container">
             <SectionHeading
               testId="heading-how"
@@ -584,7 +742,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section data-testid="section-why" id="why-us" className="border-y bg-white/50 py-8 md:py-20">
+        <section data-testid="section-why" id="why-us" className="border-y bg-[linear-gradient(180deg,#ffffff_0%,#f4f8f6_100%)] py-10 md:py-24">
           <div className="nh-container">
             <SectionHeading
               testId="heading-why"
@@ -640,7 +798,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section data-testid="section-group" className="border-y bg-white/50 py-8 md:py-20">
+        <section data-testid="section-group" className="border-y bg-[linear-gradient(180deg,#f4f8f6_0%,#ffffff_100%)] py-10 md:py-24">
           <div className="nh-container">
             <SectionHeading
               testId="heading-group"
@@ -838,7 +996,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section data-testid="section-investment" id="investment" className="border-b py-8 md:py-20">
+        <section data-testid="section-investment" id="investment" className="border-b bg-[linear-gradient(180deg,#ffffff_0%,#f6f8fb_100%)] py-10 md:py-24">
           <div className="nh-container">
             <SectionHeading
               testId="heading-investment"
@@ -898,7 +1056,7 @@ export default function Home() {
         </section>
 
         {/* ── E-2 Visa Resources ── */}
-        <section data-testid="section-e2-resources" id="e2-resources" className="border-b py-8 md:py-20 bg-white/50">
+        <section data-testid="section-e2-resources" id="e2-resources" className="border-b bg-[linear-gradient(180deg,#f6f8fb_0%,#ffffff_100%)] py-10 md:py-24">
           <div className="nh-container">
             <SectionHeading
               testId="heading-e2-resources"
@@ -1054,7 +1212,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section data-testid="section-faq" id="faq" className="py-8 md:py-20">
+        <section data-testid="section-faq" id="faq" className="bg-[linear-gradient(180deg,#ffffff_0%,#f7faf9_100%)] py-10 md:py-24">
           <div className="nh-container">
             <SectionHeading
               testId="heading-faq"
@@ -1234,7 +1392,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section data-testid="section-contact" id="contact" className="border-t bg-white/40 py-8 md:py-20">
+        <section data-testid="section-contact" id="contact" className="border-t bg-[linear-gradient(180deg,#f7faf9_0%,#eef4f1_100%)] py-10 md:py-24">
           <div className="nh-container">
             <div className="mx-auto max-w-3xl rounded-3xl border bg-white/60 p-8 shadow-sm">
               <div className="text-xs font-semibold uppercase tracking-[0.22em] text-foreground/60">Get started</div>

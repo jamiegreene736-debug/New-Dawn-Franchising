@@ -72,6 +72,22 @@ import { callClaude } from "./chat-service";
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "dylan@newdawnfranchising.com").toLowerCase().trim();
 const ADMIN_PASSWORD = (process.env.ADMIN_PASSWORD || "NewHorizons@12").trim();
 
+const HOMEPAGE_OVERVIEW_VOICEOVER =
+  "New Dawn Franchising was built for E-2 visa investors. You own the business, control the finances, and direct the strategy, while our team handles daily property management operations. Your Texas franchise is backed by more than three hundred active management contracts, escrow protection, and a ninety day contract replacement guarantee. With senior leadership across real estate, finance, law, and proprietary AI technology, New Dawn gives you a structured path to live anywhere in the United States while building a real operating business.";
+
+function getElevenLabsConfig() {
+  const apiKey =
+    process.env.ELEVENLABS_API_KEY ||
+    process.env.ELEVEN_LABS_API_KEY ||
+    process.env.XI_API_KEY;
+  const voiceId =
+    process.env.ELEVENLABS_HOME_VOICE_ID ||
+    process.env.ELEVENLABS_VOICE_ID ||
+    process.env.ELEVEN_LABS_VOICE_ID;
+  const modelId = process.env.ELEVENLABS_MODEL_ID || "eleven_multilingual_v2";
+  return { apiKey, voiceId, modelId };
+}
+
 function requireBrokerAuth(req: Request, res: Response, next: () => void) {
   if (!req.session.brokerId) {
     return res.status(401).json({ message: "Not authenticated" });
@@ -335,6 +351,58 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  app.get("/api/homepage-overview-voiceover", async (_req, res) => {
+    const { apiKey, voiceId, modelId } = getElevenLabsConfig();
+    if (!apiKey || !voiceId) {
+      return res.status(503).json({
+        message: "ElevenLabs voiceover is not configured",
+        required: ["ELEVENLABS_API_KEY", "ELEVENLABS_VOICE_ID"],
+      });
+    }
+
+    try {
+      const elevenRes = await fetch(
+        `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "xi-api-key": apiKey,
+          },
+          body: JSON.stringify({
+            text: HOMEPAGE_OVERVIEW_VOICEOVER,
+            model_id: modelId,
+            voice_settings: {
+              stability: 0.52,
+              similarity_boost: 0.82,
+              style: 0.24,
+              use_speaker_boost: true,
+            },
+          }),
+        },
+      );
+
+      if (!elevenRes.ok) {
+        const text = await elevenRes.text();
+        return res.status(elevenRes.status).json({
+          message: "Failed to generate ElevenLabs voiceover",
+          detail: text.slice(0, 500),
+        });
+      }
+
+      const audio = Buffer.from(await elevenRes.arrayBuffer());
+      res.setHeader("Content-Type", "audio/mpeg");
+      res.setHeader("Cache-Control", "public, max-age=86400");
+      res.setHeader("Content-Length", String(audio.length));
+      return res.send(audio);
+    } catch (err: any) {
+      return res.status(500).json({
+        message: "Failed to generate homepage voiceover",
+        detail: err.message,
+      });
+    }
+  });
+
   // Serve logo at a stable URL for use in email signatures
   app.get("/email-logo.png", (_req, res) => {
     res.sendFile(path.resolve("attached_assets/Gemini_Generated_Image_t1u2o5t1u2o5t1u2_1771946732580.png"));

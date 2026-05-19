@@ -199,6 +199,15 @@
     opacity: 0.28;
     border-radius: inherit;
   }
+
+  @keyframes overview-progress {
+    from {
+      width: 0%;
+    }
+    to {
+      width: 100%;
+    }
+  }
 }
 
 /* Utility: hide scrollbar while keeping scroll functionality */

@@ -1,0 +1,232 @@
+Create a comprehensive test suite for the New Dawn Franchising AI 
+Outreach Agent application. Cover every major feature end-to-end.
+Use Vitest for unit/integration tests and Playwright for end-to-end
+UI tests.
+
+---
+
+## UNIT TESTS
+
+### Lead Scoring Engine
+- Test every scoring category returns the correct points for each input
+- Test a lead with all maximum signals scores exactly 100
+- Test a lead with no data scores 0
+- Test score decay reduces engagement score by 3pts after 30 days inactivity
+- Test score tier assignment: 80+ = HOT, 60-79 = WARM, 40-59 = NURTURE,
+  20-39 = WATCH, 0-19 = COLD
+- Test score override flag (manual "M" badge) prevents auto-recalculation
+- Test partial re-score only updates recency and responsiveness categories
+- Test full re-score updates all five categories
+
+### Daily Brief Reply Parser
+- Test plain "YES" triggers digital outreach execution
+- Test plain "NO" holds all sends
+- Test "YES but skip #2" executes all except item 2
+- Test "YES but skip #2 and #4" skips both items
+- Test "YES but edit #3: [new text]" updates message body before send
+- Test "SEND LETTER #L1" submits only letter L1 to Lob
+- Test "SEND ALL LETTERS" submits all pending letters to Lob
+- Test "YES SEND ALL LETTERS" triggers both digital and all letters
+- Test plain "YES" with no letter command does NOT submit any letters
+- Test reply from an unknown email address is rejected entirely
+- Test duplicate reply (same message ID processed twice) is ignored
+- Test "yes" lowercase is treated the same as "YES"
+- Test unclear reply body triggers Slack notification and no execution
+
+### Outreach Sequence Logic
+- Test Touch 1 is scheduled on Day 1 of enrollment
+- Test Touch 2 is scheduled on Day 4
+- Test Touch 3 is scheduled on Day 9
+- Test Touch 4 is scheduled on Day 16
+- Test sequence pauses when lead replies
+- Test sequence stops immediately when lead hits DNC list
+- Test sequence does not advance if previous touch has not been sent yet
+- Test WhatsApp fallback triggers after email bounce
+
+### DNC List Enforcement
+- Test lead on DNC list is excluded from daily batch staging
+- Test DNC check runs at send time not just at staging time
+- Test reply containing "unsubscribe" adds lead to DNC immediately
+- Test reply containing "stop" adds lead to DNC immediately
+- Test reply containing "not interested" adds lead to DNC immediately
+- Test DNC suppresses letter submissions to Lob for that lead
+- Test DNC cannot be overridden by a YES reply
+
+### Lob Integration
+- Test address validation is called before any letter is drafted
+- Test undeliverable address excludes lead from letter recommendations
+- Test letter is NOT submitted to Lob on a plain YES reply
+- Test letter IS submitted to Lob on "SEND LETTER #L1" reply
+- Test send_date is always set to next business day, never same day
+- Test cancellation is attempted if lead hits DNC within the window
+- Test Lob webhook updates letter status correctly for each event type:
+  letter.mailed → in_transit
+  letter.returned_to_sender → returned + Slack alert
+  letter.failed → failed + Slack alert
+- Test cost is recorded in DB after successful Lob submission
+- Test letter recommendations capped at configured max per day (default 5)
+
+### Email & WhatsApp Send Logic
+- Test emails have unsubscribe link in footer
+- Test emails have NDF physical address in footer
+- Test random delay between sends is between 30-90 seconds
+- Test WhatsApp random delay is between 60-180 seconds
+- Test daily email cap (80) is not exceeded
+- Test daily WhatsApp cap (30) is not exceeded
+- Test email send is idempotent (same message not sent twice)
+
+---
+
+## INTEGRATION TESTS
+
+### Daily Cron Pipeline (mock all external APIs)
+- Mock Apollo returning 3 new leads → verify all 3 are enriched,
+  scored, and staged correctly
+- Mock a lead scoring 85 with a valid address → verify letter draft
+  is generated and included in brief
+- Mock a lead scoring 65 → verify NO letter is drafted
+- Mock Lob address validation returning "undeliverable" → verify
+  lead is excluded from letter section of brief
+- Mock OpenAI returning letter body → verify merge variables are
+  correct in the Lob template payload
+- Run full 6 AM preparation job → verify daily batch is created
+  with correct staged message count
+- Run 7 AM briefing job → verify email is sent to
+  franchising@newdawnfranchising.com with correct subject line
+  "NDF Agent Daily Brief — [today's date]"
+
+### Gmail Reply Listener (mock Gmail API)
+- Mock a YES reply arriving at 8 AM → verify execution is triggered
+- Mock no reply arriving by 2 PM → verify batch is moved to
+  tomorrow's queue and marked "not executed"
+- Mock YES reply at 10:59 AM → verify Slack reminder was sent at
+  11 AM before the reply was processed
+- Mock reply arriving twice with same Gmail message ID → verify
+  execution only triggers once (idempotency)
+
+### Calendly Webhook
+- Mock a booking webhook → verify lead moves to "Call Scheduled"
+- Verify confirmation WhatsApp is staged for sending
+- Verify 24-hour reminder email is scheduled
+- Verify 1-hour reminder WhatsApp is scheduled
+- Verify post-call follow-up email is scheduled 2 hours after call
+
+### Lob Webhook
+- POST letter.mailed event → verify DB updates to "in_transit"
+- POST letter.returned_to_sender → verify DB updates to "returned"
+  and Slack notification fires
+- POST letter.failed → verify DB updates to "failed" and Slack fires
+
+---
+
+## END-TO-END TESTS (Playwright)
+
+### Onboarding Flow
+- Complete all 12 onboarding steps in order
+- Verify "Test passed: approval system working" appears after
+  the test YES reply is detected
+
+### Lead Discovery & Scoring
+- Navigate to /discovery
+- Verify leads table loads with score badges and tier labels
+- Click a lead → verify research dossier panel opens
+- Verify score breakdown shows all 5 category bars
+- Verify score history chart renders
+- Verify "What changed" tooltip appears on hover
+
+### Physical Mail UI States
+- Open a lead with score below 80 → verify "not eligible" panel
+- Open a lead with score 80+ and verified address → verify green banner
+- Click "Draft Letter Now" → verify loading state → verify draft appears
+- Click "Approve & Add to Today's Brief" → verify status changes
+- Verify the letter preview renders with NDF letterhead styling
+- Verify estimated cost displays correctly
+- Verify "Approve Now via Portal" button on STATE D triggers Lob submission
+
+### Daily Brief Approval via Dashboard
+- Navigate to / dashboard
+- Verify daily approval status banner is visible
+- Click "Approve All" button → verify status changes to "Approved — executing"
+- Verify activity feed updates with send confirmations
+
+### CRM Pipeline
+- Navigate to /crm
+- Verify kanban board renders all stages
+- Drag a lead card from "Contacted" to "Replied" → verify DB updates
+- Open a lead record → verify full activity timeline is visible
+- Add a manual note → verify it appears in the timeline
+
+### Letters Page
+- Navigate to /letters
+- Verify table shows all letter records with correct status badges
+- Verify filter by status works
+- Verify filter by country works
+- Verify CSV export downloads a file
+
+### Analytics
+- Navigate to /analytics
+- Verify funnel chart renders all stages
+- Verify all charts load without errors
+- Verify letter performance chart shows approved vs sent vs delivered
+
+### Demo Mode
+- Toggle "Demo Mode: ON" in nav bar
+- Verify all pages load with populated fake data
+- Verify demo daily brief email preview shows correct format
+  including the physical mail recommendations section
+- Toggle demo mode off → verify data clears
+
+---
+
+## API ENDPOINT TESTS (Supertest)
+
+Test every backend route returns the correct status code and shape:
+
+GET  /api/leads                 → 200, array of leads
+GET  /api/leads/:id             → 200, lead object with dossier
+POST /api/leads                 → 201, new lead created
+PATCH /api/leads/:id/score      → 200, score updated
+POST /api/leads/:id/dnc         → 200, lead added to DNC
+GET  /api/leads/:id/letters     → 200, array of letters for lead
+
+POST /api/letters/draft         → 201, letter draft created
+POST /api/letters/:id/approve   → 200, letter approved, submitted to Lob
+POST /api/letters/:id/cancel    → 200 or 409 if past cancellation window
+
+GET  /api/batches/today         → 200, today's batch
+POST /api/batches/today/approve → 200, batch approved
+POST /api/batches/today/hold    → 200, batch held
+
+POST /webhooks/lob              → 200 for all valid event types
+POST /webhooks/calendly         → 200, booking created
+
+GET  /api/analytics/funnel      → 200, funnel data
+GET  /api/analytics/letters     → 200, letter performance data
+
+--- 
+
+## TEST ENVIRONMENT SETUP
+
+Create a .env.test file with:
+- Test database (separate from production — use a test DB)
+- All external API calls mocked using msw (Mock Service Worker)
+- Mock responses for: OpenAI, Apollo, Hunter, Lob, Gmail,
+  WhatsApp, Calendly, Twilio, Slack, Apify, Serper
+
+Create a seed script for the test database:
+  npx prisma db seed --env test
+  Seed with: 10 leads across all score tiers, 1 HOT lead with
+  verified address ready for a letter, 1 active daily batch,
+  1 pending letter draft, 1 upcoming booking
+
+Add these scripts to package.json:
+  "test": "vitest run"
+  "test:watch": "vitest"
+  "test:e2e": "playwright test"
+  "test:coverage": "vitest run --coverage"
+  "test:all": "vitest run && playwright test"
+
+After all tests are written, run the full suite and fix any
+failures before considering the feature complete. Target:
+100% pass rate on unit tests, 100% pass rate on integration
+tests, 90%+ pass rate on E2E tests.

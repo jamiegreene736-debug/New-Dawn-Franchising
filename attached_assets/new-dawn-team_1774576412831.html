@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Our Team — New Dawn Franchising</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --dawn-gold:    #C9A84C;
+      --dawn-dark:    #1A1A2E;
+      --dawn-mid:     #2C2C4A;
+      --dawn-soft:    #F5F1EA;
+      --dawn-muted:   #8A8098;
+      --dawn-border:  rgba(201,168,76,0.2);
+      --card-bg:      #ffffff;
+      --radius:       4px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background-color: var(--dawn-soft);
+      color: var(--dawn-dark);
+      min-height: 100vh;
+    }
+
+    /* ── HERO ─────────────────────────────── */
+    .hero {
+      background: var(--dawn-dark);
+      padding: 100px 48px 80px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 60% 50% at 30% 60%, rgba(201,168,76,0.12) 0%, transparent 70%),
+        radial-gradient(ellipse 50% 40% at 75% 30%, rgba(201,168,76,0.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero-eyebrow {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--dawn-gold);
+      margin-bottom: 20px;
+    }
+    .hero h1 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(42px, 6vw, 72px);
+      font-weight: 500;
+      color: #fff;
+      line-height: 1.1;
+      max-width: 700px;
+      margin: 0 auto 24px;
+    }
+    .hero h1 em {
+      font-style: italic;
+      color: var(--dawn-gold);
+    }
+    .hero-sub {
+      font-size: 16px;
+      font-weight: 300;
+      color: rgba(255,255,255,0.6);
+      max-width: 520px;
+      margin: 0 auto;
+      line-height: 1.7;
+    }
+    .divider {
+      width: 48px;
+      height: 2px;
+      background: var(--dawn-gold);
+      margin: 32px auto 0;
+      opacity: 0.7;
+    }
+
+    /* ── GRID ─────────────────────────────── */
+    .section {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 80px 32px;
+    }
+    .section-label {
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--dawn-gold);
+      margin-bottom: 48px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .section-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--dawn-border);
+    }
+
+    .team-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 32px;
+    }
+
+    /* ── CARD ─────────────────────────────── */
+    .card {
+      background: var(--card-bg);
+      border: 1px solid rgba(0,0,0,0.07);
+      border-radius: 8px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.25s ease, box-shadow 0.25s ease;
+    }
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 20px 40px rgba(26,26,46,0.1);
+    }
+
+    .card-img-wrap {
+      width: 100%;
+      aspect-ratio: 4/3;
+      overflow: hidden;
+      background: var(--dawn-mid);
+      position: relative;
+    }
+    .card-img-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: top center;
+      display: block;
+      transition: transform 0.4s ease;
+    }
+    .card:hover .card-img-wrap img { transform: scale(1.04); }
+
+    /* placeholder when no photo */
+    .card-initials {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 52px;
+      font-weight: 600;
+      color: var(--dawn-gold);
+      opacity: 0.6;
+    }
+
+    .card-body { padding: 28px 28px 32px; flex: 1; display: flex; flex-direction: column; }
+
+    .card-badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--dawn-gold);
+      border: 1px solid var(--dawn-gold);
+      border-radius: 2px;
+      padding: 3px 10px;
+      margin-bottom: 14px;
+      align-self: flex-start;
+    }
+    .card-name {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 26px;
+      font-weight: 500;
+      color: var(--dawn-dark);
+      margin-bottom: 6px;
+      line-height: 1.15;
+    }
+    .card-org {
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      color: var(--dawn-muted);
+      text-transform: uppercase;
+      margin-bottom: 18px;
+    }
+    .card-bio {
+      font-size: 14px;
+      line-height: 1.75;
+      color: #444;
+      flex: 1;
+    }
+
+    .card-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 22px;
+    }
+    .tag {
+      font-size: 11px;
+      font-weight: 400;
+      color: var(--dawn-dark);
+      background: var(--dawn-soft);
+      border: 1px solid rgba(0,0,0,0.1);
+      border-radius: 100px;
+      padding: 4px 12px;
+    }
+
+    .card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding: 16px 28px;
+      border-top: 1px solid rgba(0,0,0,0.05);
+      gap: 12px;
+    }
+    .card-footer a {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--dawn-muted);
+      text-decoration: none;
+      letter-spacing: 0.04em;
+      transition: color 0.2s;
+    }
+    .card-footer a:hover { color: var(--dawn-gold); }
+    .card-footer a svg { vertical-align: middle; margin-right: 4px; }
+
+    /* ── FOUNDING MEMBER (larger card) ─────── */
+    .card.featured {
+      grid-column: span 2;
+      flex-direction: row;
+    }
+    .card.featured .card-img-wrap {
+      width: 280px;
+      min-width: 280px;
+      aspect-ratio: unset;
+      height: auto;
+    }
+    @media (max-width: 720px) {
+      .card.featured { grid-column: span 1; flex-direction: column; }
+      .card.featured .card-img-wrap { width: 100%; aspect-ratio: 4/3; height: auto; }
+    }
+
+    /* ── FOOTER ───────────────────────────── */
+    footer {
+      background: var(--dawn-dark);
+      color: rgba(255,255,255,0.35);
+      text-align: center;
+      padding: 40px;
+      font-size: 13px;
+    }
+    footer strong { color: var(--dawn-gold); font-weight: 500; }
+  </style>
+</head>
+<body>
+
+<!-- ══ HERO ══════════════════════════════════ -->
+<section class="hero">
+  <p class="hero-eyebrow">New Dawn Franchising™</p>
+  <h1>The People Behind<br/><em>New Dawn</em></h1>
+  <p class="hero-sub">A team of seasoned operators, investors, and legal professionals united by a single mission — building a world-class property management franchise.</p>
+  <div class="divider"></div>
+</section>
+
+<!-- ══ LEADERSHIP ════════════════════════════ -->
+<div class="section">
+  <p class="section-label">Leadership &amp; Founding Partners</p>
+  <div class="team-grid">
+
+    <!-- CHRIS VON POHLOT — Managing Member / Board -->
+    <div class="card featured">
+      <div class="card-img-wrap">
+        <!-- Replace src with a confirmed photo URL or LinkedIn headshot -->
+        <div class="card-initials">CP</div>
+      </div>
+      <div style="display:flex;flex-direction:column;flex:1;">
+        <div class="card-body">
+          <span class="card-badge">Managing Director</span>
+          <div class="card-name">Chris von Pohlot</div>
+          <div class="card-org">Obtuse Ventures &nbsp;·&nbsp; Altbanc</div>
+          <p class="card-bio">
+            Chris is a Columbia University–educated fintech entrepreneur with deep roots in alternative financing, real estate acquisitions, and venture investment. As the founder of Altbanc, he built an alternative lending platform that has helped hundreds of small and medium-sized businesses refinance high-cost merchant cash advance debt — a model directly applicable to the capital-efficient franchise ecosystem New Dawn is building. His background spans acquisitions and asset management at The Bascom Group, investment analysis at Glenview Capital, and capital markets at Eastdil Secured. As managing director of Obtuse Ventures and the sole initial board member of NH Franchising LLC, Chris brings the financial architecture and investor network essential to scaling a franchise brand nationally.
+          </p>
+          <div class="card-tags">
+            <span class="tag">Alternative Finance</span>
+            <span class="tag">Venture Investment</span>
+            <span class="tag">Real Estate</span>
+            <span class="tag">Capital Markets</span>
+            <span class="tag">SMB Lending</span>
+          </div>
+        </div>
+        <div class="card-footer">
+          <a href="https://www.linkedin.com/in/christoph-von-pohlot-7a328990" target="_blank">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+            LinkedIn
+          </a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══ STRATEGIC INVESTORS ═══════════════════ -->
+<div class="section" style="padding-top:0;">
+  <p class="section-label">Strategic Investors &amp; Advisors</p>
+  <div class="team-grid">
+
+    <!-- TOM MEISTER -->
+    <div class="card">
+      <div class="card-img-wrap">
+        <img
+          src="https://framerusercontent.com/images/zj4pzpQxKxyEZ1VBV9BpdTk9hk.jpeg"
+          alt="Tom Meister"
+          onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+        />
+        <div class="card-initials" style="display:none;">TM</div>
+      </div>
+      <div class="card-body">
+        <span class="card-badge">Strategic Investor</span>
+        <div class="card-name">Tom Meister</div>
+        <div class="card-org">Grizzly Peak Ventures &nbsp;·&nbsp; Brightpoint Law</div>
+        <p class="card-bio">
+          Tom is an entrepreneur, investor, and attorney operating at the intersection of capital markets and financial technology. After beginning his career at Wilson Sonsini and Goodwin Procter, he took on executive roles at three venture-backed online lenders — including Funding Circle, NepFin, and Zilch, two of which achieved unicorn status. Today he leads Grizzly Peak Ventures, a fintech and specialty finance venture studio in Oakland, and co-founded Brightpoint Law, LLP. His expertise in alternative credit structures, financial technology, and franchise-scale capital formation makes him a powerful resource as New Dawn deploys its franchisee financing strategy.
+        </p>
+        <div class="card-tags">
+          <span class="tag">Fintech</span>
+          <span class="tag">Specialty Finance</span>
+          <span class="tag">Venture Studio</span>
+          <span class="tag">Corporate Law</span>
+        </div>
+      </div>
+      <div class="card-footer">
+        <a href="https://www.linkedin.com/in/eastbaytom/" target="_blank">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+          LinkedIn
+        </a>
+        <a href="https://www.grizzlypeakventures.com" target="_blank">Website</a>
+      </div>
+    </div>
+
+    <!-- KAMAL OBBAD -->
+    <div class="card">
+      <div class="card-img-wrap">
+        <!-- No publicly accessible direct photo URL found; initials shown -->
+        <div class="card-initials">KO</div>
+      </div>
+      <div class="card-body">
+        <span class="card-badge">Strategic Investor</span>
+        <div class="card-name">Kamal Obbad</div>
+        <div class="card-org">Nebula Genomics &nbsp;·&nbsp; Forbes 30 Under 30</div>
+        <p class="card-bio">
+          Kamal is a Harvard graduate and Gates-Cambridge Scholar who co-founded Nebula Genomics, a genomic data platform backed by Khosla Ventures, Arch Venture Partners, and Mayfield. Previously a product manager at Google within Google Research and ChromeOS, he was recognized as a Forbes 30 Under 30 honoree in Healthcare. His track record of building and scaling data-driven technology ventures, combined with his network in top-tier venture capital, brings investor credibility and technological sophistication to the New Dawn board.
+        </p>
+        <div class="card-tags">
+          <span class="tag">Biotech &amp; Data</span>
+          <span class="tag">Google</span>
+          <span class="tag">Forbes 30U30</span>
+          <span class="tag">Venture-Backed Founder</span>
+        </div>
+      </div>
+      <div class="card-footer">
+        <a href="https://www.linkedin.com/in/kamal-obbad-5757597784" target="_blank">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+          LinkedIn
+        </a>
+      </div>
+    </div>
+
+    <!-- ZACHARY BOHLENDER -->
+    <div class="card">
+      <div class="card-img-wrap">
+        <img
+          src="https://framerusercontent.com/images/wD1EJxhD5lnB7yaGagSxwz2jWTE.jpeg"
+          alt="Zachary Bohlender"
+          onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+        />
+        <div class="card-initials" style="display:none;">ZB</div>
+      </div>
+      <div class="card-body">
+        <span class="card-badge">Strategic Investor</span>
+        <div class="card-name">Zachary Bohlender</div>
+        <div class="card-org">Brightpoint Law &nbsp;·&nbsp; Charta Ventures</div>
+        <p class="card-bio">
+          Zachary is a UC Berkeley–trained attorney and entrepreneur with a career spanning Wilson Sonsini Goodrich &amp; Rosati (M&amp;A for Twitter, Astex), entertainment law at King Holmes Paterno &amp; Soriano, and the founding of two ventures — Charta Ventures, a legal-tech platform for creators, and Brightpoint Law, LLP. His dual expertise in transactional law and company formation gives New Dawn access to best-in-class legal structuring as it designs its franchise disclosure documents, franchise agreements, and multi-state compliance programs.
+        </p>
+        <div class="card-tags">
+          <span class="tag">Franchise Law</span>
+          <span class="tag">M&amp;A / Corporate</span>
+          <span class="tag">IP &amp; Compliance</span>
+          <span class="tag">Legal Tech</span>
+        </div>
+      </div>
+      <div class="card-footer">
+        <a href="https://www.linkedin.com/in/zachary-bohlender/" target="_blank">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+          LinkedIn
+        </a>
+        <a href="https://www.brightpoint.law" target="_blank">Website</a>
+      </div>
+    </div>
+
+    <!-- DYLAN DELANEY -->
+    <div class="card">
+      <div class="card-img-wrap">
+        <div class="card-initials">DD</div>
+      </div>
+      <div class="card-body">
+        <span class="card-badge">Strategic Investor</span>
+        <div class="card-name">Dylan Delaney</div>
+        <div class="card-org">Investor &nbsp;·&nbsp; Texas Markets</div>
+        <p class="card-bio">
+          Dylan brings boots-on-the-ground experience in Texas's high-growth business markets, with a career spanning Houston and Austin across sales, business development, and investment. His firsthand exposure to the Texas SMB landscape — one of New Dawn's primary target markets for E-2 Visa franchisee placement — gives him an operational lens that complements the financial and legal expertise of the broader investor group.
+        </p>
+        <div class="card-tags">
+          <span class="tag">Texas Markets</span>
+          <span class="tag">Business Development</span>
+          <span class="tag">SMB Operations</span>
+        </div>
+      </div>
+      <div class="card-footer">
+        <a href="https://www.linkedin.com/in/dylanmdelaney" target="_blank">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+          LinkedIn
+        </a>
+      </div>
+    </div>
+
+    <!-- KEVIN HATCH -->
+    <div class="card">
+      <div class="card-img-wrap">
+        <div class="card-initials">KH</div>
+      </div>
+      <div class="card-body">
+        <span class="card-badge">Strategic Investor</span>
+        <div class="card-name">Kevin Hatch</div>
+        <div class="card-org">Duke University &nbsp;·&nbsp; Investor</div>
+        <p class="card-bio">
+          A Duke University–educated entrepreneur and investor, Kevin brings a background in impact investing and early-stage company building. His involvement with Y Combinator alumni companies and Bain Capital–backed ventures reflects a sophisticated understanding of scalable business models. As New Dawn grows its franchisee network and pursues institutional investment, Kevin's network within the venture and private equity communities adds significant strategic value.
+        </p>
+        <div class="card-tags">
+          <span class="tag">Private Equity</span>
+          <span class="tag">Early-Stage Investing</span>
+          <span class="tag">Duke Network</span>
+          <span class="tag">Impact / Climate</span>
+        </div>
+      </div>
+      <div class="card-footer">
+        <a href="https://www.linkedin.com/in/kevin-hatch-97167857/" target="_blank">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+          LinkedIn
+        </a>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══ FOOTER ════════════════════════════════ -->
+<footer>
+  &copy; 2026 <strong>New Dawn Franchising™</strong> &nbsp;·&nbsp; All rights reserved &nbsp;·&nbsp; El Paso, Texas
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,152 @@
+Upgrade my existing broker outreach agent with the following new multi-channel sequence. Replace the current 4-touch email-only flow with this expanded omnichannel system. Here is the full logic:
+
+-----
+
+CONTEXT FOR THE AGENT:
+
+- Target: Business brokers with clients who have $250K+ to invest and want to move to the USA via an E2 Visa
+- Referral fee: 12.5% of the investment = $31,250 per referred client
+- Key trust signals to use: Forbes 30 Under 30, funds held in escrow (client gets full refund if visa denied), established franchise territory model in El Paso
+- Tone: Professional, warm, never salesy in early touches. The money reveal is a mid-sequence reward, not the opener.
+
+-----
+
+CRM TIMELINE TAB — REQUIRED FEATURE:
+
+When the agent initiates a sequence for any broker lead, it must immediately create a new tab inside that lead’s CRM card called “Outreach Timeline”. This tab must be queryable by name (e.g. “Look up Bonny Johnson” returns her card and timeline).
+
+The Outreach Timeline tab must display every planned and completed action as a chronological list of events. Each event entry must include:
+
+- The scheduled date and time for that action
+- The channel (Email, SMS, LinkedIn, WhatsApp, Lob, HeyGen)
+- The touch name (e.g. “Touch 1 — Soft Intro Email”, “Day 7 SMS Trigger”, “Lob Postcard”)
+- The current status, shown with a clear visual indicator:
+  - SCHEDULED — action is queued and pending
+  - SENT — action was successfully delivered
+  - OPENED — email or video was opened (where trackable)
+  - CLICKED — link or CTA was clicked
+  - REPLIED — broker responded
+  - FAILED — action could not be completed (include reason, e.g. “Email bounced”, “Invalid phone number”, “HeyGen render error”)
+  - SKIPPED — action was intentionally bypassed due to trigger conditions not being met (e.g. “SMS skipped — email not opened”)
+  - PAUSED — sequence paused due to reply or meeting booked
+  - CANCELLED — broker unsubscribed or marked Do Not Contact
+- A notes field for any relevant detail (e.g. “Broker opened email 3 times”, “Lob postcard sent to 123 Main St”, “HeyGen video rendered successfully — link: [url]”)
+
+The timeline must update in real time as each action executes. Dylan must be able to search any broker by name, open their CRM card, click the Outreach Timeline tab, and instantly see the full history and future schedule at a glance.
+
+-----
+
+CONDITIONAL LOGIC — ADDRESS CHECK (run this at lead ingestion):
+
+When a new lead is added, immediately check whether a physical mailing address exists in the lead record.
+
+IF address exists:
+
+- Day 1: Trigger Lob postcard (arrives ~Day 5)
+- Day 7: Trigger Lob premium letter (arrives ~Day 14)
+- Tag lead as “Lob Enabled”
+
+IF no address exists:
+
+- Day 5: Send HeyGen AI video email
+- Day 14: Send case study email
+- Tag lead as “HeyGen Flow”
+
+All other touches run identically regardless of address status.
+
+Immediately upon lead ingestion, populate the full Outreach Timeline tab with every upcoming action shown as SCHEDULED, so Dylan can see the complete planned sequence before a single message is sent.
+
+-----
+
+NEW SEQUENCE — UP TO 11 TOUCHES ACROSS 6 CHANNELS:
+
+DAY 0 — LinkedIn Connection Request
+Send a personalized connection request. 40 words max. Reference something specific about their brokerage or location. No pitch. End with a genuine compliment or question. Do NOT mention visas or money.
+CRM Log: Mark SENT on dispatch. Mark FAILED with reason if connection could not be sent. Mark SKIPPED if broker is already connected.
+
+DAY 1 — Touch 1 Email (Soft Intro)
+~120 words. Warm, curious tone. Reference something specific about their country or market. Ask one genuine question about the type of clients they work with. Zero pitch. Zero mention of visa amounts or fees. Subject line should feel like it’s from a real person, not a campaign (e.g. “Quick question, [First Name]”).
+CRM Log: Mark SENT on dispatch. Update to OPENED when open is tracked. Mark FAILED with bounce reason if undeliverable.
+
+DAY 1 — SMS Trigger (fires ONLY if email is opened within 24 hours)
+Send this exact SMS:
+“Hey [First Name], Dylan here — I just sent you a quick email that might be relevant for one of your clients. Worth a 30-second look when you get a chance. No pitch, I promise. 🙂”
+CRM Log: Mark SCHEDULED at sequence start. Update to SENT if email opens and SMS fires. Mark SKIPPED if email not opened within 24 hours. Mark FAILED if SMS delivery fails with reason.
+
+DAY 1 — Lob Postcard (fires ONLY if tag = “Lob Enabled”)
+Send via Lob API on Day 1 so it lands around Day 5. Postcard format, premium feel.
+Front: Bold headline — “Your Client Wants to Move to the USA. We Can Make That Happen.”
+Back: 3 bullet trust signals (Forbes 30 Under 30, escrow-protected funds, E2 Visa franchise model), Dylan’s name, QR code linking to landing page or Calendly. No referral fee on the mailer — curiosity only.
+CRM Log: Mark SENT when Lob confirms dispatch. Include mailing address used in notes. Mark FAILED with Lob error reason if not sent.
+
+DAY 3 — Touch 2 Email (Credibility + Social Proof)
+~150 words. Reference that you wanted to follow up. Introduce the concept briefly: you help international investors get E2 Visas through a proven franchise model. Drop the trust signals naturally: Forbes 30 Under 30 recognition, escrow-protected funds, established brand. Still no referral fee mention. End with a soft CTA like “Happy to send over a one-pager if helpful.”
+CRM Log: Mark SENT on dispatch. Update to OPENED and CLICKED where trackable.
+
+DAY 3 — LinkedIn Message (fires ONLY if connected)
+~60 words. Mirror the email topic but keep it conversational. “Sent you an email too — didn’t want it to get buried. Thought this might be relevant for any of your clients eyeing a US move.”
+CRM Log: Mark SENT if connection accepted and DM sent. Mark SKIPPED if not yet connected. Mark FAILED with reason if message could not be delivered.
+
+DAY 5 — HeyGen AI Video Email (fires ONLY if tag = “HeyGen Flow”)
+Use HeyGen to generate a personalized AI video from Dylan’s avatar. Script opens with the broker’s first name, briefly introduces the E2 Visa franchise opportunity, references Forbes credibility and escrow protection, ends with Calendly link. 90 seconds max. Wrap in an email: ~80 words of copy + embedded HeyGen video thumbnail linking to hosted video. Subject line: “I made this for you, [First Name]”.
+CRM Log: Mark SCHEDULED at sequence start. Update to SENT on dispatch. Log HeyGen video URL in notes field. Mark OPENED when email is opened. Mark FAILED if HeyGen render fails or email bounces, with reason.
+
+DAY 7 — Touch 3 Email (The Reveal — Referral Fee)
+~180 words. Subject line: “Here’s what’s in it for you, [First Name]” or “The part I haven’t mentioned yet”. Reveal the referral fee clearly: 12.5% of every investment = $31,250 per client referred. Reinforce zero risk: funds held in escrow, client gets a refund if visa is denied. Include Calendly link. Light urgency: El Paso territories are limited.
+CRM Log: Mark SENT on dispatch. Update to OPENED and CLICKED where trackable.
+
+DAY 7 — SMS Trigger (fires ONLY if Touch 3 Email is opened within 4 hours)
+Send this exact SMS:
+“Hey [First Name] — saw you opened my email. Just want to flag: the $31,250 referral fee requires zero risk on your end. Funds are held in escrow until the visa clears. Happy to hop on a quick call this week — Dylan”
+CRM Log: Mark SCHEDULED at sequence start. Update to SENT if email opens and SMS fires. Mark SKIPPED if email not opened within 4 hours. Mark FAILED if SMS delivery fails with reason.
+
+DAY 7 — Lob Premium Letter (fires ONLY if tag = “Lob Enabled”)
+Send via Lob API on Day 7 so it arrives around Day 14. Full letter format on quality letterhead, signed by Dylan. Contents: warm personal note, one-paragraph explanation of the E2 Visa franchise model, referral fee spelled out clearly ($31,250 per client), QR code to Calendly. P.S. line: “Even if you don’t have a client right now — keep this. You will.”
+CRM Log: Mark SENT when Lob confirms dispatch. Include mailing address in notes. Mark FAILED with Lob error reason if not sent.
+
+DAY 10 — WhatsApp Message
+~80 words. Personal, not templated in feel. Reference the previous emails. “Hey [First Name], I know inboxes are brutal — totally get it. I’ve reached out a couple of times about a referral opportunity that pays $31,250 per client with zero downside risk. If you have one client thinking about a US move and $250K to invest, I’d love 20 minutes. Here’s my Calendly: [link]. No pressure at all.”
+CRM Log: Mark SENT on dispatch. Mark FAILED with reason if WhatsApp delivery fails. Mark SKIPPED if broker already replied on any channel.
+
+DAY 14 — Case Study Email (fires ONLY if tag = “HeyGen Flow”)
+~160 words. Brief anonymized success story: a client who came through a broker referral, invested $250K, got their E2 Visa, and is now operating in the US. Reinforce escrow protection. End with Calendly link and: “Even if the timing isn’t right now, I’d love to be your go-to when it is.”
+CRM Log: Mark SENT on dispatch. Update to OPENED and CLICKED where trackable. Mark SKIPPED if broker already replied.
+
+DAY 21 — Final Email (Breakup / Last Touch)
+~100 words. Subject: “Closing the loop, [First Name]”. Gracious, no guilt. Won’t follow up again after this. Leave the door open. Re-include the referral fee and Calendly one final time. Must feel genuinely human — not automated.
+CRM Log: Mark SENT on dispatch. Update to OPENED where trackable. Mark SKIPPED if broker already replied or booked a call.
+
+-----
+
+GLOBAL TRIGGER AND STATUS RULES:
+
+- At lead ingestion: check for address → tag as “Lob Enabled” or “HeyGen Flow” → immediately populate full Outreach Timeline with all upcoming actions as SCHEDULED
+- Email open → SMS fires within 1 hour (Touches 1 and 3 only) → update CRM log accordingly
+- LinkedIn connected → LinkedIn DM fires same day as Touch 2 Email
+- If broker books a Calendly call at any point → pause all remaining touches → mark all future timeline items as PAUSED → tag lead as “Meeting Booked” → notify Dylan via SMS immediately
+- If broker replies to any message on any channel → pause sequence immediately → mark all future timeline items as PAUSED → tag as “Replied — Needs Human” → notify Dylan via SMS within 5 minutes
+- If broker unsubscribes or replies negatively → stop all channels immediately → mark all future timeline items as CANCELLED → tag as “Do Not Contact”
+- WhatsApp fires on Day 10 only if no reply received across any channel
+- All sequences require Dylan’s YES approval in the morning digest before any Day 1 touches fire for a new lead
+
+-----
+
+APPROVAL FLOW (keep existing):
+
+- 7 AM: Agent scores new leads, stages messages
+- 8 AM: Dylan gets SMS digest of pending items
+- 9 AM: Dylan gets approval email listing all staged messages
+- Every 15 min: Agent polls for YES/NO reply
+- 3 PM: Unapproved batch is auto-held to next day
+
+-----
+
+CHANNELS REQUIRED:
+
+- Email (existing)
+- SMS via Twilio (existing or add)
+- WhatsApp via Twilio (existing or add)
+- LinkedIn via PhantomBuster or Make.com LinkedIn module
+- Lob API — postcard and letter endpoints (only when address is present)
+- HeyGen API — personalized AI video generation (only when no address is present)
+- CRM — must support a custom tab per lead card with real-time timeline logging and name-based search

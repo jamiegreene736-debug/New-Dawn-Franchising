@@ -1,0 +1,122 @@
+// serp.js
+// Wraps SerpAPI for rank tracking and SERP snapshots.
+// One call gives us both the current rank for the target URL
+// and the competitive landscape the planner needs.
+
+import { getJson } from "serpapi";
+
+const SERPAPI_KEY = process.env.SERPAPI_KEY; // set in Replit Secrets
+
+/**
+ * Fetch the Google SERP for a keyword and find where target_url ranks.
+ * Returns rank (1–100 or null if not found) plus the full top-10 snapshot.
+ */
+export async function fetchSerpAndRank({ keyword, targetUrl, location = "United States", device = "desktop" }) {
+  if (!SERPAPI_KEY) {
+    throw new Error("SERPAPI_KEY not set in Replit Secrets");
+  }
+
+  const params = {
+    engine: "google",
+    q: keyword,
+    location,
+    google_domain: "google.com",
+    gl: "us",
+    hl: "en",
+    device,
+    num: 100, // pull 100 results so we can find ranks outside the top 10
+    api_key: SERPAPI_KEY,
+  };
+
+  const response = await getJson(params);
+
+  const organicResults = response.organic_results ?? [];
+
+  // Normalize target URL for comparison (strip protocol, www, trailing slash)
+  const normalize = (url) =>
+    url
+      .toLowerCase()
+      .replace(/^https?:\/\//, "")
+      .replace(/^www\./, "")
+      .replace(/\/$/, "");
+
+  const normalizedTarget = normalize(targetUrl);
+
+  // Find our rank — match on domain OR exact URL so we catch any page on the site
+  let rank = null;
+  let matchedResult = null;
+  for (const result of organicResults) {
+    const normalizedResult = normalize(result.link ?? "");
+    if (
+      normalizedResult === normalizedTarget ||
+      normalizedResult.startsWith(normalizedTarget.split("/")[0])
+    ) {
+      rank = result.position;
+      matchedResult = result;
+      break;
+    }
+  }
+
+  // Build the snapshot the planner will read
+  const snapshot = {
+    keyword,
+    checked_at: new Date().toISOString(),
+    rank,
+    matched_result: matchedResult,
+    organic_results: organicResults.slice(0, 10).map((r) => ({
+      position: r.position,
+      title: r.title,
+      link: r.link,
+      snippet: r.snippet,
+      displayed_link: r.displayed_link,
+    })),
+    featured_snippet: response.answer_box ?? null,
+    people_also_ask: response.related_questions?.slice(0, 5) ?? [],
+    related_searches: response.related_searches?.slice(0, 10) ?? [],
+    serp_features: {
+      has_featured_snippet: !!response.answer_box,
+      has_local_pack: !!response.local_results,
+      has_knowledge_graph: !!response.knowledge_graph,
+      has_video_results: !!response.inline_videos,
+    },
+  };
+
+  return { rank, snapshot };
+}
+
+/**
+ * Called by the daily cron for each active campaign.
+ * Saves a rank_history row and updates the campaign's current_rank.
+ */
+export async function runDailyRankCheck(db, campaign) {
+  try {
+    const { rank, snapshot } = await fetchSerpAndRank({
+      keyword: campaign.target_keyword,
+      targetUrl: campaign.target_url,
+    });
+
+    await db.rankHistory.create({
+      data: {
+        campaign_id: campaign.id,
+        rank: rank ?? null,
+        serp_snapshot: snapshot,
+        checked_at: new Date(),
+      },
+    });
+
+    await db.campaigns.update({
+      where: { id: campaign.id },
+      data: {
+        current_rank: rank,
+        // Set starting_rank on the first successful check
+        starting_rank: campaign.starting_rank ?? rank,
+        updated_at: new Date(),
+      },
+    });
+
+    return { success: true, rank, snapshot };
+  } catch (err) {
+    console.error(`Rank check failed for campaign ${campaign.id}:`, err);
+    return { success: false, error: err.message };
+  }
+}

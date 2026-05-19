@@ -1,0 +1,89 @@
+Replace the existing WhatsApp floating button behavior on the website with a 
+fully functional AI live chat widget. Here are the full requirements:
+
+---
+
+## 🟢 CHAT WIDGET TRIGGER BUTTON
+- Keep the existing WhatsApp floating button exactly as-is visually 
+  (green circle, WhatsApp logo icon, same position fixed bottom-right)
+- Change its behavior: instead of linking directly to WhatsApp, clicking 
+  it now opens the AI chat window below
+- Add a small pulsing red notification dot on the button to suggest 
+  there's a message waiting
+- On hover, show a tooltip: "Chat with us"
+
+---
+
+## 💬 CHAT WINDOW UI
+When clicked, open a chat window (like WhatsApp style) with:
+- Header showing Dylan's profile picture (from the website), his name, 
+  and "Typically replies instantly"
+- A green online indicator dot on the profile picture in the header
+- Chat bubbles styled like WhatsApp (green for Dylan, white/grey for user)
+- Dylan's profile picture appears as a small avatar bubble next to 
+  each of his messages
+- The window opens with a pre-loaded opening message from Dylan, e.g.:
+  "Hey! 👋 Dylan here — what can I help you with today?"
+- Smooth slide-up open/close animation
+- Mobile responsive
+
+---
+
+## 🤖 AI AGENT — DYLAN'S PERSONA
+- Connect to the Anthropic Claude API (claude-sonnet-4-20250514)
+- The AI must speak exactly like Dylan — casual, friendly, knowledgeable, 
+  and personable. Not robotic.
+- Scrape or use all content from this website as the AI's knowledge base 
+  (services, pricing, portfolio, about, FAQs, testimonials, contact info, etc.)
+- The system prompt should instruct the AI:
+  "You are Dylan. You speak in first person as Dylan. You are friendly, 
+  casual but professional. You know everything about your business listed 
+  on this website. Never break character. Never say you are an AI."
+  Include all website content in the system prompt as context.
+
+---
+
+## 📅 SCHEDULING / CALENDLY
+- If the user asks to book a meeting, schedule a call, or set up a time — 
+  Dylan should respond naturally and send a clickable Calendly link:
+  👉 https://calendly.com/[DYLAN'S-CALENDLY-LINK]
+- The link should render as a tappable styled button inside the chat 
+  bubble, not plain text
+
+---
+
+## 📲 BOTTOM ACTION BUTTONS
+Below the chat input, show two persistent CTA buttons at all times:
+1. "Continue on WhatsApp" → opens https://wa.me/[DYLAN'S-WHATSAPP-NUMBER] 
+   in a new tab, pre-filled with a summary of what the user was asking about
+2. "Leave a Message" → toggles a small inline form with: Name, Phone Number, 
+   and a brief message field. On submit, POST to the site's existing contact 
+   handler or a new /api/contact endpoint, then show: 
+   "Thanks! Dylan will call you back shortly. 😊"
+
+---
+
+## ⚙️ TECHNICAL REQUIREMENTS
+- Anthropic API key stored as environment variable: ANTHROPIC_API_KEY
+- Maintain full conversation history within the session for context memory
+- Show a "Dylan is typing..." animated indicator while awaiting API response
+- Handle API errors gracefully with fallback message:
+  "Hey, seems like I'm having a quick tech moment 😅 Try WhatsApp or 
+  leave me a message below!"
+- Leave a Message form should POST to existing contact handler or 
+  new /api/contact endpoint if none exists
+
+---
+
+## 🎨 STYLING
+- Keep the trigger button identical to the current WhatsApp button
+- Chat window should match the website's color scheme and fonts
+- WhatsApp-green (#25D366) for the chat header and send button
+- Clean, modern, on-brand
+- Dark mode compatible if the site already supports it
+
+---
+
+Make sure all existing site functionality remains completely untouched. 
+Only the WhatsApp button's click behavior changes — everything else is 
+additive on top.

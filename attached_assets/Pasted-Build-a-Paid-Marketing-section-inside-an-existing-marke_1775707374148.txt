@@ -1,0 +1,149 @@
+Build a Paid Marketing section inside an existing marketing portal web app using React and Tailwind CSS. This is a single-page dashboard section accessible via the main navigation. Use only mock/placeholder data — no backend or API connections needed. The goal is a fully functional, polished UI that feels like a real SaaS product.
+
+---
+
+TECH STACK
+- React (functional components + hooks)
+- Tailwind CSS for all styling
+- Lucide React for icons
+- No external data fetching — all data is hardcoded as mock arrays/objects in the component
+
+---
+
+PAGE STRUCTURE & LAYOUT
+
+The page should have:
+- A top header bar with the title "Paid Marketing", a subtitle "Manage your campaigns and discover new growth channels", and a blue "Add Campaign" button in the top right
+- A summary stats row directly below the header showing 4 KPI cards: Total Monthly Spend, Total Leads Generated, Blended Cost Per Lead, and Active Campaigns count
+- Three clearly labeled sections below that, separated by section headings with a thin divider line
+
+---
+
+SECTION 1: ACTIVE CAMPAIGNS
+
+Display a table or list of cards showing all active paid campaigns. Include the following mock campaigns:
+
+1. Facebook Ads — "Franchise Lead Gen — Lookalike Audience" — Active — $75/day budget — $2,180 spent this month — 47 leads — $46.38 CPL
+2. Facebook Ads — "Retargeting — Website Visitors" — Active — $25/day budget — $640 spent this month — 11 leads — $58.18 CPL
+3. Google Ads — "Franchise Opportunity — Search" — Active — $100/day budget — $2,950 spent this month — 28 leads — $105.36 CPL
+4. Google Ads — "Brand Keywords" — Paused — $30/day budget — $0 spent this month — 0 leads — N/A CPL
+
+Each campaign row/card must include:
+- Platform logo placeholder (a colored icon or badge — blue "f" for Facebook, multicolor "G" for Google)
+- Campaign name
+- A status pill/badge — green for "Active", gray for "Paused" — clicking it toggles the status between Active and Paused (use React state)
+- Daily budget displayed with a small pencil/edit icon — clicking the edit icon makes it an inline editable input field with a Save button
+- Spend this month
+- Leads generated
+- Cost per lead
+- A "View Details" button (ghost/outline style) and a vertical three-dot menu icon with a dropdown showing: Edit, Duplicate, Pause/Resume, Delete
+
+At the top of this section, include a filter row with buttons to filter by: All, Facebook, Google, Active, Paused
+
+---
+
+SECTION 2: FRANCHISE DIRECTORY & LISTING OPPORTUNITIES
+
+Section heading: "Recommended Listing Platforms" with a subheading: "Expand your reach beyond paid social and search"
+
+Display a responsive grid (3 columns on desktop, 2 on tablet, 1 on mobile) of recommendation cards. Include the following platforms:
+
+1. FranChoice
+   - Type: Franchise Consultant Network
+   - Model: Referral-based (fee per awarded franchise)
+   - Est. Cost: $0 upfront / % of franchise fee on close
+   - Est. Leads/mo: 3–8 highly qualified leads
+   - Audience Fit: High
+   - Description: "Connects you with pre-screened candidates through a national network of franchise consultants."
+   - CTA Button: "Request Info"
+
+2. Franchise.com
+   - Type: Franchise Directory Listing
+   - Model: Monthly subscription
+   - Est. Cost: $299–$499/mo
+   - Est. Leads/mo: 10–20 leads
+   - Audience Fit: High
+   - Description: "One of the largest franchise opportunity directories with high organic search traffic."
+   - CTA Button: "Get Started"
+
+3. Entrepreneur.com Franchise 500
+   - Type: Editorial + Directory
+   - Model: Annual listing fee
+   - Est. Cost: $1,200–$2,500/yr
+   - Est. Leads/mo: 5–12 leads
+   - Audience Fit: High
+   - Description: "Feature your franchise in the annual Franchise 500 ranking and year-round directory."
+   - CTA Button: "Learn More"
+
+4. BizBuySell
+   - Type: Business Opportunity Marketplace
+   - Model: Monthly listing
+   - Est. Cost: $99–$199/mo
+   - Est. Leads/mo: 6–14 leads
+   - Audience Fit: Medium
+   - Description: "Large marketplace for buyers exploring business ownership, including franchise opportunities."
+   - CTA Button: "Get Started"
+
+5. FranConnect
+   - Type: Franchise Development Platform
+   - Model: Platform subscription
+   - Est. Cost: Custom pricing
+   - Est. Leads/mo: 8–18 leads
+   - Audience Fit: Medium
+   - Description: "End-to-end franchise development and lead management platform used by growing brands."
+   - CTA Button: "Request Demo"
+
+6. Franchise Gator
+   - Type: Franchise Lead Generation
+   - Model: Pay per lead
+   - Est. Cost: $25–$60/lead
+   - Est. Leads/mo: 15–30 leads
+   - Audience Fit: Medium
+   - Description: "Performance-based lead generation platform where you only pay for the leads you receive."
+   - CTA Button: "Get Started"
+
+Each card should include:
+- Platform name in bold
+- A colored icon/avatar placeholder (use first letter of platform name in a styled circle)
+- Type and model labels in small gray text
+- Estimated cost displayed prominently
+- Estimated leads/mo
+- Audience Fit badge — "High" in a green pill, "Medium" in a yellow pill
+- The description text
+- The CTA button in solid blue
+- A small bookmark/save icon in the top right corner of the card that toggles a saved state (use React state — when saved, the icon fills in)
+
+---
+
+SECTION 3: AI-POWERED RECOMMENDATIONS
+
+Section heading: "Smart Recommendations" with a small purple "AI" badge next to it
+
+Display a vertical list of insight cards with a light purple/lavender left border accent. Include the following 4 mock recommendations:
+
+1. Reduce Google CPL — Icon: warning triangle (yellow) — "Your Google Search CPL ($105) is 2.3x higher than your Facebook CPL ($46). Consider shifting $400/mo from Google to Facebook or testing a new Google ad group with tighter keyword targeting." — Buttons: "Apply Suggestion" (blue) and "Dismiss" (gray text link)
+
+2. Untapped Listing Opportunity — Icon: lightbulb (purple) — "You're not currently listed on Franchise.com or Franchise Gator. Based on your target CPL of under $60, both platforms offer estimated CPLs within your range. Adding these two channels could generate an estimated 25–50 additional leads per month." — Buttons: "Explore Platforms" (blue) and "Dismiss"
+
+3. Paused Campaign Alert — Icon: pause circle (orange) — "Your Brand Keywords Google campaign has been paused for 12 days. Brand keyword protection is typically low-cost and high-converting. Consider reactivating with a modest $15/day budget." — Buttons: "Reactivate Campaign" (blue) and "Dismiss"
+
+4. Monthly Budget Pacing — Icon: chart bar (green) — "You are on pace to spend $5,820 this month across all campaigns. This is 94% of your $6,200 monthly budget. You have $380 remaining — consider boosting your top-performing Facebook campaign for the final week of the month." — Buttons: "Boost Campaign" (blue) and "Dismiss"
+
+Each recommendation card should be dismissible — when the user clicks Dismiss, that card disappears from the list using React state. If all cards are dismissed, show an empty state message: "No new recommendations. Check back soon." with a checkmark icon.
+
+---
+
+GLOBAL DESIGN REQUIREMENTS
+
+- Background: light gray (Tailwind gray-50)
+- Cards: white background, rounded-xl, subtle shadow (shadow-sm or shadow-md)
+- Primary accent: Blue (Tailwind blue-600)
+- Secondary accent: Purple (Tailwind violet-600) for AI section
+- Success/Active: Green (Tailwind green-500)
+- Warning: Yellow (Tailwind yellow-400)
+- Neutral/Paused: Gray (Tailwind gray-400)
+- Font hierarchy: Large bold section headings, medium weight subheadings, regular weight body text, small gray metadata text
+- All interactive elements (buttons, toggles, edit icons, bookmark icons, dropdowns) must be functional using React useState
+- Fully responsive across desktop, tablet, and mobile breakpoints
+- Smooth transitions on hover states for buttons and cards (transition-all duration-200)
+- The entire dashboard should feel like a premium SaaS product — clean, spacious, and professional

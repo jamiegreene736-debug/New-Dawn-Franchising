@@ -1,0 +1,157 @@
+12:00 PMIdentified need for plain text formatting accessibilityIdentified need for plain text formatting accessibilityImprove and expand the existing scraper's data source methodology to be a true catch-all people finder. The current implementation needs to be upgraded with the following additional sources and logic:
+Add These Data Sources (in priority order):
+
+Apollo.io
+
+
+Integrate Apollo.io API to search by company domain
+Pull: full name, title, seniority level, department, email, phone, LinkedIn URL
+Use the /people/search and /organizations/search endpoints
+Apollo often has the deepest employee database — treat it as the primary source
+
+
+RocketReach
+
+
+Query by company name and domain
+Pull verified emails, direct dials, and social profiles
+Cross-reference against Apollo results and merge duplicates
+
+
+ZoomInfo (Scrape Public Profiles)
+
+
+Search site:zoominfo.com "[company name]" via Google
+Scrape any publicly visible profile pages for name, title, email, phone
+
+
+Clearbit
+
+
+Use Clearbit's Enrichment API (person and company endpoints)
+Great for enriching partial records (e.g., you have a name, get their email)
+
+
+Lusha
+
+
+Search public Lusha data for company employees
+Pull direct dials and personal emails
+
+
+Snov.io
+
+
+Use the domain search endpoint to get all emails associated with a domain
+Combine with name data from other sources
+
+
+ContactOut
+
+
+Search by LinkedIn URL or company name
+Pulls personal emails and phone numbers LinkedIn hides
+
+
+Crunchbase
+
+
+Search the company on Crunchbase for founders, board members, executives
+Pull funding rounds which often list key people by name and title
+
+
+PitchBook (Google Scrape)
+
+
+Run site:pitchbook.com "[company name]" queries
+Extract any publicly visible people data
+
+
+AngelList / Wellfound
+
+
+Search for the company and pull all listed team members and job posters
+Great for startups and franchise-style companies
+
+
+Indeed & Glassdoor
+
+
+Scrape job postings for the company — hiring manager names often appear
+Glassdoor reviews sometimes reveal employee names and roles
+
+
+Facebook Business Pages
+
+
+Scrape the company's Facebook page for tagged employees and admins
+Check the People tab and post interactions
+
+
+Better Business Bureau (BBB)
+
+
+Search BBB for the business listing
+Pulls owner names, principals, and contact persons
+
+
+Secretary of State / Business Registry (All 50 States)
+
+
+Auto-detect the company's state of incorporation from WHOIS or website
+Query that state's SOS database for registered agent, officers, and directors
+Also check OpenCorporates.com as a unified fallback
+
+
+Court Records & Litigation Databases
+
+
+Search PACER (federal) and state court public records for the company name
+Litigation filings often reveal executives, owners, and key employees by name
+
+
+FCC, FTC, SEC Filings
+
+
+Query SEC EDGAR for any filings mentioning the company or domain
+FTC complaint records sometimes surface principals
+
+
+Email Permutator Engine
+
+
+Once any name is found, auto-generate all likely email combinations: first@, flast@, firstlast@, first.last@, last@, firstl@
+Verify each against Hunter.io, NeverBounce, or ZeroBounce API
+Flag verified emails as Confirmed
+
+
+Reverse Email / Phone Lookup
+
+
+Run any discovered emails through Pipl, Spokeo, or BeenVerified queries
+Run phone numbers through TrueCaller and NumLookup
+Expand each contact's profile with personal details
+
+
+Google Maps / Yelp Business Listings
+
+
+Pull the business listing for the company
+Owner name, phone, address, and sometimes employee reviews mentioning names
+
+
+Wayback Machine / Archive.org
+
+
+Check historical snapshots of the company website
+Old /team and /about pages often show former employees no longer listed
+
+Methodology Improvements:
+
+Waterfall Logic: Try Apollo first, then RocketReach, then Clearbit, then Snov.io, then Hunter.io in sequence. Stop per-contact enrichment once you hit High confidence
+Entity Resolution: Build a deduplication engine that matches "Jack Finder", "J. Finder", and "Jack F." as the same person using fuzzy matching with the rapidfuzz library
+Confidence Scoring: Upgrade the scoring system as follows: Confirmed = email verified plus 3 or more sources agree. High = 2 sources agree or Apollo/RocketReach direct match. Medium = 1 source, unverified email. Low = name only, no contact info
+Auto-Retry with Proxies: Rotate through free/paid proxies and randomized user agents so no single source blocks the scraper
+Async Scraping: Run all source queries in parallel using asyncio and aiohttp so results return fast instead of sequentially
+Rate Limit Manager: Add per-source rate limiting so API keys do not get burned
+Incremental Saving: Save results to SQLite in real time so a crash does not lose progress

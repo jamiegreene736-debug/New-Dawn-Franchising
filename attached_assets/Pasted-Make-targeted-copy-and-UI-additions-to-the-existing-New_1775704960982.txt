@@ -1,0 +1,158 @@
+Make targeted copy and UI additions to the existing New Dawn Franchising
+homepage at newdawnfranchising.com to communicate the escrow protection
+structure available to investors. Do not restructure the page, do not
+change any existing copy, do not alter any existing sections. Only ADD
+the elements described below, exactly where specified.
+
+The core message to communicate — briefly and confidently:
+The investor's funds are held in escrow while the business is set up
+and begins operating. Once the business is live and generating revenue,
+funds are released from escrow into the business. If the E-2 visa
+application is unsuccessful, the investment is released from escrow
+and returned to the investor. The money is never simply handed over
+and gone.
+
+This message should feel like a quiet confidence, not a loud guarantee.
+It answers the investor's biggest unspoken fear without making them feel
+like they needed to be afraid in the first place.
+
+⚠️ IMPORTANT: All copy added below uses the exact language provided.
+Do not paraphrase, embellish, or add claims beyond what is written here.
+Before publishing, Dylan must have this copy reviewed by his attorney
+to confirm it accurately reflects the legal escrow arrangement in place.
+
+---
+
+## ADDITION 1 — TRUST STRIP (below the hero, above the technology section)
+
+Add a slim horizontal strip between the hero text and the
+"Proprietary Technology" section. This is the most prominent
+placement but it should feel like a calm statement of fact,
+not a banner ad.
+
+Design:
+- Full width, light background (one shade lighter than the page bg)
+- Subtle top and bottom border in a light grey
+- Three items arranged horizontally (or stacked on mobile)
+  separated by thin vertical dividers
+- Each item has a small icon (Lucide React) and two lines of text
+- No bright colours — use the existing site's neutral palette
+- Padding: generous, feels airy not cramped
+
+Three items:
+
+  Item 1:
+  Icon: Shield (Lucide)
+  Line 1 (small, muted): "Your funds"
+  Line 2 (slightly larger, normal weight): "Held in escrow until
+  your business is live"
+
+  Item 2:
+  Icon: TrendingUp (Lucide)
+  Line 1 (small, muted): "Your business"
+  Line 2: "Operational and earning before funds are released"
+
+  Item 3:
+  Icon: RotateCcw (Lucide)
+  Line 1 (small, muted): "If your visa isn't approved"
+  Line 2: "Your investment is returned from escrow"
+
+Below the three items, centred, in small muted text:
+  "Structured investment with built-in investor protection.
+   Full details provided in the Franchise Disclosure Document."
+
+---
+
+## ADDITION 2 — ONE BULLET POINT in the "Why New Dawn Franchising" list
+
+The existing bullet list under "Why New Dawn Franchising?" currently has
+six items. Add one new bullet at position 2 (second in the list,
+immediately after the $250,000 bullet):
+
+  "Investment held in escrow — released only once your business
+  is live and operating"
+
+This keeps the list clean and places the protection message alongside
+the investment amount where the reader's attention is highest.
+No other bullets change.
+
+---
+
+## ADDITION 3 — ONE NEW FAQ ITEM in the FAQ section
+
+Add one new FAQ item at position 2 in the FAQ section (after "What is
+the E-2 visa?" and before "How much do I need to invest?"):
+
+  Question:
+  "What happens to my investment if my E-2 visa isn't approved?"
+
+  Answer:
+  "Your funds are held in escrow throughout the setup process.
+  Your business is established and begins operating while your
+  visa application is in progress. If your E-2 visa application
+  is not approved, your investment is released from escrow and
+  returned to you. We built the process this way intentionally —
+  so that you are never in a position where your money is gone
+  and your visa is not. Full details of the escrow arrangement
+  are outlined in the Franchise Disclosure Document, which is
+  available upon request."
+
+Use exactly this copy. Same styling as the existing FAQ items.
+No change to any other FAQ items.
+
+---
+
+## ADDITION 4 — SUBTLE INLINE TWEAK to the "How It Works" Step 1
+
+The existing Step 1 reads:
+"Invest & Acquire Your Franchise — Purchase your New Dawn Franchising
+territory starting at $250,000. This structured investment is designed
+to meet E-2 visa capital requirements and gives you a real, operating
+business."
+
+Append the following sentence to the end of Step 1 only.
+Do not change any other wording in this step or any other steps:
+
+  "Your funds are held in escrow during setup and released into
+  the business once it is live and operational."
+
+---
+
+## WHAT NOT TO DO
+
+- Do not add any new sections, headers, or page structures
+- Do not change the hero headline or subheadline
+- Do not alter the existing bullet points beyond the one addition noted
+- Do not change the Investment Overview section wording
+- Do not add any pop-ups, modals, sticky banners, or animations
+- Do not use words like "guaranteed", "risk-free", "100% protected",
+  or any language that overstates the protection
+- Do not add any new CTA buttons or change existing buttons
+- The overall tone of the additions must match the existing page:
+  calm, professional, matter-of-fact
+
+---
+
+## STYLING RULES
+
+- All added text uses the same font family, weight, and colour
+  variables already in use on the page
+- The trust strip (Addition 1) should feel native to the page —
+  not like a widget added from outside
+- On mobile, the three trust strip items stack vertically with
+  a horizontal divider between each
+- No new dependencies or libraries needed — use only what is
+  already installed on the project
+
+---
+
+## FINAL NOTE FOR DYLAN
+
+Before this goes live, have your immigration attorney and a
+franchise attorney review the escrow copy in Additions 1, 2, 3,
+and 4 to confirm it accurately describes your legal structure.
+The copy above is written to be factual and measured, but only
+you and your attorneys know the precise terms of your escrow
+arrangement. Adjust the specific wording as needed to reflect
+the actual legal reality — do not publish claims about escrow
+or refund protection that are not contractually backed.

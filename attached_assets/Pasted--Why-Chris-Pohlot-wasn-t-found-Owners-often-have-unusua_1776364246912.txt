@@ -1,0 +1,78 @@
+
+Why Chris Pohlot wasn't found:
+
+Owners often have unusual titles — "Founder," "Principal," "Managing Partner," "Owner" — that don't match a job-title search like "wealth manager"
+Apollo & Hunter index employees better than founders — small business owners frequently use personal Gmail/Outlook addresses not tied to the company domain
+LinkedIn privacy settings — many owners restrict their profiles from public search indexing
+Your SerpAPI queries are too narrow — searching "wealth manager" won't return someone listed only as "Founder & CEO"
+
+
+Fixes to make in your Replit code:
+1. Add owner/founder-specific search queries to serp.js
+In buildSearchQueries(), add these:
+javascriptreturn [
+  `"${query}" site:linkedin.com/in ${countryStr}`,
+  `"${query}" email contact ${countryStr}`,
+  // NEW — catch owners/founders
+  `"founder" OR "owner" OR "principal" OR "managing partner" "${query}" ${countryStr}`,
+  `site:linkedin.com/in "${query}" ("CEO" OR "founder" OR "owner")`,
+  // NEW — search by company name pattern
+  `"${query}" "about us" OR "our team" OR "leadership"`,
+];
+2. Add a company-first reverse lookup
+When you find a company (like Altbanc), do a second pass searching that company for executives. Add a new function:
+javascript// In pipeline.js — after Apollo enrichment
+const companies = [...new Set(contacts.map(c => c.company).filter(Boolean))];
+for (const company of companies) {
+  const execs = await apolloSearchByCompany(company, ["Owner", "Founder", "CEO", "Principal", "Managing Partner"]);
+  contacts.push(...execs);
+}
+3. Add Apollo's organization search to apollo.js
+javascriptexport async function apolloSearchByCompany(companyName, titles) {
+  const res = await fetch("https://api.apollo.io/v1/mixed_people/search", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      api_key: APOLLO_KEY,
+      q_organization_name: companyName,
+      person_titles: titles,
+      page: 1,
+      per_page: 25,
+    }),
+  });
+  const data = await res.json();
+  return (data.people || []).map(p => ({
+    first_name: p.first_name,
+    last_name: p.last_name,
+    full_name: p.name,
+    title: p.title,
+    company: companyName,
+    email: p.email,
+    phone: p.phone_numbers?.[0]?.sanitized_number,
+    linkedin_url: p.linkedin_url,
+    source: "apollo_company_search",
+  }));
+}
+4. Scrape the company website directly
+Add an Apify website scraper actor (apify/website-content-crawler) targeting the company's "About" or "Team" page. Owners are almost always listed there even when they're invisible on LinkedIn.
+5. Try Hunter.io's domain search (not email finder)
+Hunter has a separate endpoint that returns all emails it has on a domain — including the owner's. Add this:
+javascript// services/hunter.js — add this function
+export async function hunterDomainSearch(domain) {
+  const res = await fetch(
+    `https://api.hunter.io/v2/domain-search?domain=${domain}&api_key=${HUNTER_KEY}&limit=100`
+  );
+  const data = await res.json();
+  return data?.data?.emails || [];
+}
+This often returns the founder's email even when name-based searches miss them.
+
+Quick wins for right now:
+Before rebuilding, manually try this in your existing tool:
+
+Run a search with query: "Altbanc founder" or "Altbanc CEO"
+Run a Hunter domain search on altbanc.com
+Search Apollo by company "Altbanc" with no title filter
+
+That'll confirm whether the data exists and the issue is just your query strategy.
+Want me to write the updated pipeline.js with all these changes baked in?

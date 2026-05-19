@@ -1,0 +1,393 @@
+You are building a full CRM system to be added to the existing 
+New Dawn Franchising admin portal. This is for managing immigration 
+attorney and consultant contacts for E-2 visa investor outreach.
+
+EXISTING TECH STACK (do not change):
+- Backend: Node.js + Express
+- Database: PostgreSQL (use existing DATABASE_URL)
+- Email: SendGrid (SENDGRID_API_KEY)
+- Scraping: Apify (APIFY_API_TOKEN)
+- Frontend: React + Tailwind CSS
+- Brand colors: warm amber + dark navy
+
+════════════════════════════════════════
+PHASE 1: DATABASE SCHEMA
+════════════════════════════════════════
+
+Run the following migrations on the existing PostgreSQL DB:
+
+TABLE: contacts
+- id (UUID, primary key)
+- first_name (varchar)
+- last_name (varchar)
+- email (varchar, unique)
+- phone (varchar, E.164 format)
+- firm_name (varchar)
+- job_title (varchar)
+- persona_type (enum: 'immigration_attorney', 
+  'immigration_consultant', 'business_migration_agent', 
+  'relocation_consultant', 'international_tax_advisor')
+- country (varchar)
+- city (varchar)
+- source (varchar — e.g. "Apollo", "Apify/Google", 
+  "Apify/LinkedIn", "Manual")
+- linkedin_url (varchar)
+- website_url (varchar)
+- lead_score (integer 0–100, auto-calculated)
+- status (enum: 'new', 'contacted', 'responded', 
+  'call_scheduled', 'active_partner', 
+  'closed', 'unsubscribed', 'bounced')
+- tags (text array)
+- notes (text)
+- gdpr_note (text)
+- consent_source (varchar)
+- referred_by_contact_id (UUID, FK to contacts)
+- created_at (timestamp)
+- updated_at (timestamp)
+
+TABLE: contact_activities
+- id (UUID, primary key)
+- contact_id (UUID, FK to contacts)
+- activity_type (enum: 'email_sent', 'email_opened', 
+  'email_clicked', 'email_replied', 'email_bounced',
+  'status_changed', 'note_added', 'call_logged',
+  'sms_sent', 'whatsapp_sent', 'tag_added')
+- metadata (jsonb — e.g. campaign_id, subject, 
+  old_status, new_status)
+- created_at (timestamp)
+
+TABLE: tasks
+- id (UUID, primary key)
+- contact_id (UUID, FK to contacts)
+- title (varchar)
+- due_date (date)
+- completed (boolean, default false)
+- created_at (timestamp)
+
+TABLE: campaigns
+- id (UUID, primary key)
+- name (varchar)
+- subject_a (varchar)
+- subject_b (varchar — for A/B testing, nullable)
+- body_a (text)
+- body_b (text — nullable)
+- status (enum: 'draft', 'scheduled', 
+  'sending', 'sent', 'paused')
+- segment_filter (jsonb — stores filter criteria)
+- scheduled_at (timestamp)
+- sent_at (timestamp)
+- stats (jsonb — open_rate, click_rate, 
+  reply_rate, bounce_rate)
+- ab_winner (varchar — 'a', 'b', or null)
+- created_at (timestamp)
+
+TABLE: sequences
+- id (UUID, primary key)
+- name (varchar)
+- steps (jsonb array — each step has: 
+  day_delay, subject, body, condition)
+- status (enum: 'active', 'paused', 'archived')
+- created_at (timestamp)
+
+TABLE: sequence_enrollments
+- id (UUID, primary key)
+- sequence_id (UUID, FK to sequences)
+- contact_id (UUID, FK to contacts)
+- current_step (integer, default 0)
+- status (enum: 'active', 'paused', 
+  'completed', 'stopped')
+- enrolled_at (timestamp)
+- next_send_at (timestamp)
+
+TABLE: pipeline_deals
+- id (UUID, primary key)
+- contact_id (UUID, FK to contacts)
+- stage (enum: 'new', 'contacted', 
+  'responded', 'call_scheduled', 
+  'active_partner', 'closed')
+- notes (text)
+- referral_value (decimal)
+- moved_at (timestamp)
+- created_at (timestamp)
+
+TABLE: email_templates
+- id (UUID, primary key)
+- name (varchar)
+- subject (varchar)
+- body (text — supports merge tags)
+- category (varchar)
+- created_at (timestamp)
+
+════════════════════════════════════════
+PHASE 2: LEAD SCORING ENGINE
+════════════════════════════════════════
+
+Create /backend/services/leadScoring.js
+
+Auto-calculate lead_score (0–100) whenever a 
+contact is created or updated. Score based on:
+
++20 — Country is in high E-2 activity list:
+  Mexico, Colombia, Brazil, UAE, Saudi Arabia, 
+  South Korea, Taiwan, Canada, Israel, UK
++10 — Country is in medium E-2 list:
+  China, India, Germany, France, Spain, Australia
++15 — persona_type is 'immigration_attorney'
++10 — persona_type is 'immigration_consultant' 
+  or 'business_migration_agent'
++5  — persona_type is 'relocation_consultant' 
+  or 'international_tax_advisor'
++15 — email is present and valid format
++10 — phone is present
++5  — linkedin_url is present
++10 — status is 'responded' or 'call_scheduled'
++5  — has opened at least one email 
+  (check contact_activities)
+-10 — status is 'bounced' or 'unsubscribed'
+
+Cap score at 100. Store result in contacts.lead_score.
+Run this function whenever contact is saved.
+Expose as POST /api/contacts/:id/rescore
+
+════════════════════════════════════════
+PHASE 3: APOLLO API INTEGRATION
+════════════════════════════════════════
+
+Create /backend/services/apolloService.js
+
+Use environment variable: APOLLO_API_KEY
+
+Implement the following Apollo.io API calls:
+
+1. PEOPLE SEARCH
+   POST https://api.apollo.io/v1/mixed_people/search
+   Headers: { 'Content-Type': 'application/json',
+              'X-Api-Key': process.env.APOLLO_API_KEY }
+   Body params:
+   - person_titles: array of job titles
+   - person_locations: array of countries/cities
+   - q_keywords: search keywords
+   - page: pagination
+   - per_page: 25
+   
+2. EMAIL ENRICHMENT
+   POST https://api.apollo.io/v1/people/match
+   Match by: name + company domain
+   Returns verified email address
+
+3. BULK IMPORT
+   After Apollo search returns results, auto-map 
+   each result to the contacts schema:
+   - Run deduplication check against existing emails
+   - Calculate lead score immediately
+   - Set source = "Apollo"
+   - Log import count and skip count
+
+Expose as:
+POST /api/apollo/search — trigger search + import
+GET  /api/apollo/status — last run stats
+
+════════════════════════════════════════
+PHASE 4: CRM CONTACT VIEWS
+════════════════════════════════════════
+
+Build the following React pages/components:
+
+--- PAGE: /contacts ---
+Full contacts table with:
+- Search bar (searches name, email, firm, country)
+- Filter panel (collapsible):
+  * Status multi-select
+  * Country multi-select
+  * Persona type multi-select
+  * Lead score range slider (0–100)
+  * Tags filter
+  * Source filter
+  * Date added range
+- Columns: Name | Firm | Country | Persona | 
+  Lead Score (color-coded badge) | Status | 
+  Last Activity | Tags | Actions
+- Lead score badge colors:
+  80–100 = green, 50–79 = amber, 0–49 = gray
+- Bulk actions toolbar (appears when rows selected):
+  * Add to campaign
+  * Add tag
+  * Change status
+  * Add to sequence
+  * Export selected (CSV)
+- Pagination (50 per page)
+- "Save as Segment" button — saves current filter 
+  combination with a name
+
+--- PAGE: /contacts/:id ---
+Full contact profile page with:
+
+LEFT PANEL:
+- Name, title, firm, country, city
+- Lead score gauge (visual circle)
+- Status dropdown (editable)
+- Email, phone, LinkedIn (clickable)
+- Tags (add/remove inline)
+- Edit button → inline edit mode
+- "Move Pipeline Stage" button
+- "Add Task" button
+- "Send Email" button (opens template picker)
+
+CENTER PANEL — Activity Timeline:
+- Reverse chronological list of all activities
+- Each entry shows: icon + type + timestamp + detail
+  * 📧 Email sent: [campaign name] — [subject]
+  * 👁 Email opened: [campaign name]
+  * 🖱 Clicked: [link URL]
+  * 💬 Replied
+  * 📝 Note added: [note preview]
+  * 🔄 Status changed: [old] → [new]
+  * 📞 Call logged
+- "Add Note" input at top of timeline
+
+RIGHT PANEL:
+- Open tasks (with complete checkbox)
+- Sequence enrollment status (active sequences)
+- Referred by / Referral chain
+- GDPR note field
+- Consent source
+- Internal metadata (source, created date, 
+  last updated)
+
+--- PAGE: /pipeline ---
+Kanban board with columns:
+New | Contacted | Responded | Call Scheduled | 
+Active Partner | Closed
+
+Each card shows:
+- Contact name + firm
+- Country flag emoji
+- Lead score badge
+- Last activity timestamp
+- Quick action: "Log Call" | "Send Email"
+
+Drag and drop between columns.
+Column totals shown in header.
+Filter by country or persona above board.
+
+--- PAGE: /segments ---
+List of saved segments with:
+- Segment name
+- Filter summary (e.g. "Mexico, Attorney, Score 60+")
+- Contact count (live)
+- Last used date
+- Actions: View Contacts | Use in Campaign | Delete
+
+════════════════════════════════════════
+PHASE 5: TASK SYSTEM
+════════════════════════════════════════
+
+- Tasks visible on contact profile (right panel)
+- Global tasks page at /tasks showing all 
+  upcoming tasks sorted by due date
+- Overdue tasks highlighted in red
+- "Complete" checkbox marks done + logs activity
+- Daily digest: at 8am EST, send admin a summary 
+  email of tasks due today (use SendGrid)
+
+════════════════════════════════════════
+PHASE 6: DUPLICATE DETECTION & MERGE
+════════════════════════════════════════
+
+On every new contact import or manual add:
+1. Check for exact email match → block as duplicate
+2. Check for fuzzy name + firm match 
+   (>85% similarity using string-similarity library)
+   → flag as "possible duplicate" with yellow banner
+3. /contacts/duplicates page shows all flagged pairs
+4. "Merge" button on each pair:
+   - Keep the contact with more activity history
+   - Merge all activities, tags, tasks onto survivor
+   - Delete the duplicate record
+
+════════════════════════════════════════
+PHASE 7: NAVIGATION (ADD TO SIDEBAR)
+════════════════════════════════════════
+
+Add a new "CRM" section to the existing sidebar:
+
+📋 CRM
+  └── 👥 Contacts
+  └── 🏆 Pipeline
+  └── 🎯 Segments  
+  └── ✅ Tasks
+  └── 🔍 Find Leads (Apify scraper — existing)
+
+════════════════════════════════════════
+PHASE 8: SELF-TESTING
+════════════════════════════════════════
+
+After building, run these automated tests 
+and display results in the console AND in a 
+test results panel at /admin/tests:
+
+DATABASE TESTS:
+[ ] All 8 tables created successfully
+[ ] Foreign keys enforce correctly 
+    (try inserting orphan record, expect error)
+[ ] Unique constraint on contacts.email works
+    (try inserting duplicate email, expect error)
+
+LEAD SCORING TESTS:
+[ ] UAE immigration attorney with email + phone 
+    scores 65+ (run scoring function with mock data)
+[ ] Bounced contact loses 10 points correctly
+[ ] Score is capped at 100 (test with all fields)
+[ ] Score recalculates on contact update
+
+APOLLO SERVICE TESTS:
+[ ] Apollo API key is present in environment
+[ ] Test API connection returns 200 
+    (ping /api/apollo/status)
+[ ] Deduplication correctly skips existing emails
+[ ] Lead score calculated immediately after import
+
+CONTACT CRUD TESTS:
+[ ] POST /api/contacts — creates contact, 
+    returns 201 with id
+[ ] GET /api/contacts/:id — returns full contact
+[ ] PATCH /api/contacts/:id — updates status, 
+    logs activity_type = 'status_changed'
+[ ] DELETE (soft) — sets status = 'archived'
+[ ] Bulk tag update applies to all selected contacts
+
+PIPELINE TESTS:
+[ ] Moving contact between pipeline stages 
+    creates pipeline_deals record
+[ ] Pipeline board renders all 6 columns
+[ ] Card drag-and-drop updates stage in DB
+
+SEGMENT TESTS:
+[ ] Save segment with filter → reloads correctly
+[ ] Segment contact count matches live query
+[ ] Empty segment shows 0 contacts (not error)
+
+DUPLICATE TESTS:
+[ ] Exact email duplicate blocked on insert
+[ ] Fuzzy duplicate flagged (test with 
+    "John Smith / Smith Immigration" vs 
+    "Jon Smith / Smith Immigration LLC")
+[ ] Merge combines activities from both records
+
+Display a green ✅ or red ❌ next to each test. 
+Show total pass/fail count at top.
+Fix any failing tests before marking build complete.
+
+═══════════════════════════════════════
+ENVIRONMENT VARIABLES REQUIRED:
+═══════════════════════════════════════
+DATABASE_URL        — existing PostgreSQL
+SENDGRID_API_KEY    — existing
+SENDGRID_FROM_EMAIL — existing
+APIFY_API_TOKEN     — existing
+APOLLO_API_KEY      — add this new one
+
+Build this in full. Do not skip any section. 
+Use clean component architecture. All API calls 
+must have error handling and loading states. 
+Run all self-tests when build is complete.

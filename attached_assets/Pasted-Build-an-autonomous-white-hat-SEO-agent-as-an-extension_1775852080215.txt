@@ -1,0 +1,115 @@
+Build an autonomous white-hat SEO agent as an extension to my existing SEO Center app at newdawnfranchising.com. The agent should let me define target keywords and then work daily to improve our Google rankings for them automatically, pausing only when it needs credentials or approval from me.
+
+==================================================
+CORE CONCEPT
+==================================================
+I define campaigns like: "Get newdawnfranchising.com to page 1 of Google for 'E-2 visa franchise Texas' by [date]." The agent then runs a daily cron job that plans, executes, and reviews white-hat SEO actions toward that goal. It tracks rankings, logs every action, learns what's working, and surfaces blockers to me through an inbox UI when it needs help.
+
+==================================================
+TECH STACK
+==================================================
+- Backend: Node.js + Express (or Python + FastAPI — pick whichever fits the existing SEO Center codebase)
+- Database: Postgres (via Replit DB or Neon)
+- Scheduler: Replit Scheduled Deployments for the daily cron
+- LLM: Anthropic Claude Sonnet 4.6 via API (model string: claude-sonnet-4-6) for planning and content generation
+- SEO data: SerpAPI for rank tracking and SERP analysis
+- Backlink data: Ahrefs or Moz API (optional, behind a blocker request if not configured)
+- Headless browser: Playwright for any site that needs session-based actions
+- Secrets: Replit Secrets for API keys; AES-256 encryption at rest for any user-supplied credentials
+
+==================================================
+DATABASE SCHEMA
+==================================================
+campaigns
+  id, target_keyword, target_url, goal_rank (default 10), deadline,
+  current_rank, starting_rank, status (active/paused/blocked/completed),
+  created_at, updated_at
+
+rank_history
+  id, campaign_id, rank, serp_snapshot (jsonb), checked_at
+
+actions
+  id, campaign_id, action_type, status (planned/running/done/failed/awaiting_approval),
+  payload (jsonb), result (jsonb), created_at, completed_at
+
+blockers
+  id, campaign_id, type (credentials_needed/approval_needed/budget_needed/info_needed),
+  service, reason, instructions_for_user, priority, status (open/resolved/skipped),
+  created_at, resolved_at
+
+credentials_vault
+  id, service_name, encrypted_payload, created_at
+  (use AES-256-GCM, key stored in Replit Secrets)
+
+content_drafts
+  id, campaign_id, title, body_markdown, target_keyword, status
+  (draft/awaiting_approval/approved/published), published_url, created_at
+
+==================================================
+THE DAILY AGENT LOOP (runs once per day per active campaign)
+==================================================
+1. RANK CHECK: Call SerpAPI for the target keyword, store result in rank_history, update campaigns.current_rank.
+
+2. PLAN: Call Claude Sonnet 4.6 with a system prompt that makes it a white-hat SEO strategist (see prompt below). Pass it: current rank, rank trend over last 14 days, last 10 actions taken and their outcomes, current SERP competitors (top 10), and any open blockers. It returns a JSON array of 1–3 prioritized actions for today.
+
+3. EXECUTE: For each planned action, dispatch to the matching tool:
+   - write_blog_post → Claude generates a genuinely useful, long-form article (1500+ words) targeting the keyword semantically, not stuffed. Saves to content_drafts with status="awaiting_approval" unless I've enabled auto-publish.
+   - on_page_optimization → Analyze target_url with Lighthouse + a SERP gap analysis, generate a diff of recommended title/meta/heading/internal-link changes, save as an action for my review.
+   - technical_audit → Run Lighthouse, flag Core Web Vitals issues, create actionable tickets.
+   - haro_response → Check HARO/Qwoted/Featured for queries matching our niche, draft expert responses for my approval (never auto-submit — journalists need real humans).
+   - internal_linking → Find existing pages on newdawnfranchising.com that should link to the target page, propose the edits.
+   - competitor_gap_analysis → Pull top 3 SERP competitors, identify topics/keywords we're missing, feed into future content plans.
+   - directory_submission → Only reputable, niche-relevant directories (no link farms). Requires my approval first time per directory.
+   - guest_post_outreach → Identify relevant sites, draft personalized outreach emails, queue for my review and send-from-my-inbox.
+
+   BLACKLISTED (never do these — they violate Google's guidelines):
+   - Automated forum/comment posting
+   - Private blog networks (PBNs)
+   - Paid link schemes
+   - Mass-generated thin content
+   - Keyword stuffing
+   - Cloaking or doorway pages
+
+4. CRITIQUE: After execution, Claude reviews the day's actions vs. rank trend and writes a short retrospective to the campaign log. This feeds into the next day's planning context so the agent learns what correlates with ranking improvements.
+
+5. BLOCKER CHECK: If the planner requested a resource it doesn't have (e.g., "need Ahrefs to analyze competitor backlinks" or "need access to WordPress to publish"), it creates a blocker row instead of failing, and continues with whatever it CAN do today.
+
+==================================================
+THE PLANNER SYSTEM PROMPT (use this verbatim)
+==================================================
+"You are a senior white-hat SEO strategist working on a single campaign. Your ONLY goal is to improve the target URL's Google ranking for the target keyword through tactics that align with Google's Search Essentials and E-E-A-T guidelines. You must never recommend PBNs, paid links, automated forum spam, thin AI content, keyword stuffing, or any gray/black-hat tactic. Every action must create genuine value for real users.
+
+Given the campaign state, recent actions and their outcomes, and the current SERP landscape, output a JSON array of 1 to 3 actions to take today. Prioritize actions that address the biggest gap between our page and the top-ranking competitors. Prefer content depth, topical authority, technical health, earned links, and internal linking over volume. If you need a resource we don't have (a tool subscription, credentials, human approval), emit a 'request_blocker' action instead of guessing.
+
+Return ONLY valid JSON matching this schema: [{action_type, rationale, expected_impact, payload}]"
+
+==================================================
+BLOCKER / HUMAN-IN-THE-LOOP UI
+==================================================
+Add a new sidebar item "Campaigns" with:
+- List of active campaigns with current rank, trend sparkline, and status
+- Campaign detail view: rank history chart, action log, content drafts awaiting approval, open blockers
+- Inbox badge showing count of open blockers across all campaigns
+- Blocker resolution flow: when I click a blocker, I see the reason, instructions, and a form to either (a) paste credentials into an encrypted field, (b) approve/reject an action, (c) mark as "skip this forever"
+- Settings per campaign: auto-publish blog posts on/off, monthly budget cap, kill switch
+
+==================================================
+GUARDRAILS (implement all of these)
+==================================================
+- Hard monthly budget cap per campaign, configurable, enforced before any paid action
+- Global kill switch that pauses all campaigns instantly
+- Every action is logged and, where possible, reversible
+- Content touching legal/visa/financial topics ALWAYS requires my approval before publishing (critical for the E-2 visa niche — YMYL content)
+- Rate limit outreach to human-paced volumes (max 5 personalized emails/day per campaign)
+- Never store plaintext passwords; prefer API keys; for password-only sites, use Playwright with encrypted session cookies
+- Daily email digest to me summarizing: rank changes, actions taken, drafts awaiting review, new blockers
+
+==================================================
+DELIVERABLES
+==================================================
+1. Full working app with the schema, daily cron, planner/executor/critic loop, and UI
+2. Seed it with one example campaign so I can see the flow end-to-end
+3. README with setup steps, required API keys, and how to add new action types
+4. A /test endpoint that runs the daily loop on-demand for one campaign so I can debug without waiting 24 hours
+
+Build it step by step. Start with the schema and the rank-tracking cron, then the planner, then the executor with write_blog_post and internal_linking as the first two action types, then the blocker UI, then the remaining action types.

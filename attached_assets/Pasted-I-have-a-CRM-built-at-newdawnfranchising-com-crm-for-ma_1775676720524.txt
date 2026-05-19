@@ -1,0 +1,54 @@
+I have a CRM built at newdawnfranchising.com/crm for managing E-2 visa franchise prospects. 
+Please implement the following high-priority improvements:
+
+1. SMS / TEXT MESSAGING
+Add a "Send SMS" button on each client record using the Twilio API. Include pre-built 
+SMS templates for common follow-ups (e.g., "Hey [Name], just following up on your 
+E-2 franchise interest — do you have 15 mins this week?"). Replies should log back 
+into the client's activity history. Also allow bulk SMS to filtered client segments.
+
+2. RINGLESS VOICEMAIL DROPS
+Integrate a ringless voicemail drop feature (use Slybroadcast or Drop Cowboy API) 
+accessible from each client record and from bulk client selection. The user should 
+be able to upload or record a short audio message and drop it directly into a 
+prospect's voicemail inbox without the phone ringing. Add a "Drop Voicemail" 
+button on each client card and a bulk option in the client list.
+
+3. WHATSAPP MESSAGING
+Integrate the WhatsApp Business API (via Twilio or 360dialog) so messages can be 
+sent directly from a client's record. This is critical because the client base is 
+international (E-2 visa investors). Messages should log in the client's activity 
+timeline. Include WhatsApp message templates for initial outreach and follow-ups.
+
+4. FULLY AUTOMATED CAMPAIGN SENDING
+The email campaigns currently require the user to manually click "Send Due Emails." 
+Change this to fully automated — once a prospect is enrolled in a campaign, emails 
+should send automatically on their scheduled day without any manual trigger. Add a 
+configurable daily send window (e.g., "send between 9am–11am in the prospect's 
+local timezone"). Keep the manual override option as well.
+
+5. RICHER CLIENT PROFILE FIELDS
+Add the following fields to the Add Client form and client detail view:
+- Investment amount available (dropdown: under $100K / $100K–$200K / $200K–$500K / $500K+)
+- Country of origin / citizenship (separate from the current generic "Country" field)
+- Visa type of interest (E-2 / EB-5 / Other)
+- Language preference (English / Spanish / Korean / Portuguese / Other)
+- LinkedIn profile URL
+- Lead source (Google / Facebook Ad / Referral / Cold Outreach / Event / Other)
+- Company name and profession in home country
+- Document uploads — ability to attach files (PDF, DOCX) directly to a client record 
+  (e.g., signed FDD, receipts, agreements)
+
+6. CLIENT ACTIVITY TIMELINE
+Add a chronological activity timeline to every client record showing: emails sent 
+and whether they were opened/clicked, SMS messages sent and received, voicemails 
+dropped, WhatsApp messages, notes added, pipeline stage changes (with timestamps 
+and who made the change), and any scheduled appointments. This log should be 
+visible when you click into a client's detail page.
+
+7. RICHER PROSPECT FINDER DATA
+Upgrade the Prospect Finder to return richer data per result. Integrate Apollo.io 
+or Hunter.io API to enrich each prospect with: direct mobile number (not just 
+office line), verified personal email address, LinkedIn profile URL, company 
+website, years in business, and a data confidence score. Display these enriched 
+fields in the prospect card before the user saves them to their list.

@@ -1,0 +1,261 @@
+// outreach-planner.js
+// Daily planner for the outreach agent. Given a campaign's current state,
+// decides which leads to touch today, on which channels, and why.
+
+import Anthropic from "@anthropic-ai/sdk";
+import { z } from "zod";
+
+const client = new Anthropic(); // ANTHROPIC_API_KEY from Replit Secrets
+const MODEL = "claude-sonnet-4-5";
+
+// ---------- Action schema ----------
+const ActionSchema = z.object({
+  action_type: z.enum([
+    "draft_first_touch",
+    "draft_follow_up",
+    "handle_reply",
+    "book_meeting",
+    "draft_forum_engagement",
+    "draft_linkedin_message",
+    "pause_sequence",
+    "request_blocker",
+  ]),
+  contact_id: z.string().nullable(),
+  sequence_id: z.string().nullable(),
+  channel: z.enum(["email", "whatsapp", "sms", "linkedin_draft", "forum_draft", "none"]),
+  rationale: z.string().min(20),
+  expected_impact: z.enum(["low", "medium", "high"]),
+  payload: z.record(z.any()),
+});
+
+const PlanSchema = z.array(ActionSchema).min(1).max(25);
+
+// ---------- System prompt ----------
+const SYSTEM_PROMPT = `You are Dylan's head of outreach at New Dawn Franchising. Your only goal is to book qualified Zoom meetings with prospects who can realistically refer E-2 visa franchise clients. You think like a sharp BDR who deeply respects the recipient's time and inbox.
+
+HARD RULES you will never break:
+- Every message must be genuinely personalized with something specific about the recipient — no mail-merge-flavored fake personalization
+- Every email must include one-click unsubscribe and a physical address (CAN-SPAM)
+- WhatsApp first touches require an approved Business template; free-form only after they reply
+- LinkedIn is DRAFT ONLY — a human sends it, never the agent
+- Forum posts must be substantively helpful, never thinly-veiled ads
+- Never impersonate Dylan in a way that misleads on material facts; the voice is his but the content must be truthful
+- If a recipient asks to stop, pause the entire sequence across all channels immediately
+- Respect per-channel daily send caps and per-contact cooldowns (max 1 touch per 3 days, max 5 touches per sequence)
+- Respect local business hours for WhatsApp
+
+STRATEGY PRINCIPLES:
+- Reply-generating activity beats volume. One thoughtful touch > ten generic ones.
+- First touches ask for a reply, not a meeting. Meetings come in touch 2 or 3 after engagement.
+- Positive replies ALWAYS surface to the human before sending the booking message — never auto-book.
+- When a channel is underperforming (low reply rate over the last 14 days), shift budget away from it and propose testing a new angle.
+- When reply volume is high, prioritize handle_reply actions over sourcing new first touches.
+- If you lack a resource (Apollo credits, approved WhatsApp template, compliance clearance for a new geo), emit request_blocker instead of guessing.
+
+Given campaign state, recent performance, and today's top-scored leads, return a JSON array of 1–25 actions for today. Respond with ONLY valid JSON — no prose, no markdown fences.
+
+Schema per action:
+{
+  "action_type": "<one of the allowed types>",
+  "contact_id": "<id or null for campaign-level actions>",
+  "sequence_id": "<id or null>",
+  "channel": "email" | "whatsapp" | "sms" | "linkedin_draft" | "forum_draft" | "none",
+  "rationale": "<why this action now, grounded in the data>",
+  "expected_impact": "low" | "medium" | "high",
+  "payload": { <action-specific fields> }
+}
+
+Payload examples:
+- draft_first_touch: { "personalization_hook": "her recent LinkedIn post about E-2 processing times", "angle": "offer to share our franchise vetting checklist" }
+- handle_reply: { "reply_id": "...", "sentiment": "interested", "suggested_response_summary": "thank, offer Calendly link, ask one qualifying question" }
+- request_blocker: { "type": "credentials_needed", "service": "Apollo", "reason": "Monthly credits exhausted", "instructions_for_user": "Top up at apollo.io/billing" }`;
+
+// ---------- Context builder ----------
+function buildUserMessage({
+  campaign,
+  weeklyPerformance,
+  channelStats,
+  topLeads,
+  pendingReplies,
+  activeSequences,
+  openBlockers,
+  sendCapsRemaining,
+}) {
+  const perfSummary = `
+  Weekly goal: ${campaign.weekly_meeting_goal} meetings
+  Booked this week: ${weeklyPerformance.meetings_booked}
+  Replies this week: ${weeklyPerformance.replies}
+  Touches sent this week: ${weeklyPerformance.touches_sent}
+  Reply rate: ${(weeklyPerformance.reply_rate * 100).toFixed(1)}%`;
+
+  const channelBreakdown = Object.entries(channelStats)
+    .map(
+      ([ch, s]) =>
+        `  ${ch}: ${s.sent} sent, ${s.replied} replied (${(s.reply_rate * 100).toFixed(1)}%), ${s.meetings} meetings`
+    )
+    .join("\n");
+
+  const leadsList = topLeads
+    .slice(0, 20)
+    .map(
+      (l) =>
+        `  - ${l.id} | ${l.first_name} ${l.last_name}, ${l.job_title} @ ${l.firm_name} (${l.country}) | score ${l.lead_score} | ${l.score_rationale}`
+    )
+    .join("\n") || "  (no new leads — source more or focus on replies)";
+
+  const repliesList = pendingReplies
+    .slice(0, 15)
+    .map(
+      (r) =>
+        `  - reply_id ${r.id} | contact ${r.contact_id} | channel ${r.channel} | preview: "${r.reply_preview?.slice(0, 120)}"`
+    )
+    .join("\n") || "  (none pending)";
+
+  const sequencesList = activeSequences
+    .slice(0, 20)
+    .map(
+      (s) =>
+        `  - seq ${s.id} | contact ${s.contact_id} | step ${s.current_step}/5 | last touch ${s.last_touch_days_ago}d ago | status ${s.status}`
+    )
+    .join("\n") || "  (no active sequences)";
+
+  const blockersList = openBlockers.length
+    ? openBlockers.map((b) => `  - ${b.service}: ${b.reason}`).join("\n")
+    : "  (none)";
+
+  const capsList = Object.entries(sendCapsRemaining)
+    .map(([ch, remaining]) => `  ${ch}: ${remaining} sends remaining today`)
+    .join("\n");
+
+  return `CAMPAIGN
+  ID: ${campaign.id}
+  Name: ${campaign.name}
+  Persona target: ${JSON.stringify(campaign.persona_target)}
+  Channels enabled: ${Object.keys(campaign.channels_enabled).filter((k) => campaign.channels_enabled[k]).join(", ")}
+
+WEEKLY PERFORMANCE${perfSummary}
+
+CHANNEL BREAKDOWN (last 14 days)
+${channelBreakdown || "  (no data yet)"}
+
+SEND CAPS REMAINING TODAY
+${capsList}
+
+TOP-SCORED LEADS READY FOR FIRST TOUCH
+${leadsList}
+
+PENDING REPLIES NEEDING HANDLING (prioritize these)
+${repliesList}
+
+ACTIVE SEQUENCES (candidates for follow-up)
+${sequencesList}
+
+OPEN BLOCKERS
+${blockersList}
+
+Plan today's actions. Handle pending replies first, then follow-ups on warm sequences, then first touches on top leads — within the send caps. Stop proposing actions when you've hit the caps or when additional volume would hurt reply quality.`;
+}
+
+// ---------- Main entry ----------
+export async function planDailyOutreach({
+  campaign,
+  weeklyPerformance,
+  channelStats,
+  topLeads,
+  pendingReplies,
+  activeSequences,
+  openBlockers,
+  sendCapsRemaining,
+}) {
+  const userMessage = buildUserMessage({
+    campaign,
+    weeklyPerformance,
+    channelStats,
+    topLeads,
+    pendingReplies,
+    activeSequences,
+    openBlockers,
+    sendCapsRemaining,
+  });
+
+  let lastError;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const response = await client.messages.create({
+        model: MODEL,
+        max_tokens: 4096,
+        system: SYSTEM_PROMPT,
+        messages: [{ role: "user", content: userMessage }],
+      });
+
+      const text = response.content
+        .filter((b) => b.type === "text")
+        .map((b) => b.text)
+        .join("")
+        .trim();
+
+      const cleaned = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
+
+      const parsed = JSON.parse(cleaned);
+      const validated = PlanSchema.parse(parsed);
+
+      // Safety: enforce send caps at the planner boundary, not just in prompt
+      const capped = enforceSendCaps(validated, sendCapsRemaining);
+
+      return {
+        success: true,
+        actions: capped.actions,
+        dropped: capped.dropped,
+        usage: response.usage,
+      };
+    } catch (err) {
+      lastError = err;
+      console.warn(`Outreach planner attempt ${attempt} failed:`, err.message);
+    }
+  }
+
+  return {
+    success: false,
+    actions: [],
+    error: lastError?.message ?? "unknown planner failure",
+  };
+}
+
+// ---------- Send cap enforcement (belt and suspenders) ----------
+function enforceSendCaps(actions, capsRemaining) {
+  const caps = { ...capsRemaining };
+  const kept = [];
+  const dropped = [];
+
+  // Sort so reply handling and follow-ups go first, first touches last
+  const priority = {
+    handle_reply: 0,
+    book_meeting: 1,
+    pause_sequence: 2,
+    draft_follow_up: 3,
+    draft_first_touch: 4,
+    draft_forum_engagement: 5,
+    draft_linkedin_message: 6,
+    request_blocker: 7,
+  };
+  const sorted = [...actions].sort(
+    (a, b) => (priority[a.action_type] ?? 99) - (priority[b.action_type] ?? 99)
+  );
+
+  for (const action of sorted) {
+    // LinkedIn and forum drafts don't count against send caps (human sends them)
+    const countsAgainstCap = ["email", "whatsapp", "sms"].includes(action.channel);
+    if (!countsAgainstCap) {
+      kept.push(action);
+      continue;
+    }
+    if ((caps[action.channel] ?? 0) > 0) {
+      kept.push(action);
+      caps[action.channel] -= 1;
+    } else {
+      dropped.push({ action, reason: `${action.channel} daily cap reached` });
+    }
+  }
+
+  return { actions: kept, dropped };
+}

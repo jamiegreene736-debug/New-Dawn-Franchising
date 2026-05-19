@@ -1,0 +1,618 @@
+Build out a comprehensive Overview Dashboard for the New Dawn Franchising
+Franchisee Marketing Portal and restructure the portal navigation so that
+Pipeline is its own dedicated top-level tab, completely separate from
+Reports. This prompt covers the full dashboard layout, every metric
+displayed, the navigation restructure, and the Pipeline page build.
+
+---
+
+## PART 1 — MARKETING PORTAL NAVIGATION RESTRUCTURE
+
+The current portal navigation needs to be restructured. Pipeline must
+be its own tab. Reports must be its own tab. Neither lives inside
+the other.
+
+CURRENT (broken):
+Dashboard / Leads / Outreach / Reports (contains pipeline) / Settings
+
+NEW STRUCTURE (correct):
+├── Overview          ← the main dashboard (this build)
+├── Pipeline          ← dedicated kanban + table view (own tab)
+├── Leads             ← lead discovery, scoring, individual records
+├── Outreach          ← daily brief, staged messages, sent log, sequences
+├── Letters           ← physical mail recommendations and Lob tracking
+├── Reports           ← analytics, charts, exports, performance history
+└── Settings          ← voice profile, Calendly, notifications, agent config
+
+Each tab is a top-level nav item in the portal sidebar.
+No tab is nested inside another.
+Active tab is highlighted with NDF brand colour left border accent.
+Sidebar is collapsible on desktop (icon-only mode) and slides in
+from the left on mobile via hamburger.
+
+Tab icons (use Lucide React):
+Overview   → LayoutDashboard
+Pipeline   → GitMerge
+Leads      → Users
+Outreach   → Send
+Letters    → Mail
+Reports    → BarChart2
+Settings   → Settings
+
+---
+
+## PART 2 — OVERVIEW DASHBOARD (/marketing-portal/dashboard)
+
+The Overview Dashboard is the first thing a franchisee sees when
+they log in. It must answer the question "how is my business doing
+right now?" in under 10 seconds. Every metric is real-time or
+updated within the last 24 hours. No metric is filler.
+
+The dashboard is divided into six visual zones stacked vertically:
+
+  ZONE 1 — Daily Agent Status Bar (full width, top of page)
+  ZONE 2 — Primary KPI Cards (top metrics row)
+  ZONE 3 — Pipeline Health Row
+  ZONE 4 — Outreach Performance Row
+  ZONE 5 — Two-column section: Activity Feed + Upcoming Actions
+  ZONE 6 — Mini Charts Row (trend sparklines)
+
+---
+
+### ZONE 1 — DAILY AGENT STATUS BAR (full width banner)
+
+A slim status bar pinned just below the portal nav. Always visible.
+Changes colour and content based on current agent state.
+
+States and colours:
+  PENDING (yellow): "⏳ Today's outreach brief is ready and waiting
+  for your approval. [View & Approve Brief →]"
+
+  APPROVED (blue, pulsing dot): "🔵 Agent is executing — X messages
+  are being sent right now. [View Activity →]"
+
+  EXECUTED (green): "✅ Done for today — X emails sent, X WhatsApp
+  sent, X letters queued. [View Summary →]"
+
+  HELD (grey): "⏸ Today's outreach was held. Nothing was sent.
+  [Review in Outreach →]"
+
+  NOT EXECUTED (red): "⚠️ Today's brief expired without approval.
+  Messages have rolled over to tomorrow. [Review →]"
+
+  NO BRIEF YET (neutral): "Agent is preparing today's brief.
+  Check back at 7:00 AM."
+
+The banner is always one click away from the relevant action.
+
+---
+
+### ZONE 2 — PRIMARY KPI CARDS (8 cards in a responsive grid)
+
+Display these 8 metric cards in a 4x2 grid (desktop) or 2x4 (mobile).
+Each card shows: metric name, current value (large), comparison delta
+(vs last 7 days or last month), and a mini trend indicator (up/down arrow
+with percentage change). Cards use colour-coded status: green = good,
+amber = watch, red = needs attention.
+
+CARD 1 — TOTAL ACTIVE LEADS
+Value: Total number of leads currently in the pipeline
+(excludes Cold tier and DNC)
+Delta: "+X new this week"
+Colour: neutral — informational
+Click: goes to Pipeline page
+
+CARD 2 — HOT LEADS 🔴
+Value: Number of leads currently scoring 80+
+Delta: "+X vs last week"
+Colour: red accent — signals urgency
+Click: goes to Pipeline filtered to HOT tier
+Sub-line: "X have a verified address — letter ready"
+
+CARD 3 — CONSULTATIONS BOOKED
+Value: Total Zoom/call consultations booked this month
+Delta: "+X vs last month"
+Colour: green if above target, amber if below
+Click: goes to bookings calendar
+Sub-line: "Next call: [Date, Time] with [Lead First Name]"
+
+CARD 4 — OUTREACH SENT TODAY
+Value: Total messages sent today (emails + WhatsApp combined)
+Delta: "X emails / X WhatsApp"
+Colour: green if brief was approved, grey if not yet
+Click: goes to Outreach sent log
+
+CARD 5 — EMAIL OPEN RATE (last 30 days)
+Value: Percentage displayed large (e.g. "42%")
+Delta: "+X% vs last month"
+Colour: green if above 35%, amber if 20-35%, red if below 20%
+Click: goes to Reports — email performance
+
+CARD 6 — REPLY RATE (last 30 days)
+Value: Percentage of outreach emails that received a reply
+Delta: "+X% vs last month"
+Colour: green if above 8%, amber if 4-8%, red if below 4%
+Click: goes to Reports — reply performance
+
+CARD 7 — ACTIVE MANAGED PROPERTIES
+Value: Number of homeowner properties currently under management
+Delta: "+X added this month"
+Colour: always green (positive metric)
+Click: goes to a property portfolio view (future feature placeholder)
+Sub-line: "X new signed this month"
+
+CARD 8 — PIPELINE VALUE (estimated)
+Value: Estimated monthly recurring revenue if all WARM and HOT
+leads convert (based on average management fee × property count)
+Delta: "+$X vs last week"
+Colour: green
+Formula shown on hover: "Based on X leads × avg $[fee]/mo"
+Click: goes to Reports — revenue forecast
+Note: Label clearly as "Estimated Pipeline Value" not confirmed revenue
+
+---
+
+### ZONE 3 — PIPELINE HEALTH ROW
+
+A full-width visual row showing the health of the lead pipeline
+at a glance. Three components side by side:
+
+COMPONENT A — STAGE FUNNEL (left, 40% width)
+A horizontal funnel chart showing lead counts at each stage:
+  New Lead        [████████████████] 47
+  Contacted       [████████████] 31
+  Replied         [████████] 18
+  Call Scheduled  [█████] 9
+  Call Completed  [███] 6
+  Proposal Sent   [██] 4
+  Converted       [█] 2
+
+Each bar is colour-coded by stage progression (lighter to darker
+NDF brand colour as stages progress). Click any stage bar to jump
+to the Pipeline page filtered to that stage.
+
+Show conversion rate between each stage:
+  Contacted → Replied: 58% (green/amber/red based on benchmark)
+  Replied → Call Scheduled: 50%
+  Call Scheduled → Completed: 67%
+  Completed → Converted: 33%
+
+COMPONENT B — LEAD TIER BREAKDOWN (centre, 25% width)
+A donut chart showing current leads by tier:
+  🔴 HOT       X leads
+  🟠 WARM      X leads
+  🟡 NURTURE   X leads
+  🔵 WATCH     X leads
+  ⚪ COLD       X leads
+
+Centre of donut: total active leads (excludes Cold and DNC)
+Legend below the chart with counts and percentages
+
+COMPONENT C — PIPELINE VELOCITY (right, 35% width)
+Three key velocity metrics displayed as large numbers:
+
+  Avg days: Lead → First Contact
+  [X days] — benchmark: under 1 day (green/amber/red)
+
+  Avg days: First Contact → Consultation Booked
+  [X days] — benchmark: under 14 days
+
+  Avg days: Consultation → Signed Client
+  [X days] — benchmark: under 21 days
+
+Below the three metrics, a single line:
+"Best performing source this month: [Source Name] — X% conversion"
+
+---
+
+### ZONE 4 — OUTREACH PERFORMANCE ROW
+
+Four metric tiles in a single horizontal row showing outreach
+health across all channels over the last 30 days.
+
+TILE 1 — EMAIL PERFORMANCE
+  Sent: X | Delivered: X (X%) | Opened: X (X%) | Replied: X (X%)
+  Clicked: X (X%) | Bounced: X | Unsubscribed: X
+  Mini bar: Sent → Delivered → Opened → Replied (funnel within tile)
+  Benchmark lines shown as a thin dotted line on the bars
+
+TILE 2 — WHATSAPP PERFORMANCE
+  Sent: X | Delivered: X (X%) | Read: X (X%) | Replied: X (X%)
+  Opted out: X
+  Status: WhatsApp Business API connected ✅ / ⚠️
+
+TILE 3 — PHYSICAL MAIL PERFORMANCE (Lob)
+  Letters sent this month: X
+  In transit: X | Estimated delivered: X | Returned: X
+  Total spend: $X
+  Avg cost per letter: $X
+  Conversion: X consultations booked within 14 days of a letter
+
+TILE 4 — AGENT APPROVAL STATS
+  Days briefed this month: X / [days in month]
+  Days approved (YES): X (X%)
+  Days held (NO or expired): X
+  Avg approval time: X minutes after brief received
+  "You've approved X% of briefs this month"
+  Green progress bar showing approval rate
+
+---
+
+### ZONE 5 — TWO COLUMN SECTION
+
+Left column (60% width): LIVE ACTIVITY FEED
+Right column (40% width): UPCOMING ACTIONS
+
+LEFT — LIVE ACTIVITY FEED
+A scrollable chronological log of everything the agent has done
+in the last 48 hours and everything that has happened in the pipeline.
+Each entry has a timestamp, an icon, a colour dot, and a one-line
+description. Entries load in real time (poll every 60 seconds).
+
+Entry types and icons:
+  🟢 Lead discovered: "New lead found: [Name], homeowner,
+     [City] — Score: [X] [tier]"
+  📧 Email sent: "Email sent to [Name] — Touch [X] of sequence"
+  📩 Reply received: "Reply from [Name] — [first 8 words of reply]...
+     [View →]"
+  📬 Email opened: "[Name] opened your email (X times)"
+  🔗 Link clicked: "[Name] clicked your Calendly link"
+  📅 Booking: "[Name] booked a consultation for [date/time]"
+  ✉️ Letter: "Letter to [Name] submitted to Lob —
+     Est. delivery [date]"
+  ✉️ Letter: "Letter to [Name] is in transit"
+  📈 Score change: "[Name]'s score increased from [X] to [X]
+     — [reason]"
+  ⬇️ Score decay: "[Name] dropped from WARM to NURTURE
+     — no activity in 30 days"
+  ⏸ Held: "Today's brief was held — no messages sent"
+  ✅ Executed: "Today's brief executed — X messages sent"
+
+Show last 20 entries with a "Load more" button.
+Each entry links to the relevant lead record or outreach log.
+
+RIGHT — UPCOMING ACTIONS
+A prioritised to-do style list of things needing attention.
+Sorted by urgency. Each item has a priority badge and one-click action.
+
+Section A: TODAY (red badge)
+  - "Approve today's brief" (if pending)
+  - "X leads need a follow-up today" → link to Pipeline
+  - "Consultation with [Name] at [time]" → link to booking
+  - "X letters awaiting your approval" → link to Letters
+
+Section B: THIS WEEK (amber badge)
+  - "[Name] — Touch 3 due in 2 days (no reply yet)"
+  - "[Name] — Consultation follow-up overdue"
+  - "X HOT leads have no outreach scheduled yet"
+
+Section C: WATCH (blue badge)
+  - "X leads have been in 'Contacted' for 14+ days with no reply
+    — consider a different approach"
+  - "X leads decayed from WARM to NURTURE this week"
+  - "X email bounces this week — addresses need updating"
+
+"No action needed" state: show a clean green checkmark and
+"You're all caught up" if there are no urgent items.
+
+---
+
+### ZONE 6 — MINI CHARTS ROW (trend sparklines)
+
+Four small sparkline charts in a single row showing 30-day trends.
+Each has a title, current value, and a small line chart.
+Keep these compact — they are supplementary context, not primary metrics.
+
+CHART 1 — LEADS DISCOVERED PER DAY (30 days)
+  Line chart, 30 data points
+  Current average: X per day
+  "Discovery is [trending up/down/stable]"
+
+CHART 2 — OUTREACH SENT PER DAY (30 days)
+  Line chart, 30 data points
+  Stacked: email (dark) + WhatsApp (medium) + letters (light)
+  Current total: X per day avg
+
+CHART 3 — REPLY RATE TREND (weekly, last 8 weeks)
+  Line chart, 8 data points (one per week)
+  Current: X% | Best week: X%
+  Benchmark dotted line at 8%
+
+CHART 4 — CONSULTATIONS BOOKED PER WEEK (last 8 weeks)
+  Bar chart, 8 bars
+  Current week: X | Best week: X
+  Monthly target line (set in settings)
+
+---
+
+## PART 3 — PIPELINE PAGE (/marketing-portal/pipeline)
+
+The Pipeline page is now its own dedicated tab with two view modes:
+Kanban Board and Table View. Toggle between them with a button
+in the top right of the page.
+
+---
+
+### PIPELINE PAGE HEADER
+
+Row 1: Page title "My Pipeline" + view toggle (Kanban / Table)
++ filter button + sort button + "Add Lead" button (right)
+
+Row 2: A slim summary strip showing totals per stage:
+  New: X | Contacted: X | Replied: X | Call Scheduled: X |
+  Call Completed: X | Proposal Sent: X | Converted: X | Lost: X
+  
+  Each number is clickable and filters the view to that stage.
+  Total active: X | Total value: $X est.
+
+---
+
+### KANBAN BOARD VIEW
+
+One column per pipeline stage. Columns are horizontally scrollable.
+
+STAGES (left to right):
+  New Lead | Contacted | Replied | Call Scheduled |
+  Call Completed | Proposal Sent | Converted | Lost
+
+Each column:
+- Column header with stage name + lead count badge
+- Estimated value for leads in this stage (sum of pipeline value)
+- Cards are vertically scrollable within each column
+- "Add lead to this stage" button at bottom of each column
+
+Each lead card shows:
+- Lead name (bold) and company/property count if known
+- Score badge (number + tier colour dot)
+- Lead source tag (small pill: Zillow / Apollo / Reddit / Referral etc.)
+- Days in current stage (amber if 7+ days, red if 14+ days)
+- Channel icons showing which outreach has been sent
+  (email envelope / WhatsApp / letter icons, greyed out if not sent)
+- Last activity line: "Opened email 2h ago" / "No activity 8 days"
+- Quick action buttons on hover:
+  👁 View record | ✉️ Draft email | 📞 Log call | ➡️ Move stage
+
+Drag and drop cards between columns to change stage.
+Stage change is instant and logged to the activity timeline.
+
+---
+
+### TABLE VIEW
+
+A sortable, filterable data table showing all pipeline leads.
+
+Columns:
+  Name | Score | Tier | Stage | Source | Properties | Days in Stage |
+  Last Activity | Last Contacted | Next Follow-up | Channel Status |
+  Letter Status | Actions
+
+Column features:
+- Click column header to sort ascending/descending
+- Resize columns by dragging
+- Toggle column visibility (show/hide columns button)
+- Sticky first column (Name) when scrolling horizontally
+
+Row features:
+- Click row to open lead record side panel (without leaving the page)
+- Checkbox for bulk selection
+- Colour coded rows: HOT = subtle red tint, WARM = subtle amber
+
+Bulk actions (appear when rows are checked):
+  Move to stage | Add tag | Assign sequence |
+  Mark as DNC | Export selected | Delete
+
+---
+
+### PIPELINE FILTERS
+
+Filter panel (slides out from right on desktop, bottom sheet on mobile):
+
+  Lead tier: All / HOT / WARM / NURTURE / WATCH / COLD
+  Stage: multi-select checkboxes for all stages
+  Source: Apollo / Zillow / Reddit / Referral / Facebook / Other
+  Score range: dual slider (0 to 100)
+  Days in stage: any / 0-7 / 7-14 / 14-30 / 30+
+  Last activity: any / today / this week / this month / 30+ days ago
+  Has letter: yes / no / in transit / delivered
+  Has verified address: yes / no
+  Follow-up due: today / this week / overdue
+
+Active filters shown as dismissable pills below the header row.
+"Clear all filters" button when any filter is active.
+
+---
+
+### PIPELINE SETTINGS
+
+A small gear icon on the Pipeline page opens pipeline settings:
+- Set monthly consultation target (used in charts and progress bars)
+- Set estimated average monthly management fee per property
+  (used to calculate pipeline value estimates)
+- Set stage names (Dylan can rename stages from the admin panel)
+- Configure which stages count as "active" for KPI calculations
+- Set days-in-stage thresholds for amber/red warnings
+
+---
+
+## PART 4 — DASHBOARD SETTINGS & PERSONALISATION
+
+Add a "Customise Dashboard" button in the top right of the Overview
+page. Clicking it opens a settings panel where the franchisee can:
+
+- Reorder the six zones (drag to reorder)
+- Show/hide individual KPI cards
+- Set their monthly consultation target
+  (used to colour-code the consultations booked card)
+- Set their estimated average management fee per property
+  (used for pipeline value calculations)
+- Choose dashboard date range default: 7 days / 30 days / 90 days
+- Toggle real-time activity feed auto-refresh on/off
+
+These preferences are saved per franchisee in the database.
+
+---
+
+## PART 5 — REPORTS PAGE (/marketing-portal/reports)
+(restructured — no longer contains Pipeline)
+
+Reports is now purely for historical analysis, charts, and exports.
+
+Tab structure within the Reports page:
+  Overview | Email | WhatsApp | Letters | Pipeline Trends |
+  Lead Sources | Revenue Forecast | Export
+
+OVERVIEW TAB:
+  - 30/60/90 day performance summary
+  - Key metric comparison tables (this period vs last period)
+  - Funnel conversion rate history
+
+EMAIL TAB:
+  - Sent / delivered / opened / clicked / replied / bounced over time
+  - Best performing subject lines (ranked by open rate)
+  - Best performing templates (ranked by reply rate)
+  - A/B test results
+  - Sequence performance by touch number
+
+WHATSAPP TAB:
+  - Sent / delivered / read / replied over time
+  - Best performing message templates
+  - Opt-out rate trend
+
+LETTERS TAB:
+  - Letters sent / in transit / delivered / returned by month
+  - Cost per letter and total monthly spend
+  - Consultation conversion rate for letter recipients
+  - Average delivery time by country/region
+
+PIPELINE TRENDS TAB:
+  - Lead volume by stage over time (stacked area chart)
+  - Stage conversion rates over time (did they improve?)
+  - Average days in each stage over time
+  - Lead score distribution over time
+  - Win rate trend (converted / total closed)
+
+LEAD SOURCES TAB:
+  - Lead volume by source (bar chart)
+  - Conversion rate by source (which source produces best leads?)
+  - Cost per lead if applicable
+  - Best source this month highlighted
+
+REVENUE FORECAST TAB:
+  - Pipeline value estimate based on current leads and conversion rates
+  - Projected monthly management fee revenue at 3 / 6 / 12 months
+  - Properties under management growth chart
+  - Monthly recurring revenue trend
+
+EXPORT TAB:
+  - Export leads (CSV / Excel)
+  - Export outreach history (CSV)
+  - Export letter history (CSV)
+  - Export performance report (PDF — NDF branded)
+  - Scheduled reports: set a weekly PDF report to be emailed
+    to the franchisee every Monday morning
+
+---
+
+## DATABASE ADDITIONS
+
+model FranchiseeDashboardPreferences {
+  id                    String   @id @default(cuid())
+  franchiseeId          String   @unique
+  zoneOrder             Json     @default("[]")
+  hiddenKpiCards        Json     @default("[]")
+  consultationTarget    Int      @default(4)
+  avgManagementFee      Float    @default(120)
+  defaultDateRange      Int      @default(30)
+  activityFeedAutoRefresh Boolean @default(true)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  franchisee            Franchisee @relation(fields: [franchiseeId], references: [id])
+}
+
+Add to FranchiseeContact model:
+  pipelineValue         Float?
+  daysInCurrentStage    Int      @default(0)
+  stageEnteredAt        DateTime?
+  lastActivityAt        DateTime?
+  consultationDate      DateTime?
+  proposalSentAt        DateTime?
+  convertedAt           DateTime?
+
+---
+
+## API ENDPOINTS NEEDED FOR DASHBOARD
+
+GET /api/franchisee/dashboard/summary
+  Returns all Zone 2 KPI card values for the logged-in franchisee
+  Response includes: activeleads, hotLeads, consultationsBooked,
+  outreachSentToday, emailOpenRate, replyRate, activeProperties,
+  pipelineValue (estimated)
+
+GET /api/franchisee/dashboard/pipeline-health
+  Returns stage funnel counts, tier breakdown, velocity metrics
+
+GET /api/franchisee/dashboard/outreach-performance
+  Returns email, WhatsApp, letter, and approval stats (last 30 days)
+
+GET /api/franchisee/dashboard/activity-feed?limit=20&offset=0
+  Returns paginated activity feed entries for the franchisee
+
+GET /api/franchisee/dashboard/upcoming-actions
+  Returns prioritised action items grouped by urgency
+
+GET /api/franchisee/dashboard/sparklines
+  Returns 30-day daily data for all four sparkline charts
+
+GET /api/franchisee/pipeline?stage=&tier=&source=&scoreMin=&scoreMax=
+  Returns filtered pipeline leads for the Pipeline page
+
+PATCH /api/franchisee/pipeline/:leadId/stage
+  Updates a lead's stage (drag and drop kanban action)
+  Body: { stage: "replied" }
+  Logs a stage_change activity entry automatically
+
+GET /api/franchisee/reports/:tab?from=&to=
+  Returns data for each Reports tab with date range filtering
+
+---
+
+## IMPORTANT BUILD NOTES
+
+- All dashboard data must be scoped to the logged-in franchisee only —
+  never return data from another franchisee's account
+
+- The daily agent status bar (Zone 1) is the most important UI element
+  on the entire dashboard — make it impossible to miss and always
+  one click away from taking action
+
+- Pipeline value estimates must always be clearly labelled as
+  estimated — never present projected revenue as confirmed
+
+- The kanban drag-and-drop must work smoothly on both desktop
+  and mobile (use a touch-friendly drag library)
+
+- KPI card deltas should compare against the same period length:
+  if showing last 7 days, compare against the 7 days before that.
+  Never compare 7 days against a full month.
+
+- Cards that have no data yet (new franchisee) should show a clean
+  empty state with a helpful prompt rather than zeros:
+  "No consultations yet — your first lead is waiting in Pipeline →"
+
+- The activity feed should feel live — poll every 60 seconds and
+  animate new entries sliding in from the top
+
+- Pipeline value calculation: (number of HOT + WARM leads) ×
+  (franchisee's configured average management fee) × (historical
+  conversion rate for their tier — default to 15% if no history yet)
+  Always show the formula on hover so the franchisee understands it
+
+- Dashboard loads must be fast — use skeleton loading states on all
+  zones so the page feels instant even before data arrives
+
+- All charts use Recharts. Keep them clean — no chart junk,
+  no unnecessary gridlines, data labels only where they add value
+
+- Build the full demo mode with realistic fake data for all zones
+  including a sample HOT lead, a consultation booked this week,
+  a letter in transit, and 30 days of sparkline trend data

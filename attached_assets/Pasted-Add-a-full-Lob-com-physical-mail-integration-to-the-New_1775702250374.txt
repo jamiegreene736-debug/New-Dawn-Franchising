@@ -1,0 +1,505 @@
+Add a full Lob.com physical mail integration to the New Dawn Franchising
+CRM. This covers the client card UI, the AI agent pipeline, the approval
+flow, and full delivery tracking. Physical letters are NEVER sent
+automatically — they are always recommended by the agent and require
+Dylan's explicit approval before anything is submitted to Lob.
+
+---
+
+## LOB INTEGRATION OVERVIEW
+
+Install the Lob SDK:
+  npm install @lob/lob-typescript-sdk
+
+Lob is used exclusively for sending personalised physical letters to
+high-scoring leads (score 80+) who have a verified mailing address.
+The agent drafts the letter content using OpenAI, prepares the letter
+in the staging area, recommends it to Dylan in the daily briefing email,
+and only submits it to Lob after Dylan replies with explicit approval.
+
+---
+
+## PART 1 — CLIENT CARD / LEAD RECORD UI CHANGES (/leads/:id)
+
+Add a dedicated "Physical Mail" tab or panel on every lead record.
+This panel is always visible but shows different states depending on
+whether the lead qualifies and what the letter status is.
+
+### STATES THE PANEL CAN SHOW:
+
+STATE A — Not eligible (score below 80 or no verified address):
+  Show a muted info box:
+  "This lead does not currently qualify for a physical letter.
+   Threshold: score 80+ with a verified mailing address.
+   Current score: [X]. [Address: not verified / verified]"
+  Show a manual override button: "Send letter anyway"
+  (requires Dylan to confirm — bypasses score threshold only,
+  still requires a verified address)
+
+STATE B — Eligible, no letter drafted yet:
+  Show a green banner:
+  "✉️ This lead qualifies for a physical letter"
+  Score: [X] 🔴 HOT | Address: [verified address displayed]
+  Button: "Draft Letter Now"
+  On click: call OpenAI to generate a personalised letter draft
+  using the lead's research dossier. Show a loading state while
+  generating. Display the draft in an editable rich text field
+  once ready.
+
+STATE C — Letter drafted, pending Dylan's approval:
+  Show the full letter preview in a clean formatted panel
+  (styled to look like actual letterhead — New Dawn Franchising
+  logo at top, lead's address block, body text, QR code placeholder,
+  footer with NDF address)
+  Below the preview:
+  - "Approve & Add to Today's Brief" button
+    (adds to the daily batch staging area as a letter recommendation)
+  - "Edit Letter" button (opens editable text field)
+  - "Regenerate" button (calls OpenAI again with a different angle)
+  - "Discard" button
+  Show a note: "Approving adds this to tomorrow's daily briefing
+  email. You will still need to confirm in that email before it
+  is physically sent."
+
+STATE D — Letter included in daily brief, awaiting email confirmation:
+  Show a yellow status badge: "Included in today's brief — awaiting
+  your email confirmation"
+  Show a preview of exactly how it appears in the daily brief email
+  Show a "Approve Now via Portal" button as an alternative to
+  replying to the email (triggers the same Lob submission flow)
+  Show estimated cost: "~$[X] to mail to [country]"
+
+STATE E — Approved, submitted to Lob:
+  Show a blue badge: "Letter submitted to Lob"
+  Lob Letter ID: [id]
+  Submitted: [date and time]
+  Estimated delivery: [date range]
+  Destination: [country]
+  Cost: $[amount]
+  "View in Lob dashboard" link
+
+STATE F — In transit:
+  Show a green badge: "Letter in transit"
+  Estimated delivery: [date range]
+  Days since mailed: [X]
+  Lob tracking info if available
+
+STATE G — Delivered (estimated):
+  Show a checkmark badge: "Letter estimated delivered"
+  Note: "Lob does not provide confirmed delivery for all destinations.
+  This is an estimated delivery date based on postal service timelines."
+  "Send a follow-up email now?" quick action button
+  (pre-fills an email referencing the letter for Dylan to approve
+  in tomorrow's brief — e.g. "Hey Ahmed, I recently dropped you
+  a letter — wanted to follow up digitally too...")
+
+STATE H — Failed:
+  Show a red badge: "Letter submission failed"
+  Error message from Lob API
+  Retry button
+  Slack notification automatically sent to Dylan when this occurs
+
+### LETTER HISTORY TABLE (on the lead record):
+Show a table of all letters ever sent or attempted for this lead:
+Columns: Date Drafted, Date Approved, Date Submitted to Lob,
+Estimated Delivery, Status, Cost, Letter ID, Actions (Preview / Retry)
+
+### ADDRESS BLOCK ON THE LEAD RECORD:
+Display the verified mailing address clearly with a small verified
+badge (green tick) if confirmed via Apollo enrichment.
+Add an "Edit Address" button so Dylan can manually correct or add
+an address that Apollo didn't find.
+Show address in the correct international format for the lead's country.
+Flag if the address is in a country Lob does not currently support
+(show the list of unsupported countries inline as a warning).
+
+---
+
+## PART 2 — LETTER DRAFT GENERATION (OpenAI)
+
+When "Draft Letter Now" is clicked on the lead record, or when the
+agent automatically prepares a letter draft during the 6 AM run,
+use this OpenAI prompt structure:
+
+SYSTEM:
+"You are drafting a physical letter from Dylan at New Dawn Franchising
+to a prospective client. This letter will be printed on New Dawn
+Franchising letterhead and physically mailed to their business address.
+
+The letter must feel personal, warm, and handwritten in tone — not
+like a marketing flyer. It is from Dylan personally, not from the
+company. It should read like a thoughtful note from one business
+professional to another.
+
+Hard rules:
+- Max 250 words total
+- Open with Dear [firstName]
+- First paragraph: acknowledge something specific about them or their
+  business (use the research dossier data provided)
+- Second paragraph: one or two sentences about what New Dawn Franchising
+  does and why it might be relevant to them specifically
+- Third paragraph: a single clear CTA — scan the QR code below to book
+  a free 20-minute Zoom call with Dylan
+- Close: warm sign-off as Dylan, handwritten-style
+- Do NOT mention investment amounts, visa guarantees, or fees
+- Do NOT use corporate jargon or buzzwords
+- Do NOT mention that this letter was AI-generated
+- Always end with: 'P.S. If you'd prefer to reach me directly,
+  feel free to reply to this letter or email me at [Dylan's email].'"
+
+USER:
+"Lead details:
+Name: [firstName] [lastName]
+Title: [title]
+Company: [company]
+Country: [country]
+Research summary: [researchDossier.summary]
+Recent activity: [researchDossier.recentActivity]
+Lead score: [aiScore]
+Visa pathway interest: [investmentType]
+Any personal details: [researchDossier.personalDetails]"
+
+---
+
+## PART 3 — LOB LETTER TEMPLATE
+
+Build one reusable HTML/CSS letter template in the Lob template editor
+and store the template ID in your env variables as LOB_TEMPLATE_ID.
+
+Template merge variables:
+{{recipientName}}       — Full name e.g. "Ahmed Al-Rashid"
+{{recipientTitle}}      — e.g. "CEO, Al-Rashid Group"
+{{addressLine1}}        — Street address line 1
+{{addressLine2}}        — Street address line 2 (optional)
+{{city}}                — City
+{{state}}               — State / Province (optional)
+{{zip}}                 — Postal code
+{{country}}             — Country
+{{letterBody}}          — The full letter text generated by OpenAI
+{{dylanSignature}}      — Dylan's name and title
+{{qrCodeUrl}}           — URL for the QR code (Calendly booking link)
+{{ndfAddress}}          — New Dawn Franchising return address
+{{ndfPhone}}            — Phone number
+{{ndfWebsite}}          — newdawnfranchising.com
+{{date}}                — Letter date e.g. "April 9, 2026"
+
+Template design requirements:
+- New Dawn Franchising logo top left (upload to Lob as asset)
+- Return address top right
+- Date below return address
+- Lead's address block (left aligned, standard international format)
+- Letter body in clean serif font (professional but not stuffy)
+- Dylan's signature area (use a signature font or upload a signature image)
+- QR code bottom right of page with caption:
+  "Scan to book a free 20-minute call with Dylan"
+- Footer: NDF physical address, phone, website (required for compliance)
+- No garish colours — clean white page, dark text, subtle NDF brand accent
+
+---
+
+## PART 4 — LOB API FUNCTIONS (backend)
+
+Build these functions in a dedicated lob.service.ts file:
+
+async function createLetter(lead, letterBody, dailyBatchId):
+  - Validates lead has a mailing address
+  - Checks Lob's supported countries list before attempting
+  - Calls lob.letters.create() with:
+      description: "NDF outreach letter — [lead name] — [date]"
+      to: {
+        name: lead.firstName + " " + lead.lastName,
+        address_line1: lead.mailingAddress.line1,
+        address_line2: lead.mailingAddress.line2,
+        address_city: lead.mailingAddress.city,
+        address_state: lead.mailingAddress.state,
+        address_zip: lead.mailingAddress.zip,
+        address_country: lead.mailingAddress.country
+      }
+      from: {
+        name: "Dylan [Last Name]",
+        address_line1: [NDF street address],
+        address_city: [NDF city],
+        address_state: [NDF state],
+        address_zip: [NDF zip],
+        address_country: "US"
+      }
+      template_id: process.env.LOB_TEMPLATE_ID
+      merge_variables: {
+        recipientName: ...,
+        letterBody: letterBody,
+        qrCodeUrl: process.env.CALENDLY_URL,
+        date: today,
+        ... (all template vars)
+      }
+      send_date: tomorrow (never same-day to allow for last-minute cancellation)
+  - Returns { lobLetterId, expectedDeliveryDate, price }
+  - On success: update OutreachMessage record in DB
+  - On failure: log error, notify Dylan via Slack, throw error
+
+async function getLobLetterStatus(lobLetterId):
+  - Calls lob.letters.get(lobLetterId)
+  - Returns current status and tracking info
+  - Used by the status polling job
+
+async function cancelLobLetter(lobLetterId):
+  - Calls lob.letters.cancel(lobLetterId)
+  - Only possible before the letter enters production (Lob has a window)
+  - If cancellation window has passed, log it and notify Dylan
+  - Update OutreachMessage status to "cancelled"
+
+async function getEstimatedCost(country):
+  - Uses Lob's pricing to return estimated cost for a given country
+  - Used to show cost estimates in the UI and daily brief before approval
+
+async function validateAddress(address):
+  - Calls Lob's address verification endpoint before creating any letter
+  - Returns { isValid, correctedAddress, deliverability }
+  - If address is undeliverable, flag on the lead record and exclude
+    from letter recommendations until address is corrected
+
+---
+
+## PART 5 — LOB STATUS WEBHOOK
+
+Register a Lob webhook endpoint on your backend:
+POST /webhooks/lob
+
+Lob will POST to this endpoint when a letter's status changes.
+Handle these events:
+
+letter.created → update status to "submitted_to_lob"
+letter.rendered_pdf → log (internal, no action needed)
+letter.rendered_thumbnails → log
+letter.mailed → update status to "in_transit", store mailed date
+letter.in_local_area → update status to "in_local_area" (near delivery)
+letter.processed_for_delivery → update status to "processed_for_delivery"
+letter.re-routed → log, notify Dylan via Slack
+letter.returned_to_sender → update status to "returned",
+  notify Dylan via Slack: "✉️ Letter to [lead name] was returned
+  to sender. Address may be incorrect. [portal link]"
+letter.failed → update status to "failed",
+  notify Dylan via Slack immediately
+
+For each status change: update the OutreachMessage record, update the
+Lead record's letterStatus field, add an entry to the Activity timeline
+on the lead record ("Letter status updated: in_transit — Est. delivery
+April 17-20").
+
+---
+
+## PART 6 — DAILY BRIEF INTEGRATION (agent updates)
+
+During the 6 AM preparation run, the agent should:
+
+1. Query all leads where:
+   - aiScore >= 80 (or Dylan's configured threshold)
+   - mailingAddress is not null
+   - letterStatus = "none" (never received a letter)
+   - Lead is not on the DNC list
+   - Lead's country is in Lob's supported countries list
+
+2. For each qualifying lead:
+   - Call OpenAI to generate letter body
+   - Call Lob address validation endpoint to verify the address
+   - If address invalid: flag on lead record, exclude from brief
+   - If address valid: store draft in OutreachMessage with
+     status="draft_pending_approval" and include in today's batch
+
+3. In the daily briefing email, add the "✉️ PHYSICAL MAIL
+   RECOMMENDATIONS" section (see Daily Brief format below)
+
+4. Cap letter recommendations at the configured max per day
+   (default 5) to keep the brief from getting overwhelming
+
+DAILY BRIEF FORMAT FOR LETTERS SECTION:
+
+  ✉️ PHYSICAL MAIL RECOMMENDATIONS
+  ──────────────────────────────────
+  The following HOT leads have verified addresses and have never
+  received a letter from New Dawn Franchising. The agent has
+  prepared a personalised letter for each. These are NOT sent
+  automatically — reply "SEND LETTER #[n]" or "SEND ALL LETTERS"
+  to approve. A plain YES reply does not send these.
+
+  L1. Ahmed Al-Rashid [Score: 84 🔴 HOT]
+      Company: Al-Rashid Group, Dubai, UAE
+      Address: [verified address] ✓
+      Lob deliverability: Deliverable
+      Letter preview (first 2 lines):
+      "Dear Ahmed, I came across your work at Al-Rashid Group and
+       wanted to reach out the old-fashioned way..."
+      Estimated delivery: 7–10 business days
+      Estimated cost: $2.20
+      [Preview full letter: portal link]
+
+  L2. Sun Wei [Score: 81 🔴 HOT]
+      Company: Wei Industrial, Shanghai, China
+      Address: [verified address] ✓
+      Lob deliverability: Deliverable
+      Letter preview (first 2 lines):
+      "Dear Wei, I've been following the growth of Wei Industrial
+       and wanted to introduce myself properly..."
+      Estimated delivery: 10–14 business days
+      Estimated cost: $2.80
+      [Preview full letter: portal link]
+
+  Total if all approved: 2 letters | ~$5.00
+
+  Reply "SEND LETTER #L1" — approve letter to Ahmed only
+  Reply "SEND LETTER #L2" — approve letter to Wei only
+  Reply "SEND ALL LETTERS" — approve all letters above
+  Reply "YES SEND ALL LETTERS" — approve digital outreach AND all letters
+  No letter commands = no letters sent regardless of YES reply
+
+---
+
+## PART 7 — CANCELLATION WINDOW UI
+
+Because Lob sends letters same or next business day, build a
+cancellation window feature:
+
+After Dylan approves a letter (via email reply or portal), show a
+countdown timer on the lead record and dashboard:
+"✉️ Letter to Ahmed Al-Rashid submitted — cancellation window closes
+in [X hours]. [Cancel Letter] button"
+
+Lob allows cancellation before the letter enters production.
+The exact window varies but is typically a few hours after submission.
+Call Lob's cancellation endpoint if Dylan hits Cancel within the window.
+After the window closes, hide the cancel button and show "In production
+— cannot be cancelled" message.
+
+---
+
+## PART 8 — LETTERS SECTION ON DASHBOARD
+
+Add a "Letters" card to the Command Center dashboard showing:
+- Letters drafted today (pending approval)
+- Letters approved today
+- Letters currently in transit
+- Letters estimated delivered this month
+- Total spent on letters this month (sum of Lob costs)
+- Return rate (letters returned to sender — signals bad addresses)
+
+Add a dedicated Letters page (/letters) with a full table:
+Columns: Lead Name, Score, Country, Status, Date Approved,
+Date Submitted, Est. Delivery, Actual Delivery, Cost, Actions
+
+Filter by: status, country, date range
+Sort by: date submitted, estimated delivery, cost
+
+Export to CSV
+
+---
+
+## PART 9 — ADDRESS QUALITY MANAGEMENT
+
+Because international addresses are often incomplete in Apollo data,
+build an address quality workflow:
+
+On the lead record, show an address quality badge:
+- ✅ Verified by Lob — deliverable
+- ⚠️ Unverified — not yet checked with Lob
+- ❌ Undeliverable — Lob flagged this address
+- ✏️ Manually entered — not from Apollo
+
+When Dylan manually enters or edits an address, auto-run Lob's
+address verification endpoint and show the result immediately.
+
+If Lob suggests a corrected address, show a diff:
+"Lob suggests: [corrected address]. Use suggested? [Yes] [Keep mine]"
+
+Leads with undeliverable addresses are excluded from all letter
+recommendations until the address is corrected.
+
+Show a "Fix Address" queue on the /letters page listing all leads
+that qualify for a letter by score but have no valid address.
+Dylan can bulk-update these or let the agent try to find better
+address data via Apollo enrichment.
+
+---
+
+## DATABASE ADDITIONS
+
+Add to the existing schema:
+
+model LobLetter {
+  id                  String   @id @default(cuid())
+  leadId              String
+  outreachMessageId   String?
+  dailyBatchId        String?
+  lobLetterId         String?
+  templateId          String
+  letterBody          String
+  mergeVariables      Json
+  mailingAddress      Json
+  addressVerified     Boolean  @default(false)
+  lobDeliverability   String?
+  status              String   @default("draft_pending_approval")
+  // draft_pending_approval → approved_by_dylan → submitted_to_lob
+  // → in_production → mailed → in_local_area
+  // → processed_for_delivery → estimated_delivered
+  // → returned → failed → cancelled
+  approvedAt          DateTime?
+  submittedAt         DateTime?
+  mailedAt            DateTime?
+  estimatedDelivery   DateTime?
+  cancellationDeadline DateTime?
+  returnedAt          DateTime?
+  failureReason       String?
+  lobPrice            Float?
+  trackingEvents      Json?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+Add to Lead model:
+  letterStatus        String   @default("none")
+  mailingAddress      Json?
+  addressVerified     Boolean  @default(false)
+  lobDeliverability   String?
+  lettersTotal        Int      @default(0)
+  letters             LobLetter[]
+
+---
+
+## ENV VARIABLES TO ADD
+
+LOB_API_KEY=
+LOB_TEMPLATE_ID=
+LOB_WEBHOOK_SECRET=
+NDF_RETURN_ADDRESS_LINE1=
+NDF_RETURN_ADDRESS_CITY=
+NDF_RETURN_ADDRESS_STATE=
+NDF_RETURN_ADDRESS_ZIP=
+NDF_RETURN_ADDRESS_COUNTRY=US
+DYLAN_FULL_NAME=
+DYLAN_TITLE=Franchise Consultant
+CALENDLY_URL=
+
+---
+
+## IMPORTANT BUILD NOTES
+
+- The send_date on every Lob letter should be set to the next
+  business day (never same day) — this gives the cancellation
+  window time to work properly
+- Always run Lob address validation BEFORE including a letter
+  recommendation in the daily brief — never recommend a letter
+  to an undeliverable address
+- If Lob API is down during the 6 AM preparation run, skip letter
+  drafting for that day, note it in the brief:
+  "✉️ Letter recommendations unavailable today — Lob API unreachable.
+  Will retry tomorrow."
+- If a lead unsubscribes or is added to DNC after a letter has been
+  submitted to Lob but before the cancellation window closes:
+  attempt automatic cancellation via Lob API immediately and
+  log the result
+- Letter cost is tracked in the DB and surfaced in analytics —
+  Dylan should be able to see his monthly Lob spend at a glance
+- Never hardcode Dylan's personal address as the return address —
+  always use the NDF business address from env variables
+- International address formatting varies by country — use a library
+  like i18n-postal-address (npm) to format addresses correctly for
+  each destination country before displaying in the UI and in the
+  Lob template

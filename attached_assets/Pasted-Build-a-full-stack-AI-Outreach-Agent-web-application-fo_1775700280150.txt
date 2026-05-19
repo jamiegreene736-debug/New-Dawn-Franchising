@@ -1,0 +1,846 @@
+Build a full-stack AI Outreach Agent web application for New Dawn Franchising.
+The agent's sole mission is to identify, warm up, and convert leads into
+booked Zoom calls with Dylan. The agent operates across email, WhatsApp,
+LinkedIn, and online communities. All outreach is written in Dylan's
+first-person voice.
+
+Every morning the agent emails Dylan a brief daily plan. Dylan replies "yes"
+to that email and the agent executes everything for the day. Nothing sends
+without that reply.
+
+---
+
+## TECH STACK
+- Frontend: React + Vite + Tailwind CSS + Lucide React icons
+- Backend: Node.js + Express
+- Database: PostgreSQL via Prisma ORM
+- Scheduler: node-cron (daily agent runs)
+- APIs:
+  - OpenAI GPT-4o (message drafting, lead scoring, research synthesis)
+  - Apollo.io API (lead discovery, email finding, company data)
+  - Hunter.io API (email verification and finding)
+  - WhatsApp Business Cloud API (Meta) (compliant WhatsApp messaging)
+  - Gmail API via Google OAuth (email sending as Dylan + reading Dylan's reply)
+  - Apify API (web scraping: Reddit, forums, Facebook Groups, Quora)
+  - LinkedIn scraping via Apify actors (profile research only)
+  - Serper.dev API (Google search for competitor research)
+  - Calendly API (auto-embed booking link in messages)
+  - Twilio (SMS fallback)
+  - Slack webhook (internal agent activity notifications to Dylan)
+
+---
+
+## THE DAILY EMAIL APPROVAL SYSTEM (most important feature)
+
+This is the master on/off switch for the entire agent. Nothing is sent
+to any lead on any channel until this flow completes.
+
+### STEP 1 — AGENT RUNS AT 6:00 AM DAILY (pre-approval work)
+
+At 6:00 AM every day the agent silently runs the following preparation tasks:
+- Discovers new leads from all sources (Apollo, Reddit, Quora, forums,
+  competitor research)
+- Enriches and scores all leads
+- Checks which leads are due for a follow-up touch today
+- Drafts all outreach messages for the day (emails, WhatsApp, forum replies)
+- Identifies forum/community posts worth engaging
+- Compiles competitor intelligence updates
+- Prepares everything in a "today's batch" staging area in the database
+  with status = "staged" (not sent)
+
+### STEP 2 — DAILY BRIEFING EMAIL SENT AT 7:00 AM
+
+At 7:00 AM the agent sends a single briefing email to:
+  franchising@newdawnfranchising.com
+
+The email is sent from the system (via Gmail API / SMTP) with a fixed
+subject line so the reply parser can identify it unambiguously:
+
+  Subject: "NDF Agent Daily Brief — [Day, Month Date]"
+  Example: "NDF Agent Daily Brief — Wednesday, April 9"
+
+The email body is short and scannable — Dylan should be able to read
+it in under 60 seconds. Format it exactly like this:
+
+---
+  Hi Dylan,
+
+  Here's what the agent has queued for today. Reply YES to send everything,
+  or reply NO to hold. You can also reply with specific edits
+  (e.g. "YES but skip #3").
+
+  TODAY'S OUTREACH — [Date]
+
+  NEW LEADS CONTACTED (X total)
+  1. Ahmed Al-Rashid, CEO, Dubai — Cold email, Touch 1
+     "Hey Ahmed, saw you've been exploring franchise investment options..."
+  2. Priya Sharma, Director, Mumbai — Cold email, Touch 1
+     "Hi Priya, came across your post about expanding your business to the US..."
+  3. James O'Brien, Founder, London — Cold email, Touch 1
+     "Hey James, noticed you recently commented on a franchise visa thread..."
+
+  FOLLOW-UPS (X total)
+  4. Wei Chen — Email Touch 2 (last contacted 4 days ago, no reply)
+     "Wei, wanted to share a quick case study from a client in Shenzhen..."
+  5. Maria Santos — WhatsApp follow-up (email bounced)
+     "Hey Maria, this is Dylan — just following up on my email last week..."
+
+  FORUM REPLIES (X total — for Dylan to post manually)
+  6. Reddit r/franchising — "Best franchise to invest in for a US visa?"
+     Draft reply ready. [View in portal]
+  7. Quora — "Is buying a US franchise a good path to an investor visa?"
+     Draft reply ready. [View in portal]
+
+  COMPETITOR INTEL
+  - FranConnect published a new article on franchise investment trends
+  - FranChoice gained 14 new backlinks this week
+
+  TOTAL SENDS IF APPROVED: 5 emails, 1 WhatsApp
+
+  Reply YES to execute. Reply NO to hold everything until tomorrow.
+  Or log in to review individually: [portal link]
+
+  — Your AI Agent at New Dawn Franchising
+---
+
+### STEP 3 — REPLY LISTENER POLLS EVERY 15 MINUTES (7:00 AM – 9:00 PM)
+
+Build a Gmail API polling job that runs every 15 minutes and checks
+for a reply to the daily briefing email thread.
+
+Detection logic:
+- Find the most recent unread email in the thread where subject matches
+  "RE: NDF Agent Daily Brief — [today's date]"
+- From address must be franchising@newdawnfranchising.com
+- Check reply body for approval signal
+
+Reply parsing rules:
+- Body starts with or contains "YES" (case insensitive) → EXECUTE ALL
+- Body is "NO" → HOLD ALL, log as held, notify via Slack
+- Body contains "YES but skip #[numbers]" → execute all except
+  the numbered items Dylan specified
+- Body contains "YES but edit #[number]: [new text]" → update that
+  message body before sending
+- If no reply is received by 11:00 AM → send a one-line Slack reminder:
+  "⏳ Daily outreach brief hasn't been approved yet.
+  Reply YES to your email or approve here: [portal link]"
+- If no reply by 2:00 PM → hold everything, mark day as "not executed",
+  log it, move staged messages to tomorrow's queue
+
+### STEP 4 — EXECUTION (triggered by YES reply)
+
+When YES is detected:
+1. Update all staged messages from status="staged" to status="executing"
+2. Send emails one by one with a random delay of 30–90 seconds between
+   each send (avoids spam flags)
+3. Send WhatsApp messages with a random delay of 60–180 seconds between each
+4. Mark forum reply drafts as "ready to post" and push a Slack notification:
+   "📝 [X] forum replies are ready for you to post manually. [portal link]"
+5. Update all CRM records with activity logs
+6. Move all leads to their next sequence stage
+
+### STEP 5 — EXECUTION CONFIRMATION EMAIL (sent ~30 min after YES)
+
+Once all messages are dispatched, send a confirmation email back to
+franchising@newdawnfranchising.com:
+
+  Subject: "✅ Agent Executed — [Date] | X messages sent"
+
+  Hi Dylan,
+
+  Done. Here's what went out today:
+
+  ✅ 5 emails sent (0 failed)
+  ✅ 1 WhatsApp sent
+  📝 2 forum replies queued for manual posting
+
+  Track replies in real time: [portal link]
+
+  — Your AI Agent at New Dawn Franchising
+
+---
+
+## CORE CONCEPT: HOW THE FULL AGENT WORKS
+
+Every day the agent runs this full pipeline:
+
+STEP 1 — DISCOVER: Find new potential leads from multiple sources
+STEP 2 — RESEARCH: Enrich each lead with context (company, pain points,
+          activity, franchise and visa interest signals)
+STEP 3 — SCORE: AI scores each lead 1-100 on booking likelihood
+STEP 4 — DRAFT: Write personalized outreach in Dylan's voice
+STEP 5 — STAGE: All messages staged in DB with status="staged"
+STEP 6 — EMAIL DYLAN: Send the 7 AM daily briefing email
+STEP 7 — WAIT FOR YES: Poll Gmail for Dylan's reply
+STEP 8 — EXECUTE: On YES reply, messages go out via the right channels
+STEP 9 — FOLLOW UP: Agent tracks responses and schedules follow-up sequences
+STEP 10 — FORUM ENGAGE: Notify Dylan of forum reply drafts for manual posting
+STEP 11 — LOG: Everything logged to CRM with full activity timeline
+STEP 12 — CONFIRM: Send execution confirmation email to Dylan
+
+---
+
+## PAGES & SECTIONS
+
+### 1. COMMAND CENTER DASHBOARD (/)
+
+Header branding: "New Dawn Franchising — AI Outreach Agent"
+
+Metric cards (top row):
+- Leads discovered today
+- Messages sent today
+- Replies received
+- Zoom calls booked this week
+- Pipeline conversion rate (leads to calls)
+
+Daily approval status banner:
+- Shows current state: "Waiting for approval", "Approved — executing",
+  "Executed — X sent", "Held", "Not executed today"
+- Quick approve button directly on the dashboard (alternative to email reply)
+
+Live agent activity feed (scrolling log of what the agent did today)
+
+Upcoming follow-ups (next 24 hrs)
+
+Booking calendar widget (Calendly embed showing booked calls)
+
+---
+
+### 2. LEAD DISCOVERY ENGINE (/discovery)
+
+The agent pulls leads from these sources automatically every day:
+
+SOURCE A — COMPETITOR AUDIENCE RESEARCH:
+- Pre-loaded competitor list for New Dawn Franchising:
+  FranChoice, FranConnect, Franchise Group, The Franchise Consulting Company,
+  Fransmart, MatchPoint Franchise Consulting, Visa Franchise, EB5 Affiliate
+  Network, NES Financial, CMB Regional Centers, Golden Gate Global,
+  immigration lawyers and broker-dealers offering EB-5 / E-2 / investor visa
+  pathways paired with franchise investments
+- Agent uses Serper.dev to find these competitors' blog commenters,
+  review authors (Google/Trustpilot/Yelp), and social mentions
+- Surfaces people actively engaging with competitor content as hot leads
+
+SOURCE B — KEYWORD INTENT MONITORING:
+- Monitor Reddit (r/franchising, r/immigration, r/investing,
+  r/entrepreneur, r/personalfinance, r/smallbusiness, r/IWantOut,
+  r/expats, r/EB5visa, r/visas, r/FranchisedBusinesses) via Apify
+- Monitor Quora for questions about: "EB-5 franchise investment",
+  "best franchise for investor visa", "how to get US green card through
+  franchise", "E-2 visa franchise", "buying a US franchise from abroad",
+  "New Dawn Franchising", "franchise consulting for immigrants"
+- Monitor Facebook Groups (Franchise Buyers Network, Expats in USA,
+  International Investors, US Franchise Opportunities) via Apify
+- Any person posting or commenting on these topics = lead candidate
+
+SOURCE C — APOLLO.IO PROSPECTING:
+- Daily auto-search with filters:
+  Job titles: "CEO", "Founder", "Managing Director", "Business Owner",
+    "Investor", "HNWI", "Family Office", "Investment Director"
+  Locations: UAE, Saudi Arabia, India, China, UK, Canada, Australia,
+    Mexico, Brazil, Nigeria, South Africa (top franchise visa markets)
+  Company size: 10-500 employees
+  Industries: Manufacturing, Real Estate, Import/Export, Retail,
+    Technology, Hospitality
+- Pull 50 new leads per day from Apollo
+
+SOURCE D — INBOUND SIGNAL MONITORING:
+- Monitor mentions of "New Dawn Franchising" or "Dylan" online via Serper
+- Anyone who visited the Calendly link but did not book = warm lead
+  (via Calendly webhook)
+- Email opens/clicks from previous campaigns = re-engagement queue
+
+DISCOVERY UI:
+- Table of all discovered leads with source tag, discovery date,
+  AI score, status
+- Preview panel: click any lead to see full research dossier
+- Bulk actions: approve for outreach / disqualify / save for later
+- Filters: by source, score, country, industry, status
+
+---
+
+### 3. LEAD RESEARCH & ENRICHMENT (/leads/:id)
+
+For each lead, the agent automatically compiles a dossier:
+
+Personal profile:
+- Full name, title, company, location
+- LinkedIn profile URL
+- Email address (Hunter.io verified)
+- WhatsApp number (if available via Apollo)
+- Company website, revenue estimate, employee count
+
+Research summary (AI-generated):
+- What their business does in 2 sentences
+- Their likely pathway interest (EB-5 franchise, E-2 franchise,
+  straight franchise investment, multi-unit expansion)
+- Pain points inferred from their posts/activity
+- Any personal details that personalize outreach (recent post topic,
+  country of origin, business milestones)
+- Competitor connections (do they follow/engage a competitor of
+  New Dawn Franchising?)
+
+Lead score breakdown (0-100):
+- Intent signals score (are they asking franchise or investor visa questions?)
+- Fit score (do they match ICP: investable capital indicators, business
+  owner, target geography?)
+- Engagement score (how active are they online?)
+- Timing score (did they post recently? Any urgency signals?)
+- Overall score with recommendation: Hot / Warm / Cold
+
+Activity timeline:
+- All forum posts/comments found
+- All outreach sent
+- All replies received
+- Notes field
+
+---
+
+### 4. OUTREACH CENTER (/outreach)
+
+CHANNEL: EMAIL
+- Agent drafts a personalized cold email sequence (4-touch):
+  Touch 1 (Day 1): Soft intro — Dylan introduces himself as a franchise
+    consultant at New Dawn Franchising, references something specific
+    about their business or situation, asks one genuine question
+  Touch 2 (Day 4): Value add — send a relevant resource
+    (New Dawn Franchising case study, franchise ROI data, info about
+    visa pathways through franchise investment for their country)
+  Touch 3 (Day 9): Direct ask — invite them to a 20-minute Zoom call
+    with Dylan, include Calendly link, light urgency
+  Touch 4 (Day 16): Final breakup email — "I'll leave the door open"
+
+All emails written in Dylan's first-person casual-professional voice.
+Emails signed off as Dylan from New Dawn Franchising.
+Subject lines A/B tested (agent tries two variants per campaign).
+Emails sent via Gmail API from Dylan's real email address.
+Full CAN-SPAM compliance: physical address in footer, unsubscribe link.
+
+CHANNEL: WHATSAPP (WhatsApp Business Cloud API only — no unofficial APIs)
+- Only message leads who have provided a phone number AND opted in
+- Use approved WhatsApp Business message templates for first contact
+- Agent drafts WhatsApp follow-up messages for leads who don't reply
+  to email within 5 days
+- Messages are short, conversational, 2-3 sentences max
+- Always include opt-out instruction per WhatsApp policy
+
+CHANNEL: FORUM / COMMUNITY REPLIES
+- Agent monitors Reddit/Quora/Facebook sources daily
+- When someone posts a question the agent can help with, agent drafts
+  a helpful non-spammy reply that:
+  1. Directly answers their question with real value
+  2. Mentions Dylan's name and New Dawn Franchising naturally at the end
+  3. Does NOT include a hard sales pitch
+- These reply drafts are included in the daily briefing email summary
+  and marked "for Dylan to post manually" — never auto-posted
+- Rule: max 1 reply per thread, max 5 forum replies per platform per day
+
+CHANNEL: SMS (Twilio — fallback only)
+- Only used if email bounces AND WhatsApp unavailable
+- Ultra-short message with Calendly link and STOP opt-out
+- Signed as Dylan from New Dawn Franchising
+
+OUTREACH UI:
+- Today's staged messages (pending approval) with preview
+- Sent messages log with open rate, reply rate, click rate
+- Sequence tracker: see where every lead is in the follow-up sequence
+- Template library: Dylan can save/edit message templates
+- A/B test results panel
+
+---
+
+### 5. AI VOICE SETTINGS (/settings/voice)
+
+Dylan's AI Voice Profile — configure how the agent writes:
+
+Personality sliders:
+- Formal to Casual
+- Brief to Detailed
+- Reserved to Warm
+
+Writing samples: paste 3-5 examples of how Dylan actually writes
+emails. Agent uses these as few-shot examples in every OpenAI prompt.
+
+Signature block (auto-appended to all emails):
+  Dylan [Last Name]
+  Franchise Consultant | New Dawn Franchising
+  newdawnfranchising.com
+  [phone] | [Calendly link] | [LinkedIn]
+
+Prohibited phrases list: words/phrases Dylan never says
+
+Custom facts about Dylan (for personalization):
+- Years in franchising and investor visa space
+- Countries and markets worked in
+- Notable client wins (anonymized)
+- Dylan's personal background and origin story
+
+Language toggle:
+- English (default)
+- Spanish, Arabic, Mandarin, Hindi, Portuguese
+  (agent auto-detects lead's likely preferred language and adjusts)
+
+---
+
+### 6. COMPETITOR INTELLIGENCE (/competitors)
+
+Pre-loaded competitors for New Dawn Franchising:
+FranChoice, FranConnect, Franchise Group, The Franchise Consulting Company,
+Fransmart, MatchPoint Franchise Consulting, Visa Franchise,
+EB5 Affiliate Network, NES Financial, CMB Regional Centers
+
+Competitor tracker table — for each competitor, agent runs weekly:
+- New pages/content they published
+- New backlinks they earned
+- New reviews posted about them
+- New social mentions
+- Estimated traffic trend
+
+"Steal their audience" feature:
+- Shows people currently engaging with each competitor
+- One-click to add them to New Dawn Franchising's lead pipeline
+
+Gap analysis:
+- Keywords competitors rank for that newdawnfranchising.com doesn't
+- Topics competitors cover that New Dawn Franchising hasn't published
+- Countries/markets competitors target that are currently untapped
+
+---
+
+### 7. CRM (/crm)
+
+Lead record fields:
+- Name, email, phone, WhatsApp, LinkedIn
+- Company, title, country, language
+- Lead source, lead score, stage
+- Assigned sequence
+- Last contacted, next follow-up date
+- Notes (free text + AI-generated summary)
+- Tags (hot, warm, cold, do-not-contact, booked, converted)
+- Investment level interest (EB-5 / E-2 / straight franchise / unknown)
+
+Pipeline kanban board:
+Stages: New Lead → Contacted → Replied → Call Scheduled →
+        Call Completed → Proposal Sent → Converted → Lost
+
+Activity timeline on each record (all emails, WhatsApp, forum
+interactions, notes)
+
+Bulk actions: tag, move stage, assign sequence, export
+
+Search and filters across all fields
+
+CSV import/export
+
+---
+
+### 8. BOOKINGS & CALENDAR (/bookings)
+
+Calendly webhook integration:
+- When someone books a call with Dylan, agent automatically:
+  1. Moves lead to "Call Scheduled" stage in CRM
+  2. Sends a confirmation WhatsApp: "Hey [name]! This is Dylan from
+     New Dawn Franchising — just confirmed your Zoom for [date/time].
+     Really looking forward to it! Here's the link: [zoom link]"
+  3. Sends a 24-hour reminder email
+  4. Sends a 1-hour reminder WhatsApp
+  5. Sends a follow-up email 2 hours after the call with next steps
+
+Upcoming calls list with lead dossier quick-view for Dylan's call prep
+
+Post-call notes field: Dylan fills in outcome, agent updates CRM stage
+
+---
+
+### 9. ANALYTICS (/analytics)
+
+Funnel visualization:
+Leads Discovered → Contacted → Replied → Call Booked →
+Call Completed → Converted
+
+Charts:
+- Leads discovered per day (30-day trend)
+- Outreach volume by channel (email vs WhatsApp vs forum)
+- Reply rate by channel
+- Best performing message templates (by reply rate)
+- Best lead sources (which source converts highest)
+- Best performing countries (reply rate by geography)
+- Time-to-booking (avg days from first contact to Zoom booked)
+- Approval rate: how often Dylan replies YES vs NO to daily briefs
+- Daily brief response time (how quickly Dylan replies YES)
+
+---
+
+### 10. AGENT SETTINGS (/settings/agent)
+
+Approval email address: franchising@newdawnfranchising.com
+(hardcoded as the only address that can approve daily sends —
+do not make this changeable without a confirmation flow)
+
+Daily brief send time: default 7:00 AM (configurable)
+Agent preparation run time: default 6:00 AM (1 hour before brief)
+Approval deadline: default 2:00 PM (after this, day is held)
+Slack reminder if no reply by: default 11:00 AM
+
+Max new leads to discover per day: default 50
+Max emails to send per day: default 80
+Max WhatsApp messages per day: default 30
+
+Blacklist: domains/emails/keywords to never contact
+Do-not-contact list: managed here, imported via CSV
+Notification preferences: Slack, email, SMS for daily summary
+
+---
+
+## DATABASE SCHEMA (Prisma)
+
+model Lead {
+  id              String   @id @default(cuid())
+  firstName       String
+  lastName        String
+  email           String?
+  phone           String?
+  linkedinUrl     String?
+  company         String?
+  title           String?
+  country         String?
+  language        String   @default("en")
+  source          String
+  sourceUrl       String?
+  aiScore         Int      @default(0)
+  stage           String   @default("new")
+  tags            String[]
+  investmentType  String?
+  researchDossier Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  activities      Activity[]
+  messages        OutreachMessage[]
+  sequenceEnrollments SequenceEnrollment[]
+}
+
+model OutreachMessage {
+  id           String   @id @default(cuid())
+  leadId       String
+  channel      String
+  subject      String?
+  body         String
+  status       String   @default("staged")
+  // staged → approved → executing → sent → delivered → opened → replied
+  // → failed / held
+  scheduledAt  DateTime?
+  sentAt       DateTime?
+  openedAt     DateTime?
+  repliedAt    DateTime?
+  dailyBatchId String?
+  threadId     String?
+  abVariant    String?
+  lead         Lead     @relation(fields: [leadId], references: [id])
+  createdAt    DateTime @default(now())
+}
+
+model DailyBatch {
+  id                      String   @id @default(cuid())
+  batchDate               DateTime
+  briefEmailSentAt        DateTime?
+  briefEmailSubject       String?
+  approvalStatus          String   @default("pending")
+  // pending → approved → held → executed → failed
+  approvedAt              DateTime?
+  approvedBy              String?
+  replyBody               String?
+  skippedItems            Int[]
+  executedAt              DateTime?
+  executionSummary        Json?
+  confirmationEmailSentAt DateTime?
+  createdAt               DateTime @default(now())
+}
+
+model Sequence {
+  id          String   @id @default(cuid())
+  name        String
+  channel     String
+  touches     Json
+  enrollments SequenceEnrollment[]
+}
+
+model SequenceEnrollment {
+  id           String   @id @default(cuid())
+  leadId       String
+  sequenceId   String
+  currentTouch Int      @default(0)
+  status       String   @default("active")
+  startedAt    DateTime @default(now())
+  nextSendAt   DateTime?
+  lead         Lead     @relation(fields: [leadId], references: [id])
+  sequence     Sequence @relation(fields: [sequenceId], references: [id])
+}
+
+model Booking {
+  id           String   @id @default(cuid())
+  leadId       String?
+  calendlyId   String
+  zoomLink     String?
+  scheduledAt  DateTime
+  status       String   @default("scheduled")
+  outcome      String?
+  notes        String?
+  createdAt    DateTime @default(now())
+}
+
+model Competitor {
+  id          String   @id @default(cuid())
+  domain      String
+  name        String?
+  lastScanned DateTime?
+  insights    Json?
+  createdAt   DateTime @default(now())
+}
+
+model ForumOpportunity {
+  id          String   @id @default(cuid())
+  platform    String
+  postUrl     String
+  postTitle   String
+  postBody    String
+  author      String?
+  draftReply  String?
+  status      String   @default("pending")
+  // pending → included_in_brief → approved → posted_manually → skipped
+  createdAt   DateTime @default(now())
+}
+
+model AgentRun {
+  id          String   @id @default(cuid())
+  runDate     DateTime @default(now())
+  runType     String   @default("preparation")
+  // preparation (6 AM) / briefing (7 AM) / execution / followup_check
+  status      String   @default("running")
+  summary     Json?
+  tasksLog    Json?
+  completedAt DateTime?
+}
+
+model Activity {
+  id          String   @id @default(cuid())
+  leadId      String
+  type        String
+  description String
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  lead        Lead     @relation(fields: [leadId], references: [id])
+}
+
+model DoNotContact {
+  id      String   @id @default(cuid())
+  email   String?
+  phone   String?
+  domain  String?
+  reason  String?
+  addedAt DateTime @default(now())
+}
+
+---
+
+## GMAIL REPLY LISTENER — IMPLEMENTATION NOTES
+
+Use the Gmail API with OAuth2 to both send emails as Dylan and poll
+for his reply to the daily brief.
+
+Polling job (runs every 15 minutes from 7:00 AM to 9:00 PM):
+
+  1. Search for messages with:
+     - query: "from:franchising@newdawnfranchising.com
+               subject:RE: NDF Agent Daily Brief"
+     - Filter to threads created today only
+  2. Get the latest message in the matching thread
+  3. Check if it has already been processed (store processed
+     message IDs in DB to avoid double-triggering)
+  4. Extract the text body of the reply
+  5. Run reply parser:
+     - Normalize to uppercase, strip whitespace
+     - If starts with "YES" or equals "YES": approve all
+     - If starts with "NO": hold all
+     - If contains "YES BUT SKIP #": parse item numbers, approve rest
+     - If contains "YES BUT EDIT #": parse item number and new text
+     - Anything unclear: send Slack message asking Dylan to clarify
+       via portal link, do not execute yet
+  6. On YES: trigger execution pipeline immediately
+  7. Store replyBody and approvalStatus in DailyBatch record
+
+Security: only ever act on replies from franchising@newdawnfranchising.com.
+Reject any other sender even if the subject line matches.
+
+---
+
+## OPENAI PROMPT TEMPLATES
+
+For all OpenAI calls, use this system prompt base:
+
+"You are Dylan's AI assistant helping draft outreach messages on behalf
+of New Dawn Franchising (newdawnfranchising.com).
+
+New Dawn Franchising helps high-net-worth business owners and entrepreneurs
+from around the world invest in US-based franchises, often as a pathway
+to obtaining US investor visas (EB-5, E-2) or as a direct business
+expansion strategy.
+
+Dylan's voice: warm, direct, knowledgeable, never salesy. He asks
+questions more than he makes statements. He never uses buzzwords.
+He writes like a smart person texting a peer, not like a marketer.
+
+Dylan always writes in first person as himself. Messages feel personal
+and researched — never like a template.
+
+Hard rules:
+- Never make up facts about the lead
+- Never promise visa approval (legally prohibited)
+- Always include an opt-out option in email (CAN-SPAM)
+- Maximum email length: 150 words for Touch 1, 200 words for Touch 2-3
+- WhatsApp messages: max 3 sentences
+- Never mention that this message was AI-assisted
+- Never claim to be human if a lead sincerely asks
+- Always sign off as Dylan from New Dawn Franchising"
+
+For the daily briefing email, use a separate prompt:
+"Summarize today's outreach batch as a brief readable email to Dylan
+at New Dawn Franchising. He needs to understand what will be sent in
+under 60 seconds. Show the first 1-2 lines of each message preview.
+Be concrete, not vague. Total email should be under 300 words.
+Use plain text, no HTML."
+
+---
+
+## COMPLIANCE & SAFETY REQUIREMENTS
+
+1. CAN-SPAM compliance:
+   - Physical mailing address for New Dawn Franchising in all emails
+   - Unsubscribe link in every email
+   - Instant unsubscribe processing (marks lead as do-not-contact)
+   - Sender name and email must be accurate (Dylan's real email)
+
+2. GDPR compliance:
+   - Data source recorded for every lead
+   - Legitimate interest basis documented
+   - Lead deletion endpoint (right to be forgotten)
+   - No EU residents contacted without a lawful basis
+
+3. WhatsApp Business API compliance:
+   - Only use official Meta WhatsApp Business Cloud API
+   - Only message users who have opted in
+   - All first-contact messages use Meta-approved templates
+   - Opt-out honored immediately and synced to DNC list
+
+4. Forum / community rules:
+   - Forum replies are NEVER auto-posted — always manual by Dylan
+   - Replies must add genuine value, not just promote
+   - Never create fake accounts or post as anyone other than Dylan
+   - Rate limit: max 5 forum reply drafts per platform per day
+
+5. Rate limits to prevent blacklisting:
+   - Emails: max 80/day, staggered with 30–90 second random delays
+   - WhatsApp: max 30/day with 60–180 second random delays
+   - Domain warm-up mode for new email sending domains
+
+6. Do-not-contact enforcement:
+   - DNC list checked before every single send
+   - Any reply containing "unsubscribe", "remove", "stop",
+     "not interested", "opt out" auto-triggers DNC immediately
+   - DNC is permanent and overrides all future automation
+
+---
+
+## CRON SCHEDULE SUMMARY
+
+6:00 AM — Agent preparation run (discover, enrich, score, draft, stage)
+7:00 AM — Send daily briefing email to franchising@newdawnfranchising.com
+7:00 AM – 9:00 PM — Gmail reply listener polls every 15 minutes
+11:00 AM — Slack reminder if no YES received yet
+2:00 PM — Hard deadline: if no YES, hold everything, move to tomorrow
+~30 min after YES — Send execution confirmation email to Dylan
+8:00 PM — Daily stats summary pushed to Slack
+
+---
+
+## ENV VARIABLES
+
+OPENAI_API_KEY=
+APOLLO_API_KEY=
+HUNTER_API_KEY=
+APIFY_API_TOKEN=
+SERPER_API_KEY=
+WHATSAPP_BUSINESS_TOKEN=
+WHATSAPP_PHONE_NUMBER_ID=
+GMAIL_CLIENT_ID=
+GMAIL_CLIENT_SECRET=
+GMAIL_REFRESH_TOKEN=
+GMAIL_SENDER_EMAIL=dylans-real-email@newdawnfranchising.com
+APPROVAL_EMAIL=franchising@newdawnfranchising.com
+CALENDLY_API_KEY=
+CALENDLY_WEBHOOK_SECRET=
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_FROM_NUMBER=
+SLACK_WEBHOOK_URL=
+DATABASE_URL=
+JWT_SECRET=
+
+---
+
+## SEED DATA / DEMO MODE
+
+Build a full demo mode with:
+- 50 sample leads across different pipeline stages
+- Realistic fake outreach messages and replies for New Dawn Franchising
+- Sample daily batch with a simulated YES approval flow
+- Pre-populated competitor list (FranChoice, FranConnect, Fransmart,
+  Visa Franchise, EB5 Affiliate Network, MatchPoint, Franchise Group)
+- Sample forum opportunities from r/franchising, r/EB5visa, Quora
+- Sample bookings in the calendar
+- Charts populated with 30 days of fake trend data
+- Demo briefing email preview so Dylan can see exactly what his
+  morning email will look like before going live
+
+Demo mode toggle in top nav: "Demo Mode: ON"
+
+---
+
+## ONBOARDING FLOW (first-time setup wizard)
+
+Step 1: Enter website domain (newdawnfranchising.com)
+Step 2: Confirm approval email (franchising@newdawnfranchising.com)
+Step 3: Connect Gmail via OAuth (for sending AND reading YES replies)
+Step 4: Paste 3 example emails Dylan has written (trains the AI voice)
+Step 5: Fill Dylan's bio, talking points, and Calendly link
+Step 6: Confirm pre-loaded competitor list, add any others
+Step 7: Set target countries and markets
+Step 8: Connect WhatsApp Business API
+Step 9: Set daily brief time (default 7:00 AM)
+Step 10: Send a test briefing email to franchising@newdawnfranchising.com
+         — Dylan replies YES — confirm the listener detects it correctly
+         — show "Test passed: approval system working" before going live
+
+---
+
+## IMPORTANT BUILD NOTES
+
+- Header, branding, and all copy throughout the app should reference
+  New Dawn Franchising — no references to VisaFranchise.com anywhere
+- The daily email approval system is the single most important feature
+  — build and test it thoroughly before anything else
+- The Gmail reply listener must be rock-solid with proper error
+  handling, retry logic, and duplicate-detection
+- NEVER execute a batch more than once — use idempotency keys
+  on the DailyBatch record
+- All execution is transactional: if a send fails mid-batch,
+  log it, continue to the next item, report failures in the
+  confirmation email
+- Build a mobile-friendly portal dashboard so Dylan can also
+  approve/reject individual messages via browser if he prefers
+  that over email on a given day
+- Log EVERYTHING to the database for a full audit trail
+- If any third-party API fails during preparation, exclude those
+  items from today's batch, note it in the briefing email as
+  "X items held due to API error", and retry them tomorrow
+- Implement a "Pause All" emergency stop button on the dashboard
+  that immediately halts all pending sends regardless of approval status

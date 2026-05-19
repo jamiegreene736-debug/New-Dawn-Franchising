@@ -1,0 +1,196 @@
+Build a full-stack SEO Command Center web application. This is a comprehensive SEO management portal with an AI agent that runs automated daily SEO tasks. Use React (Vite) for the frontend, Node.js/Express for the backend, and PostgreSQL (or SQLite for simplicity) for the database. Use Tailwind CSS for styling.
+
+---
+
+## TECH STACK
+- Frontend: React + Vite + Tailwind CSS
+- Backend: Node.js + Express
+- Database: PostgreSQL (use Prisma ORM)
+- APIs to integrate: 
+  - Google Search Console API (keyword rankings, traffic data)
+  - Google Analytics 4 API (traffic sources, sessions)
+  - DataForSEO API or SEMrush API (keyword research, backlinks, SERP data)
+  - OpenAI API (SEO article generation, meta descriptions, title tags)
+  - Hunter.io API (email outreach for backlinks)
+  - Ahrefs API or Moz API (domain authority, backlink checker)
+- Scheduler: node-cron for daily AI agent tasks
+- Auth: JWT-based authentication
+
+---
+
+## PAGES & SECTIONS
+
+Build a sidebar navigation with the following pages:
+
+### 1. OVERVIEW DASHBOARD (/)
+- Top-level metric cards (4 cards): Organic Traffic, Total Keywords Ranking, Total Backlinks, Domain Authority score
+- Traffic trend line chart (last 90 days, broken down by organic/direct/referral/social/paid)
+- Top 10 ranking keywords table with columns: Keyword, Position, Search Volume, Traffic %, Change (up/down arrow with delta)
+- Ranking position distribution donut chart (positions 1-3, 4-10, 11-20, 21-50, 50+)
+- AI Agent activity feed showing the last 10 automated tasks completed today
+- Alerts section: keywords that dropped more than 3 positions, pages losing traffic
+
+### 2. KEYWORD RESEARCH (/keywords/research)
+- Search bar to enter a seed keyword
+- On submit, call the DataForSEO or SEMrush API and return:
+  - Keyword suggestions table: Keyword, Monthly Search Volume, Keyword Difficulty (0-100), CPC, Competition level, SERP features
+  - Filters: by volume (min/max), by difficulty (Easy <30 / Medium 30-60 / Hard 60+), by CPC range
+  - "Save to keyword list" button on each row
+- Related questions section (People Also Ask style)
+- Keyword clustering: group semantically related keywords automatically using OpenAI embeddings
+- Export to CSV button
+
+### 3. RANKINGS TRACKER (/keywords/rankings)
+- Table of all tracked keywords showing:
+  - Keyword, Current Position, Previous Position, Best Position Ever, Search Volume, Page Ranking, Last Updated
+  - Color coded: green for top 3, blue for 4-10, yellow for 11-20, red for 21+
+  - Trend sparkline for each keyword (last 30 days)
+- Add keyword button (manually add keywords to track)
+- Position history chart for any selected keyword (click row to expand)
+- Competitor comparison: enter a competitor domain and compare rankings side by side
+- Filter by: position range, page URL, tags
+
+### 4. BACKLINK MANAGER (/backlinks)
+- Total backlink count, referring domains count, DA score, spam score
+- Backlinks table: Source URL, Target URL, Anchor Text, DA, Follow/Nofollow, First Seen, Last Seen
+- Filter by: DA range, follow/nofollow, new/lost
+- Lost backlinks alert section (backlinks that went offline in last 7 days)
+- Backlink Outreach Generator:
+  - Input: enter your page URL and target niche
+  - AI generates a personalized outreach email to request a backlink
+  - Hunter.io integration to find editor/webmaster emails for target sites
+  - Outreach tracker table: Site, Contact Email, Status (Not Sent / Sent / Replied / Won / Lost), Notes
+- Paid Backlink Marketplace section:
+  - List of curated DA 40+ sites that accept sponsored posts
+  - Filter by niche, DA, price range
+  - "Request placement" button that triggers an outreach email
+
+### 5. SEO CONTENT GENERATOR (/content)
+- Article Generator:
+  - Input fields: Target keyword, Secondary keywords (comma separated), Tone (informational/commercial/listicle), Word count (500/1000/1500/2000+), Target URL to optimize for
+  - On generate: use OpenAI API to write a full SEO-optimized article with:
+    - H1 title tag (keyword-optimized)
+    - Meta description (under 160 chars)
+    - Proper H2/H3 structure
+    - Internal link suggestions
+    - FAQ section at the bottom
+    - Word count target respected
+  - Show the article in a rich text preview (use react-markdown)
+  - "Copy HTML", "Export as .docx", "Publish to WordPress" buttons
+- Meta Tag Generator: input a URL, scrape the page, suggest optimized title tag and meta description
+- Schema Markup Generator: select schema type (Article, Product, FAQ, LocalBusiness), fill fields, outputs JSON-LD
+- Content audit tool: paste a URL, AI scores it on keyword usage, readability, internal links, and gives a to-do list
+
+### 6. AI SEO AGENT (/agent)
+This is the most important section. Build an autonomous AI agent that runs daily automated SEO tasks on a cron schedule (runs at 6 AM daily). Each task logs its result to the database and is visible in a live activity feed.
+
+Agent Tasks (run automatically every day):
+1. RANKINGS CHECK: Pull updated keyword rankings via API for all tracked keywords. Store in DB. Flag changes.
+2. BACKLINK DISCOVERY: Scan for new backlinks gained or lost since yesterday. Alert if a high-DA link is lost.
+3. CONTENT PUBLISHING: If the content queue has pending articles, auto-publish them to connected WordPress site via WordPress REST API.
+4. DIRECTORY SUBMISSIONS: Automatically submit the site to 3 new free web directories from a pre-built list of 500+ directories stored in the DB. Track which ones have been submitted.
+5. BLOG OUTREACH: Use the OpenAI API to identify blog post topics in the site's niche. Use Hunter.io to find editor contacts. Send templated outreach emails for guest post opportunities. Log all outreach.
+6. NEWS / PR DISTRIBUTION: Generate a short 300-word press release about the site using OpenAI. Submit it to free PR distribution APIs (PRLog, OpenPR, etc.). Log the submission.
+7. SOCIAL BOOKMARKING: Submit the latest published page/post to social bookmarking sites (Reddit relevant subreddits, Mix, Flipboard) via their APIs.
+8. INTERNAL LINK AUDIT: Crawl the site's sitemap, identify pages with no internal links pointing to them (orphan pages), suggest internal links to add.
+9. COMPETITOR SPY: Each day check the top 3 competitors' new backlinks and new pages. Log them for review.
+10. SEO SCORE REPORT: Run a daily health score (0-100) for the site based on: avg ranking position, new backlinks, content published, technical issues, and traffic trend.
+
+Agent UI requirements:
+- Live task feed with status indicators: Pending / Running / Completed / Failed
+- Each task card shows: task name, description, status, time started, time completed, result summary
+- Manual "Run Now" button for each task
+- Agent settings panel:
+  - Toggle each task on/off
+  - Set time for daily run
+  - Connect WordPress site (URL, username, application password)
+  - Connect Google Search Console property
+  - Set target domain
+  - Notification email for daily summary
+- Daily summary email: at end of day, send a summary email of everything the agent accomplished
+- Agent log history: browse previous days' agent runs and results
+
+### 7. REPORTS (/reports)
+- Weekly SEO report generator (PDF export)
+- Report includes: traffic summary, keyword movers (biggest gains/losses), new backlinks, content published, agent activity summary, recommendations
+- Scheduled reports: set it to email a report every Monday morning
+- White-label option: add client logo and brand colors to the report
+
+---
+
+## DATABASE SCHEMA (Prisma)
+
+Create the following models:
+- User (id, email, passwordHash, createdAt)
+- Domain (id, url, name, userId, gaPropertyId, gscPropertyId)
+- Keyword (id, keyword, domainId, tags, createdAt)
+- KeywordRanking (id, keywordId, position, searchVolume, url, date)
+- Backlink (id, domainId, sourceUrl, targetUrl, anchorText, da, isFollow, firstSeen, lastSeen, isLost)
+- BacklinkOutreach (id, domainId, targetSite, contactEmail, emailSent, status, notes, createdAt)
+- GeneratedContent (id, domainId, keyword, title, body, metaDescription, wordCount, status, createdAt)
+- AgentTask (id, domainId, taskType, status, startedAt, completedAt, resultSummary, errorMessage, createdAt)
+- AgentSettings (id, domainId, taskToggles JSON, runTime, notificationEmail, wpUrl, wpUser, wpPassword)
+- DirectorySubmission (id, domainId, directoryUrl, submittedAt, status)
+
+---
+
+## UI/UX REQUIREMENTS
+
+- Sidebar navigation with icons (use Lucide React)
+- Top bar with: domain selector (if user has multiple sites), last crawl time, notification bell
+- Dark mode toggle
+- All tables must be sortable and filterable
+- Skeleton loading states on all data fetches
+- Toast notifications for success/error actions
+- Mobile responsive (sidebar collapses to hamburger on mobile)
+- Color coding convention: green = good/top rankings, blue = info/mid rankings, yellow = warning, red = error/dropped
+- Use Recharts for all charts (line charts, bar charts, donut charts, sparklines)
+- Pagination on all tables (25 rows per page default)
+
+---
+
+## ENV VARIABLES NEEDED
+
+Create a .env file and prompt the user to fill in:
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_SEARCH_CONSOLE_KEY=
+GA4_PROPERTY_ID=
+DATAFORSEO_LOGIN=
+DATAFORSEO_PASSWORD=
+OPENAI_API_KEY=
+HUNTER_API_KEY=
+AHREFS_API_KEY=
+WORDPRESS_SITE_URL=
+WORDPRESS_USERNAME=
+WORDPRESS_APP_PASSWORD=
+DATABASE_URL=
+JWT_SECRET=
+EMAIL_SMTP_HOST=
+EMAIL_SMTP_USER=
+EMAIL_SMTP_PASS=
+NOTIFICATION_EMAIL=
+
+---
+
+## GETTING STARTED FLOW
+
+When a user first signs up:
+1. Ask them to enter their website domain
+2. Walk them through connecting Google Search Console (OAuth)
+3. Walk them through connecting Google Analytics 4 (OAuth)
+4. Ask them to enter their top 10 target keywords to start tracking
+5. Run an initial site audit
+6. Take them to the Overview dashboard with a "Your data is being pulled" loading state
+
+---
+
+## IMPORTANT NOTES
+
+- All API calls should be made server-side (backend) to protect API keys
+- Add rate limiting on all API routes
+- Gracefully handle API failures — if DataForSEO is down, show cached data with a "Last updated X hours ago" notice
+- The AI Agent should be fault-tolerant — if one task fails, log the error and continue to the next task
+- Add a mock data mode / seed script so the app works and looks populated even before real API keys are connected
+- Comment all major functions clearly
+- Use environment-based feature flags so features dependent on unprovided API keys are gracefully hidden

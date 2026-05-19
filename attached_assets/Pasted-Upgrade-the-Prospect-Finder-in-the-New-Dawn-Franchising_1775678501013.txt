@@ -1,0 +1,276 @@
+Upgrade the Prospect Finder in the New Dawn Franchising CRM to move beyond basic 
+business listings (name, address, phone) and instead surface individual decision-makers 
+with verified contact details and a seniority score. Below is the full multi-phase 
+methodology to implement.
+
+The current Prospect Finder searches by 7 categories (immigration attorneys, E-2 visa 
+consulting firms, business brokers, immigration consultants, franchise consultants, 
+CPAs international tax, relocation services) filtered by US state or country. The 
+problem is it returns companies — we need PEOPLE, specifically the partners, owners, 
+and managing attorneys who make referral decisions.
+
+---
+
+PHASE 1 — SEED DATA (What You Already Have)
+Keep the existing search layer (Google Places API or similar) to discover businesses 
+by category and location. This returns: business name, address, main phone, website 
+URL, and Google rating. This is the outer shell. Do not show these results to the user 
+yet — feed them into Phase 2 automatically.
+
+---
+
+PHASE 2 — WEBSITE INTELLIGENCE SCRAPING
+For every business returned in Phase 1, scrape their website to find individuals. 
+Use Playwright (not basic fetch) because many firm websites are JavaScript-rendered.
+
+Target these URL patterns on each domain:
+/team, /about, /attorneys, /staff, /partners, /our-team, /people, /professionals, 
+/meet-the-team, /leadership, /lawyers, /consultants
+
+On each of those pages, extract using NLP + regex:
+- Full names (pattern: capitalized first + last name near a title keyword)
+- Job titles (look for: Owner, Founder, Partner, Principal, Managing Attorney, 
+  Senior Attorney, Director, Associate, Consultant, Advisor)
+- Direct email addresses (regex: any email on the page, especially name@domain patterns)
+- Direct phone extensions or personal phone numbers
+- LinkedIn profile URLs (look for linkedin.com/in/ links)
+- Headshot image alt text (often contains the person's name and title)
+- Bio snippets mentioning E-2 visa, international clients, immigration, franchising
+
+If no team page is found, fall back to scraping the homepage and contact page 
+for any individual names mentioned.
+
+---
+
+PHASE 3 — PROFESSIONAL DIRECTORY MATCHING
+After website scraping, cross-reference against authoritative professional 
+directories for each category. These directories list verified individual members 
+with their specializations. Implement scrapers or API integrations for:
+
+IMMIGRATION ATTORNEYS:
+- AILA.org (American Immigration Lawyers Association) — member directory is 
+  searchable by city/state. Extracts: attorney name, firm, bar admission, 
+  specializations, direct contact. Cross-reference AILA membership as a 
+  quality signal (AILA members = verified immigration specialists).
+- State Bar Association websites — every US state has a publicly searchable 
+  attorney directory at their bar association site (e.g., texasbar.com, 
+  calbar.ca.gov). Search by city + practice area "immigration." Returns 
+  licensed attorney names, bar numbers, firm affiliation, office address.
+- Avvo.com — has detailed attorney profiles with specialization ratings, 
+  contact info, and client reviews. Scrape name, title, specializations, 
+  and whether they list "E-2 visa" as a practice area.
+
+BUSINESS BROKERS (INTERNATIONAL):
+- IBBA.org (International Business Brokers Association) — member directory 
+  with individual broker names, certifications (CBI = Certified Business 
+  Intermediary, a quality signal), and contact details.
+- BizBuySell.com broker listings — scrape broker profile pages for name, 
+  bio mentioning international deals, direct contact.
+
+FRANCHISE CONSULTANTS:
+- FranServe.com and FranChoice.com — both have consultant directories 
+  with individual profiles, territories covered, and contact info.
+- IFA.org (International Franchise Association) member directory.
+
+CPAs (INTERNATIONAL TAX):
+- State CPA Society websites (e.g., tscpa.org for Texas) — searchable 
+  member directories with individual CPA names and firm affiliations.
+- CPADirectory.com — searchable by location and specialty. Filter for 
+  "international tax" or "foreign national."
+
+IMMIGRATION CONSULTANTS & RELOCATION SERVICES:
+- Worldwide ERC (worldwideerc.org) — relocation industry association 
+  directory with individual member profiles.
+- LinkedIn search API / scraping as primary source for these categories 
+  since formal directories are limited.
+
+---
+
+PHASE 4 — LINKEDIN ENRICHMENT (Decision Maker Discovery)
+For each business found, use the Proxycurl API (proxycurl.com — they have 
+a clean REST API specifically for LinkedIn data without violating ToS) to:
+
+1. Find all employees at the company on LinkedIn
+2. Filter by seniority keywords in title: Owner, Founder, Co-Founder, 
+   Partner, Principal, Managing, Director, Senior, Head of, VP
+3. For each decision-maker found, extract:
+   - Full name
+   - Exact job title
+   - Years at current company
+   - LinkedIn profile URL
+   - Previous companies (indicates experience level)
+   - Location (city/country)
+   - Whether they have any posts mentioning E-2 visa, immigration, 
+     franchise, or international investment in the last 90 days 
+     (high-relevance signal)
+
+Proxycurl API endpoints to use:
+- /proxycurl/api/linkedin/company/employees/ (find all employees by company URL)
+- /proxycurl/api/v2/linkedin (enrich individual profile by LinkedIn URL)
+
+---
+
+PHASE 5 — CONTACT DATA ENRICHMENT
+Once you have a person's full name and company domain, run them through 
+the following enrichment APIs (implement in waterfall order — stop when 
+you have verified email + phone):
+
+STEP A: Apollo.io API
+Endpoint: POST /api/v1/people/match
+Input: first_name, last_name, organization_domain
+Returns: email address, direct phone, LinkedIn URL, job title, seniority 
+level (C-suite / VP / Director / Manager / Individual), department.
+Apollo has 275M+ contact records and is the best first stop.
+
+STEP B: Hunter.io API (if Apollo returns no email)
+Endpoint: GET /v2/email-finder?domain={domain}&first_name={}&last_name={}
+Returns: most likely email address based on company's email pattern + 
+a confidence score (0-100). Only use results with confidence > 70.
+Also call: GET /v2/domain-search?domain={domain} to get the company's 
+email pattern (e.g., {first}.{last}@domain.com) so you can construct 
+emails for contacts Apollo missed.
+
+STEP C: RocketReach API (if no mobile number yet)
+Input: name + company
+Returns: direct mobile numbers, which are harder to find than emails. 
+RocketReach specializes in mobile numbers for professionals.
+
+STEP D: Clearbit Enrichment API (company-level fallback)
+If individual enrichment fails, use Clearbit to enrich at the company 
+level and return the company's key contacts and tech stack.
+
+---
+
+PHASE 6 — VERIFICATION LAYER
+Never store unverified contact data. Run every piece of contact info 
+through verification before saving:
+
+EMAIL VERIFICATION:
+Use ZeroBounce API: POST /v2/validate
+- "valid" status = safe to email
+- "catch-all" status = store but flag as unconfirmed  
+- "invalid" / "spamtrap" / "abuse" = discard entirely
+Store a verified_email boolean and verification_date per contact.
+
+PHONE VERIFICATION:
+Use Twilio Lookup API: GET /v1/PhoneNumbers/{number}?Type=carrier
+- Returns: line type (mobile vs. landline vs. VOIP)
+- Mobile numbers = store as primary SMS/call target
+- Landline = store as office number only (no SMS)
+- Add country code normalization for international numbers
+Store phone_type ("mobile" / "landline" / "voip") per number.
+
+---
+
+PHASE 7 — DECISION MAKER SCORING ALGORITHM
+After all enrichment is complete, score every individual contact 
+from 0–100 and display this as a "Decision Maker Score" badge in 
+the UI. This tells the user who to reach out to first.
+
+TITLE/SENIORITY SCORE (max 40 points):
+- Owner / Founder / Co-Founder / Principal: 40 points
+- Partner / Managing Partner / Managing Attorney: 35 points
+- Director / Senior Director / VP: 28 points
+- Senior Attorney / Senior Consultant / Senior Advisor: 22 points
+- Associate Attorney / Consultant / Advisor: 12 points
+- Paralegal / Assistant / Coordinator / Staff: 4 points
+
+REACHABILITY SCORE (max 35 points):
+- Has verified direct email (confidence > 85%): 15 points
+- Has verified mobile number: 12 points
+- Has LinkedIn profile URL: 5 points
+- Has direct office number: 3 points
+
+RELEVANCE SCORE (max 25 points):
+- Bio or LinkedIn mentions "E-2 visa" specifically: 15 points
+- Bio mentions "international clients" or "foreign national": 8 points
+- LinkedIn activity in last 30 days (active = reachable): 5 points
+- Company has 4+ star Google rating: 3 points
+- AILA member or professional certification held: 4 points (can exceed 25 max — cap at 25)
+
+Display score as a colored badge:
+- 75–100: 🟢 Hot Lead (decision maker, verified contact, E-2 relevant)
+- 50–74: 🟡 Warm Lead (decision maker or verified, partially relevant)
+- 25–49: 🟠 Cold Lead (found but limited data)
+- 0–24: ⚪ Unqualified (admin staff or no contact info)
+
+---
+
+PHASE 8 — DATA FRESHNESS & STALENESS MANAGEMENT
+Contact data degrades over time. Implement:
+
+- Store a last_verified_date timestamp for every email and phone number
+- Auto-flag any contact where last_verified_date > 90 days old with 
+  a "stale" indicator in the UI
+- When a user tries to add a stale contact to a campaign, prompt: 
+  "This contact was last verified 120 days ago. Re-verify before sending?"
+- Track email bounce events: if a campaign email hard-bounces, 
+  automatically mark that email as invalid and trigger re-enrichment
+- Track SMS delivery failures: if an SMS fails to deliver, mark 
+  the number as invalid
+
+---
+
+PHASE 9 — UI CHANGES IN PROSPECT FINDER
+Change the Prospect Finder results display from company-level cards 
+to individual-level cards. Each result should show:
+
+COMPANY HEADER:
+[Company Name] • [City, State] • [Category] • ⭐ Google Rating
+
+INDIVIDUALS FOUND (sorted by Decision Maker Score, highest first):
+┌─────────────────────────────────────────────────────┐
+│ 🟢 87  Sarah Chen — Managing Attorney               │
+│      📧 s.chen@chenimmigration.com  ✓ Verified      │
+│      📱 (915) 555-0182  ✓ Mobile                    │
+│      💼 linkedin.com/in/sarahchenlaw                │
+│      🏷️ AILA Member • Specializes in E-2 Visa       │
+│      [+ Add to CRM]  [✉ Enroll in Campaign]         │
+└─────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│ 🟡 52  Mark Torres — Associate Attorney             │
+│      📧 m.torres@chenimmigration.com  ✓ Verified    │
+│      📱 Not found                                    │
+│      [+ Add to CRM]  [✉ Enroll in Campaign]         │
+└─────────────────────────────────────────────────────┘
+
+Key UI requirements:
+- Show company-level info as a collapsible header
+- Default to showing only 🟢 Hot and 🟡 Warm individuals; 
+  hide lower scores behind a "Show all contacts" toggle
+- Allow bulk-selecting multiple individuals across multiple 
+  companies and adding them all to the Saved List at once
+- Show a "data sources" tooltip per contact showing which 
+  APIs confirmed the data (e.g., "Email via Apollo • Phone 
+  via RocketReach • LinkedIn via Proxycurl")
+- When adding to CRM, pre-populate ALL enriched fields 
+  automatically (name, email, phone, LinkedIn, title, source)
+
+---
+
+CACHING & RATE LIMIT MANAGEMENT
+These APIs have rate limits and costs. Implement smart caching:
+- Cache enriched company results for 30 days (don't re-query 
+  Apollo/Proxycurl for the same domain within 30 days)
+- Store all enriched data in the database, not just in memory
+- Use a job queue (like Bull or similar) for enrichment tasks 
+  so the UI doesn't hang — show a "Enriching data..." progress 
+  bar while the pipeline runs in the background
+- Prioritize enrichment of contacts the user explicitly saves 
+  or hovers over (lazy enrichment for the rest)
+
+---
+
+PRIORITY API STACK (implement in this order):
+1. Proxycurl — LinkedIn employee discovery ($0.01/profile)
+2. Apollo.io — email + phone enrichment (free tier: 50 exports/month; 
+   paid: $49/mo for 1,000 exports)
+3. Hunter.io — email finding and verification (free: 25/month; 
+   paid: $49/mo for 500)
+4. ZeroBounce — email verification ($16 for 2,000 verifications)
+5. Twilio Lookup — phone validation ($0.005/lookup)
+6. RocketReach — mobile numbers ($53/mo for 170 lookups)
+
+Total estimated cost at moderate usage: ~$150–200/month for a 
+well-enriched prospect pipeline that returns individual decision-makers 
+with verified, scored contact data instead of generic company listings.

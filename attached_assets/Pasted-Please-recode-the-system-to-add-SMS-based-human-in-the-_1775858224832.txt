@@ -1,0 +1,50 @@
+Please recode the system to add SMS-based human-in-the-loop notifications and two-way communication for the AI agents, using the QUO texting feature. Here are the requirements:
+1. Trigger conditions for texting me:
+Whenever either the SEO agent or the scraper/outreach agent encounters any of the following situations, it should automatically send me a text message:
+
+Needs me to approve a draft (blog post, outreach email, content, etc.)
+Requires login credentials or authentication to a platform
+Is stuck, blocked, or encounters an error it cannot resolve
+Needs any human decision or input to proceed
+
+2. My contact number:
+All notifications should be sent to me at: 863-360-7768
+3. Assigned QUO numbers for each agent:
+Use the QUO texting feature/API to send and receive messages. Assign the following dedicated QUO numbers to each agent (do NOT use the main 346 area code number — it is reserved):
+
+SEO agent → 407-449-7941
+Scraper/Outreach agent → 808-460-6509
+
+Each agent must consistently use its assigned number for all outgoing and incoming messages so I can tell them apart when I receive texts.
+4. Two-way communication:
+
+When an agent texts me, I should be able to reply directly to that number.
+The system must route my reply back to the correct agent based on which QUO number I'm texting:
+
+Replies to 407-449-7941 → routed to the SEO agent
+Replies to 808-460-6509 → routed to the outreach agent
+
+
+This should allow full back-and-forth conversation until the issue is resolved or the draft is approved.
+Once I reply with approval, credentials, or instructions, the agent should resume its task automatically.
+
+5. Message content:
+Each outgoing text should clearly include:
+
+Which agent is messaging (e.g., "SEO Agent:" or "Outreach Agent:")
+What it needs (approval, login, unblocking, etc.)
+Enough context for me to respond intelligently (e.g., a short preview of the draft, the site it needs to log into, or the error it hit)
+If a draft is long, send a link instead of pasting the full content.
+
+6. Internal Communications tab (NEW):
+Add a new tab in each AI agent's portal called "Internal Communications". This tab should:
+
+Display a live, running log of all SMS messages sent and received by that specific agent (SEO agent's tab shows only SEO texts; Outreach agent's tab shows only outreach texts).
+Show each message in a chat-style thread with timestamps, direction (sent/received), and the QUO number involved.
+Update in real time as new messages come in or go out.
+Allow me to scroll back through the full conversation history for that agent.
+Optionally let me send a message directly from the tab as well (same as if I texted back from my phone).
+
+7. Persistence:
+Hard-code or store the agent-to-number assignments (407-449-7941 for SEO, 808-460-6509 for outreach) so they remain consistent across sessions. Log all SMS conversations in a database so the Internal Communications tabs can load full history and the agents retain context on previous exchanges.
+Please implement this, confirm the number assignments are correctly wired (SEO = 407-449-7941, Outreach = 808-460-6509, main 346 number excluded), verify both Internal Communications tabs are rendering correctly in each agent's portal, and then run a test message from each agent to 863-360-7768 so I can confirm the two-way flow and the tabs are working end-to-end.

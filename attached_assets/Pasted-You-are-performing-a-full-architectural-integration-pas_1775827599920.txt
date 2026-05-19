@@ -1,0 +1,788 @@
+You are performing a full architectural integration pass on the New Dawn Franchising marketing portal (www.newdawnfranchising.com).
+
+Four new automation systems are going to be built as part of this prompt:
+1. Content Engine
+2. Website Visitor Trigger
+3. Calendly Meeting Booking Integration
+4. Weekly AI Strategy Brief
+
+THIS PROMPT HAS TWO PARTS. Complete Part 1 (architecture, audit, and conflict resolution) in full before beginning Part 2 (building the four new systems). Do not skip ahead.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART 1 — ARCHITECTURE, AUDIT & CONFLICT RESOLUTION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 1 — AUDIT THE EXISTING SYSTEM
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Read every file in the project. Produce a structured inventory of:
+
+EXISTING CRON JOBS
+List every registered cron job with:
+- Job name
+- Schedule expression (e.g. 0 6 * * *)
+- Timezone
+- What it does
+- Which database tables it reads from and writes to
+- Which external APIs it calls
+- Approximate runtime duration
+
+EXISTING DATABASE TABLES
+List every table with:
+- Table name
+- All columns and data types
+- Foreign key relationships
+- Indexes
+
+EXISTING API ENDPOINTS
+List every route with:
+- Method and path
+- What it does
+- Which tables it touches
+
+EXISTING EMAIL SENDS
+List every place in the codebase that sends an email with:
+- Trigger (cron schedule, API call, event, manual)
+- Scheduled time if applicable
+- Recipient
+- Subject pattern
+- Which SMTP credentials it uses
+
+EXISTING EVENT EMITTERS OR QUEUES
+List any internal event emitters, message queues, or pub/sub systems already in place.
+
+Output this inventory as a comment block at the top of a new file called /architecture/SYSTEM_MAP.md before proceeding.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 2 — IDENTIFY ALL CONFLICTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Using the inventory above, check for the following conflict types and document every instance found:
+
+CRON SCHEDULE CONFLICTS
+Check if any new scheduled jobs would fire at the same time as existing jobs and compete for database write locks, external API rate limits, SMTP rate limits, or server CPU/memory.
+
+Known schedule times already in use — verify each against what is actually registered:
+- 6:00 AM CST daily — SEO daily automations (Keyword Rank, Broken Links, Web Vitals, Competitor Monitor)
+- 7:00 AM CST Monday — SEO weekly automations (Digest, Backlink Audit, Content Gap, Schema, GBP Check)
+- 8:00 AM CST 1st of month — SEO monthly automations (Full Audit, Content Review, Trend Report, Citations, Competitor Rankings)
+- 9:00 AM EST daily — Daily email digest to Jamie.green736@gmail.com
+
+New schedules being added — check each for conflicts:
+- 7:00 AM EST Monday — Weekly AI Strategy Brief
+  CONFLICT: 7:00 AM EST = 6:00 AM CST. This fires at the same time as the existing SEO daily automation job.
+  RESOLUTION: Shift the Weekly Strategy Brief to 8:00 AM EST Monday so the daily SEO job has completed and its data is available.
+
+- Content Engine drafts — triggered by SEO Content Gap and Keyword Trend Report completions
+  CONFLICT RISK: Event-driven triggers must only fire AFTER the parent SEO job sets its status to completed. If they fire mid-write, data will be incomplete.
+  RESOLUTION: Content Engine triggers only on the seo:task:completed event — never call it directly.
+
+- Visitor Trigger — real-time, fires on every page visit
+  CONFLICT RISK: High-frequency visitor events can exhaust the database connection pool during concurrent SEO crawl jobs.
+  RESOLUTION: Visitor events use a 500ms debounce write queue per session.
+
+- Calendly webhooks — real-time, fires on booking
+  CONFLICT RISK: Low. Verify the webhook endpoint does not share middleware with heavy processing routes.
+
+DATABASE WRITE CONFLICTS
+Check for tables that multiple systems write to simultaneously:
+- tasks table: written by scheduler, read by daily email and weekly brief. All reads must use a snapshot query during active task runs.
+- outreach_log table: written by campaign sequence engine, read by visitor trigger. Add a read-only index on lead_id and clicked_at.
+- leads table: written by lead gen agent, visitor trigger, and Calendly integration simultaneously. All three must use row-level locks. SQLite WAL mode is required — confirm it is enabled and enable it if not.
+
+EMAIL SEND CONFLICTS
+All email sends must route through a single unified email queue. No system may call the SMTP transporter directly. Queue settings: max 10 concurrent sends, 200ms delay between sends, 3 retry attempts with exponential backoff.
+
+Email schedule after conflict resolution:
+- 6:00–8:45 AM CST daily — SEO automation jobs run
+- 9:00 AM EST daily — Daily digest (existing)
+- 8:00 AM EST Monday — Weekly strategy brief (shifted from 7:00 AM EST)
+- Real-time — Meeting booking alerts, visitor identification alerts, reply notifications
+- 24 hours before each meeting — Pre-meeting intelligence brief
+
+API RATE LIMIT CONFLICTS
+- SerpAPI: Called by Keyword Rank Tracker (6:00 AM) AND Competitor Monitor (also 6:00 AM). RESOLUTION: Stagger Competitor Monitor to 6:15 AM.
+- Apollo.io: On-demand list enrichment and 90-day background refresh. RESOLUTION: Background refresh runs at 2:00 AM only.
+- Twilio: Enforce daily send limits in queue before calling — never call if daily limit hit.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 3 — UNIFIED ARCHITECTURE DESIGN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+After auditing and resolving all conflicts, implement the following unified core infrastructure before touching any feature code. These modules are the foundation every system — existing and new — must use.
+
+─────────────────────────────────────────
+CENTRAL EVENT BUS — /core/event-bus.js
+─────────────────────────────────────────
+
+A singleton internal event emitter. No system calls another system's functions directly. Everything is decoupled through named events. Use Node's built-in EventEmitter. Do NOT use an external message broker.
+
+Register the following events and their listeners:
+
+seo:task:completed { taskId, taskName, cadence, completedAt, results }
+  → Email Digest: adds to today's completed list
+  → Content Engine: triggers draft generation if task is content_gap_analysis or keyword_trend_report
+  → Weekly Brief: marks data as available
+
+seo:task:failed { taskId, taskName, error, failedAt }
+  → Email Digest: adds to issues list
+  → Portal: sets red notification dot
+  → Weekly Brief: logs for warnings section
+
+lead:created { leadId, name, company, category, score, source }
+  → Sequence engine: checks auto-enrolment
+  → Portal: activity feed notification
+  → Weekly Brief: increments new leads counter
+
+lead:replied { leadId, channel, replyText, repliedAt }
+  → Intent classifier: classifies reply
+  → Sequence engine: pauses sequence
+  → Portal: flags for human review
+  → Jamie alert: immediate email notification
+
+lead:intent:positive { leadId, replyText, classifiedAt }
+  → Calendly integration: sends booking link
+  → Weekly Brief: increments positive replies counter
+
+lead:intent:objection { leadId, objectionType, replyText }
+  → Sequence engine: injects objection-handling response
+  → Portal: flags objection type
+
+lead:opted_out { leadId, channel, timestamp }
+  → Sequence engine: hard stops all sequences immediately
+  → Leads table: sets opted_out = true
+  → All channel queues: purges pending sends for this lead
+
+visitor:high_intent { fingerprint, pageUrl, visitCount, sessionId }
+  → Visitor watchlist: adds or updates entry
+  → Portal: visitor intelligence notification
+  → Weekly Brief: increments watchlist counter
+
+visitor:identified { leadId, fingerprint, sessionHistory, identifiedVia }
+  → Lead gen agent: upgrades lead status and sequence priority
+  → Jamie alert: immediate email if lead is a confirmed partner
+  → Weekly Brief: logs as notable event
+
+meeting:booked { meetingId, leadId, scheduledAt, calendlyEventId }
+  → Meetings system: creates meeting record
+  → Calendar integration: creates Google Calendar event for Jamie
+  → Jamie alert: immediate booking notification email
+  → Brief scheduler: queues pre-meeting intelligence brief for 24 hours before
+  → Weekly Brief: increments meetings booked counter
+  → Campaign metrics: logs as conversion event
+
+meeting:cancelled { meetingId, leadId, cancelledAt }
+  → Meetings system: updates status
+  → Sequence engine: re-injects lead into outreach
+  → Jamie alert: cancellation notification
+
+content:draft:created { draftId, title, targetKeyword, triggerSource }
+  → Portal: shows new draft card in Content Engine panel
+  → Weekly Brief: increments pending drafts counter
+
+─────────────────────────────────────────
+UNIFIED JOB SCHEDULER — /core/scheduler.js
+─────────────────────────────────────────
+
+The ONLY file where cron jobs are registered. No cron jobs may be registered anywhere else. This prevents duplicate registration on server restart.
+
+All jobs must follow this pattern:
+cron.schedule(expression, async () => {
+  const job = await JobRunner.start(jobName);
+  try {
+    const results = await jobHandler();
+    await JobRunner.complete(job.id, results);
+    eventBus.emit('seo:task:completed', { taskId: job.id, taskName: jobName, results });
+  } catch (error) {
+    await JobRunner.fail(job.id, error);
+    eventBus.emit('seo:task:failed', { taskId: job.id, taskName: jobName, error });
+  }
+}, { timezone: 'America/Chicago' });
+
+Conflict-free schedule (all times CST unless noted):
+
+DAILY:
+06:00 — keyword-rank-tracker
+06:15 — competitor-content-monitor       (staggered 15min from SerpAPI sibling)
+06:30 — broken-link-checker              (staggered to avoid crawl + API overlap)
+06:45 — core-web-vitals-snapshot
+09:00 EST — daily-email-digest           (after all daily SEO jobs complete)
+
+WEEKLY (Monday):
+07:00 — seo-performance-digest
+07:15 — backlink-audit
+07:30 — content-gap-analysis
+07:45 — schema-markup-validator
+08:00 — gbp-sync-check
+08:00 EST — weekly-strategy-brief        (shifted from 7AM EST to avoid SEO conflict)
+
+MONTHLY (1st of month):
+08:00 — full-technical-seo-audit
+08:30 — content-performance-review
+09:00 — keyword-trend-report
+09:30 — citation-directory-audit
+10:00 — competitor-ranking-comparison
+
+BACKGROUND MAINTENANCE:
+02:00 daily — list-enrichment-refresh
+02:30 daily — dead-sequence-cleanup
+03:00 monthly (1st) — list-90-day-refresh
+
+─────────────────────────────────────────
+UNIFIED EMAIL QUEUE — /core/email-queue.js
+─────────────────────────────────────────
+
+All email sends across the entire portal must go through this queue. No module calls nodemailer directly. Search the entire codebase and replace every direct SMTP call with emailQueue.add().
+
+Queue behaviour:
+- Max 10 concurrent sends, 200ms minimum delay between sends
+- Priority levels: CRITICAL > HIGH > NORMAL > LOW
+- 3 retry attempts with exponential backoff: 1min, 5min, 15min
+- Dead letter queue for failed sends — log in email_log and notify Jamie via fallback
+
+API: emailQueue.add({ to, from, subject, html, text, priority, metadata })
+
+─────────────────────────────────────────
+UNIFIED DATABASE CONNECTION — /core/db.js
+─────────────────────────────────────────
+
+Single connection pool exported from one file. No module creates its own database connection.
+
+If SQLite: Enable WAL mode immediately — PRAGMA journal_mode=WAL. Set busy_timeout=5000, cache_size=-64000.
+If PostgreSQL/MySQL: Pool with min:2, max:10. All multi-table writes use explicit transactions.
+
+─────────────────────────────────────────
+RATE LIMIT MANAGER — /core/rate-limiter.js
+─────────────────────────────────────────
+
+Central registry of all API and send limits. Every module checks this before external calls.
+
+Limits to register:
+- serp_api: per plan — shared across keyword tracker and competitor monitor
+- pagespeed_api: 25,000/day
+- apollo_api: per plan
+- twilio_sms: 20/day
+- twilio_whatsapp: 20/day
+- lob_mail: 10/day
+- smtp_email: 50/day
+- heygen_api: manual only
+
+API: rateLimiter.check(service), rateLimiter.consume(service), rateLimiter.getStatus()
+Store daily counts in rate_limit_usage table. Reset at midnight CST.
+
+─────────────────────────────────────────
+NOTIFICATION SYSTEM — /core/notifications.js
+─────────────────────────────────────────
+
+All portal notifications (red dots, activity feed, banners) go through this module.
+
+notifications table: id, type, system, title, message, lead_id, action_url, created_at, read_at
+API: notifications.create(), notifications.markRead(), notifications.getUnread()
+Frontend polls /api/notifications every 30 seconds alongside the existing task panel poll.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 4 — REVISED DIRECTORY STRUCTURE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Reorganise the codebase into this structure. Move existing files — do not delete anything.
+
+/core
+  db.js, event-bus.js, scheduler.js, email-queue.js, rate-limiter.js, notifications.js, job-runner.js
+
+/seo-agent/tasks
+  keyword-rank-tracker.js, broken-link-checker.js, core-web-vitals.js, competitor-content-monitor.js,
+  seo-performance-digest.js, backlink-audit.js, content-gap-analysis.js, schema-validator.js,
+  gbp-sync-check.js, technical-seo-audit.js, content-performance-review.js, keyword-trend-report.js,
+  citation-audit.js, competitor-ranking-comparison.js
+
+/lead-gen-agent
+  research/: lead-discovery.js, competitor-monitor.js, lead-enrichment.js, lead-scoring.js
+  lists/: list-builder.js, list-manager.js, list-refresh.js
+  campaigns/: campaign-creator.js, campaign-runner.js, campaign-metrics.js
+  sequences/: sequence-engine.js, intent-classifier.js
+  channels/: email.js, sms.js, whatsapp.js, mail.js, video.js
+  optimize/: ab-tester.js, send-time-optimizer.js, copy-optimizer.js
+
+/content-engine
+  draft-generator.js, meta-optimizer.js, sitemap-submitter.js, content-calendar.js
+
+/visitor-trigger
+  tracking-script-generator.js, session-tracker.js, visitor-identifier.js, routing-logic.js, warm-sequence.js
+
+/meetings
+  calendly-webhook.js, booking-handler.js, pre-meeting-brief.js, calendar-integration.js, meeting-manager.js
+
+/strategy-brief
+  data-aggregator.js, brief-generator.js, brief-scheduler.js
+
+/email-templates
+  daily-digest.js, weekly-brief.js, pre-meeting-brief.js, jamie-alert.js, lead-confirmation.js
+
+/api/routes
+  tasks.js, leads.js, lists.js, campaigns.js, visitors.js, meetings.js, briefs.js, email.js, notifications.js
+
+/architecture
+  SYSTEM_MAP.md, SCHEDULE_REGISTRY.md, EVENT_REGISTRY.md, DATABASE_SCHEMA.md
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 5 — COMPLETE DATABASE SCHEMA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Compare this against existing tables found in Step 1. Add missing tables and columns. Never drop a table. Migrate safely.
+
+CORE:
+tasks (id, name, cadence, status, last_run, next_run, duration_ms, log, created_at)
+email_log (id, queue_id, to_address, from_address, subject, status, attempts, sent_at, failed_at, preview, metadata)
+notifications (id, type, system, title, message, lead_id, action_url, created_at, read_at)
+rate_limit_usage (id, service, date, count, limit, reset_at)
+
+SEO AGENT:
+keyword_rankings (id, keyword, rank, previous_rank, delta, flagged, checked_at)
+web_vitals (id, page_url, lcp, inp, cls, performance_score, flagged, checked_at)
+broken_links (id, source_url, broken_url, status_code, type, flagged, found_at, resolved_at)
+seo_issues (id, type, severity, page_url, description, status, found_at, resolved_at)
+backlinks (id, source_domain, spam_score, flagged, discovered_at)
+content_suggestions (id, topic, keyword, source_task, priority, status, created_at)
+meta_suggestions (id, page_url, current_title, current_meta, suggested_title, suggested_meta, impressions, current_ctr, status, created_at, approved_at)
+
+CONTENT ENGINE:
+content_drafts (id, title, meta_title, meta_description, body, target_keyword, word_count, status, trigger_source, created_at, approved_at, published_at)
+
+LEAD GEN:
+leads (id, full_name, title, company, email, phone, whatsapp, mailing_address, linkedin_url, category, score, status, opted_out, source, created_at, last_enriched_at, notes)
+lists (id, name, segment_tag, created_at, last_refreshed_at, contact_count, status, performance_score)
+list_members (id, list_id, lead_id, added_at, removed_at, removal_reason)
+campaigns (id, name, list_id, goal, status, start_date, end_date, channels_enabled, daily_send_limits, ab_test_enabled, auto_optimize, created_at)
+campaign_steps (id, campaign_id, step_number, channel, scheduled_day, subject_line, message_body, variant, status)
+outreach_log (id, lead_id, campaign_id, step_id, channel, sent_at, delivered_at, opened_at, clicked_at, replied_at, reply_text, intent, status, message_preview)
+campaign_metrics (id, campaign_id, computed_at, total_contacted, sent, delivered, opened, clicked, replied, opted_out, bounced, meetings_booked, conversions, open_rate, reply_rate, conversion_rate, best_send_day, best_send_time, top_performing_channel)
+
+VISITOR TRIGGER:
+visitor_events (id, session_id, fingerprint, page_url, referral_source, utm_source, utm_campaign, time_on_page_seconds, visited_at, lead_id)
+visitor_watchlist (id, fingerprint, pages_visited, visit_count, first_seen, last_seen, status)
+
+MEETINGS:
+meetings (id, lead_id, campaign_id, calendly_event_id, scheduled_at, status, outcome, brief_sent_at, created_at)
+
+STRATEGY BRIEF:
+briefs (id, generated_at, delivered_at, delivery_status, subject, html_body, priorities_count, wins_count, portal_actions_taken)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 6 — REFACTOR EXISTING SYSTEMS TO USE CORE MODULES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Before building anything new, refactor the existing SEO agent and lead gen agent to use the unified core:
+- Replace all direct database connections with import from /core/db.js
+- Replace all direct nodemailer calls with emailQueue.add() from /core/email-queue.js
+- Move all cron job registrations into /core/scheduler.js
+- Add eventBus.emit() calls at the end of every task completion and failure
+- Add rateLimiter.check() before every external API call
+- Replace all direct portal notification logic with notifications.create()
+
+Confirm refactor is complete before proceeding to Part 2.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 7 — ARCHITECTURE VERIFICATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Before building Part 2, confirm all of the following:
+
+- All cron jobs are registered only in /core/scheduler.js — search entire codebase and confirm no cron.schedule() calls exist elsewhere
+- No direct nodemailer or SMTP calls exist outside /core/email-queue.js
+- WAL mode is confirmed enabled on the database
+- All event listeners are registered and a test emit fires the correct handlers
+- No two jobs with shared API dependencies fire within 10 minutes of each other
+- Rate limiter correctly blocks calls when daily limit is reached
+- Server restart does not produce duplicate cron job registrations
+
+Output /architecture/SYSTEM_MAP.md, /architecture/SCHEDULE_REGISTRY.md, /architecture/EVENT_REGISTRY.md, and /architecture/DATABASE_SCHEMA.md.
+
+Only proceed to Part 2 after all 7 steps above are verified and the architecture documents are written.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART 2 — BUILD THE FOUR NEW AUTOMATION SYSTEMS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The architecture from Part 1 is now in place. Build the following four systems in the order listed. Each system must use the core modules from Part 1 — no direct DB connections, no direct SMTP calls, no cron jobs registered outside /core/scheduler.js.
+
+BUILD ORDER:
+1. Content Engine (depends on seo:task:completed events)
+2. Visitor Trigger (depends on leads table and sequence engine)
+3. Calendly Meeting Integration (depends on leads, outreach_log, and email queue)
+4. Weekly Strategy Brief (depends on all other systems being complete)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+BUILD 1 — CONTENT ENGINE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The SEO agent already identifies content gaps and rising keyword trends. This build makes it act on every finding automatically.
+
+─────────────────────────────────────────
+AUTO BLOG DRAFT GENERATOR
+─────────────────────────────────────────
+
+Trigger: Listens on eventBus for seo:task:completed where taskName is content_gap_analysis or keyword_trend_report. Fires AFTER the parent task has fully completed — never mid-write.
+
+Each draft must:
+- Be 800–1200 words written for E-2 visa investors and their immigration attorneys or advisors
+- Target the identified keyword naturally
+- Include an SEO-optimised title (under 60 characters) and meta description (under 160 characters)
+- Include H2 and H3 subheadings structured for featured snippet eligibility
+- End with a CTA directing the reader to contact New Dawn Franchising or request the FDD
+- Be saved to content_drafts table with status = draft — never auto-publish
+- Appear in the portal as a content card with Approve, Edit, and Discard buttons
+- Emit content:draft:created event on the event bus after saving
+
+Content angles to prioritise:
+- "What is the E-2 visa and how does a franchise qualify?"
+- "How to meet the substantial investment requirement for an E-2 visa"
+- "Property management franchise as an E-2 visa business — what USCIS looks for"
+- "E-2 visa vs EB-5 visa — which is right for you?"
+- "How to direct and control your E-2 visa business without doing the day-to-day work"
+- "Why El Paso, Texas is a strong market for property management investors"
+- Any new topic surfaced by the SEO agent's gap or trend analysis
+
+─────────────────────────────────────────
+AUTO META DESCRIPTION & TITLE OPTIMIZER
+─────────────────────────────────────────
+
+Trigger: Listens on eventBus for seo:task:completed where taskName is content_performance_review.
+
+Action:
+- For every page with 200+ impressions and CTR below 2%, generate 3 alternative title variants and 3 alternative meta description variants
+- Score each variant by: presence of number, question format, power words, keyword placement, character length
+- Save to meta_suggestions table with status = pending
+- Present in portal as side-by-side comparison cards with recommended replacement highlighted
+- One-click approval writes change to CMS via API or outputs a formatted change file
+- Log every change: original, replacement, date, and subsequent CTR tracked at next monthly review
+
+─────────────────────────────────────────
+AUTO SITEMAP SUBMISSION
+─────────────────────────────────────────
+
+Trigger: Any content draft approved and published, or monthly Technical SEO Audit detects sitemap discrepancy.
+
+Action: Ping Google Search Console sitemap endpoint with https://www.newdawnfranchising.com/sitemap.xml, log response, include status in daily email digest via the email queue.
+
+─────────────────────────────────────────
+CONTENT ENGINE UI PANEL
+─────────────────────────────────────────
+
+Add a Content Engine tab to the portal showing:
+- All pending blog drafts with keyword target, word count, creation date, and Approve/Edit/Discard buttons
+- All pending meta optimization suggestions with current vs recommended side-by-side
+- A content calendar showing approved and published posts by date
+- A "Request Draft" button for the user to type a topic and trigger generation on demand
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+BUILD 2 — WEBSITE VISITOR TRIGGER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Monitors who visits www.newdawnfranchising.com, identifies warm visitors, and automatically routes them into the lead gen agent's outreach pipeline.
+
+─────────────────────────────────────────
+TRACKING SETUP
+─────────────────────────────────────────
+
+Generate a lightweight first-party tracking script to be installed on newdawnfranchising.com. The script captures: page visited, time on page, referral source, return visitor status, UTM parameters.
+
+All visit events write to visitor_events table via a 500ms debounce write queue per session — never flood the connection pool during concurrent SEO jobs.
+
+HIGH-INTENT PAGES — treat visits to these as warm signals and trigger identification logic immediately:
+- /fdd, /investment, /contact, /how-it-works, any page with a form submission
+
+─────────────────────────────────────────
+VISITOR IDENTIFICATION — THREE METHODS
+─────────────────────────────────────────
+
+METHOD 1 — FORM SUBMISSION: Visitor submits any site form → capture name and email → create or match lead record → link session history → route to warm outreach sequence → emit visitor:identified event.
+
+METHOD 2 — EMAIL LINK CLICK: Lead in outreach pipeline clicks a tracked link → session identified automatically → update lead record with visit data → adjust sequence priority → emit visitor:identified event.
+
+METHOD 3 — RETURN VISITOR SCORING: Unidentified visitor returns to high-intent pages 2+ times within 7 days → flag as HIGH INTENT → add to visitor_watchlist → emit visitor:high_intent event. If they ever identify, immediately emit visitor:identified and route to top of outreach queue.
+
+─────────────────────────────────────────
+AUTOMATIC OUTREACH ROUTING (via event bus)
+─────────────────────────────────────────
+
+On visitor:identified event, the lead gen agent's sequence engine applies this routing logic automatically:
+- Lead status NEW: Upgrade to ACTIVE, move to Step 1 of warm sequence
+- Lead ACTIVE with sequence running: Inject personalised touchpoint referencing site visit
+- Lead NURTURE (gone cold): Resurrect immediately with re-engagement message referencing return visit
+- Lead confirmed PARTNER: Emit Jamie alert via email queue immediately
+
+WARM OUTREACH SEQUENCE (separate from cold — triggered by visitor:identified event):
+Day 0 — Email: "Saw you were exploring our investment overview — happy to answer any questions"
+Day 1 — SMS: Short, friendly check-in
+Day 3 — Email: FDD offer with direct download or request link
+Day 6 — WhatsApp: Template message with Calendly booking link
+Day 10 — Email: Final follow-up with social proof angle
+
+─────────────────────────────────────────
+VISITOR TRIGGER UI PANEL
+─────────────────────────────────────────
+
+Add a Visitor Intelligence section showing:
+- Live visitor feed: pages visited now (anonymous) with session duration
+- Identified visitors: lead name, pages viewed, time on site, last visit date
+- High-intent anonymous watchlist: return visitors flagged for follow-up
+- Referral source breakdown: organic, email campaign, social, direct
+- Real-time portal notification and Jamie email alert when a new lead is auto-routed from a site visit
+
+New API endpoints:
+GET /api/visitors/live, GET /api/visitors/identified, GET /api/visitors/watchlist, POST /api/visitors/identify
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+BUILD 3 — CALENDLY MEETING BOOKING INTEGRATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+When a lead replies with positive intent, the agent automatically sends a booking link. When they book, everything is logged, Jamie's calendar is updated, and she receives a pre-meeting intelligence brief 24 hours before.
+
+─────────────────────────────────────────
+REPLY INTENT DETECTION
+─────────────────────────────────────────
+
+When a lead replies to any outreach message, classify the reply via AI into one of:
+
+POSITIVE: Interested, asking questions, wants to learn more → emit lead:intent:positive → Calendly booking flow triggered automatically via event bus
+NEUTRAL: Clarifying question → informational response first, then booking flow after 1 follow-up
+OBJECTION: Concern or hesitation → emit lead:intent:objection → objection-handling response auto-generated tailored to concern type (cost, visa eligibility, location, operational involvement), then re-offer booking
+UNSUBSCRIBE: Wants to opt out → emit lead:opted_out immediately → sequence hard stopped → polite confirmation sent
+OUT OF OFFICE: Auto-reply detected → pause sequence 5 business days then resume
+
+─────────────────────────────────────────
+CALENDLY INTEGRATION
+─────────────────────────────────────────
+
+Connect via Calendly API (CALENDLY_API_KEY, CALENDLY_EVENT_TYPE_URI in .env).
+
+On meeting:booked event (from Calendly webhook → event bus):
+1. Create meeting record in meetings table
+2. Update lead status to MEETING_BOOKED
+3. Log conversion in campaign_metrics via event bus
+4. Send Jamie booking notification via emailQueue (CRITICAL priority): lead name, company, category, meeting date/time, which campaign drove the booking, link to lead profile
+5. Send lead a confirmation email via emailQueue: meeting details, one-paragraph primer on New Dawn Franchising, link to newdawnfranchising.com
+6. Create Google Calendar event for Jamie via Google Calendar API
+7. Queue pre-meeting intelligence brief for 24 hours before the meeting
+8. Send Jamie a reminder 1 hour before via emailQueue with full lead profile summary
+
+On meeting:cancelled event:
+- Update meetings table
+- Emit meeting:cancelled to event bus
+- Re-inject lead into outreach sequence
+- Notify Jamie via emailQueue immediately
+
+─────────────────────────────────────────
+PRE-MEETING INTELLIGENCE BRIEF
+─────────────────────────────────────────
+
+Triggered: 24 hours before every booked meeting (scheduled via cron entry added to /core/scheduler.js at booking time).
+
+Brief contains:
+- Lead's full name, title, company, contact details
+- Referral category and lead score
+- Which campaign reached them, which step they responded to, what they said
+- Website visit history (pages viewed, time on site, visits count)
+- Publicly available information about their firm
+- Suggested talking points tailored to their referral partner category
+- E-2 visa objections most common to their category and suggested responses
+
+─────────────────────────────────────────
+MEETINGS UI PANEL
+─────────────────────────────────────────
+
+Add a Meetings section showing:
+- Upcoming meetings with lead name, company, category, date, time, profile link
+- Past meetings with outcome status (Attended / No-show / Converted / Lost) — manually marked by Jamie
+- Conversion rate: meetings booked vs FDD requests vs franchise agreements signed
+- "Book Manual Meeting" button to log meetings arranged outside the system
+
+New .env: CALENDLY_API_KEY, CALENDLY_EVENT_TYPE_URI, GOOGLE_CALENDAR_ID, GOOGLE_CALENDAR_CREDENTIALS
+
+New API endpoints: POST /api/meetings/webhook (Calendly), GET /api/meetings, PATCH /api/meetings/:id/outcome
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+BUILD 4 — WEEKLY AI STRATEGY BRIEF
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Every Monday at 8:00 AM EST (registered in /core/scheduler.js — NOT a new cron registration in this file), send Jamie.green736@gmail.com a synthesised strategy email that tells her exactly where to focus her time that week. Not a data dump — a prioritised action brief.
+
+─────────────────────────────────────────
+DATA SOURCES (aggregated by /strategy-brief/data-aggregator.js)
+─────────────────────────────────────────
+
+From SEO Agent (via database reads and seo:task:completed event history):
+- Keyword ranking changes last 7 days — gains, drops, any breaking into Page 1
+- Core Web Vitals trend: improving, stable, declining
+- New technical SEO issues flagged
+- Content drafts and meta suggestions pending approval
+
+From Lead Gen Agent:
+- New leads added, scores, categories
+- Campaign performance: sends, opens, clicks, replies per campaign
+- Meetings booked, confirmed partners added
+- Best-performing channel this week
+- Pending list and campaign approvals
+- High-intent anonymous visitors on watchlist
+- Leads whose sequence completed without reply — needs a decision
+
+From Meetings System:
+- Meetings scheduled this week with lead intelligence
+- Outcome updates on meetings held last week
+
+─────────────────────────────────────────
+BRIEF STRUCTURE
+─────────────────────────────────────────
+
+Subject: 📋 New Dawn Franchising — Weekly Strategy Brief [Date]
+
+SECTION 1 — THIS WEEK AT A GLANCE
+3–5 sentence plain-English summary of momentum across SEO, outreach, and pipeline.
+
+SECTION 2 — TOP 3 PRIORITIES THIS WEEK
+The 3 most important things Jamie should personally act on, ranked by impact. Each includes:
+- Specific action (not vague)
+- Data-backed reason why it matters right now
+- Consequence if not done
+- Estimated time to complete
+
+Examples of priorities the AI might surface:
+- "Approve 2 blog drafts — both target keywords that jumped 8 positions this week. Publishing now captures momentum."
+- "3 outreach replies came in with positive intent but no meeting booked. Review and respond today."
+- "E-2 attorney campaign has 0.8% reply rate after 7 days. AI has suggested new copy. One click to apply."
+- "A confirmed partner visited your FDD page twice this week. They may have a client ready. Reach out personally."
+
+SECTION 3 — SEO SNAPSHOT
+Top 5 keywords with rank, weekly change, trend arrow. One sentence on Core Web Vitals. Any urgent issues. Content opportunities ready to approve.
+
+SECTION 4 — OUTREACH & PIPELINE SNAPSHOT
+Total active leads, new this week, replies received, meetings booked. Best performing campaign. Leads needing manual decision. Upcoming meetings this week.
+
+SECTION 5 — WINS THIS WEEK
+What worked. Confirmed partners, Page 1 rankings, high reply rates, converted meetings. Keeps momentum positive.
+
+SECTION 6 — WATCH LIST
+2–3 things not urgent yet but needing monitoring. Trends, underperforming campaigns, leads that went quiet after strong signals.
+
+SECTION 7 — AUTOMATED THIS WEEK
+Full log of everything both agents did autonomously — tasks run, emails sent, optimizations applied, content drafted, leads enriched.
+
+─────────────────────────────────────────
+BRIEF QUALITY RULES
+─────────────────────────────────────────
+
+- Every recommendation must be backed by a specific data point
+- Priorities must be genuinely ranked — not everything equally important
+- Readable in under 4 minutes
+- If nothing urgent exists, say so clearly — do not invent urgency
+- Direct and professional tone — trusted advisor, not a status report
+- HTML with inline CSS: white background, #1a1a2e header bars, mobile-friendly, matching daily digest style
+
+─────────────────────────────────────────
+BRIEF DELIVERY
+─────────────────────────────────────────
+
+- Schedule: Monday 8:00 AM EST registered in /core/scheduler.js
+- Sent via emailQueue with priority HIGH
+- From: strategy@newdawnfranchising.com
+- Recipient: Jamie.green736@gmail.com
+- On-demand via "Generate Brief Now" button in portal
+- All briefs stored in briefs table for review in portal
+
+New API endpoints: POST /api/briefs/generate, GET /api/briefs, GET /api/briefs/:id
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CROSS-SYSTEM CONNECTIONS — WIRE EXPLICITLY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Confirm the following end-to-end flows work after all four builds are complete:
+
+FLOW 1 — SEO to Content to Visitor to Meeting:
+SEO Content Gap job completes → emits seo:task:completed → Content Engine generates blog draft → draft approved → sitemap submitted → organic traffic increases → Visitor Trigger captures new high-intent visitor → visitor identified via form fill → emits visitor:identified → warm outreach sequence fires → lead replies → intent classified as POSITIVE → emits lead:intent:positive → Calendly link sent → meeting booked → emits meeting:booked → Jamie notified → pre-meeting brief queued → Monday brief surfaces the win
+
+FLOW 2 — Outreach Reply to Booked Meeting to Brief:
+Lead replies to email → intent = POSITIVE → emits lead:intent:positive → Calendly link sent via email queue → lead books meeting → Calendly webhook fires → emits meeting:booked → meeting logged → Google Calendar event created → pre-meeting brief generated and emailed 24hrs before → meeting outcome logged → win surfaced in next Monday brief
+
+FLOW 3 — Return Visitor to Re-engagement:
+Unidentified visitor returns to /investment twice in 7 days → emits visitor:high_intent → added to watchlist → visitor fills out contact form → emits visitor:identified → matched to existing cold lead in NURTURE status → sequence re-activated → re-engagement email fires via email queue → surfaced in Monday brief watchlist section
+
+FLOW 4 — Weekly Brief reads everything:
+Monday 8:00 AM EST → data-aggregator.js reads all systems → brief-generator.js synthesises → emailQueue.add() sends brief → briefs table updated → portal shows brief history
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+UPDATED DAILY EMAIL DIGEST
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Update the existing 9:00 AM EST daily digest to include a new section at the very top:
+
+OVERNIGHT AUTOMATION SUMMARY (new — add above all existing sections):
+2–3 sentence plain-English summary of everything all systems did overnight:
+- Content drafts generated, meta suggestions created
+- Visitor triggers fired and leads auto-routed
+- Replies received and intent classifications made
+- Meetings booked or cancelled
+- SEO task results headline
+
+Keep it brief — it is a headline, not a report. All detail is in the sections below it.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+COMPLETE .ENV VARIABLES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Confirm all are present. Add missing ones with placeholder values and comments:
+
+# Database
+DATABASE_PATH or DATABASE_URL
+
+# Email
+SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS
+DAILY_DIGEST_FROM=noreply@newdawnfranchising.com
+OUTREACH_FROM=outreach@newdawnfranchising.com
+STRATEGY_FROM=strategy@newdawnfranchising.com
+NOTIFICATION_EMAIL=Jamie.green736@gmail.com
+
+# SEO
+SERP_API_KEY, PAGESPEED_API_KEY, SEARCH_CONSOLE_KEY
+
+# Lead Gen
+APOLLO_API_KEY, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER
+WHATSAPP_API_KEY, WHATSAPP_PHONE_NUMBER_ID, LOB_API_KEY
+HEYGEN_API_KEY, HEYGEN_AVATAR_ID
+
+# Meetings
+CALENDLY_API_KEY, CALENDLY_EVENT_TYPE_URI
+GOOGLE_CALENDAR_ID, GOOGLE_CALENDAR_CREDENTIALS
+
+# Visitor Tracking
+VISITOR_TRACKING_SITE_KEY
+
+# CMS (optional)
+CMS_API_KEY
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FINAL INTEGRATION VERIFICATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+After all four builds are complete, run these verification checks:
+
+1. Print all registered cron jobs from /core/scheduler.js with next 3 run times — confirm no jobs registered outside this file
+2. Emit a test event for each event type and confirm correct listeners fire — confirm no circular event chains
+3. Send 5 emails simultaneously via emailQueue — confirm queuing, not parallel sends, and priority ordering
+4. Confirm WAL mode enabled: run PRAGMA journal_mode, verify result is wal
+5. Simulate hitting daily limit for one service — confirm rateLimiter blocks subsequent calls
+6. Kill server mid-execution, restart, confirm no duplicate jobs, no double-sends, no data corruption
+7. Walk all four cross-system flows end to end and confirm each completes without errors
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DELIVERABLE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+When complete, output:
+1. /architecture/SYSTEM_MAP.md — inventory of existing system
+2. /architecture/SCHEDULE_REGISTRY.md — all cron jobs, times, and conflict resolutions
+3. /architecture/EVENT_REGISTRY.md — all events, emitters, and listeners
+4. /architecture/DATABASE_SCHEMA.md — complete schema
+5. Confirmation in the portal with green status for every system: SEO Agent, Lead Gen Agent, Content Engine, Visitor Trigger, Meetings, Strategy Brief, Email Queue, Event Bus, Rate Limiter
+6. Next scheduled run time for every cron job printed to server log on startup
+
+Do not consider this complete until all verification checks pass and all four cross-system flows run end to end without errors.

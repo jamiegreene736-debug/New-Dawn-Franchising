@@ -1,0 +1,199 @@
+// executor.js
+// Dispatches planned actions to their handlers.
+// write_blog_post is the flagship handler — it's where content quality
+// is won or lost, so the prompt is deliberately long and opinionated.
+
+import Anthropic from "@anthropic-ai/sdk";
+
+const client = new Anthropic();
+const MODEL = "claude-sonnet-4-5";
+
+// ---------- Dispatcher ----------
+export async function dispatch(db, campaign, action) {
+  const handlers = {
+    write_blog_post: writeBlogPost,
+    internal_linking: internalLinking,
+    request_blocker: requestBlocker,
+    // Add more handlers here as you build them out.
+    // Unknown action types become blockers so nothing silently fails.
+  };
+
+  const handler = handlers[action.action_type];
+  if (!handler) {
+    return createBlocker(db, campaign, {
+      type: "info_needed",
+      service: "executor",
+      reason: `No handler implemented for action type: ${action.action_type}`,
+      instructions_for_user: "This action type is planned but not yet built. Skip or implement it.",
+      priority: "low",
+    });
+  }
+
+  // Log the action as running
+  const actionRow = await db.actions.create({
+    data: {
+      campaign_id: campaign.id,
+      action_type: action.action_type,
+      status: "running",
+      payload: action.payload,
+      created_at: new Date(),
+    },
+  });
+
+  try {
+    const result = await handler(db, campaign, action.payload);
+    await db.actions.update({
+      where: { id: actionRow.id },
+      data: {
+        status: result.status ?? "done",
+        result,
+        completed_at: new Date(),
+      },
+    });
+    return result;
+  } catch (err) {
+    await db.actions.update({
+      where: { id: actionRow.id },
+      data: { status: "failed", result: { error: err.message }, completed_at: new Date() },
+    });
+    throw err;
+  }
+}
+
+// ---------- write_blog_post handler ----------
+const BLOG_SYSTEM_PROMPT = `You are an expert content writer creating long-form blog posts for a franchise consulting company. Your writing must demonstrate real expertise, experience, authority, and trust (E-E-A-T) — Google's quality bar for Your-Money-Your-Life content, which franchise and visa topics fall under.
+
+Core principles:
+- Write for a real human reader first, search engines second. If a sentence exists only for SEO, cut it.
+- Every claim about law, money, or eligibility must be hedged appropriately and recommend consulting a qualified professional. Never state legal conclusions as facts.
+- Use specific examples, realistic scenarios, and concrete numbers rather than generic advice.
+- Vary sentence length. Short punchy sentences next to longer analytical ones. Never repetitive.
+- Include a clear structure: compelling intro that states what the reader will learn, well-organized H2/H3 sections, a practical conclusion with next steps.
+- NO keyword stuffing. The target keyword should appear naturally 3–6 times across a 1500+ word post, including once in the title, once in the intro, and ideally in one H2.
+- NO filler phrases ("In today's fast-paced world", "In conclusion", "It's important to note").
+- NO AI tells ("delve", "navigate the landscape", "leverage", "unlock the power of", em-dash overuse, "it's not just X, it's Y").
+
+Output format: Return ONLY valid JSON with this exact shape, no markdown fences, no commentary:
+{
+  "title": "<SEO title, 50–60 chars, includes target keyword>",
+  "meta_description": "<150–160 chars, compelling, includes target keyword>",
+  "slug": "<url-slug-with-hyphens>",
+  "body_markdown": "<full article in markdown, 1500+ words, with H2/H3 headings>",
+  "internal_link_suggestions": [{"anchor": "...", "target_url_hint": "..."}],
+  "external_citations": [{"claim": "...", "source_hint": "..."}],
+  "ymyl_disclaimer_included": true
+}`;
+
+async function writeBlogPost(db, campaign, payload) {
+  const { title, target_keyword, outline, word_count = 1800, requires_ymyl_review = true } = payload;
+
+  const userMessage = `Write a blog post for newdawnfranchising.com.
+
+TARGET KEYWORD: "${target_keyword}"
+WORKING TITLE: ${title ?? "(you choose based on the outline)"}
+TARGET WORD COUNT: ${word_count}
+OUTLINE:
+${outline?.map((o, i) => `  ${i + 1}. ${o}`).join("\n") ?? "  (you design the structure)"}
+
+CONTEXT:
+- Company: New Dawn Franchising, a franchise consulting firm
+- Audience: prospective franchise buyers, including E-2 visa applicants looking at franchises as a path to US business ownership
+- Goal: rank for "${target_keyword}" by being the most useful, trustworthy resource on the topic
+
+REQUIREMENTS:
+- Include a YMYL disclaimer near the top: readers should consult a licensed immigration attorney and a franchise consultant before making decisions
+- Cite sources where you make factual claims (USCIS, IFA, etc.) — use "source_hint" in the JSON since you can't browse the web
+- Suggest 3–5 internal links to other pages on newdawnfranchising.com that would make sense
+- End with a clear, non-pushy call-to-action to book a consultation
+
+Write the post now and return the JSON.`;
+
+  const response = await client.messages.create({
+    model: MODEL,
+    max_tokens: 8192,
+    system: BLOG_SYSTEM_PROMPT,
+    messages: [{ role: "user", content: userMessage }],
+  });
+
+  const text = response.content
+    .filter((b) => b.type === "text")
+    .map((b) => b.text)
+    .join("")
+    .trim();
+
+  const cleaned = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
+  const draft = JSON.parse(cleaned);
+
+  // YMYL content always lands in the approval queue
+  const status = requires_ymyl_review ? "awaiting_approval" : "approved";
+
+  const saved = await db.contentDrafts.create({
+    data: {
+      campaign_id: campaign.id,
+      title: draft.title,
+      body_markdown: draft.body_markdown,
+      target_keyword,
+      status,
+      metadata: {
+        meta_description: draft.meta_description,
+        slug: draft.slug,
+        internal_link_suggestions: draft.internal_link_suggestions,
+        external_citations: draft.external_citations,
+      },
+      created_at: new Date(),
+    },
+  });
+
+  if (requires_ymyl_review) {
+    await createBlocker(db, campaign, {
+      type: "approval_needed",
+      service: "content_review",
+      reason: `New blog post draft ready for review: "${draft.title}"`,
+      instructions_for_user: `Review the draft in Campaigns → ${campaign.target_keyword} → Content Drafts. Approve, edit, or reject.`,
+      priority: "medium",
+      metadata: { draft_id: saved.id },
+    });
+  }
+
+  return {
+    status: "done",
+    summary: `Drafted blog post "${draft.title}" (${draft.body_markdown.split(/\s+/).length} words), ${status}`,
+    draft_id: saved.id,
+  };
+}
+
+// ---------- internal_linking handler (stub — Claude generates the diff) ----------
+async function internalLinking(db, campaign, payload) {
+  const { from_urls, to_url, anchor_text_suggestions } = payload;
+  // In production: fetch each from_url, have Claude identify where each anchor
+  // naturally fits, and output a diff. For now, save as a proposal for review.
+  return {
+    status: "awaiting_approval",
+    summary: `Proposed ${from_urls?.length ?? 0} internal links to ${to_url}`,
+    proposal: { from_urls, to_url, anchor_text_suggestions },
+  };
+}
+
+// ---------- request_blocker handler ----------
+async function requestBlocker(db, campaign, payload) {
+  const blocker = await createBlocker(db, campaign, {
+    type: payload.type ?? "info_needed",
+    service: payload.service ?? "unknown",
+    reason: payload.reason,
+    instructions_for_user: payload.instructions_for_user,
+    priority: payload.priority ?? "medium",
+  });
+  return { status: "done", summary: `Created blocker: ${payload.service}`, blocker_id: blocker.id };
+}
+
+// ---------- Helper ----------
+async function createBlocker(db, campaign, fields) {
+  return db.blockers.create({
+    data: {
+      campaign_id: campaign.id,
+      status: "open",
+      created_at: new Date(),
+      ...fields,
+    },
+  });
+}

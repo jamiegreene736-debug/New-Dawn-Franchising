@@ -1,0 +1,371 @@
+You are performing a full end-to-end audit, test, bug fix, and improvement pass on everything built inside this marketing portal for New Dawn Franchising (www.newdawnfranchising.com) over the past week.
+
+This portal contains two AI agents:
+1. The SEO Automation Agent — schedules and runs daily, weekly, and monthly SEO tasks and sends a daily email digest to Jamie.green736@gmail.com at 9:00 AM EST
+2. The Lead Generation & Outreach Agent — builds contact lists, creates and runs outreach campaigns across Email, SMS, WhatsApp, Physical Mail, and HeyGen (manual only), and optimizes campaigns automatically
+
+Your job is to methodically test every single feature, identify every bug or broken flow, fix all issues, and improve anything that is underperforming, slow, fragile, or incomplete. Do not skip anything. Do not stop after finding the first issue. Work through the entire system.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PHASE 1 — ENVIRONMENT & INFRASTRUCTURE AUDIT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Before testing features, verify the foundation is solid:
+
+1. ENV VARIABLES
+   - Confirm all required .env variables are present and not empty:
+     SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS
+     SERP_API_KEY, PAGESPEED_API_KEY, SEARCH_CONSOLE_KEY
+     TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER
+     WHATSAPP_API_KEY, WHATSAPP_PHONE_NUMBER_ID
+     LOB_API_KEY
+     HEYGEN_API_KEY, HEYGEN_AVATAR_ID
+     APOLLO_API_KEY (or HUNTER_API_KEY)
+     NOTIFICATION_EMAIL
+   - Flag any that are missing or using placeholder values
+   - Do NOT expose values in logs — confirm present/absent only
+
+2. DATABASE INTEGRITY
+   - Confirm all required tables exist with the correct schema:
+     tasks, email_log, leads, lists, list_members, campaigns, campaign_steps, outreach_log, campaign_metrics
+   - Run a schema diff against the expected column definitions from the original build prompts
+   - Flag any missing tables, missing columns, incorrect data types, or missing indexes
+   - Add any missing indexes on frequently queried columns: lead_id, campaign_id, status, sent_at, next_run
+   - Check for orphaned records: outreach_log rows with no matching lead, campaign_steps with no matching campaign
+   - Fix all schema issues in place — do not drop and recreate tables, migrate safely
+
+3. SERVER HEALTH
+   - Confirm the Express server (or existing backend) starts without errors
+   - Confirm all API routes are registered and reachable
+   - Test every API endpoint with a basic request and confirm it returns the correct HTTP status code
+   - Identify any routes that return 500 errors, undefined responses, or crash the server
+   - Fix all broken routes
+
+4. SCHEDULER HEALTH
+   - Confirm node-cron (or equivalent) is initialised and all jobs are registered
+   - Log all registered cron jobs with their schedule expression and next run time
+   - Verify no duplicate jobs are registered (can happen after hot reloads)
+   - Confirm the scheduler survives a server restart without double-registering jobs
+   - Fix any duplicate registration or missed job issues
+
+5. FRONTEND BUILD
+   - Confirm the portal loads without console errors
+   - Check for any broken imports, missing components, or failed API calls on page load
+   - Verify all UI panels render correctly: SEO Tasks panel, Lead Pipeline panel, Lists Manager, Campaigns Dashboard, Activity Feed, Search & Discover
+   - Confirm the layout is correct on both desktop and mobile viewports
+   - Fix all rendering errors and layout breaks
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PHASE 2 — SEO AGENT END-TO-END TESTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Test every SEO automation feature in sequence. For each test, record: PASS / FAIL / IMPROVED. Fix all failures before moving on.
+
+─────────────────────────────────────────
+DAILY AUTOMATIONS
+─────────────────────────────────────────
+
+TEST: Keyword Rank Tracker
+- Manually trigger the Keyword Rank Tracker via POST /api/tasks/:id/run
+- Confirm it calls the configured SERP API with all 5 target keywords
+- Confirm results are written to the database with current rank, previous rank, and delta
+- Confirm keywords with a drop of 3+ positions are flagged correctly
+- Confirm the task status updates to "completed" on success and "failed" with an error log on failure
+- IMPROVE: If results are not deduplicated by date (i.e. running twice on the same day creates duplicate records), add a upsert-by-date logic
+
+TEST: Broken Link Checker
+- Trigger manually and confirm it crawls www.newdawnfranchising.com internal pages
+- Confirm 404s, broken outbound links, and redirect chains longer than 2 hops are detected and logged
+- Confirm results are stored and visible in the portal
+- IMPROVE: If the crawler is not respecting robots.txt or is hitting external domains aggressively, add rate limiting and robots.txt compliance
+
+TEST: Core Web Vitals Snapshot
+- Trigger manually and confirm the PageSpeed Insights API is called for the homepage
+- Confirm LCP, INP, and CLS scores are stored in the database
+- Confirm scores below Google's "Good" threshold trigger a flag
+- IMPROVE: If only the homepage is being tested, extend to test all key landing pages automatically
+
+TEST: Competitor Content Monitor
+- Trigger manually and confirm the agent attempts to check configured competitor domains
+- If no competitor domains are configured, confirm a clear error message appears in the portal (not a silent crash)
+- Confirm results are logged and new content is surfaced in the portal
+- IMPROVE: If the monitor is polling too aggressively or has no rate limiting, add a polite crawl delay
+
+─────────────────────────────────────────
+WEEKLY AUTOMATIONS
+─────────────────────────────────────────
+
+TEST: SEO Performance Digest
+- Trigger manually and confirm it aggregates the past 7 days of task results
+- Confirm the output renders correctly in the portal dashboard
+- IMPROVE: If it crashes when fewer than 7 days of data exist (fresh install), add a graceful fallback
+
+TEST: Backlink Audit
+- Trigger manually and confirm the API call is made and results are returned
+- If the API key is not configured, confirm a clear warning is shown in the portal rather than a crash
+- Confirm domains with spam score above 40 are flagged
+- IMPROVE: If results are not persisted between runs, add historical backlink snapshots to the database
+
+TEST: Content Gap Analysis
+- Trigger manually and confirm 3–5 content suggestions are generated
+- Confirm suggestions appear as actionable cards in the portal
+- IMPROVE: If suggestions are generic and not specific to E-2 visa / property management / franchise topics, tighten the prompt or search query logic
+
+TEST: Schema Markup Validator
+- Trigger manually and confirm the Rich Results API is called for newdawnfranchising.com
+- Confirm errors and warnings are logged and displayed
+- IMPROVE: If the validator only checks the homepage, extend it to check all pages with structured data
+
+TEST: Google Business Profile Sync Check
+- Trigger manually and confirm the NAP comparison logic runs
+- Confirm any mismatch between site NAP and GBP data is flagged
+- IMPROVE: If this check is brittle due to formatting differences (e.g. "Rd" vs "Road"), normalise addresses before comparing
+
+─────────────────────────────────────────
+MONTHLY AUTOMATIONS
+─────────────────────────────────────────
+
+TEST: Full Technical SEO Audit
+- Trigger manually and confirm the crawler runs across all pages
+- Confirm it checks indexability, canonicals, meta descriptions, thin content, and sitemap accuracy
+- Confirm the prioritised issue report is generated and stored
+- IMPROVE: If the report has no priority ranking, add a severity sort (Critical / High / Medium / Low)
+
+TEST: Content Performance Review
+- Trigger manually and confirm Search Console data is pulled (or mock data is used if key not yet connected)
+- Confirm pages with high impressions and CTR under 2% are flagged
+- IMPROVE: If there is no historical comparison (this month vs last month), add delta tracking
+
+TEST: E-2 Visa Keyword Trend Report
+- Trigger manually and confirm trend data is fetched and stored
+- Confirm rising queries are surfaced in the portal
+- IMPROVE: If trends data is not visualised, add a simple sparkline or trend indicator to the portal card
+
+TEST: Citation & Directory Audit
+- Trigger manually and confirm the agent checks at least the top 5 directories
+- Confirm missing or incorrect listings are flagged
+- IMPROVE: If fewer than 15 directories are being checked, expand the list
+
+TEST: Competitor Ranking Comparison
+- Trigger manually and confirm a side-by-side ranking table is generated
+- Confirm the visual output renders correctly in the portal
+- IMPROVE: If there is no export option, add a CSV download button to the comparison table
+
+─────────────────────────────────────────
+SCHEDULED TASKS UI PANEL
+─────────────────────────────────────────
+
+TEST: Panel renders next to the AI agent on desktop and mobile
+TEST: All four tabs work correctly — Upcoming / Running / Completed / Failed
+TEST: Each task card shows correct cadence badge, last run time, status, and next run time
+TEST: "Run Now" button triggers the correct task and updates the status in real time
+TEST: "Send Email Now" button triggers the digest email and confirms delivery
+TEST: Panel auto-refreshes every 30 seconds without a full page reload
+TEST: Red notification dot appears when a task has failed status
+IMPROVE: If the panel does not show a loading state while polling, add a subtle loading indicator
+
+─────────────────────────────────────────
+DAILY EMAIL DIGEST
+─────────────────────────────────────────
+
+TEST: Trigger the email manually via "Send Email Now" button
+TEST: Confirm the email is delivered to Jamie.green736@gmail.com
+TEST: Confirm the subject line includes today's date correctly formatted
+TEST: Confirm all five sections render correctly in Gmail: Summary, Completed, Issues, Scheduled Today, Coming Up This Week
+TEST: Confirm the HTML renders correctly on mobile (test at 375px width)
+TEST: Confirm the scheduled 9:00 AM EST cron job is registered and shows the correct next run time
+IMPROVE: If the email has no plain-text fallback, add a plain-text alternative version for email clients that block HTML
+IMPROVE: If completed task count shows zero even when tasks ran, fix the 24-hour lookback query
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PHASE 3 — LEAD GEN AGENT END-TO-END TESTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+─────────────────────────────────────────
+LEAD RESEARCH & DISCOVERY
+─────────────────────────────────────────
+
+TEST: Search & Discover panel — type "E-2 visa attorney Texas" and confirm the agent returns enriched results
+TEST: Confirm each result shows name, title, company, email (if found), phone (if found), and a lead score
+TEST: "Add to Pipeline" button adds the lead to the leads table without duplicates
+TEST: Competitor monitor detects referral partner mentions on configured competitor domains
+IMPROVE: If the enrichment API is returning incomplete profiles (no email), add a fallback to try a secondary enrichment source
+IMPROVE: If search results are not cached and every query hits the API fresh, add a 1-hour result cache to reduce API costs
+
+─────────────────────────────────────────
+LEAD SCORING
+─────────────────────────────────────────
+
+TEST: Create a lead manually and confirm the scoring logic applies correctly
+TEST: Confirm score is stored in the database and displayed in the pipeline panel
+TEST: Confirm leads with score below 6 are excluded from default campaign list builds
+IMPROVE: If scoring is entirely rule-based with no learning over time, add a feedback loop: when a lead converts, weight their profile attributes to improve future scores
+
+─────────────────────────────────────────
+LIST BUILDING
+─────────────────────────────────────────
+
+TEST: Click "Build New List" and enter a segment description
+TEST: Confirm the agent researches and returns contacts matching the description
+TEST: Confirm enrichment runs on each contact (email, phone, address)
+TEST: Confirm deduplication correctly identifies leads already in the database
+TEST: Confirm the list is saved in draft status and surfaces for user approval
+TEST: Approve the list and confirm status updates to "approved"
+TEST: Confirm list contact count is accurate
+TEST: Confirm a list cannot be used in a campaign until it has been approved
+IMPROVE: If the list builder has no progress indicator during research (which can take time), add a live progress bar showing contacts found so far
+IMPROVE: If lists are not tagged by segment automatically, infer the segment tag from the search description and store it
+
+─────────────────────────────────────────
+CAMPAIGN CREATION
+─────────────────────────────────────────
+
+TEST: Click "Create New Campaign" and complete the setup flow
+TEST: Confirm the agent generates a full multi-step sequence with copy for each step
+TEST: Confirm all generated copy is personalised to the selected referral partner category
+TEST: Confirm the campaign is saved in draft status and presented for review
+TEST: Edit a message step and confirm the edit is saved correctly
+TEST: Approve the campaign and confirm it transitions to active status
+TEST: Confirm no messages are sent before approval
+IMPROVE: If the campaign creation wizard has no back/forward navigation (user gets stuck if they make a mistake), add step navigation
+IMPROVE: If the AI-generated copy is generic and does not reference E-2 visas, property management, or $250K investment, strengthen the generation prompt with more context about New Dawn Franchising
+
+─────────────────────────────────────────
+OUTREACH CHANNELS
+─────────────────────────────────────────
+
+TEST — EMAIL:
+- Send a test email to Jamie.green736@gmail.com from the campaign engine
+- Confirm delivery, correct personalisation tokens, and correct sender address
+- Confirm the outreach_log record is created with status = sent
+- IMPROVE: If emails are not being tracked for opens and clicks (no tracking pixel or click redirect), add open tracking via a 1x1 pixel and click tracking via redirect URLs
+
+TEST — SMS:
+- Send a test SMS to a configured test number via Twilio
+- Confirm delivery confirmation is logged
+- Confirm opt-out handling works — reply STOP and confirm the lead is marked opted_out = true and removed from all active sequences
+- IMPROVE: If SMS messages exceed 160 characters and are being split into multiple parts without warning, add a character counter to the template editor
+
+TEST — WHATSAPP:
+- Attempt to send a WhatsApp template message to a test number
+- If templates are not yet approved, confirm the system shows a clear "Pending Approval" warning in the portal rather than a silent failure
+- Confirm delivery status is logged
+- IMPROVE: If failed WhatsApp sends are retried immediately (can cause spam flags), add a minimum 4-hour retry delay
+
+TEST — PHYSICAL MAIL:
+- Create a test mail send via Lob.com API (use Lob's test mode — do not send a real letter)
+- Confirm the API response is handled correctly and the send is logged
+- Confirm only leads with a mailing address on file are queued for physical mail
+- IMPROVE: If the system attempts to send physical mail to leads with no mailing address, add a validation check before queuing
+
+TEST — HEYGEN (MANUAL ONLY):
+- Open a lead profile card in the portal
+- Click "Send HeyGen Video" button
+- Confirm the agent calls the HeyGen API and returns a preview link
+- Confirm the video is NOT sent until the user explicitly approves it
+- Confirm the send is logged in outreach_log after approval
+- IMPROVE: If the HeyGen preview link is not displayed inline in the portal (only a raw URL), embed it as a clickable thumbnail
+
+─────────────────────────────────────────
+SEQUENCE ENGINE
+─────────────────────────────────────────
+
+TEST: Add a lead to an active campaign and confirm they enter the sequence at Step 1
+TEST: Confirm Step 2 is only triggered after the correct day delay
+TEST: Reply to an outreach message (simulate a reply in the database) and confirm the sequence pauses immediately
+TEST: Confirm a paused lead does not receive further automated messages
+TEST: Confirm the portal flags the replied lead for human follow-up with a notification
+TEST: Confirm the sequence resumes correctly if manually unpaused
+TEST: Restart the server and confirm no lead receives a duplicate message
+IMPROVE: If there is no global sequence pause switch (to halt all outreach at once in an emergency), add a master kill switch to the portal settings
+
+─────────────────────────────────────────
+CAMPAIGN OPTIMIZATION ENGINE
+─────────────────────────────────────────
+
+TEST: Confirm A/B subject line split is applied when a campaign list has 20+ contacts
+TEST: After simulating opens on both variants, confirm the winning variant is identified and applied
+TEST: Confirm send time optimization logic is reading historical outreach_log data correctly
+TEST: Confirm underperforming message steps (reply rate below 1%) are flagged after a campaign completes
+TEST: Confirm AI-generated copy alternatives are presented for underperforming steps
+TEST: Confirm optimization suggestions appear as actionable cards in the Campaigns Dashboard
+TEST: Click "Apply Suggestion" and confirm the campaign step is updated accordingly
+IMPROVE: If optimization runs only after a campaign fully completes, add mid-campaign optimization that checks performance at the 50% mark and adjusts in real time
+IMPROVE: If there is no explanation attached to each optimization suggestion (just a recommendation with no reasoning), add a one-sentence rationale to every suggestion card so the user understands why the change is recommended
+
+─────────────────────────────────────────
+CAMPAIGN METRICS & DASHBOARD
+─────────────────────────────────────────
+
+TEST: Confirm the Campaigns Dashboard shows live metrics for an active campaign
+TEST: Confirm open rate, reply rate, and conversion rate calculations are correct
+TEST: Confirm per-channel performance breakdown is displayed
+TEST: Confirm the Activity Feed updates in real time with outreach actions
+TEST: Confirm the "best send day" and "best send time" fields populate after enough data exists
+IMPROVE: If metrics are computed on every page load (expensive), move computation to a background job that runs every 15 minutes and caches results
+IMPROVE: If there is no way to export campaign results, add a CSV export button to each completed campaign
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PHASE 4 — CROSS-SYSTEM TESTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+These tests verify the two agents work correctly alongside each other and do not interfere.
+
+TEST: Both agents are visible in the portal simultaneously with no layout overlap
+TEST: The SEO Tasks panel and the Lead Gen panels do not share or corrupt each other's database tables
+TEST: The daily email digest correctly reports on SEO tasks only — it does not accidentally include lead gen data
+TEST: Running a heavy SEO crawl task does not block or delay outreach sequence processing
+TEST: The portal remains responsive under concurrent activity (SEO task running + campaign sending simultaneously)
+IMPROVE: If both agents share the same job queue and a long SEO task can delay time-sensitive outreach sends, separate them into two independent queues with different priority levels
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PHASE 5 — SECURITY & RELIABILITY PASS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. SECRETS — Confirm no API keys, passwords, or email addresses are hardcoded anywhere in the codebase. Search all files for common patterns. Flag any found and move them to .env immediately.
+
+2. INPUT VALIDATION — Confirm all API endpoints validate and sanitise incoming data. Test POST /api/leads with missing fields, malformed email addresses, and excessively long strings. Confirm the server returns a 400 with a clear error message rather than crashing.
+
+3. RATE LIMITING — Confirm the daily send limits (50 emails, 20 texts, 20 WhatsApps, 10 physical mails) are enforced and the system cannot exceed them even if manually triggered multiple times.
+
+4. OPT-OUT COMPLIANCE — Confirm opted_out = true leads are blocked at every possible send point across all channels. This must be a hard block, not a soft warning.
+
+5. ERROR HANDLING — Confirm every external API call (SERP, PageSpeed, Twilio, Lob, HeyGen, Apollo) has a try/catch with meaningful error logging. No unhandled promise rejections anywhere.
+
+6. CRASH RECOVERY — Simulate a server crash mid-sequence. Restart the server. Confirm no leads are double-contacted, no tasks are skipped, and all in-progress jobs resume from the correct state.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PHASE 6 — FINAL IMPROVEMENTS PASS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+After all bugs are fixed, do one final pass looking for anything that works but could be meaningfully better. Apply improvements proactively without waiting to be asked. Areas to focus on:
+
+PERFORMANCE
+- Identify any database queries that are doing full table scans and add indexes
+- Identify any API calls that are sequential and could be parallelised
+- Identify any frontend components that re-render unnecessarily and memoize them
+
+UX & CLARITY
+- Confirm every loading state has a spinner or skeleton screen — no blank panels
+- Confirm every error state has a clear, human-readable message — no raw error objects displayed to the user
+- Confirm all timestamps are shown in the user's local timezone, not UTC
+- Confirm all empty states (no leads yet, no campaigns yet) have a helpful prompt rather than just being blank
+
+CODE QUALITY
+- Remove any unused imports, dead code, or commented-out blocks left over from development
+- Ensure all async functions have proper error handling
+- Ensure no console.log statements remain in production code — replace with a proper logger
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DELIVERABLE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+When you have completed all phases, output a structured summary report in the portal and as a log file containing:
+
+1. FIXED — list of every bug found and fixed, with a one-line description of what was wrong and what was changed
+2. IMPROVED — list of every improvement applied, with a one-line description of the change and its expected impact
+3. WARNINGS — list of anything that could not be fully tested (e.g. API key not configured) with instructions for the user to resolve manually
+4. ALL CLEAR — a green confirmation for each major system: SEO Agent, Email Digest, Lead Gen Agent, Campaign Engine, Optimization Engine, All Outreach Channels
+5. NEXT RECOMMENDED ACTIONS — up to 5 suggestions for what to build or improve next based on what you observed during the audit
+
+Do not stop until every phase is complete and the summary report has been generated.

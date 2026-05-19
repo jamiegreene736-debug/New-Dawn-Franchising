@@ -1,0 +1,150 @@
+Build out a comprehensive Overview Dashboard for the New Dawn Franchising
+Franchisee Marketing Portal and restructure the portal navigation so that
+Pipeline is its own dedicated top-level tab, completely separate from
+Reports. This prompt covers the full dashboard layout, every metric
+displayed, the navigation restructure, and the Pipeline page build.
+
+---
+
+## PART 1 — MARKETING PORTAL NAVIGATION RESTRUCTURE
+
+The current portal navigation needs to be restructured. Pipeline must
+be its own tab. Reports must be its own tab. Neither lives inside
+the other.
+
+CURRENT (broken):
+Dashboard / Leads / Outreach / Reports (contains pipeline) / Settings
+
+NEW STRUCTURE (correct):
+├── Overview          ← the main dashboard (this build)
+├── Pipeline          ← dedicated kanban + table view (own tab)
+├── Leads             ← lead discovery, scoring, individual records
+├── Outreach          ← daily brief, staged messages, sent log, sequences
+├── Letters           ← physical mail recommendations and Lob tracking
+├── Reports           ← analytics, charts, exports, performance history
+└── Settings          ← voice profile, Calendly, notifications, agent config
+
+Each tab is a top-level nav item in the portal sidebar.
+No tab is nested inside another.
+Active tab is highlighted with NDF brand colour left border accent.
+Sidebar is collapsible on desktop (icon-only mode) and slides in
+from the left on mobile via hamburger.
+
+Tab icons (use Lucide React):
+Overview   → LayoutDashboard
+Pipeline   → GitMerge
+Leads      → Users
+Outreach   → Send
+Letters    → Mail
+Reports    → BarChart2
+Settings   → Settings
+
+---
+
+## PART 2 — OVERVIEW DASHBOARD (/marketing-portal/dashboard)
+
+The Overview Dashboard is the first thing a franchisee sees when
+they log in. It must answer the question "how is my business doing
+right now?" in under 10 seconds. Every metric is real-time or
+updated within the last 24 hours. No metric is filler.
+
+The dashboard is divided into six visual zones stacked vertically:
+
+  ZONE 1 — Daily Agent Status Bar (full width, top of page)
+  ZONE 2 — Primary KPI Cards (top metrics row)
+  ZONE 3 — Pipeline Health Row
+  ZONE 4 — Outreach Performance Row
+  ZONE 5 — Two-column section: Activity Feed + Upcoming Actions
+  ZONE 6 — Mini Charts Row (trend sparklines)
+
+---
+
+### ZONE 1 — DAILY AGENT STATUS BAR (full width banner)
+
+A slim status bar pinned just below the portal nav. Always visible.
+Changes colour and content based on current agent state.
+
+States and colours:
+  PENDING (yellow): "⏳ Today's outreach brief is ready and waiting
+  for your approval. [View & Approve Brief →]"
+
+  APPROVED (blue, pulsing dot): "🔵 Agent is executing — X messages
+  are being sent right now. [View Activity →]"
+
+  EXECUTED (green): "✅ Done for today — X emails sent, X WhatsApp
+  sent, X letters queued. [View Summary →]"
+
+  HELD (grey): "⏸ Today's outreach was held. Nothing was sent.
+  [Review in Outreach →]"
+
+  NOT EXECUTED (red): "⚠️ Today's brief expired without approval.
+  Messages have rolled over to tomorrow. [Review →]"
+
+  NO BRIEF YET (neutral): "Agent is preparing today's brief.
+  Check back at 7:00 AM."
+
+The banner is always one click away from the relevant action.
+
+---
+
+### ZONE 2 — PRIMARY KPI CARDS (8 cards in a responsive grid)
+
+Display these 8 metric cards in a 4x2 grid (desktop) or 2x4 (mobile).
+Each card shows: metric name, current value (large), comparison delta
+(vs last 7 days or last month), and a mini trend indicator (up/down arrow
+with percentage change). Cards use colour-coded status: green = good,
+amber = watch, red = needs attention.
+
+CARD 1 — TOTAL ACTIVE LEADS
+Value: Total number of leads currently in the pipeline
+(excludes Cold tier and DNC)
+Delta: "+X new this week"
+Colour: neutral — informational
+Click: goes to Pipeline page
+
+CARD 2 — HOT LEADS 🔴
+Value: Number of leads currently scoring 80+
+Delta: "+X vs last week"
+Colour: red accent — signals urgency
+Click: goes to Pipeline filtered to HOT tier
+Sub-line: "X have a verified address — letter ready"
+
+CARD 3 — CONSULTATIONS BOOKED
+Value: Total Zoom/call consultations booked this month
+Delta: "+X vs last month"
+Colour: green if above target, amber if below
+Click: goes to bookings calendar
+Sub-line: "Next call: [Date, Time] with [Lead First Name]"
+
+CARD 4 — OUTREACH SENT TODAY
+Value: Total messages sent today (emails + WhatsApp combined)
+Delta: "X emails / X WhatsApp"
+Colour: green if brief was approved, grey if not yet
+Click: goes to Outreach sent log
+
+CARD 5 — EMAIL OPEN RATE (last 30 days)
+Value: Percentage displayed large (e.g. "42%")
+Delta: "+X% vs last month"
+Colour: green if above 35%, amber if 20-35%, red if below 20%
+Click: goes to Reports — email performance
+
+CARD 6 — REPLY RATE (last 30 days)
+Value: Percentage of outreach emails that received a reply
+Delta: "+X% vs last month"
+Colour: green if above 8%, amber if 4-8%, red if below 4%
+Click: goes to Reports — reply performance
+
+CARD 7 — ACTIVE MANAGED PROPERTIES
+Value: Number of homeowner properties currently under management
+Delta: "+X added this month"
+Colour: always green (positive metric)
+Click: goes to a property portfolio view (future feature placeholder)
+Sub-line: "X new signed this month"
+
+CARD 8 — PIPELINE VALUE (estimated)
+Value: Estimated monthly recurring revenue if all WARM and HOT
+leads convert (based on average management fee × property count)
+Delta: "+$X vs last week"
+Colour: green
+Formula shown on hover: "Based on X leads × avg $[fee]/mo"
+Click: goe

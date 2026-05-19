@@ -1,0 +1,1194 @@
+Add two new major sections to the New Dawn Franchising web application:
+a Franchisee Training Portal and a Franchisee Marketing Portal. Also
+add a clean navigation menu to the existing site. The current site is
+a minimal single-page site — do NOT restructure, remove, or alter any
+existing page content or layout. Only ADD the navigation bar on top and
+the new portal pages. All existing homepage content stays exactly as is.
+
+New Dawn Franchising is a property management franchise built for E-2
+visa investors. Franchisees invest $250,000+ to acquire a territory,
+obtain their E-2 visa, and run a property management business. Their
+clients are homeowners who need their properties professionally managed
+and long-term rented out. The day-to-day operations are handled by an
+approved territory manager while the franchisee directs the business.
+
+---
+
+## PART 1 — NAVIGATION BAR (add only — do not change existing content)
+
+Add a clean sticky top navigation bar to the existing site.
+It must sit above all existing content without pushing, hiding,
+or altering anything on the current page.
+
+NAVIGATION STRUCTURE:
+
+Left: New Dawn Franchising logo (link to homepage /)
+Centre: nav links
+Right: "Book a Call" CTA button (links to Calendly)
+
+NAV LINKS:
+├── Home (links to /)
+├── How It Works (smooth scroll to #how-it-works section on homepage)
+├── FAQ (smooth scroll to #faq section on homepage)
+├── Contact (smooth scroll to #contact section on homepage)
+└── Portals  ← dropdown sub-menu
+    ├── 🎓 Franchisee Training Portal
+    │   "Access your training, modules and resources"
+    │   → /training/login
+    ├── 📣 Franchisee Marketing Portal
+    │   "Manage your leads and outreach tools"
+    │   → /marketing-portal/login
+    └── 🔒 Admin
+        "Dylan's internal CRM and AI agent"
+        → /admin/login
+
+PORTALS DROPDOWN BEHAVIOUR:
+- Opens on hover (desktop) and tap (mobile)
+- Clean card-style dropdown, white background, subtle shadow
+- Each option shows icon, title in bold, and a short descriptor line
+- The three portals have completely separate authentication
+- A franchisee login cannot access the Admin portal and vice versa
+
+DESIGN RULES FOR THE NAV BAR:
+- White background, subtle 1px bottom border
+- Logo left, links centred, Book a Call button right
+- Book a Call: filled button using NDF brand colour
+- Active page: underline accent in NDF brand colour
+- Sticky: stays at top on scroll
+- Mobile: hamburger menu, Portals dropdown expands inline
+  vertically, Book a Call pinned to bottom of mobile menu
+- Do NOT change font, colours, or any styling below the nav bar
+- Add padding-top to the body equal to the nav bar height so
+  the existing hero content is not hidden behind the bar
+
+---
+
+## PART 2 — FRANCHISEE TRAINING PORTAL
+
+### OVERVIEW
+
+A dedicated learning management system for New Dawn Franchising
+franchisees. This is where franchisees go when they first join and
+throughout their journey. They learn how to run their property
+management business, find and manage homeowner clients, use their
+tools, handle tenant situations, and grow their portfolio — all
+within the E-2 visa compliance requirements.
+
+URL: /training
+Auth: Separate franchisee login (email + password)
+Access: Franchisees only — each account is tied to their franchise
+        agreement in the database
+
+---
+
+### STEP 0 — LAUNCH YOUR FRANCHISE CHECKLIST
+(gates access to all training content — must be completed first)
+
+The very first thing a franchisee sees after logging in for the
+first time is the Launch Your Franchise Checklist. This is a
+mandatory pre-training gate. All checklist items must be marked
+complete before Track 1 of the training modules unlocks.
+
+Display this as a clean full-screen checklist page with:
+- A progress bar at the top showing X of 7 items complete
+- Each checklist item as a large card with:
+  - An icon representing the item
+  - The item title in bold
+  - A short description explaining why it matters
+  - A status badge: Pending / Confirmed
+  - A "Mark as Complete" button (franchisee self-confirms)
+  - An optional notes field and document upload slot
+    so the franchisee can attach proof (e.g. upload their
+    insurance certificate, lease agreement, etc.)
+- A "Why do I need this?" expandable section on each card
+  explaining the business and E-2 compliance reason
+- Once all 7 items are confirmed, a "Begin Training" button
+  appears and Track 1 unlocks
+
+Dylan can see the checklist status for every franchisee in the
+admin panel, including any uploaded documents. Dylan can manually
+override any checklist item if needed (e.g. if a franchisee is
+waiting on a document but Dylan wants to unlock training early).
+
+CHECKLIST ITEMS (in this order):
+
+ITEM 1 — Business Entity Registered
+  Title: "Your US Business Entity is Registered"
+  Description: "Confirm that your business entity (LLC or
+  Corporation) has been officially registered with the state.
+  This is a foundational E-2 visa requirement — you must own
+  a legally registered US business."
+  Why it matters: "Your E-2 visa is tied to your US business.
+  Without a registered entity you cannot legally operate or
+  demonstrate the ownership required for your visa."
+  Upload slot: Certificate of Formation / Articles of Incorporation
+  Notes field: Business entity name and state of registration
+
+ITEM 2 — Business Bank Account Open & Active
+  Title: "Your Business Bank Account is Open and Active"
+  Description: "Confirm that you have opened a dedicated US
+  business bank account in the name of your business entity
+  and that it is active. Your operating capital should be
+  deposited and you should have full control and signatory
+  authority over this account."
+  Why it matters: "E-2 visa compliance requires you to maintain
+  full financial control of your business. Your bank account
+  must be in the business name with you as the account holder.
+  Never comingle personal and business funds."
+  Upload slot: Bank account confirmation letter or statement
+  (redact sensitive numbers — just show account name and bank)
+  Notes field: Bank name and account type
+
+ITEM 3 — County / City Operating License Obtained
+  Title: "Your Operating License from the County is Confirmed"
+  Description: "Confirm that you have obtained the required
+  business operating license from your county or city. In
+  El Paso, Texas this is the local business license required
+  to legally operate a property management company."
+  Why it matters: "Operating a property management business
+  without the required local license is illegal and could
+  jeopardise your franchise agreement and your visa status.
+  Contact the El Paso City Clerk's office or County to obtain
+  yours if you haven't already."
+  Upload slot: Operating license document (PDF or image)
+  Notes field: License number and expiry date
+  Helper link: Link to El Paso County business license page
+
+ITEM 4 — Property Management License (if required by state)
+  Title: "Your Texas Real Estate / Property Management
+  Licensing Requirements are Confirmed"
+  Description: "Texas has specific licensing requirements for
+  property managers. Confirm that you understand the current
+  requirements and have taken any steps needed to comply.
+  Your NDF territory manager handles day-to-day operations
+  and will hold any required real estate license — confirm
+  with Dylan that this is covered for your territory."
+  Why it matters: "Operating without the correct license
+  in Texas can result in fines and legal action. This item
+  confirms you have verified the requirements with Dylan
+  and your territory manager."
+  Upload slot: Relevant license documentation or confirmation
+  Notes field: Free text
+  ⚠️ Note displayed on this card: "For specific licensing
+  legal requirements, always consult a licensed real estate
+  attorney in Texas."
+
+ITEM 5 — General Liability Insurance Active
+  Title: "Your General Liability Insurance Policy is Active"
+  Description: "Confirm that you have obtained a general
+  liability insurance policy for your property management
+  business and that it is currently active. Your policy
+  should name your business entity as the insured party."
+  Why it matters: "General liability insurance protects you,
+  your homeowner clients, and your business from claims
+  arising from property management operations. It is a
+  requirement of your NDF franchise agreement and is
+  essential for professional credibility with homeowners."
+  Recommended minimum coverage: $1,000,000 per occurrence /
+  $2,000,000 aggregate (franchisee to confirm with their
+  insurance broker)
+  Upload slot: Certificate of Insurance (COI)
+  Notes field: Insurance provider, policy number, expiry date
+
+ITEM 6 — Errors & Omissions (E&O) Insurance Active
+  Title: "Your Errors & Omissions (E&O) Insurance is Active"
+  Description: "Confirm that you have obtained Errors &
+  Omissions insurance (also called Professional Liability
+  insurance) specific to property management. This covers
+  you against claims from homeowner clients related to
+  mistakes or omissions in your professional services."
+  Why it matters: "Property managers can face claims from
+  homeowners if something goes wrong with how their property
+  is managed. E&O insurance is standard professional
+  protection in the property management industry and is
+  required under your franchise agreement."
+  Upload slot: Certificate of Insurance (COI)
+  Notes field: Insurance provider, policy number, expiry date
+
+ITEM 7 — Office Space or Remote Workspace Confirmed
+  Title: "Your Office or Workspace is Set Up and Confirmed"
+  Description: "Confirm that you have a dedicated workspace
+  for your business operations. This can be a leased office
+  space, a co-working membership, or a confirmed dedicated
+  home office setup. If you have signed a commercial office
+  lease, upload the lease agreement here."
+  Why it matters: "Having a dedicated workspace demonstrates
+  that you are actively directing a real operating business —
+  which is important for E-2 visa compliance. It also gives
+  your homeowner clients confidence that they are working
+  with a professional operation."
+  Upload slot: Office lease agreement or workspace confirmation
+  (optional — required only if you have a signed lease)
+  Notes field: Office address or workspace description
+
+CHECKLIST COMPLETION SCREEN:
+When all 7 items are confirmed, show a congratulations screen:
+  "🎉 Your franchise is ready to launch.
+  All pre-training requirements are confirmed.
+  Your training modules are now unlocked.
+  Let's build your business."
+  Button: "Start Training →" (takes them to Track 1, Module 1.1)
+
+Dylan receives a Slack notification when a franchisee completes
+their launch checklist: "✅ [Franchisee Name] has completed their
+Launch Checklist and is starting training."
+
+RETURNING FRANCHISEES:
+- If a franchisee has already completed the checklist, they skip
+  straight to their training dashboard on login
+- The checklist is always accessible from the dashboard under
+  "My Business Setup" for reference and document updates
+- Franchisees can update uploaded documents at any time
+  (e.g. upload renewed insurance certificate each year)
+
+---
+
+### TRAINING PORTAL DASHBOARD (/training/dashboard)
+
+Only visible after the Launch Checklist is complete.
+
+Welcome banner: "Welcome back, [First Name]. Here's where you left off."
+
+Progress overview:
+- Overall completion percentage (large ring chart)
+- Current module
+- Login streak: "You've logged in X days in a row"
+- Estimated time to complete remaining content
+
+Quick stats cards:
+- Modules completed / total
+- Quizzes passed
+- Certificates earned
+- Days since joining
+
+Next step card: prominent card showing exactly what to do next
+with a "Continue" button
+
+My Business Setup card: shows checklist completion status with
+a link to view/update documents — always visible on the dashboard
+
+Announcements panel: Dylan posts updates that appear on all
+franchisee dashboards
+
+---
+
+### TRAINING MODULES STRUCTURE (/training/modules)
+
+Six tracks. Each track contains multiple modules. Each module
+contains lessons, videos, quizzes, and downloadable resources.
+Tracks unlock sequentially — Track 1 must be completed before
+Track 2 unlocks. Within each track, modules unlock in order.
+All tracks are locked until the Launch Checklist is complete.
+
+Display a visual roadmap showing all tracks and progress.
+
+---
+
+TRACK 1 — WELCOME & FOUNDATIONS
+"Everything you need to know before you do anything else"
+
+Module 1.1 — Welcome to New Dawn Franchising
+  - Video: Welcome message from Dylan (embed Loom or YouTube)
+  - Lesson: The NDF mission, vision, and values
+  - Lesson: How the franchise system works
+  - Lesson: Your role as the business director
+  - Lesson: What the territory manager does vs what you do
+  - Resource: Franchise Agreement Summary (PDF)
+  - Quiz: 5 questions
+
+Module 1.2 — Your First 30 Days
+  - Lesson: The 30-day onboarding checklist
+  - Lesson: Setting up your US business entity
+  - Lesson: Opening your US business bank account
+    (critical for E-2 compliance — you must maintain full
+    control of your bank accounts at all times)
+  - Lesson: Setting up your workspace
+  - Lesson: Meeting your territory manager
+  - Resource: 30-Day Checklist (PDF)
+  - Quiz: 5 questions
+
+Module 1.3 — Your Tools & Systems
+  - Lesson: Overview of every tool you will use
+  - Lesson: How to log into the Franchisee Marketing Portal
+  - Lesson: How to use the property management platform
+  - Lesson: How to use your CRM to manage homeowner clients
+  - Lesson: How to read your operational dashboards
+  - Resource: Tools Setup Guide (PDF)
+  - Quiz: 5 questions
+
+---
+
+TRACK 2 — THE PROPERTY MANAGEMENT BUSINESS
+"Understanding the service you are delivering and how it works"
+
+Module 2.1 — What Is Property Management?
+  - Lesson: What a property management company does
+  - Lesson: The full lifecycle of a managed property:
+    onboarding the homeowner → marketing the property →
+    tenant screening → lease signing → ongoing management →
+    maintenance → renewals → owner reporting
+  - Lesson: What homeowner clients expect from a property manager
+  - Lesson: Long-term rental vs short-term rental — why NDF
+    focuses on long-term rentals and why that matters for
+    stability and E-2 compliance
+  - Lesson: The El Paso, Texas rental market overview
+  - Resource: NDF Property Management Service Overview (PDF)
+  - Quiz: 10 questions
+
+Module 2.2 — Your Homeowner Clients
+  - Lesson: Who is the ideal homeowner client for NDF franchisees?
+    (homeowners with 1-10 properties who want passive income
+    without the hassle of self-managing, landlords tired of
+    dealing with tenants directly, investors who own properties
+    remotely, homeowners relocating who want to rent rather than sell)
+  - Lesson: What problems homeowners are trying to solve
+    (finding reliable long-term tenants, collecting rent on time,
+    handling maintenance, staying legally compliant as a landlord,
+    avoiding vacancy periods)
+  - Lesson: What homeowners worry about when hiring a property
+    manager (fees, trust, communication, protecting their asset)
+  - Lesson: How to speak to a homeowner's specific concerns
+  - Lesson: Red flags — homeowner clients who are not a good fit
+  - Quiz: 10 questions
+
+Module 2.3 — Your Services & Fee Structure
+  - Lesson: What services NDF franchisees offer homeowners
+  - Lesson: Standard property management fee structures
+    (monthly management fee as % of rent, leasing fee,
+    maintenance coordination fee, renewal fee)
+  - Lesson: How to explain your fees to a homeowner clearly
+  - Lesson: What is included and what is not included
+  - Resource: NDF Standard Service Agreement Template
+  - Resource: Fee Structure Explainer (client-facing PDF)
+  - Quiz: 10 questions
+
+Module 2.4 — The E-2 Visa & Your Business
+  - Lesson: Why this franchise was built specifically for
+    the E-2 visa investor
+  - Lesson: What the E-2 visa requires from you as the
+    business owner (you must own, direct, and develop the
+    business — this module explains what that means practically)
+  - Lesson: How your day-to-day business activities demonstrate
+    E-2 compliance (oversight, decision-making, financial control)
+  - Lesson: What records and documentation you should keep
+    to demonstrate active business direction
+  - Lesson: General questions consulates may ask about your
+    business during an E-2 interview and how to think about them
+    from a business operations perspective
+
+  ⚠️ MANDATORY DISCLAIMER (must be acknowledged before proceeding):
+  "New Dawn Franchising and its franchisees are not immigration
+  attorneys and cannot provide immigration legal advice. Nothing
+  in this training constitutes legal advice. The information in
+  this module is provided for general business education purposes
+  only. For all questions about your E-2 visa application,
+  renewal, consulate interview, eligibility, or any immigration
+  legal matter, you must consult a qualified licensed immigration
+  attorney. Franchisee must click 'I understand and agree' to
+  unlock the next module."
+
+  - Resource: List of NDF Partner Immigration Attorneys
+  - Resource: Questions to Ask Your Immigration Attorney
+  - Quiz: 10 questions
+
+Module 2.5 — Navigating Consulate & Immigration Questions
+  - Lesson: General questions a consulate may ask about the
+    business and how to think about your answers from a
+    business perspective
+  - Lesson: What documentation about your business operations
+    is typically useful (general guidance only)
+  - Lesson: How to work effectively with your immigration attorney
+    to prepare for interviews
+  - Lesson: What to tell clients or partners who ask about your
+    visa situation
+
+  ⚠️ DISCLAIMER ON EVERY PAGE IN THIS MODULE:
+  "This content is for general business education only. It is
+  not legal advice and does not cover visa-specific eligibility
+  or legal strategy. Always consult your licensed immigration
+  attorney for guidance on consulate interviews, visa renewals,
+  and any immigration legal matters. New Dawn Franchising
+  franchisees are not immigration attorneys."
+
+  - Resource: Working With Your Immigration Attorney (guide)
+  - Resource: Business Documentation Best Practices (not legal advice)
+  - Quiz: 10 questions
+
+---
+
+TRACK 3 — FINDING & WINNING HOMEOWNER CLIENTS
+"How to fill your pipeline with homeowners who need long-term
+rental management"
+
+Module 3.1 — Where to Find Homeowner Clients
+  - Lesson: The best sources of homeowner leads in your territory
+    (real estate agents and brokers, landlord associations, local
+    Facebook groups for landlords, Nextdoor, Google search ads,
+    direct mail to multi-property owners, referrals from
+    mortgage brokers, referrals from real estate attorneys,
+    for-rent-by-owner listings on Zillow and Craigslist)
+  - Lesson: How to identify homeowners who are self-managing and
+    frustrated (the warmest leads you will ever find)
+  - Lesson: Homeowners who are about to relocate — a high-intent
+    segment worth targeting specifically
+  - Lesson: How to build a referral pipeline from real estate agents
+  - Resource: Lead Source Directory for El Paso Territory
+  - Quiz: 10 questions
+
+Module 3.2 — The Homeowner Consultation Call
+  - Lesson: Structure of the perfect homeowner discovery call
+    (understand their situation → explain your service →
+    address their concerns → present your agreement → close)
+  - Lesson: The most common homeowner objections and how to
+    handle them:
+    "Your fee is too high" / "I've managed it myself fine"
+    "I had a bad experience with a property manager before"
+    "I'm not sure I can trust someone else with my property"
+  - Lesson: How to close a homeowner without being pushy
+  - Lesson: When to walk away
+  - Resource: Homeowner Discovery Call Script
+  - Resource: Objection Handling Cheat Sheet
+  - Quiz: 10 questions
+  - Practice: Role-play scenario (franchisee types responses to
+    a simulated homeowner conversation, AI scores their answers)
+
+Module 3.3 — Using the CRM to Manage Homeowner Leads
+  - Lesson: How to log every homeowner interaction in the CRM
+  - Lesson: How to move leads through the pipeline stages
+  - Lesson: Setting follow-up reminders so no lead goes cold
+  - Lesson: How to read your pipeline metrics
+  - Video: CRM walkthrough (screen recording)
+  - Quiz: 5 questions
+
+Module 3.4 — The Management Agreement
+  - Lesson: Walk through the NDF standard management agreement
+  - Lesson: How to explain each clause to a homeowner clearly
+  - Lesson: What to do when a homeowner wants to negotiate terms
+  - Lesson: Getting the agreement signed (DocuSign workflow)
+  - Resource: NDF Standard Management Agreement Template
+  - Quiz: 5 questions
+
+---
+
+TRACK 4 — MANAGING PROPERTIES & TENANTS
+"How to deliver an excellent service that keeps homeowners
+as long-term clients"
+
+Module 4.1 — Marketing a Property for Long-Term Rent
+  - Lesson: How to list a property effectively
+    (professional photos, compelling descriptions,
+    competitive pricing research)
+  - Lesson: Which platforms to list on
+    (Zillow, Trulia, Realtor.com, Apartments.com, Facebook
+    Marketplace, Craigslist — and how to manage them)
+  - Lesson: How to price a rental correctly for the El Paso market
+  - Lesson: How to use the NDF proprietary technology to
+    automate listing distribution and tenant follow-up
+  - Lesson: How to reduce vacancy time
+  - Quiz: 10 questions
+
+Module 4.2 — Tenant Screening
+  - Lesson: The NDF tenant screening process
+  - Lesson: What to check: credit, income, rental history,
+    background, references
+  - Lesson: Fair Housing Act basics — what you can and cannot
+    consider when screening (legal compliance)
+  - Lesson: How to decline an applicant correctly and legally
+  - Lesson: Red flag tenant profiles
+  - Resource: NDF Tenant Screening Checklist
+  - Resource: Fair Housing Act Quick Reference
+  - Quiz: 10 questions
+
+Module 4.3 — Leases & Move-In
+  - Lesson: The standard NDF lease agreement
+  - Lesson: Move-in inspection process and documentation
+    (photos, condition report, security deposit handling)
+  - Lesson: How to use the technology platform for lease signing
+    and tenant onboarding
+  - Lesson: Setting tenant expectations from day one
+  - Resource: NDF Standard Lease Template
+  - Resource: Move-In Inspection Checklist
+  - Quiz: 10 questions
+
+Module 4.4 — Ongoing Tenant & Property Management
+  - Lesson: Rent collection — how the automated system works
+  - Lesson: What to do when rent is late
+  - Lesson: Handling maintenance requests (the NDF process)
+  - Lesson: Emergency maintenance vs routine maintenance
+  - Lesson: Communicating with homeowners — monthly reports,
+    how often to update them, what they care about
+  - Lesson: Lease renewals — when and how to approach them
+  - Resource: Monthly Owner Report Template
+  - Resource: Maintenance Request Handling Guide
+  - Quiz: 10 questions
+
+Module 4.5 — Problem Situations
+  - Lesson: What to do when a tenant stops paying rent
+  - Lesson: The eviction process in Texas — general overview
+    (always work with a local attorney for actual evictions)
+  - Lesson: Property damage — how to document and handle it
+  - Lesson: Difficult homeowner clients — managing expectations
+  - Lesson: When to escalate to Dylan or NDF headquarters
+  - ⚠️ Always consult a licensed attorney for eviction
+    proceedings and any legal disputes with tenants or owners.
+  - Quiz: 10 questions
+
+---
+
+TRACK 5 — MARKETING YOUR PROPERTY MANAGEMENT BUSINESS
+"How to consistently generate new homeowner clients"
+
+Module 5.1 — Your Personal Brand as an NDF Franchisee
+  - Lesson: Why your personal brand as a local property manager
+    matters in your territory
+  - Lesson: How to position yourself as the trusted property
+    management expert in El Paso
+  - Lesson: LinkedIn and Facebook profile optimisation
+  - Lesson: How to talk about what you do at local networking events
+  - Resource: LinkedIn Profile Template for NDF Franchisees
+  - Resource: Elevator Pitch Script
+  - Quiz: 5 questions
+
+Module 5.2 — Using the Franchisee Marketing Portal
+  - Lesson: Overview of the Marketing Portal
+  - Lesson: How the AI agent finds homeowner leads for you
+  - Lesson: How to review and approve your daily outreach brief
+  - Lesson: How to manage your leads in the portal
+  - Lesson: How to read your analytics and improve performance
+  - Lesson: How physical mail letters work for high-scoring leads
+  - Video: Full Marketing Portal walkthrough (screen recording)
+  - Quiz: 10 questions
+
+Module 5.3 — Digital Marketing for Property Managers
+  - Lesson: Google Business Profile setup and optimisation
+    (critical for local search visibility in El Paso)
+  - Lesson: Getting homeowner reviews on Google
+  - Lesson: Facebook and Nextdoor for local lead generation
+  - Lesson: Content ideas: what to post and why
+  - Resource: 30-Day Social Media Content Calendar Template
+  - Quiz: 5 questions
+
+Module 5.4 — Referral Partnerships
+  - Lesson: Real estate agents as your best referral source
+  - Lesson: How to approach and build relationships with
+    local real estate agents
+  - Lesson: Other referral partners: mortgage brokers,
+    real estate attorneys, relocation companies, HOA managers
+  - Lesson: How to ask for referrals without being awkward
+  - Resource: Referral Partner Outreach Email Template
+  - Quiz: 5 questions
+
+Module 5.5 — Direct Mail & Physical Outreach
+  - Lesson: How to identify homeowners who are self-managing
+    (public records, for-rent-by-owner listings)
+  - Lesson: Direct mail campaigns targeting local landlords
+  - Lesson: How physical mail letters are generated through
+    the NDF Marketing Portal for high-scoring leads
+  - Resource: Direct Mail Letter Template (homeowner-facing)
+  - Quiz: 5 questions
+
+---
+
+TRACK 6 — COMPLIANCE, LEGAL & PROFESSIONAL STANDARDS
+"Protecting yourself, your homeowner clients, and New Dawn Franchising"
+
+Module 6.1 — What You Can and Cannot Say
+  - Lesson: The legal boundaries of your role as a franchisee
+  - Lesson: What constitutes immigration legal advice and why
+    you must never provide it even informally
+  - Lesson: What constitutes legal advice about tenant law and
+    why you must always refer to a licensed attorney
+  - Lesson: How to stay helpful without crossing legal lines
+  - Lesson: The exact phrases to use when redirecting to attorneys
+
+  ⚠️ MANDATORY COMPLIANCE ACKNOWLEDGEMENT:
+  Franchisee must read and digitally sign before this module unlocks:
+  "I understand that as a New Dawn Franchising franchisee I am not
+  an immigration attorney, real estate attorney, or legal professional
+  of any kind. I will not provide immigration legal advice, visa
+  application guidance, eviction legal strategy, or any legal
+  interpretation to homeowners, tenants, or any other party. I will
+  always direct parties to a qualified licensed attorney for any
+  legal questions. I understand that failure to comply may result
+  in termination of my franchise agreement."
+
+  - Quiz: 10 questions (scenario-based — what do you say?)
+
+Module 6.2 — Fair Housing & Landlord-Tenant Law Basics
+  - Lesson: Fair Housing Act — the key rules every property
+    manager must know
+  - Lesson: Texas landlord-tenant law basics
+    (security deposits, notice requirements, habitability)
+  - Lesson: What you cannot do as a property manager
+  - Lesson: When to bring in a real estate attorney
+  - ⚠️ This is general education only. Always consult a licensed
+    attorney for specific legal situations.
+  - Resource: Fair Housing Act Reference Guide
+  - Resource: Texas Landlord-Tenant Law Overview
+  - Quiz: 10 questions
+
+Module 6.3 — Data Privacy & Client Confidentiality
+  - Lesson: How to handle sensitive homeowner and tenant data
+  - Lesson: Secure document handling
+  - Lesson: GDPR basics for any international homeowner clients
+  - Lesson: CAN-SPAM compliance for email outreach
+  - Resource: Client Data Handling Policy
+  - Quiz: 5 questions
+
+Module 6.4 — NDF Brand Standards
+  - Lesson: How to represent the New Dawn Franchising brand
+  - Lesson: What you are and are not allowed to say in marketing
+  - Lesson: Social media guidelines
+  - Lesson: Approved marketing materials
+  - Lesson: When and how to escalate issues to Dylan
+  - Resource: Brand Standards Guide (PDF)
+  - Resource: Approved Marketing Materials Library
+  - Quiz: 5 questions
+
+Module 6.5 — Ongoing Compliance & Renewals
+  - Lesson: Annual franchise compliance review process
+  - Lesson: E-2 visa renewal — what your business records
+    need to show (general guidance — always work with your
+    immigration attorney for the actual renewal)
+  - Lesson: Staying current with NDF system changes
+  - Lesson: How to flag concerns or questions to NDF headquarters
+  - Quiz: 5 questions
+
+---
+
+### TRAINING PORTAL FEATURES
+
+PROGRESS TRACKING:
+- Lesson marked complete when scrolled to bottom or video
+  watched to at least 80%
+- Quiz must be passed at 80% or above to complete the module
+- Failed quizzes can be retaken after a 10-minute cooldown
+  (enforced server-side, not just client-side)
+- Progress syncs in real time and is visible to Dylan in admin
+
+CERTIFICATES:
+- Certificate issued automatically when each Track is completed
+- Final "Certified New Dawn Franchising Property Manager"
+  certificate on completion of all 6 tracks
+- Certificates downloadable as PDF with NDF branding,
+  franchisee name, completion date, Dylan's digital signature
+- Each certificate has a unique verification ID
+- Public verification page at /verify/[verificationId]
+
+RESOURCE LIBRARY (/training/resources):
+- Central library of all downloadable resources
+- Searchable and filterable by track, topic, file type
+- Resources added by Dylan are immediately available to all franchisees
+
+SEARCH (/training/search):
+- Full-text search across all training content
+- Shows which module and lesson contains the search term
+
+ANNOUNCEMENTS:
+- Dylan posts from the admin panel
+- Optional "Action Required" flag for urgent items
+- Franchisees acknowledge announcements
+- Dylan sees who has and has not read each one
+
+DISCUSSION / Q&A:
+- Each module has a Q&A section
+- Franchisees post questions, Dylan or trainers reply
+- Other franchisees upvote questions
+- Answered questions become a searchable FAQ
+
+ADMIN VIEW (Dylan):
+- See all franchisees and their training progress
+- See Launch Checklist completion status and uploaded documents
+  for every franchisee
+- Flag franchisees who are stuck or not progressing
+- See quiz scores across all franchisees
+- Override any checklist item for any franchisee if needed
+- Push new content to all or specific franchisees
+- Export compliance acknowledgement records
+  (who signed what, when, from which IP)
+- Manage certificate issuance
+
+---
+
+### DISCLAIMER SYSTEM
+
+Disclaimers appear in three places throughout the training portal:
+
+1. Mandatory acknowledgement in Module 2.4 and 6.1
+   (franchisee cannot proceed without clicking "I understand and agree")
+
+2. Persistent banner at the top of every page in Track 2 and Track 6:
+   "Reminder: You are not an immigration attorney or legal professional.
+   Always refer immigration and legal questions to a qualified
+   licensed attorney."
+
+3. Yellow info box at the top of every lesson in Module 2.5:
+   "⚠️ This content is for general business education only and does
+   not constitute legal advice. Refer all immigration, visa, and
+   legal questions to a licensed attorney."
+
+Store all disclaimer acknowledgements with:
+- Franchisee ID
+- Disclaimer type and version number
+- Timestamp
+- IP address
+These records are immutable — no update or delete ever.
+
+---
+
+## PART 3 — FRANCHISEE MARKETING PORTAL
+
+### OVERVIEW
+
+A simplified version of the NDF AI outreach system tailored for
+individual franchisees. Each franchisee gets their own lead pipeline,
+their own daily approval brief, and their own outreach tools — scoped
+to finding homeowners in their territory who need long-term rental
+property management.
+
+URL: /marketing-portal
+Auth: Same franchisee credentials as the training portal
+      (single login, access to both portals)
+
+Access gate: The Marketing Portal is only accessible after the
+franchisee has completed the Launch Checklist AND completed at
+least Track 1 of the training modules. Show a friendly locked
+state with progress indicator if they try to access early:
+"Complete your Launch Checklist and Welcome & Foundations
+training to unlock your Marketing Portal."
+
+---
+
+### FRANCHISEE MARKETING PORTAL DASHBOARD
+
+Clean dashboard showing:
+- New homeowner leads discovered today
+- Messages pending my approval
+- Replies received this week
+- Consultations booked this week
+- My active managed properties count
+- My pipeline conversion rate
+
+Daily approval status banner
+"View Today's Brief" primary action button
+
+---
+
+### WHO THE FRANCHISEE IS TARGETING
+
+TARGET LEAD PROFILES:
+- Homeowners with 1-10 rental properties in the territory
+  who are currently self-managing (frustrated landlords)
+- Homeowners who are relocating and need someone to manage
+  their property while they are away
+- Real estate investors who own properties in El Paso
+  but live elsewhere
+- New landlords who just bought an investment property
+  and do not know where to start
+- Homeowners who have had bad experiences with a previous
+  property manager and are looking for a better option
+- Real estate agents who regularly refer clients to
+  property managers (referral partner leads)
+
+LEAD DISCOVERY SOURCES:
+- For-rent-by-owner listings on Zillow, Craigslist,
+  Facebook Marketplace (self-managing homeowners = warm leads)
+- Google Maps for landlords and property owners in the territory
+- Facebook groups for El Paso landlords and real estate investors
+- Nextdoor posts where homeowners ask about renting their property
+- Public property records for multi-property owners in the territory
+- Local real estate agent directories (referral partner targets)
+- Neighbourhood forums and community boards
+- Mortgage data for recently purchased investment properties
+  in the territory (new landlords who will need management)
+
+OUTREACH VOICE:
+All outreach is written in the franchisee's own first-person voice.
+The franchisee fills in their name, background, and writing samples
+during onboarding and the AI adapts accordingly.
+
+OUTREACH SEQUENCE FOR HOMEOWNERS (4-touch):
+Touch 1 (Day 1): Soft intro referencing their specific listing
+  or situation, one genuine question
+Touch 2 (Day 4): Value — local market insight, landlord tip,
+  or relevant resource
+Touch 3 (Day 9): Direct ask — free 15-minute property management
+  consultation via franchisee's Calendly link
+Touch 4 (Day 16): Soft close — "happy to leave the door open"
+
+PHYSICAL MAIL FOR HIGH-SCORING HOMEOWNER LEADS (Lob):
+- Included as a recommendation in the franchisee's daily brief
+- Never sent automatically — requires explicit franchisee approval
+- Letter references the homeowner's specific property
+- QR code links to franchisee's personal Calendly
+- Threshold: lead score 80+ with verified property address
+
+---
+
+### FRANCHISEE LEAD SCORING (0-100)
+
+CATEGORY 1 — INTENT SIGNALS (30 pts max)
+  30 pts — Active for-rent-by-owner listing (self-managing now)
+  25 pts — Posted in a landlord forum asking for advice
+  20 pts — Commented on property management content
+  15 pts — Posted about relocating and owning a property
+  10 pts — General real estate investor activity
+   5 pts — No signals but fits the profile
+
+CATEGORY 2 — PROPERTY FIT (25 pts max)
+  Sub-score A: Number of properties owned (10 pts)
+    10 pts — 3+ properties (multi-property landlord)
+     7 pts — 2 properties
+     4 pts — 1 property confirmed
+     1 pt  — Unknown
+  Sub-score B: Property location (8 pts)
+     8 pts — Property confirmed in NDF territory (El Paso)
+     4 pts — Nearby area, possible territory fit
+     0 pts — Outside territory
+  Sub-score C: Property type (7 pts)
+     7 pts — Single family home (core NDF property type)
+     5 pts — Townhouse or condo
+     3 pts — Multi-unit small building
+     1 pt  — Unknown
+
+CATEGORY 3 — LANDLORD PAIN SIGNALS (20 pts max)
+  20 pts — Explicit complaints about self-managing
+           (vacancy, difficult tenants, maintenance headaches)
+  16 pts — Self-managing a property remotely
+  12 pts — Self-managing for more than 1 year
+   8 pts — Recently became a landlord (needs guidance)
+   4 pts — Some landlord activity but limited signal
+   0 pts — No pain signals detected
+
+CATEGORY 4 — ENGAGEMENT & RECENCY (15 pts max)
+  15 pts — Activity in the last 7 days on a relevant topic
+  12 pts — Active in last 14 days
+   9 pts — Last activity 15-30 days ago
+   5 pts — Last activity 31-60 days ago
+   2 pts — Last activity 61-90 days ago
+   0 pts — No detectable activity in 90+ days
+
+CATEGORY 5 — OUTREACH RESPONSIVENESS (10 pts max)
+  10 pts — Replied to an email or WhatsApp
+   8 pts — Opened an email 2+ times
+   6 pts — Clicked a link in an email
+   4 pts — Opened an email once
+   2 pts — Email delivered, no open
+   0 pts — No contact yet or email bounced
+  -5 pts — Ignored across 3+ touches
+
+TIER LABELS:
+  80-100  🔴 HOT — Fast-track, prepare letter draft for brief
+  60-79   🟠 WARM — Standard 4-touch sequence
+  40-59   🟡 NURTURE — Monthly email only
+  20-39   🔵 WATCH — Monitor only
+  0-19    ⚪ COLD — No action
+
+SCORE DECAY:
+Engagement score decays 3pts per week after 30 days of inactivity.
+Full re-score every Sunday at 5 AM.
+Partial re-score (recency + responsiveness) nightly at 5:30 AM.
+
+---
+
+### FRANCHISEE DAILY BRIEF
+
+Same format as Dylan's daily brief but scoped to the franchisee
+and their homeowner leads. Sent to the franchisee's own email.
+Subject: "NDF [Franchisee First Name] Daily Brief — [Date]"
+
+Dylan has read-only visibility into all franchisee briefs.
+
+Sections:
+- New homeowner leads to contact (with score badges)
+- Follow-ups due today
+- Forum/community reply drafts (for manual posting)
+- ✉️ Physical mail recommendations (score 80+, separate approval)
+- Local competitor intel (other property managers in the territory)
+
+Reply YES to execute digital outreach.
+Reply "SEND LETTER #[n]" or "SEND ALL LETTERS" for physical mail.
+Physical mail is never triggered by a plain YES reply.
+
+---
+
+### FRANCHISEE MARKETING PORTAL PAGES
+
+/marketing-portal/dashboard    — Main dashboard
+/marketing-portal/leads        — Lead pipeline (kanban + table)
+/marketing-portal/outreach     — Today's staged messages + sent log
+/marketing-portal/letters      — Physical mail recommendations + status
+/marketing-portal/analytics    — Personal funnel and performance metrics
+/marketing-portal/resources    — Brand assets, email signature generator,
+                                  approved marketing materials
+/marketing-portal/settings     — Voice settings, Calendly link, personal info
+
+---
+
+### APPROVED CONTENT LIBRARY
+
+Franchisees cannot create their own email templates without
+Dylan's approval. Dylan maintains a library of pre-approved
+templates that franchisees can personalise:
+- Cold outreach to self-managing landlords
+- Follow-up sequences
+- Referral partner outreach (to real estate agents)
+- Post-consultation follow-up
+- Welcome email for new homeowner clients
+- Monthly owner report cover email
+
+Dylan approves new templates from the admin panel and they
+appear immediately for all franchisees.
+
+---
+
+## PART 4 — FRANCHISEE ACCOUNT MANAGEMENT (Admin Panel)
+
+Dylan manages all franchisee accounts from /admin:
+
+- Create new franchisee account (name, email, territory, start date)
+- Assign franchise agreement record
+- Enable/disable training portal access
+- Enable/disable marketing portal access
+- Set franchisee's territory (scopes lead discovery)
+- View Launch Checklist status and all uploaded documents
+- Override any Launch Checklist item for any franchisee
+- Receive Slack notification when a franchisee completes checklist
+- View training progress and quiz scores per franchisee
+- View outreach performance metrics per franchisee
+- Read-only view of any franchisee's daily brief
+- Read-only view of any franchisee's lead pipeline
+- Suspend or deactivate an account
+- Export compliance acknowledgement records
+- Post announcements to all or specific franchisees
+
+---
+
+## DATABASE SCHEMA (Prisma additions)
+
+model Franchisee {
+  id               String   @id @default(cuid())
+  firstName        String
+  lastName         String
+  email            String   @unique
+  passwordHash     String
+  territory        String?
+  franchiseStart   DateTime?
+  status           String   @default("active")
+  trainingAccess   Boolean  @default(true)
+  marketingAccess  Boolean  @default(false)
+  calendlyUrl      String?
+  voiceProfile     Json?
+  checklistComplete Boolean @default(false)
+  createdAt        DateTime @default(now())
+  checklistItems   FranchiseeChecklistItem[]
+  trainingProgress TrainingProgress[]
+  disclaimerAcks   DisclaimerAcknowledgement[]
+  leads            FranchiseeContact[]
+  certificates     Certificate[]
+  dailyBriefs      FranchiseeDailyBatch[]
+}
+
+model FranchiseeChecklistItem {
+  id             String   @id @default(cuid())
+  franchiseeId   String
+  itemKey        String
+  // entity_registered / bank_account / operating_license /
+  // pm_license / liability_insurance / eo_insurance / office_space
+  status         String   @default("pending")
+  // pending / confirmed
+  notes          String?
+  documentUrl    String?
+  confirmedAt    DateTime?
+  overriddenBy   String?
+  overriddenAt   DateTime?
+  createdAt      DateTime @default(now())
+  franchisee     Franchisee @relation(fields: [franchiseeId], references: [id])
+}
+
+model TrainingModule {
+  id            String   @id @default(cuid())
+  track         Int
+  moduleNumber  String
+  title         String
+  description   String
+  content       Json
+  quizQuestions Json
+  passMark      Int      @default(80)
+  order         Int
+  isLocked      Boolean  @default(true)
+  resources     TrainingResource[]
+  progress      TrainingProgress[]
+}
+
+model TrainingProgress {
+  id            String   @id @default(cuid())
+  franchiseeId  String
+  moduleId      String
+  status        String   @default("not_started")
+  quizScore     Int?
+  quizAttempts  Int      @default(0)
+  completedAt   DateTime?
+  franchisee    Franchisee     @relation(fields: [franchiseeId], references: [id])
+  module        TrainingModule @relation(fields: [moduleId], references: [id])
+}
+
+model TrainingResource {
+  id          String   @id @default(cuid())
+  moduleId    String?
+  title       String
+  description String?
+  fileUrl     String
+  fileType    String
+  isGlobal    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  module      TrainingModule? @relation(fields: [moduleId], references: [id])
+}
+
+model Certificate {
+  id             String   @id @default(cuid())
+  franchiseeId   String
+  type           String
+  verificationId String   @unique @default(cuid())
+  issuedAt       DateTime @default(now())
+  franchisee     Franchisee @relation(fields: [franchiseeId], references: [id])
+}
+
+model DisclaimerAcknowledgement {
+  id             String   @id @default(cuid())
+  franchiseeId   String
+  disclaimerType String
+  version        String
+  acknowledgedAt DateTime @default(now())
+  ipAddress      String?
+  franchisee     Franchisee @relation(fields: [franchiseeId], references: [id])
+}
+
+model TrainingAnnouncement {
+  id          String   @id @default(cuid())
+  title       String
+  body        String
+  isUrgent    Boolean  @default(false)
+  publishedAt DateTime @default(now())
+  expiresAt   DateTime?
+  readBy      Json     @default("[]")
+}
+
+model FranchiseeContact {
+  id              String   @id @default(cuid())
+  franchiseeId    String
+  firstName       String
+  lastName        String?
+  email           String?
+  phone           String?
+  propertyAddress Json?
+  propertyCount   Int?
+  source          String
+  sourceUrl       String?
+  aiScore         Int      @default(0)
+  scoreTier       String   @default("cold")
+  scoreBreakdown  Json?
+  scoreHistory    Json?
+  stage           String   @default("new")
+  tags            String[]
+  letterStatus    String   @default("none")
+  researchDossier Json?
+  createdAt       DateTime @default(now())
+  franchisee      Franchisee @relation(fields: [franchiseeId], references: [id])
+}
+
+model FranchiseeDailyBatch {
+  id                      String   @id @default(cuid())
+  franchiseeId            String
+  batchDate               DateTime
+  briefEmailSentAt        DateTime?
+  approvalStatus          String   @default("pending")
+  approvedAt              DateTime?
+  replyBody               String?
+  skippedItems            Int[]
+  lettersApproved         Int[]
+  lettersApprovedAll      Boolean  @default(false)
+  executedAt              DateTime?
+  executionSummary        Json?
+  confirmationEmailSentAt DateTime?
+  createdAt               DateTime @default(now())
+  franchisee              Franchisee @relation(fields: [franchiseeId], references: [id])
+}
+
+---
+
+## ENV VARIABLES TO ADD
+
+TRAINING_PORTAL_URL=
+MARKETING_PORTAL_URL=
+FRANCHISEE_JWT_SECRET=
+CERTIFICATE_LOGO_URL=
+DYLAN_SIGNATURE_IMAGE_URL=
+DOCUMENT_UPLOAD_BUCKET=
+
+---
+
+## IMPORTANT BUILD NOTES
+
+- The existing homepage content must remain 100% unchanged.
+  Only add the nav bar on top and the new portal routes.
+  Do not touch the existing HTML, CSS, copy, or layout.
+  Add padding-top to the body equal to the sticky nav height.
+
+- The Launch Checklist is a hard gate. No training module
+  content is visible until all 7 items are confirmed.
+  This must be enforced server-side — not just in the UI.
+  Dylan can override individual items from the admin panel.
+
+- The Marketing Portal is a second gate. It requires both
+  the Launch Checklist AND Track 1 completion. Enforce
+  server-side on the /marketing-portal routes.
+
+- Document uploads from the checklist should be stored in a
+  secure file bucket (S3 or equivalent). Only the franchisee
+  and Dylan (admin) can access uploaded documents. Generate
+  signed URLs for viewing — never expose raw storage paths.
+
+- Franchisee auth is completely separate from Dylan's admin auth.
+  A franchisee JWT can never access any /admin route.
+
+- Franchisee leads are completely siloed. No franchisee can
+  ever see another franchisee's contacts, messages, or briefs.
+
+- Disclaimer acknowledgement records are immutable once created.
+  No update or delete operations on these records ever.
+
+- Quiz retake cooldown must be enforced server-side.
+
+- Certificate verification IDs are publicly verifiable at
+  /verify/[verificationId] — a simple public page.
+
+- Training content must be editable by Dylan from the admin
+  panel without a developer. Build a simple content editor.
+
+- The Franchisee Marketing Portal targets LOCAL homeowners in
+  the franchisee's territory — not international E-2 investors.
+  These are completely different audiences.
+
+- All franchisee outreach must comply with CAN-SPAM, GDPR,
+  and WhatsApp Business API policies.
+
+- Videos embed from Loom or YouTube only — do not host
+  video files directly in the app.
+
+- Training portal must be mobile-first — franchisees will
+  often complete modules on their phone.
+
+- Build full demo mode for both portals including:
+  a sample franchisee mid-way through the Launch Checklist
+  (some items confirmed, some pending), sample training progress,
+  sample homeowner leads in the marketing portal, and a sample
+  daily brief with a physical mail recommendation section.
+
+- Demo mode toggle in the nav: "Demo Mode: ON"
+
+- Slack notification to Dylan when:
+  A franchisee completes their Launch Checklist
+  A franchisee completes a full training track
+  A franchisee earns their final certificate
+  A franchisee's marketing portal is unlocked for the first time

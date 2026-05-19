@@ -1,0 +1,149 @@
+Build an autonomous outreach agent as an extension to my existing New Dawn Franchising / VisaFranchise CRM. The agent's single job: given a target persona and a weekly booked-meeting goal, it should find leads, warm them up across email / WhatsApp / LinkedIn / forums, and book qualified Zoom calls on Dylan's calendar — speaking as Dylan in a warm, first-person voice. It runs daily, logs everything, and pauses to ask me when it needs credentials, approval, or budget.
+
+==================================================
+CORE CONCEPT
+==================================================
+I define campaigns like: "Book 5 qualified Zoom calls per week with immigration attorneys in the UAE who serve E-2 visa clients." The agent then runs a daily cron that sources leads, scores them, drafts personalized multi-channel touches, queues them for my approval (or auto-sends if I've enabled it for that channel), tracks replies, and iterates. Every action is logged and every outbound message is CAN-SPAM / GDPR / WhatsApp Business Policy compliant.
+
+==================================================
+TECH STACK (match the existing CRM)
+==================================================
+- Backend: Node.js + Express (existing)
+- Database: PostgreSQL (existing DATABASE_URL — extend the schema, don't replace)
+- LLM: Anthropic Claude Sonnet 4.6 (model: claude-sonnet-4-5) via @anthropic-ai/sdk
+- Email: SendGrid (existing SENDGRID_API_KEY) + reply webhook
+- WhatsApp + SMS: Twilio (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN) — WhatsApp Business templates only for first touch
+- LinkedIn: no scraping or automation against LinkedIn ToS — the agent drafts messages and queues them for me to send manually from my own account
+- Lead sourcing: Apollo.io API (preferred) + Apify actors as fallback for public web sources
+- Forum sourcing: Reddit API, Quora (manual queue only — no auto-posting)
+- Calendar: Calendly API for Dylan's booking link and meeting detection
+- Scheduler: Replit Scheduled Deployments for the daily cron
+- Secrets: Replit Secrets for all API keys; AES-256-GCM for any user-supplied credentials
+
+==================================================
+DATABASE SCHEMA (extend existing contacts table)
+==================================================
+outreach_campaigns
+  id, name, persona_target (jsonb: titles, industries, geos, company_size),
+  weekly_meeting_goal, channels_enabled (jsonb: {email, whatsapp, linkedin, forum}),
+  auto_send_rules (jsonb: per-channel thresholds),
+  voice_profile_id, status (active/paused), created_at
+
+lead_sources
+  id, campaign_id, source_type (apollo/apify/reddit/referral/manual),
+  query_payload (jsonb), last_run_at, contacts_found
+
+outreach_sequences
+  id, contact_id, campaign_id, current_step, status
+  (active/paused/replied/booked/unsubscribed/bounced), next_action_at
+
+outreach_touches
+  id, sequence_id, channel (email/whatsapp/sms/linkedin_draft/forum_draft),
+  step_number, status (drafted/awaiting_approval/sent/delivered/opened/replied/failed),
+  subject, body, personalization_notes, sent_at, reply_body, reply_sentiment
+
+voice_profiles
+  id, name, sample_messages (jsonb), tone_rules (text),
+  signature_block, do_not_say (text[]), created_at
+  (seed one profile called "Dylan" from 5–10 of his real past messages I'll paste in)
+
+blockers
+  id, campaign_id, contact_id (nullable), type, service, reason,
+  instructions_for_user, priority, status, created_at
+
+lead_scores
+  contact_id, campaign_id, score (0-100), score_breakdown (jsonb), scored_at
+
+==================================================
+THE DAILY AGENT LOOP
+==================================================
+For each active campaign, once per day:
+
+1. SOURCE: Pull new leads matching the persona from Apollo (primary) and any configured Apify actors. Deduplicate against existing contacts. Cap new leads per day per campaign (default 50) to keep volume sane.
+
+2. SCORE: For each new or stale lead, compute a 0–100 score. Factors: persona match strength, seniority, firm size/prestige, geographic fit, recency of relevant activity (LinkedIn posts, published articles, firm news), and whether they serve E-2 visa clients specifically. Claude generates the score with a rationale; store both.
+
+3. PLAN: Call Claude Sonnet 4.6 as the outreach strategist (system prompt below). Pass it: campaign goal, last 7 days of meetings booked, reply rates per channel, leads in each sequence stage, and today's top-scored leads. It returns a JSON array of today's actions — which leads to enter which sequences, which channel to use first, which replies need handling, which sequences to pause.
+
+4. EXECUTE: Dispatch each action:
+   - draft_first_touch → Claude writes a personalized first message as Dylan, grounded in something specific about the lead (recent post, firm specialty, shared connection). Saves as a touch with status="awaiting_approval" unless auto-send rules allow.
+   - draft_follow_up → Contextual follow-up referencing prior touches and any opens/clicks.
+   - handle_reply → Claude reads the reply, classifies sentiment (interested / objection / unsubscribe / out-of-office / cold), drafts a response, and updates the sequence. Positive replies ALWAYS surface to me before sending the meeting-booking message.
+   - book_meeting → When a lead signals interest, send the Calendly link with a warm handoff message in Dylan's voice.
+   - draft_forum_engagement → Find a thread where the lead asked a relevant question. Draft a GENUINELY helpful answer (not a pitch) with a soft signature. Always requires my approval — never auto-posts.
+   - draft_linkedin_message → Writes the DM text and pushes it to my "LinkedIn queue" for me to send manually from my own account.
+   - pause_sequence → For unsubscribes, bounces, clear no's.
+
+5. CRITIQUE: End-of-day, Claude reviews: which channels/personas/message angles are producing replies and meetings, which are dead, what to change tomorrow. Writes a retro to the campaign log and adjusts the next day's plan context.
+
+6. BLOCKER CHECK: If the planner needs something it doesn't have (Apollo credits depleted, WhatsApp template not approved, new geo needs local compliance review), it creates a blocker instead of failing.
+
+==================================================
+THE PLANNER SYSTEM PROMPT
+==================================================
+"You are Dylan's head of outreach at New Dawn Franchising. Your only goal is to book qualified Zoom meetings with prospects who could realistically refer E-2 visa franchise clients to Dylan. You think like a sharp BDR who deeply respects the recipient's time and inbox.
+
+Hard rules you will never break:
+- Every message must be genuinely personalized with something specific about the recipient — no mail-merge-flavored fake personalization
+- Every email must include a one-click unsubscribe and physical address (CAN-SPAM)
+- WhatsApp first touches must use an approved Business template; free-form only after they reply
+- No LinkedIn automation — draft only, human sends
+- No forum posts that are thinly-veiled ads — only substantive help, signature optional
+- No purchased/scraped lists from shady sources; Apollo or public web only
+- Never impersonate Dylan in a way that could mislead on material facts; the voice is his, but the content must be truthful
+- If a recipient asks to stop, the entire sequence pauses immediately across all channels
+
+Given the campaign state, recent performance, and today's top leads, return a JSON array of actions: [{action_type, contact_id, channel, rationale, expected_impact, payload}]. Prioritize reply-generating activity over volume. Return ONLY valid JSON."
+
+==================================================
+THE VOICE-OF-DYLAN SYSTEM PROMPT (for message drafting)
+==================================================
+"You are writing as Dylan, founder of New Dawn Franchising. You will receive 5–10 samples of his real writing — study the cadence, sentence length, vocabulary, and warmth. Match it. Dylan writes like a human, not a marketer: short sentences, specific details, occasional dry humor, no corporate filler.
+
+Banned phrases: 'I hope this email finds you well', 'reaching out', 'circle back', 'touch base', 'quick question', 'synergies', 'leverage', 'per my last email', 'just wanted to', any em-dash overuse, any 'It's not just X, it's Y' construction.
+
+Every first touch must:
+- Open with something specific to the recipient (a post, a case, a firm detail) — no generic opener
+- State the reason for writing in one sentence
+- Offer concrete value before asking for anything
+- End with a low-friction ask (a reply, not a meeting) — meetings come in touch 2 or 3
+- Include a real signature block with unsubscribe + mailing address
+- Be under 120 words
+
+Return JSON: {subject, body, personalization_hook, confidence_score, ymyl_flag}"
+
+==================================================
+HUMAN-IN-THE-LOOP UI (new sidebar: "Outreach Agent")
+==================================================
+- Campaigns list: goal, this week's booked meetings vs. target, reply rate, active sequences
+- Campaign detail: funnel (sourced → contacted → replied → booked), top-performing message angles, worst-performing
+- Approval inbox: all drafted touches awaiting my review, grouped by channel, with one-click approve / edit / reject / "approve all from this sequence"
+- Reply center: incoming replies with Claude's suggested response, sentiment tag, and recommended next action
+- LinkedIn queue: drafted DMs I need to copy-paste and send manually
+- Forum queue: drafted helpful answers I need to review before posting
+- Blockers inbox (shared with SEO agent): credentials, budget approvals, compliance questions
+- Voice profile editor: paste real Dylan samples, edit tone rules, preview generated messages
+- Kill switch: pauses all outbound across all campaigns instantly
+
+==================================================
+GUARDRAILS
+==================================================
+- Global send cap per day per channel (configurable; default: 40 emails, 15 WhatsApp, 0 LinkedIn auto-sends ever)
+- Per-contact cooldown: no more than one touch every 3 days, max 5 touches per sequence
+- Automatic suppression list: any unsubscribe, bounce, or "stop" reply blocks that contact from ALL future campaigns forever
+- Reply detection via SendGrid inbound parse webhook + Twilio webhooks — updates sequence state in real time
+- Every outbound email includes unsubscribe link + physical address
+- WhatsApp only sends during recipient's local business hours (use contact timezone)
+- Daily digest email to me: meetings booked, replies needing attention, drafts awaiting approval, blockers, top-performing messages
+- Audit log: every sourced lead, every draft, every send, every reply — fully queryable
+
+==================================================
+DELIVERABLES
+==================================================
+1. Full working agent integrated with the existing CRM schema
+2. One seeded campaign targeting UAE-based immigration attorneys serving E-2 clients, end-to-end demo flow
+3. Voice profile seeded with a placeholder I can overwrite with Dylan's real samples
+4. /test endpoint that runs the daily loop on demand for one campaign
+5. README: setup, required API keys, how to add a new channel, how to tune the voice profile
+
+Build it in this order: schema extension → lead sourcing + scoring → voice profile + first-touch drafter → approval inbox UI → daily planner loop → reply handling → WhatsApp channel → forum/LinkedIn draft queues → critique loop → digest email.

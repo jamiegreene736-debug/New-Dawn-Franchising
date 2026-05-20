@@ -168,37 +168,34 @@ function CartoonPerson({
 function HomepageVideoVisual({ isPlaying }: { isPlaying: boolean }) {
   return (
     <div
-      className={`overview-visual ${isPlaying ? "overview-visual-playing" : ""} relative min-h-[330px] overflow-hidden rounded-[1.75rem] border border-white/20 bg-black/25 shadow-2xl`}
+      className={`overview-visual ${isPlaying ? "overview-visual-playing" : ""} relative min-h-[245px] overflow-hidden rounded-[1.5rem] border border-white/20 bg-black/25 shadow-2xl md:min-h-[265px] lg:min-h-[285px]`}
     >
       {/* Hero thumbnail: a richer placeholder composition for the future custom video artwork. */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(255,255,255,.92),transparent_26%),linear-gradient(135deg,#e7eef8_0%,#fff8e7_44%,#d7eee7_100%)]" />
       <div className="absolute inset-0 opacity-50 nh-fine-grid" />
       <div className="absolute inset-x-0 bottom-0 h-28 bg-[linear-gradient(180deg,transparent,rgba(15,35,64,.35))]" />
-      <div className="absolute right-5 top-5 rounded-full border border-white/75 bg-white/85 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[hsl(var(--primary))] shadow-lg backdrop-blur">
-        30-Second Illustrated Overview
-      </div>
       <div className="absolute left-5 top-5 rounded-2xl border border-white/75 bg-white/85 p-4 text-[hsl(var(--primary))] shadow-xl backdrop-blur">
         <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/45">Owner control dashboard</div>
-        <div className="mt-3 grid grid-cols-3 gap-2">
+        <div className="mt-2 grid grid-cols-3 gap-2">
           {["Escrow", "10 contracts", "90 days"].map((label) => (
-            <div key={label} className="rounded-xl border bg-white/80 px-3 py-2 text-center shadow-sm">
+            <div key={label} className="rounded-xl border bg-white/80 px-2 py-1.5 text-center shadow-sm">
               <div className="mx-auto mb-1 h-1.5 w-8 rounded-full bg-[hsl(var(--accent))]" />
               <div className="text-[10px] font-semibold leading-tight">{label}</div>
             </div>
           ))}
         </div>
       </div>
-      <div className="absolute bottom-8 right-6 w-[46%] min-w-[210px] rounded-3xl border border-white/75 bg-[hsl(var(--primary))]/95 p-4 text-white shadow-2xl">
+      <div className="absolute bottom-14 right-5 w-[42%] min-w-[185px] rounded-2xl border border-white/75 bg-[hsl(var(--primary))]/95 p-3 text-white shadow-2xl">
         <div className="flex items-center justify-between gap-3">
           <div>
             <div className="text-[10px] uppercase tracking-[0.16em] text-white/50">Live operations</div>
             <div className="mt-1 text-sm font-semibold">Managed execution</div>
           </div>
-          <div className="grid size-10 place-items-center rounded-2xl bg-white/10">
-            <ShieldCheck className="size-5 text-[hsl(var(--accent))]" />
+          <div className="grid size-9 place-items-center rounded-2xl bg-white/10">
+            <ShieldCheck className="size-4 text-[hsl(var(--accent))]" />
           </div>
         </div>
-        <div className="mt-4 space-y-2">
+        <div className="mt-3 space-y-1.5">
           <div className="h-2 rounded-full bg-white/15"><div className="h-2 w-[86%] rounded-full bg-[hsl(var(--accent))]" /></div>
           <div className="h-2 rounded-full bg-white/15"><div className="h-2 w-[68%] rounded-full bg-emerald-400" /></div>
           <div className="h-2 rounded-full bg-white/15"><div className="h-2 w-[74%] rounded-full bg-sky-300" /></div>
@@ -210,8 +207,8 @@ function HomepageVideoVisual({ isPlaying }: { isPlaying: boolean }) {
           <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/45">Scene 1</div>
           <div className="mt-1 text-sm font-semibold">E-2 investor owns the franchise</div>
         </div>
-        <CartoonPerson className="bottom-24 left-16 overview-float" shirt="bg-[hsl(var(--primary))]" />
-        <div className="absolute bottom-28 left-32 h-28 w-40 rounded-2xl border border-white/75 bg-white/85 p-3 shadow-xl">
+        <CartoonPerson className="bottom-20 left-16 overview-float" shirt="bg-[hsl(var(--primary))]" />
+        <div className="absolute bottom-24 left-32 h-24 w-40 rounded-2xl border border-white/75 bg-white/85 p-3 shadow-xl">
           <div className="h-3 w-24 rounded-full bg-slate-300" />
           <div className="mt-3 h-2 w-full rounded-full bg-slate-200" />
           <div className="mt-2 h-2 w-4/5 rounded-full bg-slate-200" />
@@ -219,7 +216,7 @@ function HomepageVideoVisual({ isPlaying }: { isPlaying: boolean }) {
             OWNER CONTROL
           </div>
         </div>
-        <div className="absolute bottom-24 right-12 hidden rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-sm font-semibold text-[hsl(var(--primary))] shadow-xl sm:block">
+        <div className="absolute bottom-20 right-12 hidden rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-sm font-semibold text-[hsl(var(--primary))] shadow-xl sm:block">
           You own it
         </div>
       </div>
@@ -229,10 +226,10 @@ function HomepageVideoVisual({ isPlaying }: { isPlaying: boolean }) {
           <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/45">Scene 2</div>
           <div className="mt-1 text-sm font-semibold">Our team handles daily operations</div>
         </div>
-        <CartoonPerson className="bottom-24 left-10 overview-float" shirt="bg-emerald-500" />
-        <CartoonPerson className="bottom-24 left-24 overview-float-delayed" shirt="bg-sky-500" />
-        <CartoonPerson className="bottom-24 left-[9.5rem] overview-float" shirt="bg-amber-400" />
-        <div className="absolute bottom-24 right-8 hidden w-48 rounded-2xl border border-white/70 bg-[hsl(var(--primary))]/90 p-4 text-white shadow-xl sm:block">
+        <CartoonPerson className="bottom-20 left-10 overview-float" shirt="bg-emerald-500" />
+        <CartoonPerson className="bottom-20 left-24 overview-float-delayed" shirt="bg-sky-500" />
+        <CartoonPerson className="bottom-20 left-[9.5rem] overview-float" shirt="bg-amber-400" />
+        <div className="absolute bottom-20 right-8 hidden w-48 rounded-2xl border border-white/70 bg-[hsl(var(--primary))]/90 p-4 text-white shadow-xl sm:block">
           <div className="text-[10px] uppercase tracking-[0.16em] text-white/55">Operations board</div>
           <div className="mt-3 space-y-2">
             <div className="h-2 rounded-full bg-white/20"><div className="h-2 w-[82%] rounded-full bg-[hsl(var(--accent))]" /></div>
@@ -252,14 +249,14 @@ function HomepageVideoVisual({ isPlaying }: { isPlaying: boolean }) {
             <div
               key={`${row}-${col}`}
               className="absolute h-12 w-20 rounded-xl border border-white/75 bg-white/90 shadow-lg"
-              style={{ left: `${42 + col * 112}px`, bottom: `${98 + row * 22}px` }}
+              style={{ left: `${42 + col * 112}px`, bottom: `${82 + row * 18}px` }}
             >
               <div className="mx-auto mt-3 h-2 w-12 rounded-full bg-[hsl(var(--primary))]/25" />
               <div className="mx-auto mt-2 h-2 w-8 rounded-full bg-[hsl(var(--accent))]" />
             </div>
           )),
         )}
-        <div className="absolute bottom-24 right-10 grid size-24 place-items-center rounded-full border border-white/80 bg-[hsl(var(--primary))] text-center text-white shadow-2xl">
+        <div className="absolute bottom-20 right-10 grid size-24 place-items-center rounded-full border border-white/80 bg-[hsl(var(--primary))] text-center text-white shadow-2xl">
           <div>
             <div className="text-3xl font-bold text-[hsl(var(--accent))]">10</div>
             <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70">contracts</div>
@@ -272,15 +269,15 @@ function HomepageVideoVisual({ isPlaying }: { isPlaying: boolean }) {
           <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/45">Scene 4</div>
           <div className="mt-1 text-sm font-semibold">Escrow and replacement protections</div>
         </div>
-        <div className="absolute bottom-24 left-10 grid size-28 place-items-center rounded-3xl border border-white/75 bg-white/85 shadow-xl">
-          <ShieldCheck className="size-12 text-emerald-600" />
+        <div className="absolute bottom-20 left-10 grid size-24 place-items-center rounded-3xl border border-white/75 bg-white/85 shadow-xl">
+          <ShieldCheck className="size-10 text-emerald-600" />
         </div>
-        <div className="absolute bottom-32 left-40 rounded-2xl border border-white/75 bg-white/90 px-5 py-4 text-[hsl(var(--primary))] shadow-xl">
-          <div className="text-3xl font-bold text-[hsl(var(--accent))]">90</div>
+        <div className="absolute bottom-28 left-36 rounded-2xl border border-white/75 bg-white/90 px-4 py-3 text-[hsl(var(--primary))] shadow-xl">
+          <div className="text-2xl font-bold text-[hsl(var(--accent))]">90</div>
           <div className="text-xs font-semibold uppercase tracking-[0.14em] text-foreground/55">day replacement</div>
         </div>
-        <CartoonPerson className="bottom-24 right-28 overview-float" shirt="bg-[hsl(var(--primary))]" />
-        <CartoonPerson className="bottom-24 right-14 overview-float-delayed" shirt="bg-[hsl(var(--accent))]" />
+        <CartoonPerson className="bottom-20 right-28 overview-float" shirt="bg-[hsl(var(--primary))]" />
+        <CartoonPerson className="bottom-20 right-14 overview-float-delayed" shirt="bg-[hsl(var(--accent))]" />
       </div>
 
       <div className="absolute bottom-4 right-4 z-20">
@@ -292,7 +289,7 @@ function HomepageVideoVisual({ isPlaying }: { isPlaying: boolean }) {
           )}
         </div>
       </div>
-      <div className="absolute bottom-4 left-4 rounded-full border border-white/25 bg-black/40 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
+      <div className="absolute bottom-4 left-4 max-w-[calc(100%-6rem)] truncate rounded-full border border-white/25 bg-black/40 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
         Watch the illustrated 30-second overview
       </div>
     </div>
@@ -348,44 +345,63 @@ function HomepageVideoCard({ hero = false }: { hero?: boolean }) {
         className="group block w-full overflow-hidden rounded-[2rem] border border-white/80 bg-[hsl(var(--primary))] text-left shadow-2xl transition hover:-translate-y-0.5 hover:shadow-[0_30px_90px_rgba(15,23,42,0.30)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[hsl(var(--accent))]/40 disabled:cursor-wait"
         aria-label={isPlaying ? "Pause the 30-second illustrated overview" : "Play the 30-second illustrated overview"}
       >
-        <div className={`relative p-4 text-white md:p-6 ${hero ? "min-h-[620px]" : "min-h-[520px]"}`}>
+        <div className={`relative p-4 text-white md:p-5 ${hero ? "min-h-0" : "min-h-[520px]"}`}>
           <div className="absolute inset-0 opacity-25 nh-fine-grid" />
           <div className="absolute inset-x-0 top-0 h-36 bg-[linear-gradient(180deg,rgba(255,255,255,.16),transparent)]" />
           <div className="absolute right-5 top-5 z-20 rounded-full border border-white/20 bg-black/25 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/80 backdrop-blur md:hidden">
             {isPlaying ? "Playing" : "30-sec overview"}
           </div>
 
-          <div className="relative flex items-center justify-between">
+          <div className="relative flex items-start justify-between gap-4">
             <div>
-              <div className="text-xs uppercase tracking-[0.2em] text-white/55">30-Second Illustrated Overview</div>
-              <div className="mt-1 font-serif text-2xl text-white md:text-3xl">You Own It. You Direct It. We Run It.</div>
+              <div className="text-[11px] uppercase tracking-[0.2em] text-white/55">30-Second Illustrated Overview</div>
+              <div className="mt-1 font-serif text-2xl leading-tight text-white md:text-[1.75rem]">You Own It. You Direct It. We Run It.</div>
             </div>
-            <div className="grid size-12 place-items-center rounded-full border border-white/20 bg-white/10">
+            <div className="grid size-11 shrink-0 place-items-center rounded-full border border-white/20 bg-white/10">
               <Volume2 className="size-5 text-[hsl(var(--accent))]" />
             </div>
           </div>
 
-          <div className="mt-6">
+          <div className="mt-4">
             <HomepageVideoVisual isPlaying={isPlaying} />
           </div>
 
-          <div className="relative mt-5 grid gap-3 md:grid-cols-2">
-            {VIDEO_SCENES.map((scene, index) => (
-              <div
-                key={scene.time}
-                className={`rounded-2xl border border-white/15 bg-white/[0.08] p-4 backdrop-blur transition ${
-                  isPlaying ? "animate-[pulse_2.8s_ease-in-out_infinite]" : ""
-                }`}
-                style={{ animationDelay: `${index * 0.35}s` }}
-              >
-                <div className="text-xs font-semibold text-[hsl(var(--accent))]">{scene.time}</div>
-                <div className="mt-2 text-sm font-semibold">{scene.title}</div>
-                <div className="mt-2 text-xs leading-relaxed text-white/65">{scene.copy}</div>
-              </div>
-            ))}
-          </div>
+          {hero ? (
+            <div className="relative mt-4 grid grid-cols-2 gap-2 md:grid-cols-4">
+              {VIDEO_SCENES.map((scene, index) => (
+                <div
+                  key={scene.time}
+                  className={`min-w-0 rounded-xl border border-white/15 bg-white/[0.08] p-2.5 backdrop-blur transition ${
+                    isPlaying ? "animate-[pulse_2.8s_ease-in-out_infinite]" : ""
+                  }`}
+                  style={{ animationDelay: `${index * 0.35}s` }}
+                >
+                  <div className="text-[11px] font-semibold text-[hsl(var(--accent))]">{scene.time}</div>
+                  <div className="mt-1 truncate text-[11px] font-semibold leading-tight text-white/90">
+                    {scene.title}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="relative mt-5 grid gap-3 md:grid-cols-2">
+              {VIDEO_SCENES.map((scene, index) => (
+                <div
+                  key={scene.time}
+                  className={`rounded-2xl border border-white/15 bg-white/[0.08] p-4 backdrop-blur transition ${
+                    isPlaying ? "animate-[pulse_2.8s_ease-in-out_infinite]" : ""
+                  }`}
+                  style={{ animationDelay: `${index * 0.35}s` }}
+                >
+                  <div className="text-xs font-semibold text-[hsl(var(--accent))]">{scene.time}</div>
+                  <div className="mt-2 text-sm font-semibold">{scene.title}</div>
+                  <div className="mt-2 text-xs leading-relaxed text-white/65">{scene.copy}</div>
+                </div>
+              ))}
+            </div>
+          )}
 
-          <div className="relative mt-6 h-2 overflow-hidden rounded-full bg-white/15">
+          <div className="relative mt-4 h-2 overflow-hidden rounded-full bg-white/15">
             <div className={`h-full rounded-full bg-[hsl(var(--accent))] ${isPlaying ? "animate-[overview-progress_30s_linear_forwards]" : "w-[18%]"}`} />
           </div>
         </div>
@@ -556,9 +572,9 @@ export default function Home() {
         >
           <div className="absolute inset-0 -z-10 nh-hero-bg" />
           <div className="absolute inset-0 -z-10 opacity-60 nh-fine-grid" />
-          <div className="nh-container py-8 md:py-16 lg:py-20">
+          <div className="nh-container py-5 md:py-8 lg:py-10">
             {/* Redesigned hero: clearer conversion path on the left, video as the visual anchor on the right. */}
-            <div className="grid items-center gap-10 lg:grid-cols-[0.86fr_1.14fr] xl:gap-14">
+            <div className="grid items-start gap-8 lg:grid-cols-[0.9fr_1.1fr] xl:gap-12">
               <motion.div
                 initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -578,7 +594,7 @@ export default function Home() {
 
                 <h1
                   data-testid="text-hero-title"
-                  className="mt-6 text-balance text-4xl font-semibold leading-[1.02] tracking-tight md:text-6xl lg:text-7xl"
+                  className="mt-5 text-balance text-4xl font-semibold leading-[1.02] tracking-tight md:text-5xl lg:text-6xl"
                 >
                   You Own It.{" "}
                   <span className="bg-gradient-to-r from-[hsl(var(--primary))] via-[hsl(var(--primary))] to-[hsl(var(--accent))] bg-clip-text text-transparent">
@@ -589,12 +605,12 @@ export default function Home() {
 
                 <p
                   data-testid="text-hero-subtitle"
-                  className="mt-5 max-w-xl text-pretty text-base leading-relaxed text-muted-foreground md:text-lg"
+                  className="mt-4 max-w-xl text-pretty text-base leading-relaxed text-muted-foreground md:text-lg"
                 >
                   A property management franchise built for E-2 investors. You control the business and finances; our team handles daily operations so you can focus on ownership, growth, and visa compliance.
                 </p>
 
-                <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
                   <Button data-testid="button-hero-primary-fdd" size="lg" className="gap-2 bg-[hsl(var(--primary))] px-6 py-6 text-base shadow-xl shadow-[hsl(var(--primary))]/20 hover:bg-[hsl(var(--primary))]/92" asChild>
                     <a href="/contact">
                       Request Your Free FDD & Schedule a Call
@@ -609,7 +625,7 @@ export default function Home() {
                   </Button>
                 </div>
 
-                <div className="mt-5 flex flex-wrap gap-3 text-sm text-muted-foreground">
+                <div className="mt-4 flex flex-wrap gap-3 text-sm text-muted-foreground">
                   <a data-testid="button-hero-attorney" href="/contact?type=attorney" className="inline-flex items-center gap-1.5 font-medium text-[hsl(var(--primary))] hover:underline">
                     Immigration attorney inquiry <ArrowRight className="size-3.5" />
                   </a>
@@ -632,7 +648,7 @@ export default function Home() {
                   Franchise Disclosure Document (FDD) available upon request. New Dawn Franchising is a registered franchisor.
                 </p>
 
-                <div className="mt-7 grid gap-0 overflow-hidden rounded-2xl border bg-white/80 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/60 md:max-w-3xl md:grid-cols-3">
+                <div className="mt-5 grid gap-0 overflow-hidden rounded-2xl border bg-white/80 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/60 md:max-w-3xl md:grid-cols-3">
                   {[
                     {
                       id: "1",
@@ -650,7 +666,7 @@ export default function Home() {
                       title: "Your investment is returned from escrow",
                     },
                   ].map((item) => (
-                    <div key={item.id} className="border-b p-4 last:border-b-0 md:border-b-0 md:border-r md:last:border-r-0">
+                    <div key={item.id} className="border-b p-3.5 last:border-b-0 md:border-b-0 md:border-r md:last:border-r-0">
                       <div className="flex items-start gap-3">
                         <div className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-[hsl(var(--primary))]/8 text-[11px] font-bold text-[hsl(var(--primary))]">
                           {item.id}

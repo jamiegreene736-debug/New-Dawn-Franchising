@@ -400,54 +400,6 @@ function HomepageVideoCard({ hero = false }: { hero?: boolean }) {
   );
 }
 
-function ProtectionStrip() {
-  const items = [
-    {
-      title: "Your funds",
-      text: "Held in escrow until your E-2 visa is approved",
-      icon: <Landmark className="size-5" />,
-      tone: "bg-blue-50 text-blue-700 border-blue-100",
-    },
-    {
-      title: "Your business",
-      text: "Operational and earning before funds are released",
-      icon: <TrendingUp className="size-5" />,
-      tone: "bg-emerald-50 text-emerald-700 border-emerald-100",
-    },
-    {
-      title: "If your visa isn't approved",
-      text: "Your investment is returned from escrow",
-      icon: <RotateCcw className="size-5" />,
-      tone: "bg-amber-50 text-amber-700 border-amber-100",
-    },
-  ];
-
-  return (
-    <div data-testid="section-trust-strip" className="border-y bg-white/90 py-7 shadow-sm md:py-10">
-      <div className="nh-container">
-        <div className="mx-auto max-w-5xl">
-          <div className="grid gap-4 md:grid-cols-3">
-            {items.map((item) => (
-              <div key={item.title} className="flex items-start gap-4 rounded-2xl border bg-white p-5 shadow-sm">
-                <div className={`grid size-12 shrink-0 place-items-center rounded-2xl border ${item.tone}`}>
-                  {item.icon}
-                </div>
-                <div>
-                  <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{item.title}</div>
-                  <div className="mt-1 text-base font-semibold leading-snug text-foreground">{item.text}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-          <p className="mt-5 text-center text-sm text-muted-foreground">
-            Structured investment with built-in investor protection. Full details provided in the Franchise Disclosure Document.
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 const HOMEPAGE_TEAM = [
   {
     name: "Dylan Delaney",
@@ -680,40 +632,44 @@ export default function Home() {
                   Franchise Disclosure Document (FDD) available upon request. New Dawn Franchising is a registered franchisor.
                 </p>
 
-                <div className="mt-7 grid gap-3 rounded-2xl border bg-white/75 p-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/55 md:max-w-3xl md:grid-cols-3">
+                <div className="mt-7 grid gap-0 overflow-hidden rounded-2xl border bg-white/80 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/60 md:max-w-3xl md:grid-cols-3">
                   {[
                     {
                       id: "1",
-                      icon: <Wallet className="size-4 text-[hsl(var(--primary))]" />,
-                      title: "Financial control",
-                      desc: "Direct oversight of accounts and reporting.",
+                      label: "Your funds",
+                      title: "Held in escrow until your E-2 visa is approved",
                     },
                     {
                       id: "2",
-                      icon: <Building2 className="size-4 text-[hsl(var(--primary))]" />,
-                      title: "10-contract start",
-                      desc: "Initial long-term rental portfolio.",
+                      label: "Your business",
+                      title: "Operational and earning before funds are released",
                     },
                     {
                       id: "3",
-                      icon: <ClipboardCheck className="size-4 text-[hsl(var(--primary))]" />,
-                      title: "Managed daily ops",
-                      desc: "Territory manager handles execution.",
+                      label: "If your visa isn't approved",
+                      title: "Your investment is returned from escrow",
                     },
                   ].map((item) => (
-                    <div key={item.id} className="flex items-start gap-2.5 rounded-xl bg-white/60 p-3">
-                      <div className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg bg-[hsl(var(--primary))]/8">
-                        {item.icon}
-                      </div>
-                      <div>
-                        <div data-testid={`text-hero-proof-${item.id}`} className="text-sm font-semibold leading-tight">
-                          {item.title}
+                    <div key={item.id} className="border-b p-4 last:border-b-0 md:border-b-0 md:border-r md:last:border-r-0">
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-[hsl(var(--primary))]/8 text-[11px] font-bold text-[hsl(var(--primary))]">
+                          {item.id}
                         </div>
-                        <div className="mt-1 text-xs leading-snug text-muted-foreground">{item.desc}</div>
+                        <div>
+                          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                            {item.label}
+                          </div>
+                          <div data-testid={`text-hero-proof-${item.id}`} className="mt-1 text-sm font-semibold leading-snug">
+                            {item.title}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   ))}
                 </div>
+                <p className="mt-3 max-w-2xl text-xs text-muted-foreground/70">
+                  Structured investment with built-in investor protection. Full details provided in the Franchise Disclosure Document.
+                </p>
               </motion.div>
 
               <motion.div
@@ -729,7 +685,6 @@ export default function Home() {
           </div>
         </section>
 
-        <ProtectionStrip />
         <HomepageTeamRow />
 
         {/* ── Embassy Wait Time Checker ── */}

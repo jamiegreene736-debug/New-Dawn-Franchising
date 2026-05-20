@@ -421,19 +421,43 @@ const HOMEPAGE_TEAM = [
     name: "Dylan Delaney",
     role: "Founding Member",
     focus: "Franchise development and investor launch",
+    bullets: [
+      "Founding member leading franchise development and investor launch",
+      "Guides entity setup, territory selection, FDD review, and operational kickoff",
+      "Texas SMB experience across sales, business development, and investment",
+      "Direct point of contact for investors, attorneys, and territory partners",
+    ],
     image: "/dylan-headshot.png",
+    imageClass: "object-[center_8%]",
+    imageOverlay: "from-slate-950/10 via-transparent to-[hsl(var(--primary))]/20",
   },
   {
     name: "Chris von Pohlot",
     role: "Managing Director",
     focus: "Alternative finance, real estate, and capital markets",
-    image: "/chris-von-pohlot.jpg",
+    bullets: [
+      "Columbia University-educated fintech entrepreneur",
+      "Founder of Altbanc, an alternative lending platform for SMB debt refinancing",
+      "Real estate acquisitions and asset management experience at The Bascom Group",
+      "Capital markets background with financial analysis experience at Eastdil Secured",
+    ],
+    image: "/chris-von-pohlot-pro.jpg",
+    imageClass: "object-[center_30%] saturate-[1.06] contrast-[1.04]",
+    imageOverlay: "from-emerald-950/10 via-transparent to-[hsl(var(--primary))]/18",
   },
   {
     name: "Tom Meister",
     role: "Founding Member",
     focus: "Fintech, specialty finance, and legal strategy",
-    image: "/tom-meister.jpg",
+    bullets: [
+      "Attorney, entrepreneur, and investor across capital markets and fintech",
+      "Began his legal career at Wilson Sonsini and Goodwin Procter",
+      "Executive roles at Funding Circle, NepFin, and Zilch; two reached unicorn status",
+      "Leads Grizzly Peak Ventures and co-founded Brightpoint Law, LLP",
+    ],
+    image: "/tom-meister-pro.jpg",
+    imageClass: "object-[center_26%] saturate-[0.98] contrast-[1.07]",
+    imageOverlay: "from-amber-950/10 via-transparent to-[hsl(var(--primary))]/20",
   },
 ];
 
@@ -455,19 +479,28 @@ function HomepageTeamRow() {
 
         <div className="mt-8 grid gap-4 md:grid-cols-3">
           {HOMEPAGE_TEAM.map((member) => (
-            <div key={member.name} className="overflow-hidden rounded-3xl border bg-white shadow-sm">
-              <div className="aspect-[4/3] overflow-hidden bg-[hsl(var(--primary))]">
+            <div key={member.name} className="group overflow-hidden rounded-3xl border bg-white shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-xl">
+              <div className="relative aspect-[4/3] overflow-hidden bg-[hsl(var(--primary))]">
                 <img
                   src={member.image}
                   alt={`${member.name} — ${member.role}`}
-                  className="h-full w-full object-cover object-center transition duration-500 hover:scale-105"
+                  className={`h-full w-full object-cover transition duration-500 group-hover:scale-[1.035] ${member.imageClass}`}
                   loading="lazy"
                 />
+                <div className={`pointer-events-none absolute inset-0 bg-gradient-to-t ${member.imageOverlay}`} />
               </div>
               <div className="p-5">
                 <div className="text-lg font-semibold">{member.name}</div>
                 <div className="mt-1 text-sm font-medium text-[hsl(var(--primary))]">{member.role}</div>
                 <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{member.focus}</p>
+                <ul className="mt-4 space-y-2 border-t pt-4">
+                  {member.bullets.map((bullet) => (
+                    <li key={bullet} className="flex gap-2 text-[13px] leading-snug text-foreground/75">
+                      <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-[hsl(var(--accent))]" />
+                      <span>{bullet}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             </div>
           ))}

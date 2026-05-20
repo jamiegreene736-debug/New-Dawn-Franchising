@@ -168,19 +168,50 @@ function CartoonPerson({
 function HomepageVideoVisual({ isPlaying }: { isPlaying: boolean }) {
   return (
     <div
-      className={`overview-visual ${isPlaying ? "overview-visual-playing" : ""} relative min-h-[270px] overflow-hidden rounded-3xl border border-white/15 bg-black/25 shadow-2xl`}
+      className={`overview-visual ${isPlaying ? "overview-visual-playing" : ""} relative min-h-[330px] overflow-hidden rounded-[1.75rem] border border-white/20 bg-black/25 shadow-2xl`}
     >
-      <div className="absolute inset-0 bg-[linear-gradient(135deg,#dfe9f3_0%,#fff8e8_48%,#d8efe6_100%)]" />
-      <div className="absolute inset-0 opacity-60 nh-fine-grid" />
-      <div className="absolute inset-x-0 bottom-0 h-20 bg-[linear-gradient(180deg,transparent,rgba(16,42,70,.32))]" />
+      {/* Hero thumbnail: a richer placeholder composition for the future custom video artwork. */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(255,255,255,.92),transparent_26%),linear-gradient(135deg,#e7eef8_0%,#fff8e7_44%,#d7eee7_100%)]" />
+      <div className="absolute inset-0 opacity-50 nh-fine-grid" />
+      <div className="absolute inset-x-0 bottom-0 h-28 bg-[linear-gradient(180deg,transparent,rgba(15,35,64,.35))]" />
+      <div className="absolute right-5 top-5 rounded-full border border-white/75 bg-white/85 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[hsl(var(--primary))] shadow-lg backdrop-blur">
+        30-Second Illustrated Overview
+      </div>
+      <div className="absolute left-5 top-5 rounded-2xl border border-white/75 bg-white/85 p-4 text-[hsl(var(--primary))] shadow-xl backdrop-blur">
+        <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/45">Owner control dashboard</div>
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          {["Escrow", "10 contracts", "90 days"].map((label) => (
+            <div key={label} className="rounded-xl border bg-white/80 px-3 py-2 text-center shadow-sm">
+              <div className="mx-auto mb-1 h-1.5 w-8 rounded-full bg-[hsl(var(--accent))]" />
+              <div className="text-[10px] font-semibold leading-tight">{label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="absolute bottom-8 right-6 w-[46%] min-w-[210px] rounded-3xl border border-white/75 bg-[hsl(var(--primary))]/95 p-4 text-white shadow-2xl">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.16em] text-white/50">Live operations</div>
+            <div className="mt-1 text-sm font-semibold">Managed execution</div>
+          </div>
+          <div className="grid size-10 place-items-center rounded-2xl bg-white/10">
+            <ShieldCheck className="size-5 text-[hsl(var(--accent))]" />
+          </div>
+        </div>
+        <div className="mt-4 space-y-2">
+          <div className="h-2 rounded-full bg-white/15"><div className="h-2 w-[86%] rounded-full bg-[hsl(var(--accent))]" /></div>
+          <div className="h-2 rounded-full bg-white/15"><div className="h-2 w-[68%] rounded-full bg-emerald-400" /></div>
+          <div className="h-2 rounded-full bg-white/15"><div className="h-2 w-[74%] rounded-full bg-sky-300" /></div>
+        </div>
+      </div>
 
       <div className="overview-scene overview-scene-1 absolute inset-0">
-        <div className="absolute left-6 top-6 rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-[hsl(var(--primary))] shadow-xl backdrop-blur">
+        <div className="absolute bottom-8 left-6 rounded-2xl border border-white/70 bg-white/85 px-4 py-3 text-[hsl(var(--primary))] shadow-xl backdrop-blur">
           <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/45">Scene 1</div>
           <div className="mt-1 text-sm font-semibold">E-2 investor owns the franchise</div>
         </div>
-        <CartoonPerson className="bottom-8 left-12 overview-float" shirt="bg-[hsl(var(--primary))]" />
-        <div className="absolute bottom-16 left-28 h-28 w-40 rounded-2xl border border-white/75 bg-white/85 p-3 shadow-xl">
+        <CartoonPerson className="bottom-24 left-16 overview-float" shirt="bg-[hsl(var(--primary))]" />
+        <div className="absolute bottom-28 left-32 h-28 w-40 rounded-2xl border border-white/75 bg-white/85 p-3 shadow-xl">
           <div className="h-3 w-24 rounded-full bg-slate-300" />
           <div className="mt-3 h-2 w-full rounded-full bg-slate-200" />
           <div className="mt-2 h-2 w-4/5 rounded-full bg-slate-200" />
@@ -188,20 +219,20 @@ function HomepageVideoVisual({ isPlaying }: { isPlaying: boolean }) {
             OWNER CONTROL
           </div>
         </div>
-        <div className="absolute bottom-8 right-12 rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-sm font-semibold text-[hsl(var(--primary))] shadow-xl">
+        <div className="absolute bottom-24 right-12 hidden rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-sm font-semibold text-[hsl(var(--primary))] shadow-xl sm:block">
           You own it
         </div>
       </div>
 
       <div className="overview-scene overview-scene-2 absolute inset-0">
-        <div className="absolute left-6 top-6 rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-[hsl(var(--primary))] shadow-xl backdrop-blur">
+        <div className="absolute bottom-8 left-6 rounded-2xl border border-white/70 bg-white/85 px-4 py-3 text-[hsl(var(--primary))] shadow-xl backdrop-blur">
           <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/45">Scene 2</div>
           <div className="mt-1 text-sm font-semibold">Our team handles daily operations</div>
         </div>
-        <CartoonPerson className="bottom-8 left-10 overview-float" shirt="bg-emerald-500" />
-        <CartoonPerson className="bottom-8 left-24 overview-float-delayed" shirt="bg-sky-500" />
-        <CartoonPerson className="bottom-8 left-[9.5rem] overview-float" shirt="bg-amber-400" />
-        <div className="absolute bottom-14 right-8 w-48 rounded-2xl border border-white/70 bg-[hsl(var(--primary))]/90 p-4 text-white shadow-xl">
+        <CartoonPerson className="bottom-24 left-10 overview-float" shirt="bg-emerald-500" />
+        <CartoonPerson className="bottom-24 left-24 overview-float-delayed" shirt="bg-sky-500" />
+        <CartoonPerson className="bottom-24 left-[9.5rem] overview-float" shirt="bg-amber-400" />
+        <div className="absolute bottom-24 right-8 hidden w-48 rounded-2xl border border-white/70 bg-[hsl(var(--primary))]/90 p-4 text-white shadow-xl sm:block">
           <div className="text-[10px] uppercase tracking-[0.16em] text-white/55">Operations board</div>
           <div className="mt-3 space-y-2">
             <div className="h-2 rounded-full bg-white/20"><div className="h-2 w-[82%] rounded-full bg-[hsl(var(--accent))]" /></div>
@@ -212,7 +243,7 @@ function HomepageVideoVisual({ isPlaying }: { isPlaying: boolean }) {
       </div>
 
       <div className="overview-scene overview-scene-3 absolute inset-0">
-        <div className="absolute left-6 top-6 rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-[hsl(var(--primary))] shadow-xl backdrop-blur">
+        <div className="absolute bottom-8 left-6 rounded-2xl border border-white/70 bg-white/85 px-4 py-3 text-[hsl(var(--primary))] shadow-xl backdrop-blur">
           <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/45">Scene 3</div>
           <div className="mt-1 text-sm font-semibold">10 starting management contracts</div>
         </div>
@@ -221,14 +252,14 @@ function HomepageVideoVisual({ isPlaying }: { isPlaying: boolean }) {
             <div
               key={`${row}-${col}`}
               className="absolute h-12 w-20 rounded-xl border border-white/75 bg-white/90 shadow-lg"
-              style={{ left: `${42 + col * 112}px`, bottom: `${34 + row * 22}px` }}
+              style={{ left: `${42 + col * 112}px`, bottom: `${98 + row * 22}px` }}
             >
               <div className="mx-auto mt-3 h-2 w-12 rounded-full bg-[hsl(var(--primary))]/25" />
               <div className="mx-auto mt-2 h-2 w-8 rounded-full bg-[hsl(var(--accent))]" />
             </div>
           )),
         )}
-        <div className="absolute bottom-10 right-10 grid size-24 place-items-center rounded-full border border-white/80 bg-[hsl(var(--primary))] text-center text-white shadow-2xl">
+        <div className="absolute bottom-24 right-10 grid size-24 place-items-center rounded-full border border-white/80 bg-[hsl(var(--primary))] text-center text-white shadow-2xl">
           <div>
             <div className="text-3xl font-bold text-[hsl(var(--accent))]">10</div>
             <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70">contracts</div>
@@ -237,27 +268,31 @@ function HomepageVideoVisual({ isPlaying }: { isPlaying: boolean }) {
       </div>
 
       <div className="overview-scene overview-scene-4 absolute inset-0">
-        <div className="absolute left-6 top-6 rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-[hsl(var(--primary))] shadow-xl backdrop-blur">
+        <div className="absolute bottom-8 left-6 rounded-2xl border border-white/70 bg-white/85 px-4 py-3 text-[hsl(var(--primary))] shadow-xl backdrop-blur">
           <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/45">Scene 4</div>
           <div className="mt-1 text-sm font-semibold">Escrow and replacement protections</div>
         </div>
-        <div className="absolute bottom-10 left-10 grid size-28 place-items-center rounded-3xl border border-white/75 bg-white/85 shadow-xl">
+        <div className="absolute bottom-24 left-10 grid size-28 place-items-center rounded-3xl border border-white/75 bg-white/85 shadow-xl">
           <ShieldCheck className="size-12 text-emerald-600" />
         </div>
-        <div className="absolute bottom-16 left-40 rounded-2xl border border-white/75 bg-white/90 px-5 py-4 text-[hsl(var(--primary))] shadow-xl">
+        <div className="absolute bottom-32 left-40 rounded-2xl border border-white/75 bg-white/90 px-5 py-4 text-[hsl(var(--primary))] shadow-xl">
           <div className="text-3xl font-bold text-[hsl(var(--accent))]">90</div>
           <div className="text-xs font-semibold uppercase tracking-[0.14em] text-foreground/55">day replacement</div>
         </div>
-        <CartoonPerson className="bottom-8 right-28 overview-float" shirt="bg-[hsl(var(--primary))]" />
-        <CartoonPerson className="bottom-8 right-14 overview-float-delayed" shirt="bg-[hsl(var(--accent))]" />
+        <CartoonPerson className="bottom-24 right-28 overview-float" shirt="bg-[hsl(var(--primary))]" />
+        <CartoonPerson className="bottom-24 right-14 overview-float-delayed" shirt="bg-[hsl(var(--accent))]" />
       </div>
 
       <div className="absolute inset-0 grid place-items-center">
-        <div className="grid size-20 place-items-center rounded-full border border-white/50 bg-white/20 shadow-[0_0_0_12px_rgba(255,255,255,0.10)] backdrop-blur transition group-hover:scale-105">
-          {isPlaying ? <Pause className="size-9 fill-white text-white" /> : <Play className="ml-1 size-9 fill-white text-white" />}
+        <div className="grid size-24 place-items-center rounded-full bg-white shadow-[0_0_0_12px_rgba(255,255,255,0.35),0_24px_80px_rgba(185,28,28,0.38)] ring-1 ring-black/5 transition group-hover:scale-105 md:size-28">
+          {isPlaying ? (
+            <Pause className="size-10 fill-[hsl(var(--primary))] text-[hsl(var(--primary))]" />
+          ) : (
+            <span className="ml-1 block h-0 w-0 border-y-[16px] border-l-[25px] border-y-transparent border-l-red-600 md:border-y-[19px] md:border-l-[30px]" />
+          )}
         </div>
       </div>
-      <div className="absolute bottom-4 left-4 rounded-full border border-white/20 bg-black/35 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
+      <div className="absolute bottom-4 left-4 rounded-full border border-white/25 bg-black/40 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
         Watch the illustrated 30-second overview
       </div>
     </div>
@@ -310,18 +345,19 @@ function HomepageVideoCard({ hero = false }: { hero?: boolean }) {
         data-testid={hero ? "hero-video-preview-card" : "video-preview-card"}
         onClick={togglePlayback}
         disabled={status === "loading"}
-        className="group block w-full overflow-hidden rounded-[2rem] border border-white/70 bg-[hsl(var(--primary))] text-left shadow-2xl transition hover:-translate-y-0.5 hover:shadow-[0_30px_80px_rgba(15,23,42,0.26)] disabled:cursor-wait"
+        className="group block w-full overflow-hidden rounded-[2rem] border border-white/80 bg-[hsl(var(--primary))] text-left shadow-2xl transition hover:-translate-y-0.5 hover:shadow-[0_30px_90px_rgba(15,23,42,0.30)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[hsl(var(--accent))]/40 disabled:cursor-wait"
+        aria-label={isPlaying ? "Pause the 30-second illustrated overview" : "Play the 30-second illustrated overview"}
       >
-        <div className={`relative p-4 text-white md:p-6 ${hero ? "min-h-[560px]" : "min-h-[520px]"}`}>
+        <div className={`relative p-4 text-white md:p-6 ${hero ? "min-h-[620px]" : "min-h-[520px]"}`}>
           <div className="absolute inset-0 opacity-25 nh-fine-grid" />
           <div className="absolute inset-x-0 top-0 h-36 bg-[linear-gradient(180deg,rgba(255,255,255,.16),transparent)]" />
-          <div className="absolute right-5 top-5 z-20 rounded-full border border-white/20 bg-black/25 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/80 backdrop-blur">
-            {isPlaying ? "Playing" : "Video overview"}
+          <div className="absolute right-5 top-5 z-20 rounded-full border border-white/20 bg-black/25 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/80 backdrop-blur md:hidden">
+            {isPlaying ? "Playing" : "30-sec overview"}
           </div>
 
           <div className="relative flex items-center justify-between">
             <div>
-              <div className="text-xs uppercase tracking-[0.2em] text-white/55">New Dawn Franchising</div>
+              <div className="text-xs uppercase tracking-[0.2em] text-white/55">30-Second Illustrated Overview</div>
               <div className="mt-1 font-serif text-2xl text-white md:text-3xl">You Own It. You Direct It. We Run It.</div>
             </div>
             <div className="grid size-12 place-items-center rounded-full border border-white/20 bg-white/10">
@@ -528,8 +564,9 @@ export default function Home() {
         >
           <div className="absolute inset-0 -z-10 nh-hero-bg" />
           <div className="absolute inset-0 -z-10 opacity-60 nh-fine-grid" />
-          <div className="nh-container py-4 md:py-14">
-            <div className="grid items-start gap-10 lg:grid-cols-[0.82fr_1.18fr]">
+          <div className="nh-container py-8 md:py-16 lg:py-20">
+            {/* Redesigned hero: clearer conversion path on the left, video as the visual anchor on the right. */}
+            <div className="grid items-center gap-10 lg:grid-cols-[0.86fr_1.14fr] xl:gap-14">
               <motion.div
                 initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -542,15 +579,6 @@ export default function Home() {
                   <Pill testId="pill-focus">
                     <Globe2 className="size-4 text-foreground/70" /> E-2 investor focus
                   </Pill>
-                  <Pill testId="pill-model">
-                    <ShieldCheck className="size-4 text-foreground/70" /> We manage operations
-                  </Pill>
-                  <Pill testId="pill-live-anywhere">
-                    <Plane className="size-4 text-foreground/70" /> Live anywhere
-                  </Pill>
-                  <Pill testId="pill-ai">
-                    <Bot className="size-4 text-foreground/70" /> Proprietary technology
-                  </Pill>
                   <Pill testId="pill-spanish">
                     <Globe2 className="size-4 text-foreground/70" /> <span lang="es">Hablamos Español</span>
                   </Pill>
@@ -558,7 +586,7 @@ export default function Home() {
 
                 <h1
                   data-testid="text-hero-title"
-                  className="mt-6 text-balance text-4xl font-semibold leading-[1.05] tracking-tight md:text-6xl"
+                  className="mt-6 text-balance text-4xl font-semibold leading-[1.02] tracking-tight md:text-6xl lg:text-7xl"
                 >
                   You Own It.{" "}
                   <span className="bg-gradient-to-r from-[hsl(var(--primary))] via-[hsl(var(--primary))] to-[hsl(var(--accent))] bg-clip-text text-transparent">
@@ -571,30 +599,34 @@ export default function Home() {
                   data-testid="text-hero-subtitle"
                   className="mt-5 max-w-xl text-pretty text-base leading-relaxed text-muted-foreground md:text-lg"
                 >
-                  New Dawn Franchising is a property management franchise built specifically for E-2 visa investors. You maintain full control of your bank accounts and all business decisions — while our team handles the daily operational workload so you can focus on leading and growing your enterprise, exactly as the E-2 visa requires.
+                  A property management franchise built for E-2 investors. You control the business and finances; our team handles daily operations so you can focus on ownership, growth, and visa compliance.
                 </p>
 
-                <div className="mt-7 flex flex-col gap-2">
-                  <div className="text-xs font-semibold uppercase tracking-[0.16em] text-foreground/50">Who are you?</div>
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                    <Button data-testid="button-hero-investor" className="gap-2" asChild>
-                      <a href="/contact">
-                        I'm an Investor
-                        <ArrowRight className="size-4" />
-                      </a>
-                    </Button>
-                    <Button data-testid="button-hero-attorney" variant="secondary" className="gap-2" asChild>
-                      <a href="/contact?type=attorney">
-                        I'm an Immigration Attorney
-                        <ArrowRight className="size-4" />
-                      </a>
-                    </Button>
-                  </div>
+                <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <Button data-testid="button-hero-primary-fdd" size="lg" className="gap-2 bg-[hsl(var(--primary))] px-6 py-6 text-base shadow-xl shadow-[hsl(var(--primary))]/20 hover:bg-[hsl(var(--primary))]/92" asChild>
+                    <a href="/contact">
+                      Request Your Free FDD & Schedule a Call
+                      <ArrowRight className="size-5" />
+                    </a>
+                  </Button>
+                  <Button data-testid="button-hero-dylan-call" size="lg" variant="secondary" className="gap-2 px-6 py-6 text-base" asChild>
+                    <a href="https://calendly.com/dylan-newdawnfranchising" target="_blank" rel="noopener noreferrer">
+                      Schedule with Dylan
+                      <CalendarCheck className="size-5" />
+                    </a>
+                  </Button>
+                </div>
+
+                <div className="mt-5 flex flex-wrap gap-3 text-sm text-muted-foreground">
+                  <a data-testid="button-hero-attorney" href="/contact?type=attorney" className="inline-flex items-center gap-1.5 font-medium text-[hsl(var(--primary))] hover:underline">
+                    Immigration attorney inquiry <ArrowRight className="size-3.5" />
+                  </a>
+                  <span className="hidden text-muted-foreground/40 sm:inline">•</span>
                   <Button
                     data-testid="button-hero-brochure"
                     variant="ghost"
                     size="sm"
-                    className="mt-1 w-fit gap-2 text-muted-foreground"
+                    className="h-auto w-fit gap-2 p-0 text-muted-foreground hover:bg-transparent hover:text-[hsl(var(--primary))]"
                     asChild
                   >
                     <a href="/api/brochure" download>
@@ -608,7 +640,7 @@ export default function Home() {
                   Franchise Disclosure Document (FDD) available upon request. New Dawn Franchising is a registered franchisor.
                 </p>
 
-                <div className="mt-6 grid gap-3 rounded-2xl border bg-white/70 p-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/50 md:max-w-3xl md:grid-cols-3">
+                <div className="mt-7 grid gap-3 rounded-2xl border bg-white/75 p-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/55 md:max-w-3xl md:grid-cols-3">
                   {[
                     {
                       id: "1",
@@ -619,8 +651,8 @@ export default function Home() {
                     {
                       id: "2",
                       icon: <Building2 className="size-4 text-[hsl(var(--primary))]" />,
-                      title: "Portfolio-first",
-                      desc: "~10 long-term rental contracts per territory rep.",
+                      title: "10-contract start",
+                      desc: "Initial long-term rental portfolio.",
                     },
                     {
                       id: "3",
@@ -648,7 +680,7 @@ export default function Home() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.7, ease: "easeOut", delay: 0.05 }}
-                className="relative order-first lg:order-none"
+                className="relative"
               >
                 <HomepageVideoCard hero />
                 <div className="pointer-events-none absolute -inset-6 -z-10 rounded-[2.5rem] bg-gradient-to-tr from-[hsl(var(--accent))]/15 via-transparent to-[hsl(var(--primary))]/15 blur-2xl" />

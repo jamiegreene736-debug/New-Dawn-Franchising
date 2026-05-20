@@ -185,7 +185,7 @@ function HomepageVideoVisual({ isPlaying }: { isPlaying: boolean }) {
           ))}
         </div>
       </div>
-      <div className="absolute bottom-14 right-5 w-[42%] min-w-[185px] rounded-2xl border border-white/75 bg-[hsl(var(--primary))]/95 p-3 text-white shadow-2xl">
+      <div className="absolute bottom-12 right-5 w-[38%] min-w-[160px] rounded-2xl border border-white/65 bg-[hsl(var(--primary))]/90 p-3 text-white shadow-2xl">
         <div className="flex items-center justify-between gap-3">
           <div>
             <div className="text-[10px] uppercase tracking-[0.16em] text-white/50">Live operations</div>
@@ -212,12 +212,6 @@ function HomepageVideoVisual({ isPlaying }: { isPlaying: boolean }) {
           <div className="h-3 w-24 rounded-full bg-slate-300" />
           <div className="mt-3 h-2 w-full rounded-full bg-slate-200" />
           <div className="mt-2 h-2 w-4/5 rounded-full bg-slate-200" />
-          <div className="mt-4 inline-flex rounded-full bg-[hsl(var(--accent))] px-3 py-1 text-[10px] font-bold text-[hsl(var(--primary))]">
-            VISA-READY BUSINESS
-          </div>
-        </div>
-        <div className="absolute bottom-20 right-12 hidden rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-sm font-semibold text-[hsl(var(--primary))] shadow-xl sm:block">
-          Family pathway
         </div>
       </div>
 

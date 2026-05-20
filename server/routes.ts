@@ -73,7 +73,7 @@ const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "dylan@newdawnfranchising.com").
 const ADMIN_PASSWORD = (process.env.ADMIN_PASSWORD || "NewHorizons@12").trim();
 
 const HOMEPAGE_OVERVIEW_VOICEOVER =
-  "New Dawn Franchising was built for E-2 visa investors. You own the business, control the finances, and direct the strategy, while our team handles daily property management operations. Your Texas franchise starts with ten long-term rental management contracts, plus escrow protection and a ninety day contract replacement guarantee. With senior leadership across real estate, finance, law, and proprietary AI technology, New Dawn gives you a structured path to live anywhere in the United States while building a real operating business.";
+  "New Dawn Franchising is a property management franchise built for qualified E-2 investors who want to live and work in the United States with their families. We provide a starting portfolio of ten long-term rental management contracts. You own and direct the business; our proprietary AI technology helps you expand while our team handles the day-to-day operations. Escrow protections support your investment through the visa process. Inquire today to build a real operating franchise and live and work anywhere in the USA.";
 
 function getElevenLabsConfig() {
   const apiKey =

@@ -129,23 +129,23 @@ function FeatureCard({
 const VIDEO_SCENES = [
   {
     time: "0:00",
-    title: "E-2 visa pathway",
-    copy: "A U.S. property management franchise designed for qualified treaty investors and their families.",
+    title: "E-2 property management franchise",
+    copy: "A real U.S. business path for qualified investors and their families.",
   },
   {
     time: "0:06",
-    title: "Launch with operations support",
-    copy: "Your franchise is set up with systems, reporting, and a territory representative from day one.",
+    title: "10 long-term contracts provided",
+    copy: "We provide a starting portfolio of 10 long-term rental management contracts.",
   },
   {
     time: "0:13",
-    title: "10-contract starting portfolio",
-    copy: "Each franchise territory starts with 10 long-term rental management contracts.",
+    title: "AI-powered franchise growth",
+    copy: "Our proprietary AI technology helps you expand your franchise over time.",
   },
   {
     time: "0:20",
-    title: "Escrow-backed protections",
-    copy: "Investor safeguards, replacement support, and senior leadership across real estate, finance, law, and AI.",
+    title: "We handle daily operations",
+    copy: "You own and direct the business while our team manages the day-to-day work.",
   },
 ];
 
@@ -633,6 +633,9 @@ export default function Home() {
                   </Pill>
                   <Pill testId="pill-spanish">
                     <Globe2 className="size-4 text-foreground/70" /> <span lang="es">Hablamos Español</span>
+                  </Pill>
+                  <Pill testId="pill-network-contracts">
+                    <Building2 className="size-4 text-foreground/70" /> 300+ contracts under network management
                   </Pill>
                 </div>
 

@@ -283,12 +283,12 @@ function HomepageVideoVisual({ isPlaying }: { isPlaying: boolean }) {
         <CartoonPerson className="bottom-24 right-14 overview-float-delayed" shirt="bg-[hsl(var(--accent))]" />
       </div>
 
-      <div className="absolute inset-0 grid place-items-center">
-        <div className="grid size-24 place-items-center rounded-full bg-white shadow-[0_0_0_12px_rgba(255,255,255,0.35),0_24px_80px_rgba(185,28,28,0.38)] ring-1 ring-black/5 transition group-hover:scale-105 md:size-28">
+      <div className="absolute bottom-4 right-4 z-20">
+        <div className="grid size-14 place-items-center rounded-full bg-white shadow-[0_0_0_6px_rgba(255,255,255,0.28),0_14px_36px_rgba(185,28,28,0.28)] ring-1 ring-black/5 transition group-hover:scale-105 md:size-16">
           {isPlaying ? (
-            <Pause className="size-10 fill-[hsl(var(--primary))] text-[hsl(var(--primary))]" />
+            <Pause className="size-6 fill-[hsl(var(--primary))] text-[hsl(var(--primary))] md:size-7" />
           ) : (
-            <span className="ml-1 block h-0 w-0 border-y-[16px] border-l-[25px] border-y-transparent border-l-red-600 md:border-y-[19px] md:border-l-[30px]" />
+            <span className="ml-0.5 block h-0 w-0 border-y-[9px] border-l-[15px] border-y-transparent border-l-red-600 md:border-y-[11px] md:border-l-[18px]" />
           )}
         </div>
       </div>

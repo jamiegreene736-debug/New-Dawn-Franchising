@@ -362,7 +362,18 @@ function HomepageVideoCard({ hero = false }: { hero?: boolean }) {
             </div>
           </div>
 
-          <div className="mt-4">
+          <div className="relative mt-3 grid gap-2 sm:grid-cols-2">
+            <div className="flex items-center gap-2 rounded-xl border border-white/15 bg-white/[0.08] px-3 py-2 text-xs font-semibold text-white/85 backdrop-blur">
+              <Building2 className="size-4 shrink-0 text-[hsl(var(--accent))]" />
+              <span>Property management franchise</span>
+            </div>
+            <div className="flex items-center gap-2 rounded-xl border border-white/15 bg-white/[0.08] px-3 py-2 text-xs font-semibold text-white/85 backdrop-blur">
+              <Users className="size-4 shrink-0 text-[hsl(var(--accent))]" />
+              <span>E-2 pathway for your family</span>
+            </div>
+          </div>
+
+          <div className="mt-3">
             <HomepageVideoVisual isPlaying={isPlaying} />
           </div>
 
@@ -640,7 +651,7 @@ export default function Home() {
                   data-testid="text-hero-subtitle"
                   className="mt-4 max-w-xl text-pretty text-base leading-relaxed text-muted-foreground md:text-lg"
                 >
-                  A property management franchise built for E-2 investors. You control the business and finances; our team handles daily operations so you can focus on ownership, growth, and visa compliance.
+                  A property management franchise designed to help qualified E-2 investors and their families live in the USA. You control the business and finances; our team handles daily operations so you can focus on ownership, growth, and visa compliance.
                 </p>
 
                 <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">

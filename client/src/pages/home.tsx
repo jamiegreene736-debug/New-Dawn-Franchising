@@ -518,6 +518,46 @@ function HomepageTeamRow() {
   );
 }
 
+function EmbassyTechnologyBridge() {
+  const items = [
+    {
+      title: "Check timing",
+      text: "Start with the embassy timeline for your country.",
+      icon: <Clock className="size-5" />,
+    },
+    {
+      title: "Build the file",
+      text: "Use the franchise model, FDD, and operating documents.",
+      icon: <FileDown className="size-5" />,
+    },
+    {
+      title: "Run with systems",
+      text: "Launch with technology, reporting, and managed operations.",
+      icon: <Cpu className="size-5" />,
+    },
+  ];
+
+  return (
+    <section data-testid="section-embassy-tech-bridge" className="relative z-10 -mt-10 bg-[#f7faf8] pb-8 md:-mt-14 md:pb-12">
+      <div className="nh-container">
+        <div className="mx-auto grid max-w-5xl gap-3 rounded-3xl border bg-white/95 p-3 shadow-[0_24px_70px_rgba(15,23,42,0.16)] backdrop-blur md:grid-cols-3">
+          {items.map((item) => (
+            <div key={item.title} className="flex items-start gap-3 rounded-2xl px-4 py-4">
+              <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-[hsl(var(--primary))] text-[hsl(var(--accent))] shadow-sm">
+                {item.icon}
+              </div>
+              <div>
+                <div className="text-sm font-semibold text-foreground">{item.title}</div>
+                <div className="mt-1 text-sm leading-snug text-muted-foreground">{item.text}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 // ── E-2 FAQ Accordion ─────────────────────────────────────────────────────────
 const E2_FAQ_ITEMS = [
   { q: "How much do I need to invest?", a: "There is no fixed minimum, but the investment must be \"substantial\" relative to the cost of the business. Most E-2 investors invest $100,000 or more. Our franchise packages start at $250,000, which is designed to clearly meet the substantiality requirement." },
@@ -693,7 +733,7 @@ export default function Home() {
         <HomepageTeamRow />
 
         {/* ── Embassy Wait Time Checker ── */}
-        <section data-testid="section-embassy" className="border-b bg-gradient-to-br from-[#0f172a] via-[#0f2744] to-[#0a3d2e] py-8 md:py-18 relative overflow-hidden">
+        <section data-testid="section-embassy" className="relative overflow-hidden bg-gradient-to-br from-[#0f172a] via-[#0f2744] to-[#0a3d2e] pb-20 pt-10 md:pb-28 md:pt-20">
           {/* decorative grid */}
           <div className="pointer-events-none absolute inset-0 opacity-10" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.07) 1px,transparent 1px)", backgroundSize: "40px 40px" }} />
           {/* glow blobs */}
@@ -790,7 +830,9 @@ export default function Home() {
           </div>
         </section>
 
-        <section data-testid="section-tech" className="border-b bg-[linear-gradient(180deg,hsl(var(--primary))_0%,#102a46_100%)] py-10 md:py-24">
+        <EmbassyTechnologyBridge />
+
+        <section data-testid="section-tech" className="border-b bg-[linear-gradient(180deg,#1d2d5c_0%,hsl(var(--primary))_46%,#102a46_100%)] pb-12 pt-14 md:pb-24 md:pt-24">
           <div className="nh-container">
             <div className="mx-auto max-w-3xl text-center text-white">
               <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[hsl(var(--accent))]">Proprietary Technology. Built Exclusively for New Dawn Franchisees.</div>

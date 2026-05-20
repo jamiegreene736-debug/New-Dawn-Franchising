@@ -876,7 +876,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section data-testid="section-how" id="how-it-works" className="bg-[linear-gradient(180deg,#f6f9fb_0%,#ffffff_72%,#fbfdfc_100%)] pb-8 pt-10 md:pb-14 md:pt-16">
+        <section data-testid="section-how" id="how-it-works" className="bg-[linear-gradient(180deg,#f6f9fb_0%,#ffffff_62%,#eef4fb_100%)] pb-8 pt-10 md:pb-14 md:pt-16">
           <div className="nh-container">
             <SectionHeading
               testId="heading-how"
@@ -908,7 +908,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section data-testid="section-why" id="why-us" className="border-y bg-[linear-gradient(180deg,#fbfdfc_0%,#ffffff_22%,#f4f8f6_100%)] pb-10 pt-8 md:pb-16 md:pt-14">
+        <section data-testid="section-why" id="why-us" className="border-y bg-[linear-gradient(180deg,#ffffff_0%,#fbfdfc_34%,#edf6f0_100%)] pb-10 pt-8 md:pb-16 md:pt-14">
           <div className="nh-container">
             <SectionHeading
               testId="heading-why"
@@ -964,7 +964,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section data-testid="section-group" className="border-b bg-[linear-gradient(180deg,#f4f8f6_0%,#fbfdfc_42%,#ffffff_100%)] pb-10 pt-8 md:pb-16 md:pt-14">
+        <section data-testid="section-group" className="border-b bg-[linear-gradient(180deg,#f7fbf8_0%,#eef7f1_54%,#e8f1ee_100%)] pb-10 pt-8 md:pb-16 md:pt-14">
           <div className="nh-container">
             <SectionHeading
               testId="heading-group"
@@ -1012,7 +1012,7 @@ export default function Home() {
         </section>
 
         {/* ── Meet Dylan ── */}
-        <section data-testid="section-meet-dylan" className="overflow-hidden border-b bg-[linear-gradient(180deg,#ffffff_0%,#fbfcff_35%,#ffffff_100%)] pb-8 pt-10 md:pb-16 md:pt-16">
+        <section data-testid="section-meet-dylan" className="overflow-hidden border-b bg-[linear-gradient(180deg,#eaf1fb_0%,#f8fbff_44%,#ffffff_100%)] pb-8 pt-10 md:pb-16 md:pt-16">
           <div className="nh-container">
             <div className="mx-auto max-w-5xl">
               <div className="grid gap-12 md:grid-cols-[280px_1fr] md:gap-16 items-start">
@@ -1162,7 +1162,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section data-testid="section-investment" id="investment" className="border-b bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_48%,#f6f8fb_100%)] pb-10 pt-8 md:pb-16 md:pt-16">
+        <section data-testid="section-investment" id="investment" className="border-b bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_48%,#eef3fa_100%)] pb-10 pt-8 md:pb-16 md:pt-16">
           <div className="nh-container">
             <SectionHeading
               testId="heading-investment"
@@ -1222,7 +1222,7 @@ export default function Home() {
         </section>
 
         {/* ── E-2 Visa Resources ── */}
-        <section data-testid="section-e2-resources" id="e2-resources" className="border-b bg-[linear-gradient(180deg,#f6f8fb_0%,#fbfdff_34%,#ffffff_100%)] pb-10 pt-8 md:pb-16 md:pt-14">
+        <section data-testid="section-e2-resources" id="e2-resources" className="border-b bg-[linear-gradient(180deg,#f7faf9_0%,#fbfdff_38%,#ffffff_100%)] pb-10 pt-8 md:pb-16 md:pt-14">
           <div className="nh-container">
             <SectionHeading
               testId="heading-e2-resources"
@@ -1378,7 +1378,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section data-testid="section-faq" id="faq" className="bg-[linear-gradient(180deg,#ffffff_0%,#fbfdfc_36%,#f7faf9_100%)] pb-10 pt-8 md:pb-16 md:pt-14">
+        <section data-testid="section-faq" id="faq" className="bg-[linear-gradient(180deg,#ffffff_0%,#fbfcff_36%,#eef5f2_100%)] pb-10 pt-8 md:pb-16 md:pt-14">
           <div className="nh-container">
             <SectionHeading
               testId="heading-faq"
@@ -1558,7 +1558,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section data-testid="section-contact" id="contact" className="border-t bg-[linear-gradient(180deg,#f7faf9_0%,#f2f7f4_42%,#eef4f1_100%)] pb-12 pt-8 md:pb-20 md:pt-14">
+        <section data-testid="section-contact" id="contact" className="border-t bg-[linear-gradient(180deg,#f9fbf8_0%,#f2f7f4_42%,#eaf3ef_100%)] pb-12 pt-8 md:pb-20 md:pt-14">
           <div className="nh-container">
             <div className="mx-auto max-w-3xl rounded-3xl border bg-white/60 p-8 shadow-sm">
               <div className="text-xs font-semibold uppercase tracking-[0.22em] text-foreground/60">Get started</div>

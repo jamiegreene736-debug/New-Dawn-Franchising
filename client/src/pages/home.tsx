@@ -129,23 +129,23 @@ function FeatureCard({
 const VIDEO_SCENES = [
   {
     time: "0:00",
-    title: "Built for E-2 investors",
-    copy: "A real operating U.S. franchise structured around owner control.",
+    title: "E-2 visa pathway",
+    copy: "A U.S. property management franchise designed for qualified treaty investors and their families.",
   },
   {
     time: "0:06",
-    title: "You direct it. We run daily ops.",
-    copy: "You control the finances and decisions while our team handles execution.",
+    title: "Launch with operations support",
+    copy: "Your franchise is set up with systems, reporting, and a territory representative from day one.",
   },
   {
     time: "0:13",
-    title: "Texas property management",
+    title: "10-contract starting portfolio",
     copy: "Each franchise territory starts with 10 long-term rental management contracts.",
   },
   {
     time: "0:20",
-    title: "Protections and senior team",
-    copy: "Escrow, contract replacement, and leadership across real estate, finance, law, and AI.",
+    title: "Escrow-backed protections",
+    copy: "Investor safeguards, replacement support, and senior leadership across real estate, finance, law, and AI.",
   },
 ];
 
@@ -205,7 +205,7 @@ function HomepageVideoVisual({ isPlaying }: { isPlaying: boolean }) {
       <div className="overview-scene overview-scene-1 absolute inset-0">
         <div className="absolute bottom-8 left-6 rounded-2xl border border-white/70 bg-white/85 px-4 py-3 text-[hsl(var(--primary))] shadow-xl backdrop-blur">
           <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/45">Scene 1</div>
-          <div className="mt-1 text-sm font-semibold">E-2 investor owns the franchise</div>
+          <div className="mt-1 text-sm font-semibold">A franchise built for the E-2 visa</div>
         </div>
         <CartoonPerson className="bottom-20 left-16 overview-float" shirt="bg-[hsl(var(--primary))]" />
         <div className="absolute bottom-24 left-32 h-24 w-40 rounded-2xl border border-white/75 bg-white/85 p-3 shadow-xl">
@@ -213,11 +213,11 @@ function HomepageVideoVisual({ isPlaying }: { isPlaying: boolean }) {
           <div className="mt-3 h-2 w-full rounded-full bg-slate-200" />
           <div className="mt-2 h-2 w-4/5 rounded-full bg-slate-200" />
           <div className="mt-4 inline-flex rounded-full bg-[hsl(var(--accent))] px-3 py-1 text-[10px] font-bold text-[hsl(var(--primary))]">
-            OWNER CONTROL
+            VISA-READY BUSINESS
           </div>
         </div>
         <div className="absolute bottom-20 right-12 hidden rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-sm font-semibold text-[hsl(var(--primary))] shadow-xl sm:block">
-          You own it
+          Family pathway
         </div>
       </div>
 
@@ -355,7 +355,7 @@ function HomepageVideoCard({ hero = false }: { hero?: boolean }) {
           <div className="relative flex items-start justify-between gap-4">
             <div>
               <div className="text-[11px] uppercase tracking-[0.2em] text-white/55">30-Second Illustrated Overview</div>
-              <div className="mt-1 font-serif text-2xl leading-tight text-white md:text-[1.75rem]">You Own It. You Direct It. We Run It.</div>
+              <div className="mt-1 font-serif text-2xl leading-tight text-white md:text-[1.75rem]">From Investment to Operating Franchise.</div>
             </div>
             <div className="grid size-11 shrink-0 place-items-center rounded-full border border-white/20 bg-white/10">
               <Volume2 className="size-5 text-[hsl(var(--accent))]" />
@@ -365,11 +365,11 @@ function HomepageVideoCard({ hero = false }: { hero?: boolean }) {
           <div className="relative mt-3 grid gap-2 sm:grid-cols-2">
             <div className="flex items-center gap-2 rounded-xl border border-white/15 bg-white/[0.08] px-3 py-2 text-xs font-semibold text-white/85 backdrop-blur">
               <Building2 className="size-4 shrink-0 text-[hsl(var(--accent))]" />
-              <span>Property management franchise</span>
+              <span>Built for E-2 qualification</span>
             </div>
             <div className="flex items-center gap-2 rounded-xl border border-white/15 bg-white/[0.08] px-3 py-2 text-xs font-semibold text-white/85 backdrop-blur">
               <Users className="size-4 shrink-0 text-[hsl(var(--accent))]" />
-              <span>E-2 pathway for your family</span>
+              <span>Live in the USA with your family</span>
             </div>
           </div>
 

@@ -598,7 +598,7 @@ function FranchiseesTab() {
                             onChange={e => toggleAccess.mutate({ id: f.id, field: "trainingAccess", value: e.target.checked })}
                             className="size-4 rounded"
                           />
-                          <span className="text-sm">Training Portal Access</span>
+                          <span className="text-sm">Training Academy Access</span>
                         </label>
                         <label className="flex items-center gap-3 cursor-pointer">
                           <input
@@ -607,7 +607,7 @@ function FranchiseesTab() {
                             onChange={e => toggleAccess.mutate({ id: f.id, field: "marketingAccess", value: e.target.checked })}
                             className="size-4 rounded"
                           />
-                          <span className="text-sm">Marketing Portal Access <span className="text-xs text-muted-foreground">(override gate)</span></span>
+                          <span className="text-sm">Marketing Academy Access <span className="text-xs text-muted-foreground">(override gate)</span></span>
                         </label>
                       </div>
                     </div>
@@ -1060,7 +1060,7 @@ export default function CrmPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 data-testid="crm-title" className="text-2xl font-semibold text-white">
-                Marketing Portal
+                Marketing Academy
               </h1>
               <p className="mt-1 text-sm text-white/70">New Dawn Franchising — Investor Sales & Pipeline</p>
             </div>

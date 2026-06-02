@@ -36,7 +36,7 @@ const PATHS = [
   {
     icon: Send,
     title: "Refer Leads & Earn Commissions",
-    desc: "Not interested in getting licensed? Simply refer buyers and sellers to our brokerage and earn a referral commission on every closed deal. Our marketing portal can help you find leads — you just send them our way.",
+    desc: "Not interested in getting licensed? Simply refer buyers and sellers to our brokerage and earn a referral commission on every closed deal. Our marketing academy can help you find leads — you just send them our way.",
     highlight: false,
     id: "refer-leads",
   },
@@ -63,8 +63,8 @@ const BROKERAGE_BENEFITS = [
   },
   {
     icon: Megaphone,
-    title: "Marketing Portal Access",
-    desc: "Use the same powerful marketing portal included with your franchise to generate real estate leads — buyers and sellers in El Paso and surrounding areas.",
+    title: "Marketing Academy Access",
+    desc: "Use the same powerful marketing academy included with your franchise to generate real estate leads — buyers and sellers in El Paso and surrounding areas.",
     id: "marketing",
   },
   {
@@ -96,8 +96,8 @@ const HOW_IT_WORKS = [
   },
   {
     step: "3",
-    title: "Use the marketing portal",
-    desc: "Generate leads for buyers and sellers in the El Paso area and surrounding markets using your franchise marketing portal.",
+    title: "Use the marketing academy",
+    desc: "Generate leads for buyers and sellers in the El Paso area and surrounding markets using your franchise marketing academy.",
     id: "step-portal",
   },
   {
@@ -238,13 +238,13 @@ export default function RealEstatePage() {
                 <Home className="size-6 text-[hsl(var(--primary))]" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold">Your marketing portal works for real estate too</h3>
+                <h3 className="text-lg font-semibold">Your marketing academy works for real estate too</h3>
                 <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                  The same franchise marketing portal that helps you find property management clients can also generate leads for people looking to buy or sell homes in El Paso and the surrounding areas. Use email drip campaigns, PPC ads, social media, and more to find motivated buyers and sellers — all from the same dashboard.
+                  The same franchise marketing academy that helps you find property management clients can also generate leads for people looking to buy or sell homes in El Paso and the surrounding areas. Use email drip campaigns, PPC ads, social media, and more to find motivated buyers and sellers — all from the same dashboard.
                 </p>
                 <Button data-testid="button-re-marketing" className="mt-4 gap-2" variant="secondary" asChild>
                   <Link href="/marketing">
-                    Explore the marketing portal
+                    Explore the marketing academy
                     <ArrowRight className="size-4" />
                   </Link>
                 </Button>

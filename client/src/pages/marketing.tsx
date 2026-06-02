@@ -148,7 +148,7 @@ export default function MarketingPage() {
             <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
               <Button data-testid="button-marketing-login" className="gap-2" asChild>
                 <Link href="/login">
-                  Access Marketing Portal
+                  Access Marketing Academy
                   <ArrowRight className="size-4" />
                 </Link>
               </Button>
@@ -171,7 +171,7 @@ export default function MarketingPage() {
               One portal. Every marketing channel.
             </h2>
             <p className="mt-3 text-pretty text-base leading-relaxed text-muted-foreground">
-              Your proprietary franchise marketing portal is your command center for growing your business. Our technology works across every channel — from email campaigns to social media content — and is built exclusively for New Dawn franchisees. Access it through the login page or the Apple app — everything syncs in real time.
+              Your proprietary franchise marketing academy is your command center for growing your business. Our technology works across every channel — from email campaigns to social media content — and is built exclusively for New Dawn franchisees. Access it through the login page or the Apple app — everything syncs in real time.
             </p>
           </div>
 
@@ -227,7 +227,7 @@ export default function MarketingPage() {
           <div className="mx-auto mt-10 max-w-2xl">
             <div className="space-y-0">
               {[
-                { step: "1", title: "Log in to your marketing portal", desc: "Access your dashboard through the website login or the Apple app.", id: "step-login" },
+                { step: "1", title: "Log in to your marketing academy", desc: "Access your dashboard through the website login or the Apple app.", id: "step-login" },
                 { step: "2", title: "Choose your campaign", desc: "Pick from email drips, SMS, social media, mailers, PPC, or agent referrals — or let the AI recommend the best mix for your territory.", id: "step-choose" },
                 { step: "3", title: "Launch & automate", desc: "Set your campaigns live. The AI handles scheduling, follow-ups, and content generation while you focus on your business.", id: "step-launch" },
                 { step: "4", title: "Track & optimize", desc: "Monitor leads, conversions, and ROI in real time. The portal suggests tweaks to maximize your results.", id: "step-track" },
@@ -259,7 +259,7 @@ export default function MarketingPage() {
               Generate real estate leads too
             </h2>
             <p className="mt-3 text-pretty text-base leading-relaxed text-muted-foreground">
-              The same marketing portal works for finding buyers and sellers — not just property management clients. Earn additional income through our brokerage.
+              The same marketing academy works for finding buyers and sellers — not just property management clients. Earn additional income through our brokerage.
             </p>
           </div>
 
@@ -294,7 +294,7 @@ export default function MarketingPage() {
               Ready to see it in action?
             </h2>
             <p className="mt-3 text-sm leading-relaxed text-muted-foreground md:text-base">
-              The marketing portal is included with every franchise at no additional cost. Log in to explore, or contact us for a walkthrough.
+              The marketing academy is included with every franchise at no additional cost. Log in to explore, or contact us for a walkthrough.
             </p>
             <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
               <Button data-testid="button-marketing-cta-login" className="gap-2" asChild>

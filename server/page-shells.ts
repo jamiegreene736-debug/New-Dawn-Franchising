@@ -312,7 +312,7 @@ const shells: Record<string, PageShell> = {
   "/marketing": {
     title: `Franchise Marketing System | ${SITE}`,
     description:
-      "New Dawn franchisees get access to a proprietary marketing portal — automating lead generation, email campaigns, social media, and property marketing from one dashboard.",
+      "New Dawn franchisees get access to a proprietary marketing academy — automating lead generation, email campaigns, social media, and property marketing from one dashboard.",
     html: `
 <main>
   <h1>Your Marketing Engine</h1>
@@ -351,7 +351,7 @@ const shells: Record<string, PageShell> = {
     <ul>
       <li>Earn referral commissions by referring buyers and sellers — no license required</li>
       <li>Become a licensed real estate agent with our support and mentorship</li>
-      <li>Use your franchise marketing portal to generate real estate leads in El Paso and surrounding areas</li>
+      <li>Use your franchise marketing academy to generate real estate leads in El Paso and surrounding areas</li>
     </ul>
   </section>
 </main>`,

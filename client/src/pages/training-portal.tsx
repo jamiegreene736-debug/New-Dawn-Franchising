@@ -80,7 +80,7 @@ function buildDemoState() {
         issuedAt: oneWeekAgo, verificationId: "DEMO-TRACK1-VERIFY" },
     ],
     announcements: [
-      { id: "demo-ann-1", title: "Welcome to the Franchisee Training Portal!",
+      { id: "demo-ann-1", title: "Welcome to the Franchisee Training Academy!",
         body: "Explore your training modules, complete quizzes, and earn certificates at your own pace. Your dedicated territory manager is here to support you every step of the way.",
         isUrgent: false, publishedAt: twoWeeksAgo },
     ],
@@ -263,7 +263,7 @@ function LoginView({ onLogin, onDemoLogin }: { onLogin: (f: Franchisee) => void;
               <div className="inline-flex items-center justify-center size-16 rounded-2xl bg-blue-50 mb-4">
                 <GraduationCap className="size-8 text-blue-600" />
               </div>
-              <h1 className="text-2xl font-bold text-gray-900">Franchisee Training Portal</h1>
+              <h1 className="text-2xl font-bold text-gray-900">Franchisee Training Academy</h1>
               <p className="text-sm text-gray-500 mt-2">New Dawn Franchising LLC</p>
             </div>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -304,7 +304,7 @@ function LoginView({ onLogin, onDemoLogin }: { onLogin: (f: Franchisee) => void;
                 disabled={loading}
               >
                 {loading ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
-                Sign in to Training Portal
+                Sign in to Training Academy
               </Button>
             </form>
             <p className="text-center text-xs text-gray-400 mt-6">
@@ -1171,7 +1171,7 @@ function DashboardView({
         >
           <span className="text-2xl">📣</span>
           <div>
-            <p className="font-semibold text-sm text-gray-900">Marketing Portal</p>
+            <p className="font-semibold text-sm text-gray-900">Marketing Academy</p>
             <p className="text-xs text-gray-400">Manage your leads</p>
           </div>
         </a>
@@ -1295,7 +1295,7 @@ function PortalShell({
               <img src={logo} alt="NDF" className="h-10 w-auto" />
             </a>
             <div className="hidden sm:block w-px h-5 bg-gray-200" />
-            <span className="hidden sm:block text-sm font-semibold text-gray-600">Training Portal</span>
+            <span className="hidden sm:block text-sm font-semibold text-gray-600">Training Academy</span>
           </div>
           <div className="flex items-center gap-2">
             {isDemoMode && (
@@ -1362,7 +1362,7 @@ function PortalShell({
               className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm text-gray-500 hover:bg-gray-50 hover:text-gray-900"
             >
               <span>📣</span>
-              <span className="text-sm">Marketing Portal</span>
+              <span className="text-sm">Marketing Academy</span>
             </a>
           </div>
         </nav>

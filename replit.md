@@ -1,7 +1,7 @@
 # New Dawn Franchising Website
 
 ## Overview
-This project is a marketing website for New Dawn Franchising LLC, aiming to attract E-2 visa investors. It showcases franchise opportunities, E-2 visa suitability, and available territories in Texas. The platform includes a lead capture system, an AI-powered blog, and a dedicated portal for referring brokers. A comprehensive CRM manages leads, clients, and prospects, featuring an advanced prospect finder, electronic signature capabilities, and integrated communication tools. Additionally, it offers a Franchisee Training Portal with extensive modules and a Franchisee Marketing Portal providing territory-scoped homeowner lead pipelines. The overarching goal is to streamline operations, enhance lead generation, and improve client management for the franchise business.
+This project is a marketing website for New Dawn Franchising LLC, aiming to attract E-2 visa investors. It showcases franchise opportunities, E-2 visa suitability, and available territories in Texas. The platform includes a lead capture system, an AI-powered blog, and a dedicated portal for referring brokers. A comprehensive CRM manages leads, clients, and prospects, featuring an advanced prospect finder, electronic signature capabilities, and integrated communication tools. Additionally, it offers a Franchisee Training Academy with extensive modules and a Franchisee Marketing Academy providing territory-scoped homeowner lead pipelines. The overarching goal is to streamline operations, enhance lead generation, and improve client management for the franchise business.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.

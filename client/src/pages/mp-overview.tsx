@@ -634,7 +634,7 @@ export function MpOverview({ franchisee, onNavigate }: { franchisee: any; onNavi
         {/* Welcome + customise */}
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="rounded-xl bg-gradient-to-r from-indigo-600 to-purple-700 text-white px-5 py-4 flex-1">
-            <p className="text-indigo-300 text-xs font-semibold uppercase tracking-wide mb-0.5">Marketing Portal · Overview</p>
+            <p className="text-indigo-300 text-xs font-semibold uppercase tracking-wide mb-0.5">Marketing Academy · Overview</p>
             <h1 className="text-xl font-bold">Welcome back, {franchisee.firstName}!</h1>
             <p className="text-indigo-300 text-sm mt-0.5">{franchisee.territory ?? "El Paso, TX"} · {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</p>
           </div>

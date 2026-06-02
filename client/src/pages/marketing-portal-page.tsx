@@ -55,8 +55,8 @@ function LockedState({ checklistComplete, track1Complete }: { checklistComplete:
           <div className="inline-flex items-center justify-center size-20 rounded-full bg-slate-100 mb-6">
             <Lock className="size-10 text-slate-400" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-3">Marketing Portal Locked</h1>
-          <p className="text-gray-500 mb-8">Complete your Launch Checklist and Welcome &amp; Foundations training to unlock your Marketing Portal.</p>
+          <h1 className="text-2xl font-bold text-gray-900 mb-3">Marketing Academy Locked</h1>
+          <p className="text-gray-500 mb-8">Complete your Launch Checklist and Welcome &amp; Foundations training to unlock your Marketing Academy.</p>
           <div className="space-y-4 text-left mb-8">
             {[
               { done: checklistComplete, label: "Launch Checklist",              sub: "All 7 business setup items confirmed",           n: "1" },
@@ -74,7 +74,7 @@ function LockedState({ checklistComplete, track1Complete }: { checklistComplete:
             ))}
           </div>
           <Button asChild className="gap-2 bg-indigo-600 hover:bg-indigo-700">
-            <a href="/training"><GraduationCap className="size-4" /> Go to Training Portal</a>
+            <a href="/training"><GraduationCap className="size-4" /> Go to Training Academy</a>
           </Button>
         </div>
       </div>
@@ -118,7 +118,7 @@ function MarketingShell({
           </button>
           <a href="/"><img src={logo} alt="NDF" className="h-9 w-auto" /></a>
           <div className="hidden sm:block w-px h-5 bg-gray-200" />
-          <span className="hidden sm:block text-sm font-semibold text-gray-500">Marketing Portal</span>
+          <span className="hidden sm:block text-sm font-semibold text-gray-500">Marketing Academy</span>
         </div>
         <div className="flex items-center gap-3">
           <a href="/training" className="hidden sm:flex items-center gap-1.5 text-xs text-gray-400 hover:text-indigo-600 transition-colors">
@@ -188,7 +188,7 @@ function MarketingShell({
   );
 }
 
-// ─── Main Marketing Portal ────────────────────────────────────────────────────
+// ─── Main Marketing Academy ────────────────────────────────────────────────────
 
 export default function MarketingPortalPage() {
   const [franchisee, setFranchisee] = useState<any>(null);
@@ -230,12 +230,12 @@ export default function MarketingPortalPage() {
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="max-w-sm text-center">
             <div className="text-5xl mb-4">📣</div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-3">Franchisee Marketing Portal</h1>
+            <h1 className="text-2xl font-bold text-gray-900 mb-3">Franchisee Marketing Academy</h1>
             <p className="text-gray-500 mb-6">Sign in with your franchisee account to access your marketing tools.</p>
             <Button asChild className="gap-2 bg-indigo-600 hover:bg-indigo-700">
-              <a href="/training"><GraduationCap className="size-4" /> Sign in via Training Portal</a>
+              <a href="/training"><GraduationCap className="size-4" /> Sign in via Training Academy</a>
             </Button>
-            <p className="text-xs text-gray-400 mt-4">Same email and password as your Training Portal.</p>
+            <p className="text-xs text-gray-400 mt-4">Same email and password as your Training Academy.</p>
           </div>
         </div>
       </div>

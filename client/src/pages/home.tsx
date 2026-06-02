@@ -1562,7 +1562,7 @@ export default function Home() {
                   id: "re-license",
                 },
                 {
-                  q: "How does the marketing portal help with real estate leads?",
+                  q: "How does the marketing academy help with real estate leads?",
                   a: "The portal is designed as a broader franchise growth system, not just a property-management dashboard. Depending on your vertical, it can support campaigns, referral tracking, lead follow-up, and performance reporting from one owner-facing system.",
                   id: "re-marketing-portal",
                 },

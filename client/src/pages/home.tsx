@@ -1061,8 +1061,14 @@ export default function Home() {
                   <div className="relative overflow-hidden rounded-3xl shadow-2xl aspect-square bg-[hsl(var(--primary))]">
                     <img
                       src="/dylan-headshot.png"
+                      alt=""
+                      aria-hidden="true"
+                      className="absolute inset-0 h-full w-full scale-110 object-cover object-center blur-lg"
+                    />
+                    <img
+                      src="/dylan-headshot.png"
                       alt="Dylan Delaney — Founding Member & Director of Franchise Development"
-                      className="h-full w-full object-contain object-center"
+                      className="relative h-full w-full object-contain object-center"
                       loading="eager"
                     />
                     {/* gradient overlay at bottom */}

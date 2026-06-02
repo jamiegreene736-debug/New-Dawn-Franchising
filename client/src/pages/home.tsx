@@ -129,23 +129,23 @@ function FeatureCard({
 const VIDEO_SCENES = [
   {
     time: "0:00",
-    title: "Three E-2 franchise options",
-    copy: "Choose a recurring-revenue model in property management, telecom, or insurance.",
+    title: "Three industries, one E-2 platform",
+    copy: "Choose Property Management, Telecom, or Insurance from a platform designed for treaty-investor business ownership.",
   },
   {
     time: "0:06",
-    title: "Executive control structure",
-    copy: "You supervise the enterprise while local teams execute day-to-day operations.",
+    title: "Chosen for E-2 fit",
+    copy: "We selected recurring-revenue industries that support active oversight, documentation, staffing, and renewal readiness.",
   },
   {
     time: "0:13",
-    title: "AI-powered operating platform",
-    copy: "Centralized dashboards and automation support growth across each vertical.",
+    title: "AI plus local execution",
+    copy: "Proprietary AI, dashboards, training, and operating teams help you expand while day-to-day workflows are handled.",
   },
   {
     time: "0:20",
-    title: "Built for E-2 applicants",
-    copy: "The model is structured around investor oversight, documentation, and renewal readiness.",
+    title: "Build your U.S. enterprise",
+    copy: "Review the FDD, compare your options, and inquire today to live and work anywhere in the USA.",
   },
 ];
 
@@ -196,9 +196,9 @@ function HomepageVideoVisual({ isPlaying }: { isPlaying: boolean }) {
       <div className="absolute inset-0 opacity-50 nh-fine-grid" />
       <div className="absolute inset-x-0 bottom-0 h-28 bg-[linear-gradient(180deg,transparent,rgba(15,35,64,.35))]" />
       <div className="absolute left-5 top-5 rounded-2xl border border-white/75 bg-white/85 p-4 text-[hsl(var(--primary))] shadow-xl backdrop-blur">
-        <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/45">Owner control dashboard</div>
+        <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/45">E-2 platform dashboard</div>
         <div className="mt-2 grid grid-cols-3 gap-2">
-          {["Escrow", "10 contracts", "90 days"].map((label) => (
+          {["Property", "Telecom", "Insurance"].map((label) => (
             <div key={label} className="rounded-xl border bg-white/80 px-2 py-1.5 text-center shadow-sm">
               <div className="mx-auto mb-1 h-1.5 w-8 rounded-full bg-[hsl(var(--accent))]" />
               <div className="text-[10px] font-semibold leading-tight">{label}</div>
@@ -226,7 +226,7 @@ function HomepageVideoVisual({ isPlaying }: { isPlaying: boolean }) {
       <div className="overview-scene overview-scene-1 absolute inset-0">
         <div className="absolute bottom-8 left-6 rounded-2xl border border-white/70 bg-white/85 px-4 py-3 text-[hsl(var(--primary))] shadow-xl backdrop-blur">
           <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/45">Scene 1</div>
-          <div className="mt-1 text-sm font-semibold">A franchise built for the E-2 visa</div>
+          <div className="mt-1 text-sm font-semibold">Three franchise options built for E-2</div>
         </div>
         <CartoonPerson className="bottom-20 left-16 overview-float" shirt="bg-[hsl(var(--primary))]" />
         <div className="absolute bottom-24 left-32 h-24 w-40 rounded-2xl border border-white/75 bg-white/85 p-3 shadow-xl">
@@ -239,7 +239,7 @@ function HomepageVideoVisual({ isPlaying }: { isPlaying: boolean }) {
       <div className="overview-scene overview-scene-2 absolute inset-0">
         <div className="absolute bottom-8 left-6 rounded-2xl border border-white/70 bg-white/85 px-4 py-3 text-[hsl(var(--primary))] shadow-xl backdrop-blur">
           <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/45">Scene 2</div>
-          <div className="mt-1 text-sm font-semibold">Our team handles daily operations</div>
+          <div className="mt-1 text-sm font-semibold">Selected for recurring-revenue fit</div>
         </div>
         <CartoonPerson className="bottom-20 left-10 overview-float" shirt="bg-emerald-500" />
         <CartoonPerson className="bottom-20 left-24 overview-float-delayed" shirt="bg-sky-500" />
@@ -257,7 +257,7 @@ function HomepageVideoVisual({ isPlaying }: { isPlaying: boolean }) {
       <div className="overview-scene overview-scene-3 absolute inset-0">
         <div className="absolute bottom-8 left-6 rounded-2xl border border-white/70 bg-white/85 px-4 py-3 text-[hsl(var(--primary))] shadow-xl backdrop-blur">
           <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/45">Scene 3</div>
-          <div className="mt-1 text-sm font-semibold">10 starting management contracts</div>
+          <div className="mt-1 text-sm font-semibold">AI infrastructure helps you scale</div>
         </div>
         {[0, 1, 2, 3, 4].map((row) =>
           [0, 1].map((col) => (
@@ -273,8 +273,8 @@ function HomepageVideoVisual({ isPlaying }: { isPlaying: boolean }) {
         )}
         <div className="absolute bottom-20 right-10 grid size-24 place-items-center rounded-full border border-white/80 bg-[hsl(var(--primary))] text-center text-white shadow-2xl">
           <div>
-            <div className="text-3xl font-bold text-[hsl(var(--accent))]">10</div>
-            <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70">contracts</div>
+            <div className="text-3xl font-bold text-[hsl(var(--accent))]">AI</div>
+            <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70">dashboards</div>
           </div>
         </div>
       </div>
@@ -282,14 +282,14 @@ function HomepageVideoVisual({ isPlaying }: { isPlaying: boolean }) {
       <div className="overview-scene overview-scene-4 absolute inset-0">
         <div className="absolute bottom-8 left-6 rounded-2xl border border-white/70 bg-white/85 px-4 py-3 text-[hsl(var(--primary))] shadow-xl backdrop-blur">
           <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/45">Scene 4</div>
-          <div className="mt-1 text-sm font-semibold">Escrow and replacement protections</div>
+          <div className="mt-1 text-sm font-semibold">Inquire to live and work in the USA</div>
         </div>
         <div className="absolute bottom-20 left-10 grid size-24 place-items-center rounded-3xl border border-white/75 bg-white/85 shadow-xl">
           <ShieldCheck className="size-10 text-emerald-600" />
         </div>
         <div className="absolute bottom-28 left-36 rounded-2xl border border-white/75 bg-white/90 px-4 py-3 text-[hsl(var(--primary))] shadow-xl">
-          <div className="text-2xl font-bold text-[hsl(var(--accent))]">90</div>
-          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-foreground/55">day replacement</div>
+          <div className="text-2xl font-bold text-[hsl(var(--accent))]">USA</div>
+          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-foreground/55">family pathway</div>
         </div>
         <CartoonPerson className="bottom-20 right-28 overview-float" shirt="bg-[hsl(var(--primary))]" />
         <CartoonPerson className="bottom-20 right-14 overview-float-delayed" shirt="bg-[hsl(var(--accent))]" />
@@ -370,7 +370,7 @@ function HomepageVideoCard({ hero = false }: { hero?: boolean }) {
           <div className="relative flex items-start justify-between gap-4">
             <div>
               <div className="text-[11px] uppercase tracking-[0.2em] text-white/55">30-Second Illustrated Overview</div>
-              <div className="mt-1 font-serif text-2xl leading-tight text-white md:text-[1.75rem]">From Investment to Operating Franchise.</div>
+              <div className="mt-1 font-serif text-2xl leading-tight text-white md:text-[1.75rem]">Three Industries. One E-2 Platform.</div>
             </div>
             <div className="grid size-11 shrink-0 place-items-center rounded-full border border-white/20 bg-white/10">
               <Volume2 className="size-5 text-[hsl(var(--accent))]" />
@@ -380,11 +380,11 @@ function HomepageVideoCard({ hero = false }: { hero?: boolean }) {
           <div className="relative mt-3 grid gap-2 sm:grid-cols-2">
             <div className="flex items-center gap-2 rounded-xl border border-white/15 bg-white/[0.08] px-3 py-2 text-xs font-semibold text-white/85 backdrop-blur">
               <Building2 className="size-4 shrink-0 text-[hsl(var(--accent))]" />
-              <span>Built for E-2 qualification</span>
+              <span>Chosen for E-2 fit</span>
             </div>
             <div className="flex items-center gap-2 rounded-xl border border-white/15 bg-white/[0.08] px-3 py-2 text-xs font-semibold text-white/85 backdrop-blur">
               <Users className="size-4 shrink-0 text-[hsl(var(--accent))]" />
-              <span>Live in the USA with your family</span>
+              <span>Property · Telecom · Insurance</span>
             </div>
           </div>
 
@@ -444,17 +444,17 @@ function HomepageVideoCard({ hero = false }: { hero?: boolean }) {
 
 const HOMEPAGE_TEAM = [
   {
-    name: "Dylan Delaney",
+    name: "Jeffrey Tung",
     role: "Founding Member",
-    focus: "Franchise development and investor launch",
+    focus: "SMB operations, private equity, and multi-market execution",
     bullets: [
-      "Founding member leading franchise development and investor launch",
-      "Guides entity setup, territory selection, FDD review, and operational kickoff",
-      "Texas SMB experience across sales, business development, and investment",
-      "Direct point of contact for investors, attorneys, and territory partners",
+      "Co-Founder & Partner at CPS Capital, a private equity firm focused on SMBs",
+      "Works with management teams to support growth, execution, and operating discipline",
+      "Board and audit committee experience across private and public company contexts",
+      "Background includes Inner Spirit Holdings, Auxly Cannabis Group, McKinsey, and SAP",
     ],
-    image: "/dylan-headshot.png",
-    imageClass: "object-[center_8%]",
+    image: "/jeffrey-tung-profile.svg",
+    imageClass: "object-cover",
     imageOverlay: "from-slate-950/10 via-transparent to-[hsl(var(--primary))]/20",
   },
   {
@@ -467,8 +467,8 @@ const HOMEPAGE_TEAM = [
       "Real estate acquisitions and asset management experience at The Bascom Group",
       "Capital markets background with financial analysis experience at Eastdil Secured",
     ],
-    image: "/chris-von-pohlot-pro.jpg",
-    imageClass: "object-[center_30%] saturate-[1.06] contrast-[1.04]",
+    image: "/chris-von-pohlot-clean.jpg",
+    imageClass: "object-[center_32%]",
     imageOverlay: "from-emerald-950/10 via-transparent to-[hsl(var(--primary))]/18",
   },
   {
@@ -481,8 +481,8 @@ const HOMEPAGE_TEAM = [
       "Executive roles at Funding Circle, NepFin, and Zilch; two reached unicorn status",
       "Leads Grizzly Peak Ventures and co-founded Brightpoint Law, LLP",
     ],
-    image: "/tom-meister-pro.jpg",
-    imageClass: "object-[center_26%] saturate-[0.98] contrast-[1.07]",
+    image: "/tom-meister-clean.jpg",
+    imageClass: "object-[center_25%]",
     imageOverlay: "from-amber-950/10 via-transparent to-[hsl(var(--primary))]/20",
   },
 ];
@@ -686,6 +686,9 @@ export default function Home() {
                           </span>
                           <div className="text-sm font-semibold leading-tight">{vertical.title}</div>
                         </div>
+                        <p className="mt-2 hidden text-xs leading-snug text-muted-foreground lg:block">
+                          {vertical.desc}
+                        </p>
                       </div>
                     );
                   })}
@@ -959,31 +962,31 @@ export default function Home() {
                 testId="card-why-ai"
                 icon={<Bot className="size-5 text-[hsl(var(--accent))]" />}
                 title="Proprietary technology powers the engine"
-                desc="Our proprietary technology handles marketing campaigns, lead generation, operations reporting, and more — built exclusively for New Dawn so you and your territory manager can focus on results."
+                desc="Our proprietary technology supports lead generation, operations reporting, training, and owner dashboards across Property Management, Telecom, and Insurance."
               />
               <FeatureCard
                 testId="card-why-1"
-                icon={<ShieldCheck className="size-5 text-[hsl(var(--accent))]" />}
-                title="Operations managed for you"
-                desc="Territory representatives handle all operational tasks so you can focus on business oversight, growth, and your visa requirements."
+                icon={<Building2 className="size-5 text-[hsl(var(--accent))]" />}
+                title="Three industries selected for E-2 fit"
+                desc="Property Management, Telecom, and Insurance were chosen because they can support recurring revenue, supervisory control, documented operations, and long-term renewal readiness."
               />
               <FeatureCard
                 testId="card-why-2"
                 icon={<Wallet className="size-5 text-[hsl(var(--accent))]" />}
                 title="Owner visibility and control"
-                desc="You retain control of your bank account and maintain clear oversight through structured reporting and operational systems."
+                desc="You retain executive control of your franchise, bank accounts, and key decisions while local teams execute the day-to-day workflows."
               />
               <FeatureCard
                 testId="card-why-live"
                 icon={<Plane className="size-5 text-[hsl(var(--accent))]" />}
                 title="Live anywhere in the USA"
-                desc="Your franchise operates in Texas, but you can live anywhere in the United States. There's no requirement to relocate to the territory — manage your business from wherever you call home."
+                desc="The operating framework gives franchise owners domestic flexibility, with oversight systems designed so families can live where they choose in the United States."
               />
               <FeatureCard
                 testId="card-why-buyback"
                 icon={<RefreshCw className="size-5 text-[hsl(var(--accent))]" />}
-                title="90-day contract replacement guarantee"
-                desc="The biggest risk of losing contracts is right after you acquire the franchise. We will replace any lost contracts — lost for any reason — with new ones at no cost to you during the first 90 days. Plus, if your E-2 visa is declined, we replace your money."
+                title="Escrow-first investor protection"
+                desc="Investor capital is placed in escrow during setup, and New Dawn’s FDD explains the refund framework if a qualifying E-2 application is denied twice."
               />
               <FeatureCard
                 testId="card-why-referral"
@@ -1007,7 +1010,7 @@ export default function Home() {
               testId="heading-group"
               eyebrow="Part of something bigger"
               title="The New Dawn Franchising Group of Companies™"
-              subtitle="New Dawn Franchising is part of the New Dawn Franchising Group of Companies™ — an established organization with large, experienced divisions in real estate, financing, and law, each with over a decade of proven results."
+              subtitle="New Dawn Franchising is part of a larger corporate platform combining franchise operations, technology, real estate, finance, and legal experience to support three recurring-revenue industries."
             />
 
             <div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -1437,28 +1440,28 @@ export default function Home() {
                   id: "escrow-protection",
                 },
                 {
-                  q: "Do I have to do property management work myself?",
-                  a: "The franchise is structured so you are the business director and decision-maker. You maintain full ownership control and oversight — including control over your bank accounts — while an approved territory representative manages day-to-day execution.",
+                  q: "Do I have to do the day-to-day work myself?",
+                  a: "No. Each New Dawn vertical is structured so you are the business director and decision-maker. You maintain ownership control, bank-account oversight, and executive supervision while approved local teams manage daily execution.",
                   id: "hands-off",
                 },
                 {
-                  q: "How many contracts does one territory typically manage?",
-                  a: "The initial operating target is approximately 10 long-term rental management contracts per territory representative, scaling with systems and staffing.",
-                  id: "contracts",
+                  q: "How do I choose between Property Management, Telecom, and Insurance?",
+                  a: "The FDD and discovery process help you compare the three options. We look at your goals, market fit, investment preferences, operational comfort, and E-2 strategy, then walk you through which vertical is the strongest fit.",
+                  id: "choose-vertical",
                 },
                 {
-                  q: "What types of properties do you focus on?",
-                  a: "Single-family dwellings in Texas under long-term rental management arrangements.",
-                  id: "properties",
+                  q: "Why were these three industries selected?",
+                  a: "Property Management, Telecom, and Insurance all lend themselves to recurring revenue, documented operating systems, supervisory control, staffing, and renewal-ready reporting. Those traits are important for a credible E-2 business, although visa decisions are made only by the relevant government authorities.",
+                  id: "vertical-selection",
                 },
                 {
                   q: "Do I have to live in Texas?",
-                  a: "No. Your franchise operates in Texas, but you can live anywhere in the United States. There is no requirement to relocate to the territory where your business is based.",
+                  a: "No. New Dawn is headquartered in El Paso, Texas, but the platform is designed for domestic geographic flexibility. Qualified E-2 owners can live elsewhere in the United States while maintaining executive oversight of the franchise.",
                   id: "live-anywhere",
                 },
                 {
                   q: "Do you offer a guarantee?",
-                  a: "Any franchise that offers a traditional investment guarantee will not comply with E-2 visa requirements, because the investment must be genuinely \"at risk.\" However, we do offer two important protections: a 90-day contract replacement guarantee — if you lose any contracts during the first 90 days (for any reason), we replace them with new ones at no cost — and a money replacement if your E-2 visa application is declined.",
+                  a: "E-2 investments must be genuinely at risk, so this page cannot promise a visa or financial result. New Dawn does use an escrow-first setup structure, and the Franchise Disclosure Document explains the refund framework if a qualifying E-2 application is denied twice.",
                   id: "guarantee",
                 },
                 {
@@ -1487,43 +1490,43 @@ export default function Home() {
                   id: "franchise-vs-standalone",
                 },
                 {
-                  q: "What happens if I lose property management contracts after the initial warranty period?",
+                  q: "How does New Dawn help a franchise owner keep growing?",
                   a: (
                     <div>
                       <p className="mb-4">
-                        We never leave you on your own. Every New Dawn franchise includes full access to our marketing portal — a multi-channel system built exclusively to keep your pipeline full. Every channel below is included at no additional cost.
+                        New Dawn gives franchise owners access to a proprietary growth portal, centralized campaign tools, reporting dashboards, and operator support across the selected vertical. The exact workflows vary by Property Management, Telecom, or Insurance, but the goal is the same: keep your pipeline, reporting, and operating cadence visible.
                       </p>
                       <div className="grid gap-3">
                         {[
                           {
                             icon: <Printer className="size-4 text-[hsl(var(--accent))]" />,
-                            title: "Physical Mailers",
-                            desc: "Professionally designed, full-color direct mail pieces sent to homeowner addresses inside your designated territory. We coordinate design, printing, addressing, postage, and delivery tracking — you just approve the creative. Physical mail reaches homeowners who ignore email and social media, giving you a channel your competitors often overlook.",
+                            title: "Vertical-specific campaigns",
+                            desc: "Campaigns are tailored to the franchise lane you select instead of forcing every owner into the same sales motion.",
                           },
                           {
                             icon: <Mail className="size-4 text-[hsl(var(--accent))]" />,
-                            title: "Email & SMS Drip Campaigns",
-                            desc: "Automated multi-touch email and text sequences that nurture homeowner leads over time. The portal scrapes homeowner data in your territory and handles the entire send schedule — you just watch the replies come in.",
+                            title: "Email and SMS workflows",
+                            desc: "Approved outreach sequences help your operating team nurture prospects, referral sources, and client relationships.",
                           },
                           {
                             icon: <DollarSign className="size-4 text-[hsl(var(--accent))]" />,
-                            title: "Pay-Per-Click Advertising",
-                            desc: "Targeted Google and Facebook ad campaigns that reach homeowners and real estate agents actively searching for property management services in El Paso. Budget controls and performance tracking are built right into the portal.",
+                            title: "Performance marketing",
+                            desc: "Paid campaigns can be launched and tracked from the same owner dashboard, with budget controls and performance reporting.",
                           },
                           {
                             icon: <Globe2 className="size-4 text-[hsl(var(--accent))]" />,
                             title: "Social Media Content",
-                            desc: "AI-generated posts published automatically to Facebook, X (Twitter), and YouTube on a consistent schedule — keeping your brand visible without adding to your workload.",
+                            desc: "Content workflows keep the franchise visible without making the owner manually manage daily posting.",
                           },
                           {
                             icon: <Users className="size-4 text-[hsl(var(--accent))]" />,
-                            title: "Real Estate Agent Referral Network",
-                            desc: "Agents earn a referral fee for every homeowner they send your way. The entire program — invitations, tracking, and payments — runs through the portal, so your referral pipeline grows on autopilot.",
+                            title: "Referral networks",
+                            desc: "Partner and referral relationships can be tracked through the platform so the business develops beyond one marketing channel.",
                           },
                           {
                             icon: <Bot className="size-4 text-[hsl(var(--accent))]" />,
                             title: "AI Outreach Agent",
-                            desc: "Our proprietary AI agent runs daily prospect discovery, drafts personalized outreach sequences, and executes approved campaigns across email and WhatsApp — giving you enterprise-grade outreach at franchise scale.",
+                            desc: "Our proprietary AI supports prospect discovery, follow-up suggestions, and reporting so the owner can supervise strategy instead of chasing admin tasks.",
                           },
                         ].map((ch) => (
                           <div key={ch.title} className="flex items-start gap-3 rounded-xl border bg-white/70 p-3">
@@ -1538,15 +1541,15 @@ export default function Home() {
                         ))}
                       </div>
                       <p className="mt-4 text-xs text-muted-foreground">
-                        The portal continuously recommends new campaigns based on your territory data, and our team is on hand to help you plan your next move.
+                        The portal recommends next steps based on franchise activity, and the New Dawn team helps you plan growth in the selected industry.
                       </p>
                     </div>
                   ),
-                  id: "lost-contracts",
+                  id: "growth-support",
                 },
                 {
-                  q: "How do I grow and expand my portfolio?",
-                  a: "The same marketing engine that replaces lost contracts is designed to help you grow. Through your franchise marketing portal you can target new neighborhoods, launch additional drip campaigns, ramp up pay-per-click spending, and expand your real estate agent referral network — all within your designated territory. The portal tracks every lead, campaign, and conversion so you can see exactly what's working. Our AI tools continuously suggest new campaigns and optimizations based on your market data, and our team is here around the clock to help you plan your growth strategy. When you're ready to scale beyond your current territory, talk to us about adding additional territories to your franchise.",
+                  q: "Can I expand beyond the first franchise lane?",
+                  a: "Expansion depends on the FDD, territory availability, operational readiness, and your growth plan. The platform was intentionally built as a multi-vertical system, so qualified owners can discuss broader expansion with the New Dawn team after the initial franchise is operating.",
                   id: "expand-portfolio",
                 },
                 {
@@ -1566,7 +1569,7 @@ export default function Home() {
                 },
                 {
                   q: "How does the marketing portal help with real estate leads?",
-                  a: "The same marketing portal included with your franchise can generate leads for people looking to buy or sell homes — not just property management clients. Use email campaigns, PPC ads, social media, and more to find motivated buyers and sellers in El Paso and surrounding areas, all from the same dashboard at no additional cost.",
+                  a: "The portal is designed as a broader franchise growth system, not just a property-management dashboard. Depending on your vertical, it can support campaigns, referral tracking, lead follow-up, and performance reporting from one owner-facing system.",
                   id: "re-marketing-portal",
                 },
                 {

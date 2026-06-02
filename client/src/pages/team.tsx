@@ -117,11 +117,11 @@ const ADVISORS: TeamMember[] = [
     badge: "Founding Member",
     org: "SMB Operations · Private Equity",
     initials: "JT",
-    photo: null,
+    photo: "/jeffrey-tung-profile.svg",
     linkedin: null,
     website: null,
-    bio: "Jeffrey is an SMB operator and private equity investor with cross-market deployment experience across dozens of states. His operating background supports New Dawn's ability to standardize local execution while franchise owners maintain executive and supervisory control of their enterprise.",
-    tags: ["SMB Operations", "Private Equity", "Multi-State Deployment", "Operational Scale"],
+    bio: "Jeffrey is a private equity operator and Co-Founder & Partner at CPS Capital, where he works with small and medium-sized businesses on growth, execution, and operating discipline. His background across private equity, board oversight, and management-team partnerships strengthens New Dawn's ability to standardize local execution while franchise owners maintain executive and supervisory control of their enterprise.",
+    tags: ["SMB Operations", "Private Equity", "Board Oversight", "Operational Scale"],
   },
 ];
 

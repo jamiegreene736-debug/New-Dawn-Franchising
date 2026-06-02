@@ -73,7 +73,7 @@ const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "dylan@newdawnfranchising.com").
 const ADMIN_PASSWORD = (process.env.ADMIN_PASSWORD || "NewHorizons@12").trim();
 
 const HOMEPAGE_OVERVIEW_VOICEOVER =
-  "New Dawn Franchising is a multi-vertical franchise platform built for qualified E-2 investors who want to live and work in the United States with their families. Investors can choose from Property Management, Telecom, or Insurance, each designed around recurring revenue, executive oversight, and local operational support. You own and direct the business while our teams handle day-to-day execution, supported by proprietary AI technology, dashboards, and structured reporting. Inquire today to review the FDD, compare franchise options, and build a real operating enterprise in the USA.";
+  "New Dawn Franchising is a multi-vertical franchise platform built for qualified E-2 investors who want to live and work in the United States with their families. Choose from Property Management, Telecom, or Insurance. We selected these industries because they can support recurring revenue, active executive oversight, documented operations, staffing, and renewal-ready reporting. You own and direct the business while New Dawn provides proprietary AI technology, dashboards, training, and local operating teams for daily execution. Request the FDD today to compare your options and build a real U.S. enterprise designed around treaty-investor requirements.";
 
 function getElevenLabsConfig() {
   const apiKey =

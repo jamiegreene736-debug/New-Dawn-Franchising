@@ -1,12 +1,13 @@
 const SITE_KNOWLEDGE = `
 ABOUT NEW DAWN FRANCHISING
-New Dawn Franchising LLC is a property management franchise opportunity specifically designed for E-2 visa investors. Founded by Dylan Delaney and based in El Paso, Texas, we help international investors enter the U.S. market through a proven franchise model.
+New Dawn Franchising LLC is a multi-vertical franchise platform specifically designed for E-2 visa investors. Founded by Dylan Delaney and based in El Paso, Texas, we help international investors enter the U.S. market through franchise options in Property Management, Telecom, and Insurance.
 
 THE FRANCHISE MODEL
 - Investment: $250,000 minimum (satisfies E-2 visa substantial investment requirement)
-- Business type: Property management franchise (residential rental properties in El Paso, TX)
-- Franchise provides: Systems, training, vendor relationships, software, and ongoing support
-- The investor directs and controls the business without doing day-to-day property management tasks
+- Business types: Property Management, Telecom, or Insurance franchise options
+- Franchise provides: Systems, training, vendor relationships, proprietary software, AI-enabled dashboards, and ongoing support
+- The investor directs and controls the business without doing day-to-day manual operations
+- New Dawn selected these industries because they can support recurring revenue, supervisory control, documented operations, staffing, and renewal-ready reporting
 - This structure satisfies the USCIS "direct and control" requirement for the E-2 visa
 
 THE E-2 VISA
@@ -33,12 +34,12 @@ FDD (FRANCHISE DISCLOSURE DOCUMENT)
 - 14-day review period required before signing
 
 SERVICES INCLUDED IN FRANCHISE
-1. Full training program (6 tracks covering all aspects of property management)
-2. Proprietary property management software
+1. Full training program for the selected franchise vertical
+2. Proprietary franchise operations software and owner dashboards
 3. Vendor network (contractors, inspectors, etc.)
-4. Marketing support and materials
-5. Lead generation for tenants
-6. Legal document templates
+4. Marketing support and materials tailored to the chosen industry
+5. Lead generation and referral workflows
+6. Legal document templates and FDD-led setup process
 7. Ongoing operational support from Dylan and the New Dawn team
 
 WHO THIS IS FOR
@@ -51,8 +52,8 @@ WHO THIS IS FOR
 INVESTMENT STRUCTURE
 - $250,000 total investment
 - Covers franchise fee, initial working capital, setup costs
-- Revenue comes from property management fees (typically 8-12% of monthly rent)
-- Break-even typically achievable in 12-18 months with a managed portfolio
+- Revenue model depends on the selected vertical and is reviewed through the FDD and discovery process
+- New Dawn focuses on recurring-revenue industries with systems for reporting and owner oversight
 - No royalties on revenue for the first year (ask for current terms in FDD)
 
 CONTACT & NEXT STEPS
@@ -68,7 +69,7 @@ Q: Is my country eligible for E-2?
 A: Most countries qualify — over 80 treaty countries. Mexico, India, UAE, UK, Canada, Brazil, South Korea, Japan, Germany, France, Australia, and many more. Dylan can confirm your specific country.
 
 Q: Do I need to live in El Paso?
-A: As the director, you'll want to be present initially and make key decisions. Day-to-day operations are handled by staff — you're the owner-operator, not the manager.
+A: No. New Dawn is headquartered in El Paso, but the platform is designed for domestic geographic flexibility. You maintain executive oversight while approved local teams handle day-to-day execution.
 
 Q: What's the timeline to get an E-2 visa through this?
 A: After signing the franchise agreement and making the investment, the visa application typically takes 2-6 months depending on your country and embassy.
@@ -77,7 +78,7 @@ Q: Can I bring my family?
 A: Yes — your spouse gets an unrestricted work permit with an E-2 visa. Children under 21 get E-2 dependent status and can attend school.
 
 Q: Is this passive income?
-A: The E-2 visa requires you to direct and develop the enterprise — it's not purely passive. But you manage the business, not individual properties. This is an important distinction Dylan can explain in detail.
+A: The E-2 visa requires you to direct and develop the enterprise — it's not purely passive. But you supervise the business rather than performing daily manual tasks in the chosen vertical. This is an important distinction Dylan can explain in detail.
 
 Q: What happens if the franchise doesn't work out?
 A: The FDD covers exit provisions. Dylan can walk through options during your consultation. Protecting your investment is a priority.

@@ -649,12 +649,6 @@ export default function Home() {
                   <Pill testId="pill-verticals">
                     <Building className="size-4 text-foreground/70" /> Property Management · Telecom · Insurance
                   </Pill>
-                  <Pill testId="pill-spanish">
-                    <Globe2 className="size-4 text-foreground/70" /> <span lang="es">Hablamos Español</span>
-                  </Pill>
-                  <Pill testId="pill-network-contracts">
-                    <Building2 className="size-4 text-foreground/70" /> 300+ contracts under network management
-                  </Pill>
                 </div>
 
                 <h1

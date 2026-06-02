@@ -73,7 +73,7 @@ const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "dylan@newdawnfranchising.com").
 const ADMIN_PASSWORD = (process.env.ADMIN_PASSWORD || "NewHorizons@12").trim();
 
 const HOMEPAGE_OVERVIEW_VOICEOVER =
-  "New Dawn Franchising is a property management franchise built for qualified E-2 investors who want to live and work in the United States with their families. We provide a starting portfolio of ten long-term rental management contracts. You own and direct the business; our proprietary AI technology helps you expand while our team handles the day-to-day operations. Escrow protections support your investment through the visa process. Inquire today to build a real operating franchise and live and work anywhere in the USA.";
+  "New Dawn Franchising is a multi-vertical franchise platform built for qualified E-2 investors who want to live and work in the United States with their families. Investors can choose from Property Management, Telecom, or Insurance, each designed around recurring revenue, executive oversight, and local operational support. You own and direct the business while our teams handle day-to-day execution, supported by proprietary AI technology, dashboards, and structured reporting. Inquire today to review the FDD, compare franchise options, and build a real operating enterprise in the USA.";
 
 function getElevenLabsConfig() {
   const apiKey =
@@ -1197,22 +1197,22 @@ export async function registerRoutes(
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 WHAT NEW DAWN FRANCHISING ACTUALLY IS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-New Dawn Franchising sells a property management franchise in El Paso, Texas, specifically engineered to qualify investors for the E-2 Treaty Investor Visa.
+New Dawn Franchising offers a multi-vertical franchise platform specifically engineered for E-2 Treaty Investor Visa applicants, with recurring-revenue options in Property Management, Telecom, and Insurance.
 
 The franchise model: "You Own It. You Direct It. We Run It."
-- The investor buys the franchise (~$250,000 investment, meets the E-2 "substantial investment" threshold)
+- The investor selects a franchise vertical and reviews investment details through the Franchise Disclosure Document
 - They are the legal owner and sole signatory on US bank accounts — USCIS requires this
-- A Territory Manager (employed by New Dawn) runs all day-to-day operations: tenant screening, maintenance, rent collection, property inspections
-- The investor can live ANYWHERE in the USA — they do not need to be in El Paso
-- The business manages single-family residential rental properties in El Paso, TX
-- Revenue comes from property management fees on the portfolio
+- Local operations teams execute the day-to-day manual work while the investor maintains executive and supervisory control
+- The investor can live ANYWHERE in the USA while overseeing the enterprise
+- Revenue comes from recurring-service activity in the selected vertical
 
 What's included in the franchise:
-- ~10 active property management contracts from day one (so the business is "real" for USCIS)
+- A real operating franchise model in Property Management, Telecom, or Insurance
 - A USCIS-compliant business plan (partnered with Joorney Business Plans)
-- Full operational management by the Territory Manager
-- 90-day money-back guarantee if the E-2 visa is denied
-- 90-day contract replacement guarantee (lost contracts replaced at no cost)
+- Operational support by New Dawn's local teams
+- Escrow structure through the investor's selected escrow account
+- Escrow refund protection if the visa is denied twice, as detailed in the FDD and transaction documents
+- Internal buyback pathway and documentation support for future growth planning
 - Investor funds held in escrow by a third-party attorney — only released on visa approval
 
 Additional paths: As the business grows, it can serve as a stepping stone to EB-5 (Green Card).

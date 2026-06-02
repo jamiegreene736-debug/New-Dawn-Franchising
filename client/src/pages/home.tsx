@@ -129,23 +129,44 @@ function FeatureCard({
 const VIDEO_SCENES = [
   {
     time: "0:00",
-    title: "E-2 property management franchise",
-    copy: "A real U.S. business path for qualified investors and their families.",
+    title: "Three E-2 franchise options",
+    copy: "Choose a recurring-revenue model in property management, telecom, or insurance.",
   },
   {
     time: "0:06",
-    title: "10 long-term contracts provided",
-    copy: "We provide a starting portfolio of 10 long-term rental management contracts.",
+    title: "Executive control structure",
+    copy: "You supervise the enterprise while local teams execute day-to-day operations.",
   },
   {
     time: "0:13",
-    title: "AI-powered franchise growth",
-    copy: "Our proprietary AI technology helps you expand your franchise over time.",
+    title: "AI-powered operating platform",
+    copy: "Centralized dashboards and automation support growth across each vertical.",
   },
   {
     time: "0:20",
-    title: "We handle daily operations",
-    copy: "You own and direct the business while our team manages the day-to-day work.",
+    title: "Built for E-2 applicants",
+    copy: "The model is structured around investor oversight, documentation, and renewal readiness.",
+  },
+];
+
+const FRANCHISE_VERTICALS = [
+  {
+    id: "property-management",
+    title: "Property Management",
+    desc: "Long-term rental management operations with local execution teams and owner-level reporting.",
+    icon: Building2,
+  },
+  {
+    id: "telecom",
+    title: "Telecom",
+    desc: "Recurring-service telecom operations supported by centralized systems, sales workflows, and oversight dashboards.",
+    icon: Cpu,
+  },
+  {
+    id: "insurance",
+    title: "Insurance",
+    desc: "Insurance-sector franchise operations designed around compliant supervision, client service, and recurring revenue.",
+    icon: ShieldCheck,
   },
 ];
 
@@ -625,6 +646,9 @@ export default function Home() {
                   <Pill testId="pill-focus">
                     <Globe2 className="size-4 text-foreground/70" /> E-2 investor focus
                   </Pill>
+                  <Pill testId="pill-verticals">
+                    <Building className="size-4 text-foreground/70" /> Property Management · Telecom · Insurance
+                  </Pill>
                   <Pill testId="pill-spanish">
                     <Globe2 className="size-4 text-foreground/70" /> <span lang="es">Hablamos Español</span>
                   </Pill>
@@ -648,8 +672,24 @@ export default function Home() {
                   data-testid="text-hero-subtitle"
                   className="mt-4 max-w-xl text-pretty text-base leading-relaxed text-muted-foreground md:text-lg"
                 >
-                  A property management franchise designed to help qualified E-2 investors and their families live in the USA. You control the business and finances; our team handles daily operations so you can focus on ownership, growth, and visa compliance.
+                  A multi-vertical franchise platform designed to help qualified E-2 investors and their families live in the USA. Choose from Property Management, Telecom, or Insurance while you maintain executive control and our operating teams handle the daily execution.
                 </p>
+
+                <div className="mt-5 grid gap-2 sm:grid-cols-3">
+                  {FRANCHISE_VERTICALS.map((vertical) => {
+                    const Icon = vertical.icon;
+                    return (
+                      <div key={vertical.id} data-testid={`card-hero-vertical-${vertical.id}`} className="rounded-2xl border bg-white/70 p-3 shadow-sm backdrop-blur">
+                        <div className="flex items-center gap-2">
+                          <span className="grid size-8 place-items-center rounded-full bg-[hsl(var(--primary))]/8">
+                            <Icon className="size-4 text-[hsl(var(--primary))]" />
+                          </span>
+                          <div className="text-sm font-semibold leading-tight">{vertical.title}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
 
                 <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
                   <Button data-testid="button-hero-primary-fdd" size="lg" className="gap-2 bg-[hsl(var(--primary))] px-6 py-6 text-base shadow-xl shadow-[hsl(var(--primary))]/20 hover:bg-[hsl(var(--primary))]/92" asChild>
@@ -852,16 +892,16 @@ export default function Home() {
                 Technology Built for Your Business
               </h2>
               <p data-testid="text-tech-body" className="mt-4 text-pretty text-base leading-relaxed text-white/75">
-                Every New Dawn franchisee benefits from proprietary technology built exclusively for our system — from automated tenant communications and leasing workflows to marketing that works around the clock. This isn't off-the-shelf software. It's infrastructure we designed specifically for the E-2 property management model, so your business runs with the efficiency of a seasoned operation from day one.
+                Every New Dawn franchisee benefits from proprietary technology built exclusively for our multi-vertical system — from owner dashboards and client communications to marketing, reporting, and workflow automation. This isn't off-the-shelf software. It's infrastructure designed around E-2 investor oversight across Property Management, Telecom, and Insurance.
               </p>
               <p data-testid="text-tech-spanish" className="mt-4 text-pretty text-sm leading-relaxed text-white/55" lang="es">
-                Cada franquiciado de New Dawn tiene acceso a herramientas desarrolladas exclusivamente para nuestro sistema — desde comunicaciones automatizadas con inquilinos hasta marketing que trabaja por usted las 24 horas. No es software genérico. Es infraestructura diseñada específicamente para el modelo de administración de propiedades con visa E-2.
+                Cada franquiciado de New Dawn tiene acceso a herramientas desarrolladas exclusivamente para nuestro sistema — desde paneles de control y comunicaciones automatizadas hasta marketing e informes operativos. No es software genérico. Es infraestructura diseñada para inversionistas E-2 en administración de propiedades, telecomunicaciones y seguros.
               </p>
             </div>
             <div className="mx-auto mt-10 grid max-w-3xl gap-4 md:grid-cols-3">
               {[
-                { id: "tenant-comm", icon: <Users className="size-5 text-[hsl(var(--accent))]" />, text: "Automated tenant communication & follow-up" },
-                { id: "leasing", icon: <CalendarCheck className="size-5 text-[hsl(var(--accent))]" />, text: "Technology-assisted leasing and property marketing" },
+                { id: "client-comm", icon: <Users className="size-5 text-[hsl(var(--accent))]" />, text: "Automated client communication, follow-up, and service workflows" },
+                { id: "marketing", icon: <CalendarCheck className="size-5 text-[hsl(var(--accent))]" />, text: "Technology-assisted marketing and franchise growth campaigns" },
                 { id: "dashboards", icon: <Cpu className="size-5 text-[hsl(var(--accent))]" />, text: "Operational dashboards so you always know what's happening in your business" },
               ].map((item) => (
                 <div key={item.id} data-testid={`card-tech-${item.id}`} className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/10 p-5 text-left backdrop-blur">
@@ -879,7 +919,7 @@ export default function Home() {
               testId="heading-how"
               eyebrow="How it works"
               title="You control the business. We manage the operations."
-              subtitle="A structure designed for investors who want full visibility and control, without handling daily property management tasks."
+              subtitle="A structure designed for investors who want full visibility and control, without handling daily manual work in Property Management, Telecom, or Insurance."
             />
 
             <div className="mt-10 grid gap-4 md:grid-cols-3">
@@ -892,14 +932,14 @@ export default function Home() {
               <FeatureCard
                 testId="card-how-2"
                 icon={<ClipboardCheck className="size-5 text-[hsl(var(--primary))]" />}
-                title="We set up an approved territory rep"
-                desc="An experienced territory representative runs operations: leasing coordination, vendor management, tenant communication, and reporting cadence."
+                title="We set up local operations"
+                desc="Experienced operating teams execute the manual work, service coordination, client communication, and reporting cadence."
               />
               <FeatureCard
                 testId="card-how-3"
                 icon={<Building2 className="size-5 text-[hsl(var(--primary))]" />}
-                title="A portfolio of long-term contracts"
-                desc="The model centers on building and maintaining a portfolio of single-family long-term rental management contracts in Texas."
+                title="Three recurring-revenue lanes"
+                desc="Select the franchise vertical that fits your strategy: Property Management, Telecom, or Insurance."
               />
             </div>
           </div>

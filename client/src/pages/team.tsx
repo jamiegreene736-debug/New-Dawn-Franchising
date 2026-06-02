@@ -6,11 +6,24 @@ import photoTom from "@assets/TomMeister_1774713209619.jpg";
 import photoKamal from "@assets/KamalObbad_1774713209619.jpg";
 import photoZach from "@assets/Zach_1774713209619.jpg";
 import photoDylan from "@assets/Dylan_1774713209619.jpg";
-import photoKevin from "@assets/KevinHatch_1774713209619.jpg";
 
 const COMPANY = {
   phone: "(346) 597-9994",
   phoneTel: "+13465979994",
+};
+
+type TeamMember = {
+  id: string;
+  name: string;
+  badge: string;
+  org: string;
+  initials: string;
+  photo: string | null;
+  linkedin: string | null;
+  website: { label: string; url: string } | null;
+  bio: string;
+  tags: string[];
+  featured?: boolean;
 };
 
 function LinkedInIcon({ className }: { className?: string }) {
@@ -21,7 +34,7 @@ function LinkedInIcon({ className }: { className?: string }) {
   );
 }
 
-const LEADERSHIP = [
+const LEADERSHIP: TeamMember[] = [
   {
     id: "chris",
     name: "Chris von Pohlot",
@@ -37,7 +50,7 @@ const LEADERSHIP = [
   },
 ];
 
-const ADVISORS = [
+const ADVISORS: TeamMember[] = [
   {
     id: "tom",
     name: "Tom Meister",
@@ -88,19 +101,31 @@ const ADVISORS = [
   },
   {
     id: "kevin",
-    name: "Kevin Hatch",
-    badge: "Founding Member",
-    org: "Duke University · Investor",
-    initials: "KH",
-    photo: photoKevin,
-    linkedin: "https://www.linkedin.com/in/kevin-hatch-97167857/",
+    name: "Kevin Quinn",
+    badge: "Technological Infrastructure",
+    org: "Google · Nebula Genomics",
+    initials: "KQ",
+    photo: null,
+    linkedin: null,
     website: null,
-    bio: "A Duke University–educated entrepreneur and investor, Kevin brings a background in impact investing and early-stage company building. His involvement with Y Combinator alumni companies and Bain Capital–backed ventures reflects a sophisticated understanding of scalable business models. As New Dawn grows its franchisee network and pursues institutional investment, Kevin's network within the venture and private equity communities adds significant strategic value.",
-    tags: ["Private Equity", "Early-Stage Investing", "Duke Network", "Impact / Climate"],
+    bio: "Kevin leads technological infrastructure strategy for New Dawn. A University of Washington Master of Engineering graduate, former Product Manager at Google, and co-founder/CTO of Nebula Genomics, he brings senior product and systems architecture experience to the dashboards, automation, and operational tooling that support New Dawn franchise owners.",
+    tags: ["Google", "Systems Architecture", "Product Leadership", "Nebula Genomics"],
+  },
+  {
+    id: "jeffrey",
+    name: "Jeffrey Tung",
+    badge: "Founding Member",
+    org: "SMB Operations · Private Equity",
+    initials: "JT",
+    photo: null,
+    linkedin: null,
+    website: null,
+    bio: "Jeffrey is an SMB operator and private equity investor with cross-market deployment experience across dozens of states. His operating background supports New Dawn's ability to standardize local execution while franchise owners maintain executive and supervisory control of their enterprise.",
+    tags: ["SMB Operations", "Private Equity", "Multi-State Deployment", "Operational Scale"],
   },
 ];
 
-function MemberCard({ member, featured = false }: { member: typeof ADVISORS[0]; featured?: boolean }) {
+function MemberCard({ member, featured = false }: { member: TeamMember; featured?: boolean }) {
   return (
     <div
       data-testid={`card-team-${member.id}`}
@@ -171,15 +196,17 @@ function MemberCard({ member, featured = false }: { member: typeof ADVISORS[0]; 
               {member.website.label}
             </a>
           )}
-          <a
-            href={member.linkedin}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-xs font-medium tracking-wide text-muted-foreground transition-colors hover:text-[hsl(var(--accent))]"
-          >
-            <LinkedInIcon className="size-3.5" />
-            LinkedIn
-          </a>
+          {member.linkedin && (
+            <a
+              href={member.linkedin}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-xs font-medium tracking-wide text-muted-foreground transition-colors hover:text-[hsl(var(--accent))]"
+            >
+              <LinkedInIcon className="size-3.5" />
+              LinkedIn
+            </a>
+          )}
         </div>
       </div>
     </div>
@@ -209,7 +236,7 @@ export default function TeamPage() {
             <em className="italic text-[hsl(var(--accent))]">New Dawn</em>
           </h1>
           <p className="mt-3 text-sm font-light leading-relaxed text-white/60 md:text-base">
-            The first franchise designed specifically for the E-2 Visa investor — structured, compliant, and professionally operated so you can live and work freely anywhere in America.
+            A multi-vertical franchise platform built for E-2 Treaty Investor Visa applicants, with operating models across Property Management, Telecom, and Insurance.
           </p>
           <div className="mx-auto mt-5 h-0.5 w-10 bg-[hsl(var(--accent))] opacity-70" />
         </div>
@@ -218,7 +245,7 @@ export default function TeamPage() {
       <div className="mx-auto max-w-6xl px-6 py-20">
         <div className="mb-8 mx-auto max-w-3xl rounded-2xl border bg-white/60 p-6 shadow-sm">
           <p className="text-sm leading-relaxed text-muted-foreground">
-            Our leadership team brings deep expertise in property management operations, U.S. franchise law, and E-2 visa business compliance. New Dawn was built by founders who have lived this model firsthand — and who understand what it takes to build a business that satisfies both visa requirements and long-term financial goals.
+            Our leadership team brings deep expertise in recurring-revenue operations, U.S. franchise law, technology infrastructure, capital markets, and E-2 visa business compliance. New Dawn was built for investors who need a real operating enterprise with clear executive oversight and professional day-to-day execution.
           </p>
         </div>
         <div className="mb-12 flex items-center gap-4">

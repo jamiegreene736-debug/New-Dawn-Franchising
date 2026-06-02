@@ -1062,7 +1062,7 @@ export default function Home() {
                     <img
                       src="/dylan-headshot.png"
                       alt="Dylan Delaney — Founding Member & Director of Franchise Development"
-                      className="h-full w-full object-cover object-center"
+                      className="h-full w-full object-contain object-center"
                       loading="eager"
                     />
                     {/* gradient overlay at bottom */}

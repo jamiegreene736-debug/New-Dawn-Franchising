@@ -1,9 +1,6 @@
 import { ArrowRight, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import photoKamal from "@assets/KamalObbad_1774713209619.jpg";
-import photoZach from "@assets/Zach_1774713209619.jpg";
-import photoDylan from "@assets/Dylan_1774713209619.jpg";
 
 const COMPANY = {
   phone: "(346) 597-9994",
@@ -67,7 +64,7 @@ const ADVISORS: TeamMember[] = [
     badge: "Founding Member",
     org: "Nebula Genomics · Forbes 30 Under 30",
     initials: "KO",
-    photo: photoKamal,
+    photo: "/kamal-obbad-headshot.jpg",
     linkedin: "https://www.linkedin.com/in/kamal-obbad-5757597784",
     website: null,
     bio: "Kamal is a Harvard graduate and Gates-Cambridge Scholar who co-founded Nebula Genomics, a genomic data platform backed by Khosla Ventures, Arch Venture Partners, and Mayfield. Previously a product manager at Google within Google Research and ChromeOS, he was recognized as a Forbes 30 Under 30 honoree in Healthcare. His track record of building and scaling data-driven technology ventures brings investor credibility and technological sophistication to New Dawn's operational infrastructure.",
@@ -79,7 +76,7 @@ const ADVISORS: TeamMember[] = [
     badge: "Founding Member",
     org: "Brightpoint Law · Charta Ventures",
     initials: "ZB",
-    photo: photoZach,
+    photo: "/zachary-bohlender-headshot.jpg",
     linkedin: "https://www.linkedin.com/in/zachary-bohlender/",
     website: { label: "Website", url: "https://www.brightpoint.law" },
     bio: "Zachary is a UC Berkeley–trained attorney and entrepreneur with a career spanning Wilson Sonsini Goodrich & Rosati (M&A for Twitter, Astex), entertainment law at King Holmes Paterno & Soriano, and the founding of two ventures — Charta Ventures, a legal-tech platform for creators, and Brightpoint Law, LLP. His dual expertise in transactional law and company formation gives New Dawn access to best-in-class legal structuring for franchise disclosure documents, franchise agreements, and multi-state compliance.",
@@ -91,7 +88,7 @@ const ADVISORS: TeamMember[] = [
     badge: "Founding Member",
     org: "Investor · Texas Markets",
     initials: "DD",
-    photo: photoDylan,
+    photo: "/dylan-headshot.png",
     linkedin: "https://www.linkedin.com/in/dylanmdelaney",
     website: null,
     bio: "Dylan brings boots-on-the-ground experience in Texas's high-growth business markets, with a career spanning Houston and Austin across sales, business development, and investment. His firsthand exposure to the Texas SMB landscape — one of New Dawn's primary target markets for E-2 Visa franchisee placement — gives him an operational lens that complements the financial and legal expertise of the broader investor group.",
@@ -103,7 +100,7 @@ const ADVISORS: TeamMember[] = [
     badge: "Technological Infrastructure",
     org: "Google · Nebula Genomics",
     initials: "KQ",
-    photo: null,
+    photo: "/kevin-quinn-headshot.jpg",
     linkedin: null,
     website: null,
     bio: "Kevin leads technological infrastructure strategy for New Dawn. A University of Washington Master of Engineering graduate, former Product Manager at Google, and co-founder/CTO of Nebula Genomics, he brings senior product and systems architecture experience to the dashboards, automation, and operational tooling that support New Dawn franchise owners.",

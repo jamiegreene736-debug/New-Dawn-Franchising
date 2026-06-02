@@ -685,7 +685,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-2">
             <span data-testid="badge-spanish" className="hidden items-center gap-1 rounded-full border bg-white/60 px-2.5 py-1 text-[11px] font-medium text-foreground/60 lg:inline-flex">
               <Globe2 className="size-3" />
-              <span lang="es">Hablamos Español</span>
+              <span>E-2 investor guidance</span>
             </span>
             <Button data-testid="button-top-cta" className="hidden gap-2 lg:inline-flex" asChild>
               <Link href="/contact">
@@ -771,7 +771,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
         <div className="border-t p-4">
           <div className="mb-3 flex items-center justify-center gap-1.5 text-xs text-foreground/50">
             <Globe2 className="size-3" />
-            <span lang="es">Hablamos Español</span>
+            <span>E-2 investor guidance</span>
           </div>
           <Button data-testid="button-mobile-cta" className="w-full gap-2" asChild>
             <Link href="/contact">

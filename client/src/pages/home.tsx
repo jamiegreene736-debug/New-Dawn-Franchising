@@ -1058,17 +1058,11 @@ export default function Home() {
                   <div className="pointer-events-none absolute -bottom-6 -right-6 size-48 rounded-full bg-[hsl(var(--primary))] opacity-10 blur-2xl" />
 
                   {/* Portrait */}
-                  <div className="relative overflow-hidden rounded-3xl shadow-2xl aspect-square bg-[hsl(var(--primary))]">
-                    <img
-                      src="/dylan-headshot.png"
-                      alt=""
-                      aria-hidden="true"
-                      className="absolute inset-0 h-full w-full scale-110 object-cover object-center blur-lg"
-                    />
+                  <div className="relative overflow-hidden rounded-3xl shadow-2xl aspect-[4/5] bg-[hsl(var(--primary))]">
                     <img
                       src="/dylan-headshot.png"
                       alt="Dylan Delaney — Founding Member & Director of Franchise Development"
-                      className="relative h-full w-full object-contain object-center"
+                      className="h-full w-full object-cover object-top"
                       loading="eager"
                     />
                     {/* gradient overlay at bottom */}

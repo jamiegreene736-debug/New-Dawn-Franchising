@@ -1,8 +1,6 @@
 import { ArrowRight, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import photoChris from "@assets/ChrisVonPohlot_1774713209619.jpg";
-import photoTom from "@assets/TomMeister_1774713209619.jpg";
 import photoKamal from "@assets/KamalObbad_1774713209619.jpg";
 import photoZach from "@assets/Zach_1774713209619.jpg";
 import photoDylan from "@assets/Dylan_1774713209619.jpg";
@@ -41,7 +39,7 @@ const LEADERSHIP: TeamMember[] = [
     badge: "Managing Director",
     org: "Obtuse Ventures · Altbanc",
     initials: "CP",
-    photo: photoChris,
+    photo: "/chris-von-pohlot-headshot.jpg",
     linkedin: "https://www.linkedin.com/in/christoph-von-pohlot-7a328990",
     website: null,
     bio: "Chris is a Columbia University–educated fintech entrepreneur with deep roots in alternative financing, real estate acquisitions, and venture investment. As the founder of Altbanc, he built an alternative lending platform helping hundreds of small and medium-sized businesses refinance high-cost merchant cash advance debt — a model directly applicable to the capital-efficient franchise ecosystem New Dawn is building. His background spans acquisitions and asset management at The Bascom Group and financial analysis at Eastdil Secured, giving him a rare combination of real estate and capital markets expertise.",
@@ -57,7 +55,7 @@ const ADVISORS: TeamMember[] = [
     badge: "Founding Member",
     org: "Grizzly Peak Ventures · Brightpoint Law",
     initials: "TM",
-    photo: photoTom,
+    photo: "/tom-meister-headshot.jpg",
     linkedin: "https://www.linkedin.com/in/eastbaytom/",
     website: { label: "Website", url: "https://www.grizzlypeakventures.com" },
     bio: "Tom is an entrepreneur, investor, and attorney operating at the intersection of capital markets and financial technology. After beginning his career at Wilson Sonsini and Goodwin Procter, he took on executive roles at three venture-backed online lenders — including Funding Circle, NepFin, and Zilch, two of which achieved unicorn status. Today he leads Grizzly Peak Ventures, a fintech and specialty finance venture studio, and co-founded Brightpoint Law, LLP. His skills in venture capital and strategic planning are invaluable for structuring investments and ensuring financial stability for the franchise network.",
@@ -117,7 +115,7 @@ const ADVISORS: TeamMember[] = [
     badge: "Founding Member",
     org: "SMB Operations · Private Equity",
     initials: "JT",
-    photo: "/jeffrey-tung-profile.svg",
+    photo: "/jeffrey-tung-headshot.jpg",
     linkedin: null,
     website: null,
     bio: "Jeffrey is a private equity operator and Co-Founder & Partner at CPS Capital, where he works with small and medium-sized businesses on growth, execution, and operating discipline. His background across private equity, board oversight, and management-team partnerships strengthens New Dawn's ability to standardize local execution while franchise owners maintain executive and supervisory control of their enterprise.",

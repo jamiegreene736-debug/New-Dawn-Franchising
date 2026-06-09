@@ -460,6 +460,7 @@ export async function registerRoutes(
     { path: "/", priority: "1.0", changefreq: "weekly" },
     { path: "/about", priority: "0.8", changefreq: "monthly" },
     { path: "/team", priority: "0.7", changefreq: "monthly" },
+    { path: "/e2-visa-franchise", priority: "0.9", changefreq: "monthly" },
     { path: "/e2-fit", priority: "0.8", changefreq: "monthly" },
     { path: "/process", priority: "0.8", changefreq: "monthly" },
     { path: "/territories", priority: "0.8", changefreq: "monthly" },
@@ -580,6 +581,7 @@ export async function registerRoutes(
   app.get("/llms.txt", async (_req, res) => {
     const pages: Array<[string, string]> = [
       ["/", "Multi-vertical E-2 visa franchise platform (Property Management, Telecom, Insurance) — overview, how it works, FAQ"],
+      ["/e2-visa-franchise", "The franchisor built for the E-2 visa — how the model is designed around E-2 requirements, plus the three verticals and FAQ"],
       ["/e2-fit", "Why New Dawn satisfies each E-2 Treaty Investor Visa requirement, plus E-2 FAQ"],
       ["/process", "Step-by-step franchise process from inquiry to E-2 approval and operations"],
       ["/territories", "El Paso, TX market and territory details for the property management vertical"],

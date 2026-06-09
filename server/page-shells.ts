@@ -204,6 +204,88 @@ const shells: Record<string, PageShell> = {
 </main>`,
   },
 
+  "/e2-visa-franchise": {
+    title: `The Franchisor Built for the E-2 Visa | ${SITE}`,
+    description:
+      "New Dawn Franchising is a multi-vertical franchisor built specifically for the E-2 Treaty Investor Visa. Choose Property Management, Telecom, or Insurance — own and direct a real U.S. business from $225,000. FDD available upon request.",
+    html: `
+<main>
+  <h1>The Franchisor Built for the E-2 Visa</h1>
+  <p>New Dawn Franchising is a multi-vertical franchisor designed specifically for E-2 Treaty Investor Visa investors. You choose one of three recurring-revenue franchises — Property Management, Telecom, or Insurance — own and direct a real U.S. business, and our teams handle the daily execution.</p>
+  <p>Unlike general-purpose franchises that merely qualify for the E-2 visa, New Dawn was designed from the ground up around the E-2 requirements.</p>
+
+  <section>
+    <h2>Designed Around the E-2 Requirements</h2>
+    <ul>
+      <li><strong>A substantial investment:</strong> Franchise investment starts at $225,000, sized to meet the E-2 substantiality test.</li>
+      <li><strong>Capital genuinely at risk:</strong> Your investment funds a real, operating U.S. business, satisfying the E-2 "at-risk" requirement.</li>
+      <li><strong>You direct and develop it:</strong> You own the franchise, control the bank accounts, and make the key decisions while approved teams execute day-to-day.</li>
+      <li><strong>More than a marginal enterprise:</strong> All three verticals are recurring-revenue businesses built to generate real, ongoing activity.</li>
+      <li><strong>Open to treaty nationals:</strong> The E-2 visa is available to nationals of 80+ treaty countries.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Choose Your Franchise Vertical</h2>
+    <ul>
+      <li><strong>Property Management</strong> — Long-term rental management operations with local execution teams and owner-level reporting.</li>
+      <li><strong>Telecom</strong> — Recurring-service telecom operations supported by centralized systems, sales workflows, and oversight dashboards.</li>
+      <li><strong>Insurance</strong> — Insurance-sector franchise operations designed around compliant supervision, client service, and recurring revenue.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Frequently Asked Questions</h2>
+    <h3>What does "a franchisor built for the E-2 visa" mean?</h3>
+    <p>Most franchises are general-purpose businesses that happen to qualify for the E-2 visa. New Dawn Franchising was designed from the ground up around the E-2 requirements — a substantial, at-risk investment in a real operating business that you own and direct.</p>
+    <h3>Which franchise verticals does New Dawn offer?</h3>
+    <p>Three recurring-revenue industries chosen for E-2 fit: Property Management, Telecom, and Insurance.</p>
+    <h3>How much do I need to invest?</h3>
+    <p>Franchise investment starts at $225,000, structured to meet the E-2 substantial-investment requirement. Financing options are available.</p>
+    <h3>Do I have to run the business day-to-day?</h3>
+    <p>No. Each vertical is structured so you are the business director and decision-maker while approved local teams manage daily execution.</p>
+    <h3>Can I live anywhere in the U.S.?</h3>
+    <p>Yes. New Dawn is headquartered in El Paso, Texas, but qualified E-2 owners can live anywhere in the United States.</p>
+  </section>
+
+  <section>
+    <h2>Request Information</h2>
+    <p>Contact us to request the FDD and schedule an intro call.</p>
+    <address>
+      <p>Phone: <a href="tel:+13465979994">${PHONE}</a></p>
+      <p>Email: <a href="mailto:${EMAIL}">${EMAIL}</a></p>
+    </address>
+  </section>
+</main>`,
+    faq: [
+      {
+        question: "What does \"a franchisor built for the E-2 visa\" mean?",
+        answer:
+          "Most franchises are general-purpose businesses that happen to qualify for the E-2 visa. New Dawn Franchising was designed from the ground up around the E-2 requirements — a substantial, at-risk investment in a real operating business that you own and direct.",
+      },
+      {
+        question: "Which franchise verticals does New Dawn offer?",
+        answer:
+          "Three recurring-revenue industries chosen for E-2 fit: Property Management, Telecom, and Insurance. You select the one that best matches your goals during the discovery process.",
+      },
+      {
+        question: "How much do I need to invest?",
+        answer:
+          "Franchise investment starts at $225,000, structured to meet the E-2 substantial-investment requirement. Financing options are available.",
+      },
+      {
+        question: "Do I have to run the business day-to-day?",
+        answer:
+          "No. Each vertical is structured so you are the business director and decision-maker. You keep ownership control and bank-account oversight while approved local teams manage daily execution.",
+      },
+      {
+        question: "Can I live anywhere in the U.S.?",
+        answer:
+          "Yes. New Dawn is headquartered in El Paso, Texas, but qualified E-2 owners can live anywhere in the United States while maintaining executive oversight of the franchise.",
+      },
+    ],
+  },
+
   "/e2-fit": {
     title: `E-2 Visa Franchise Fit | Why New Dawn is the Right E-2 Business | ${SITE}`,
     description:

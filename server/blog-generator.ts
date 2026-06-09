@@ -3,7 +3,7 @@ import { storage } from "./storage";
 import { createLazyOpenAIClient } from "./openai-client";
 import { submitToIndexNow } from "./indexnow";
 
-const SITE_URL = "https://newdawnfranchising.com";
+const SITE_URL = "https://www.newdawnfranchising.com";
 
 const openai = createLazyOpenAIClient();
 

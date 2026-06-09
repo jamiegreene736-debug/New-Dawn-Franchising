@@ -257,7 +257,7 @@ async function fetchPageContent(url: string): Promise<{ title: string; h1: strin
 }
 
 async function execAnalyzeWebsite(): Promise<string> {
-  const baseUrl = "https://newdawnfranchising.com";
+  const baseUrl = "https://www.newdawnfranchising.com";
   const openaiBase = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || "https://api.openai.com/v1";
   const openaiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY || "";
 
@@ -921,7 +921,7 @@ async function execPageCoverage(): Promise<string> {
 // ─── Schema Audit ─────────────────────────────────────────────────────────────
 
 async function execSchemaAudit(): Promise<string> {
-  const baseUrl = "https://newdawnfranchising.com";
+  const baseUrl = "https://www.newdawnfranchising.com";
   const pages = [
     { path: "/", label: "Homepage", recommendedSchema: ["LocalBusiness", "Organization", "FAQPage"] },
     { path: "/franchise", label: "Franchise Opportunity", recommendedSchema: ["Product", "FAQPage", "BreadcrumbList"] },
@@ -972,7 +972,7 @@ async function execSchemaAudit(): Promise<string> {
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${openaiKey}` },
       body: JSON.stringify({
         model: "gpt-4o-mini",
-        messages: [{ role: "user", content: `Write a complete, ready-to-paste JSON-LD schema for ${priorityPage.missing[0]} for this business: New Dawn Franchising LLC, property management franchise for E-2 visa investors in El Paso Texas, website: https://newdawnfranchising.com, phone: (915) 123-4567. Return only the <script type="application/ld+json">...</script> block.` }],
+        messages: [{ role: "user", content: `Write a complete, ready-to-paste JSON-LD schema for ${priorityPage.missing[0]} for this business: New Dawn Franchising LLC, property management franchise for E-2 visa investors in El Paso Texas, website: https://www.newdawnfranchising.com, phone: (915) 123-4567. Return only the <script type="application/ld+json">...</script> block.` }],
         max_tokens: 500,
       }),
     });

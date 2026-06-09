@@ -455,7 +455,7 @@ export async function registerRoutes(
     }
   });
 
-  const SITE_URL = "https://newdawnfranchising.com";
+  const SITE_URL = "https://www.newdawnfranchising.com";
   const STATIC_PAGES = [
     { path: "/", priority: "1.0", changefreq: "weekly" },
     { path: "/about", priority: "0.8", changefreq: "monthly" },
@@ -652,7 +652,7 @@ export async function registerRoutes(
 
       // Fire-and-forget emails — don't block the response
       const NOTIFY_TO = "franchising@newdawnfranchising.com";
-      const BASE_URL = process.env.BASE_URL || "https://newdawnfranchising.com";
+      const BASE_URL = process.env.BASE_URL || "https://www.newdawnfranchising.com";
 
       // 1. Internal notification to the team
       const internalHtml = `
@@ -757,7 +757,7 @@ export async function registerRoutes(
       res.status(201).json({ ok: true, id: lead.id });
 
       // Confirmation email to the subscriber
-      const BASE_URL = process.env.BASE_URL || "https://newdawnfranchising.com";
+      const BASE_URL = process.env.BASE_URL || "https://www.newdawnfranchising.com";
       const confirmHtml = `
         <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#1a1a2e;">
           <div style="background:#1a2a4a;padding:24px 32px;border-radius:8px 8px 0 0;">

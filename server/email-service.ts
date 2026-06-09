@@ -100,7 +100,7 @@ export async function sendEmailFromSender(
     let finalHtml = html;
 
     if (!options?.skipSignature) {
-      const baseUrl = "https://newdawnfranchising.com";
+      const baseUrl = "https://www.newdawnfranchising.com";
       const sigHtml = finalHtml.includes(SIGNATURE_SENTINEL)
         ? ""  // Signature already embedded (e.g. signature-service emails)
         : buildEmailSignature(fromEmail, baseUrl);

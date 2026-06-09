@@ -178,7 +178,7 @@ router.post("/videos/:id/resend", requireAdmin, async (req, res) => {
     if (!rows[0]) return res.status(404).json({ error: "Not found" });
     const original = rows[0];
     // Create a fresh record with new tracking token
-    const appBase = process.env.APP_BASE_URL ?? "https://newdawnfranchising.com";
+    const appBase = process.env.APP_BASE_URL ?? "https://www.newdawnfranchising.com";
     const [newRow] = await db.insert(heygenVideos).values({
       leadId: original.leadId, leadName: original.leadName, leadEmail: original.leadEmail,
       leadPhone: original.leadPhone, script: original.script, subjectLine: original.subjectLine,

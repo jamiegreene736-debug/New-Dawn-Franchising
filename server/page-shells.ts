@@ -2,6 +2,8 @@ export type PageShell = {
   title: string;
   description: string;
   html: string;
+  /** Structured Q&A, mirrored from the page's FAQ section, emitted as FAQPage JSON-LD. */
+  faq?: { question: string; answer: string }[];
 };
 
 const SITE = "New Dawn Franchising";
@@ -85,6 +87,33 @@ const shells: Record<string, PageShell> = {
     </address>
   </section>
 </main>`,
+    faq: [
+      {
+        question: "What is the E-2 visa?",
+        answer:
+          "The E-2 Treaty Investor Visa allows nationals of treaty countries to enter and work in the U.S. based on a substantial investment in a U.S. business. The investor must own and direct the enterprise.",
+      },
+      {
+        question: "How much do I need to invest?",
+        answer:
+          "Our franchise packages start at $250,000. The E-2 visa does not have a fixed minimum, but the investment must be \"substantial\" relative to the total cost of the business.",
+      },
+      {
+        question: "Do I have to do property management work myself?",
+        answer:
+          "The franchise is structured so you are the business director and decision-maker. You maintain full ownership control and oversight — including control over your bank accounts — while an approved territory representative manages day-to-day execution.",
+      },
+      {
+        question: "Can I live anywhere in the USA on the E-2 visa?",
+        answer:
+          "Yes. E-2 visa holders are authorized to live anywhere in the United States. Your business is based in El Paso, Texas, but you are not required to live there.",
+      },
+      {
+        question: "What is the in-house buy-back program?",
+        answer:
+          "Our in-house buy-back program gives you a path to recover your investment. After approximately 4 years, we can work with you on an exit. Contact us for full details.",
+      },
+    ],
   },
 
   "/about": {
@@ -202,6 +231,23 @@ const shells: Record<string, PageShell> = {
     <p>Yes. E-2 visa holders can bring their spouse and unmarried children under 21 as E-2 dependents. Your spouse is eligible for work authorization anywhere in the U.S.</p>
   </section>
 </main>`,
+    faq: [
+      {
+        question: "Which countries are eligible for the E-2 visa?",
+        answer:
+          "The E-2 visa is available to nationals of countries that have a bilateral investment treaty with the United States. There are over 80 eligible countries including Mexico, Canada, Germany, Japan, South Korea, Turkey, Israel, and many more. Contact us to confirm your country's eligibility.",
+      },
+      {
+        question: "How long does the E-2 visa last?",
+        answer:
+          "E-2 visas are typically issued for 2–5 years and can be renewed indefinitely as long as the business remains operational and you continue to direct the enterprise.",
+      },
+      {
+        question: "Can my spouse and children come to the U.S. on E-2?",
+        answer:
+          "Yes. E-2 visa holders can bring their spouse and unmarried children under 21 as E-2 dependents. Your spouse is eligible for work authorization anywhere in the U.S.",
+      },
+    ],
   },
 
   "/territories": {

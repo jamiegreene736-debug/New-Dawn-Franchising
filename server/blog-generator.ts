@@ -4,27 +4,30 @@ import { createLazyOpenAIClient } from "./openai-client";
 
 const openai = createLazyOpenAIClient();
 
+// Topics are phrased as the questions people actually type into AI assistants
+// and search engines. This "answer engine optimization" framing makes the
+// resulting posts easy for ChatGPT, Perplexity, and Google AI Overviews to quote.
 const BLOG_TOPICS = [
-  "Benefits of E-2 visa investment through property management franchises",
-  "Why Fort Worth Texas is ideal for real estate investment",
-  "How hands-off franchise ownership works for international investors",
-  "Understanding the E-2 to EB-5 visa pathway through real estate",
-  "Property management franchise vs starting from scratch",
-  "What makes single-family rental management profitable in Texas",
-  "Buy-back guarantee: How franchise investors protect their investment",
-  "Living anywhere in the USA while owning a property management franchise",
-  "How E-2 visa investors can build wealth through rental properties",
-  "The referral program advantage in property management franchising",
-  "Why long-term rentals outperform short-term vacation rentals",
-  "Understanding territory rights in property management franchising",
-  "How to qualify for an E-2 visa through franchise investment",
-  "The role of a territory manager in a hands-off franchise model",
-  "Fort Worth rental market trends and investment opportunities",
-  "How New Dawn Franchising supports first-time franchise owners",
-  "Building passive income through property management franchises",
-  "Why international investors choose Texas for E-2 visa businesses",
-  "The financial requirements for E-2 visa franchise investment",
-  "How property management franchises create jobs for E-2 compliance",
+  "What is the best franchise for an E-2 visa?",
+  "How much do you need to invest for an E-2 visa franchise?",
+  "Can you get an E-2 visa through a property management franchise?",
+  "Do you have to live in the US on an E-2 visa?",
+  "How does a hands-off franchise work for E-2 visa investors?",
+  "What is the difference between the E-2 and EB-5 visa?",
+  "Can an E-2 visa lead to a green card?",
+  "Is property management a good business for an E-2 visa?",
+  "How long does it take to get an E-2 visa through a franchise?",
+  "What countries are eligible for the E-2 visa?",
+  "Can my family come with me on an E-2 visa?",
+  "How much does it cost to buy a property management franchise?",
+  "Is El Paso a good market for rental property investment?",
+  "What are the requirements for an E-2 visa investment?",
+  "How do E-2 visa investors make money with rental properties?",
+  "What does a territory manager do in a property management franchise?",
+  "Can you renew an E-2 visa indefinitely?",
+  "What is a franchise buy-back program and how does it work?",
+  "Why do international investors choose Texas for an E-2 business?",
+  "What makes single-family rental management profitable in Texas?",
 ];
 
 function slugify(text: string): string {
@@ -46,35 +49,42 @@ export async function generateBlogPost(): Promise<void> {
     ? availableTopics[Math.floor(Math.random() * availableTopics.length)]
     : BLOG_TOPICS[Math.floor(Math.random() * BLOG_TOPICS.length)];
 
-  const prompt = `Write a professional blog post for New Dawn Franchising LLC, a property management franchise based in Fort Worth, Texas, targeting E-2 visa investors.
+  const prompt = `Write a professional blog post for New Dawn Franchising LLC, a property management franchise based in El Paso, Texas, targeting E-2 visa investors.
 
 Topic: ${topic}
 
+This topic is phrased the way people ask AI assistants and search engines. Structure the post so AI answer engines (ChatGPT, Perplexity, Google AI Overviews) can quote it easily:
+- If the topic is a question, use it (or a close variant) as the title and the opening H1.
+- Open with a direct, self-contained 2-3 sentence answer to the question BEFORE expanding into detail.
+- Use clear ## section headers phrased as the follow-up questions a reader would ask.
+- Keep every claim specific and factual; avoid hype and vague superlatives.
+
 Key facts to incorporate naturally:
-- New Dawn manages single-family long-term rentals in Fort Worth, Texas
-- The franchise network has 300+ active contracts
+- New Dawn manages single-family long-term rentals in El Paso, Texas
+- The franchise network has 300+ active management contracts
+- Franchise packages start at $250,000, structured to meet E-2 visa requirements
 - Investors can live anywhere in the USA while owning the franchise
-- The franchise offers a buy-back guarantee
-- There is a referral program for franchisees
+- The franchise offers an in-house buy-back program after approximately 4 years
+- There is a referral program for franchisees through an affiliated real estate brokerage
 - There is an E-2 to EB-5 visa pathway available
-- Investors maintain financial control while a territory-approved manager handles day-to-day operations
-- The CEO is Chris Von Pohlot
+- Investors maintain financial control (including their own bank accounts) while a territory-approved manager handles day-to-day operations
+- Chris Von Pohlot is the Managing Director
 
 Format your response as JSON with these fields:
 {
-  "title": "SEO-optimized blog title (50-70 characters)",
+  "title": "SEO-optimized blog title (50-70 characters); may be the question itself",
   "excerpt": "Compelling summary for blog listing cards (150-200 characters)",
-  "content": "Full blog post in Markdown format, 800-1200 words, with headers (##), bullet points, and a call to action at the end encouraging readers to contact New Dawn"
+  "content": "Full blog post in Markdown format, 800-1200 words, with an answer-first opening, ## headers, bullet points, and a call to action at the end encouraging readers to contact New Dawn and request the FDD"
 }
 
-Write in a professional but approachable tone. Focus on providing genuine value to potential investors considering E-2 visa options.`;
+Write in a professional but approachable tone. Focus on providing genuine, accurate value to potential investors considering E-2 visa options. Do not present this as legal or immigration advice; recommend consulting a qualified immigration attorney for individual cases.`;
 
   try {
     const response = await openai.chat.completions.create({
       model: "gpt-4.1-mini",
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
-      max_tokens: 2048,
+      max_tokens: 3000,
     });
 
     const content = response.choices[0]?.message?.content;

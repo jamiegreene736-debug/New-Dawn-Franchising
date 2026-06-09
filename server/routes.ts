@@ -510,18 +510,112 @@ export async function registerRoutes(
   });
 
   app.get("/robots.txt", (_req, res) => {
+    // Private/app areas kept out of all indexes.
+    const disallow = [
+      "/api/",
+      "/crm",
+      "/login",
+      "/approve/",
+      "/sign/",
+      "/verify/",
+      "/agent",
+      "/seo",
+      "/heygen",
+      "/training",
+      "/marketing-portal",
+      "/brokers",
+    ];
+    // AI answer engines & assistants — explicitly welcomed to read public pages.
+    const aiAgents = [
+      "GPTBot",
+      "OAI-SearchBot",
+      "ChatGPT-User",
+      "ClaudeBot",
+      "Claude-User",
+      "anthropic-ai",
+      "PerplexityBot",
+      "Perplexity-User",
+      "Google-Extended",
+      "Applebot-Extended",
+      "CCBot",
+      "Amazonbot",
+      "meta-externalagent",
+      "Bingbot",
+    ];
+    const ruleBlock = (userAgents: string[]) =>
+      [
+        ...userAgents.map((ua) => `User-agent: ${ua}`),
+        "Allow: /",
+        ...disallow.map((d) => `Disallow: ${d}`),
+      ].join("\n");
+
     const txt = [
-      "User-agent: *",
-      "Allow: /",
+      "# New Dawn Franchising",
+      ruleBlock(["*"]),
       "",
-      "Disallow: /crm",
-      "Disallow: /login",
-      "Disallow: /api/",
+      "# AI answer engines & assistants are explicitly welcome to read public pages",
+      ruleBlock(aiAgents),
       "",
       `Sitemap: ${SITE_URL}/sitemap.xml`,
+      "",
     ].join("\n");
     res.set("Content-Type", "text/plain");
     res.send(txt);
+  });
+
+  // llms.txt — a curated, AI-friendly map of the site (see llmstxt.org).
+  app.get("/llms.txt", async (_req, res) => {
+    const pages: Array<[string, string]> = [
+      ["/", "E-2 visa property management franchise — overview, how it works, FAQ"],
+      ["/e2-fit", "Why New Dawn satisfies each E-2 Treaty Investor Visa requirement, plus E-2 FAQ"],
+      ["/process", "Step-by-step franchise process from inquiry to E-2 approval and operations"],
+      ["/territories", "El Paso, TX market, 300+ active management contracts, territory details"],
+      ["/about", "Company background and the New Dawn Franchising Group of Companies"],
+      ["/team", "Leadership team and advisors"],
+      ["/marketing", "Proprietary marketing system included for franchisees"],
+      ["/real-estate", "Real estate referral income via Star Spangled Banner Realty"],
+      ["/blog", "Insights on E-2 visas, property management franchising, and Texas real estate"],
+      ["/contact", "Request the FDD, overview deck, or an intro call"],
+    ];
+
+    const lines: string[] = [
+      "# New Dawn Franchising",
+      "",
+      "> Property management franchise built specifically for E-2 Treaty Investor Visa investors. " +
+        "You own and direct a real U.S. business while an approved territory manager runs daily operations. " +
+        "Franchise packages from $250,000. Headquartered in El Paso, Texas. FDD available upon request.",
+      "",
+      "## Key Pages",
+      ...pages.map(([path, desc]) => `- [${path}](${SITE_URL}${path}): ${desc}`),
+      "",
+      "## Key Facts",
+      "- Franchise investment: from $250,000, structured to meet E-2 visa requirements",
+      "- Model: single-family long-term rental property management",
+      "- Location: El Paso, Texas; 300+ active management contracts in the network",
+      "- Owner role: you direct the business and control the bank accounts; a territory manager runs daily operations",
+      "- Support: in-house immigration attorneys, financing, and real estate brokerage",
+      "- E-2 holders may live anywhere in the U.S.; spouse is eligible for work authorization",
+      "",
+      "## Contact",
+      "- Phone: (346) 597-9994",
+      "- Email: franchising@newdawnfranchising.com",
+      "- Address: 2601 N Zaragoza Rd, El Paso, TX 79938",
+    ];
+
+    try {
+      const posts = await storage.getBlogPosts();
+      if (posts.length) {
+        lines.push("", "## Recent Articles");
+        for (const post of posts.slice(0, 15)) {
+          lines.push(`- [${post.title}](${SITE_URL}/blog/${post.slug}): ${post.excerpt}`);
+        }
+      }
+    } catch {
+      // Blog list is optional; omit if unavailable.
+    }
+
+    res.set("Content-Type", "text/plain; charset=utf-8");
+    res.send(lines.join("\n") + "\n");
   });
 
   app.post("/api/leads", async (req, res) => {

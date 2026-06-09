@@ -245,24 +245,24 @@ async function draftEmail(lead: PartnerLead, step: number): Promise<{ subject: s
 
 ABOUT NEW DAWN FRANCHISING:
 - The first franchise system designed specifically for E-2 visa investors
-- $250,000 minimum investment — a property management franchise in El Paso, Texas
+- $225,000 minimum investment — a property management franchise in El Paso, Texas
 - Investor retains full ownership and controls all bank accounts and key decisions
 - An approved territory manager handles day-to-day operations ("develop and direct" standard)
 - FDD-registered, bona fide enterprise, non-marginal, in-house immigration counsel
 - Buy-back program after ~4 years
 
 ESCROW PROTECTION (most distinctive feature — use it):
-- Client's $250,000 sits in escrow (attorney of their choosing)
+- Client's $225,000 sits in escrow (attorney of their choosing)
 - Business operates ~4 months, building operational history
 - If E-2 visa approved → escrow releases
-- If denied after required two attempts → client gets FULL $250,000 refund
-- CORRECT framing: "If their visa isn't approved, they get their full $250,000 franchise investment back."
+- If denied after required two attempts → client gets FULL $225,000 refund
+- CORRECT framing: "If their visa isn't approved, they get their full $225,000 franchise investment back."
 - Do NOT say "risk-free" — standard E-2 petition costs (~$3,000 business plan, filing fees) are the client's responsibility
 - New Dawn is newly launched — never imply a track record of approvals
 
 PARTNER FEE (Step 7 ONLY — never in earlier steps):
 - 12.5% of franchise package price, paid on E-2 visa approval
-- At $250,000 minimum: $31,250 per approved client
+- At $225,000 minimum: $28,125 per approved client
 - NEVER call it a "referral fee" — always "partner fee" or "partnership arrangement"
 - For immigration_attorney: frame as co-education and marketing partnership; push specifics to a call (bar rules vary by state)
 
@@ -303,10 +303,10 @@ Opening line: "${openingLine}"
 Opening sentence: "Following up on my earlier note with something more substantive."
 - Apply audience-specific framing paragraph (how the E-2 requirements map)
 - Cover all 4 requirements in 4 bullet points:
-  • Substantial & at-risk: $250K minimum, genuinely committed, capital at risk
+  • Substantial & at-risk: $225K minimum, genuinely committed, capital at risk
   • Bona fide enterprise: real operating property management business, FDD-registered, assigned territory
   • Develop and direct: investor controls bank accounts + key decisions; territory manager handles day-to-day
-  • The escrow protection: $250K in escrow ~4 months while business builds history; full refund if denied
+  • The escrow protection: $225K in escrow ~4 months while business builds history; full refund if denied
 - One final sentence about in-house immigration attorney available for a deeper conversation
 ${spanish ? '- Add on its own line before closing: "Con gusto lo conversamos en español si lo prefiere."' : ""}
 - FDD CTA: "Would it be useful if I sent over the FDD? → ${FDD_LINK}"
@@ -325,7 +325,7 @@ ${spanish ? '- Add on its own line: "Con gusto lo conversamos en español si lo 
     7: `Step 7 — Email 3 (Partnership Structure / Fee Reveal), ~180 words max.
 Opening line: "${openingLine}"
 Opening: "One more note, then I'll stop filling your inbox."
-- Introduce partnership arrangement: "When a client you introduce invests in New Dawn and their E-2 visa is approved, we pay a partner fee of 12.5% of their franchise package price. At our $250,000 starting package, that's $31,250. If your client takes a larger package, the fee scales with it at 12.5%."
+- Introduce partnership arrangement: "When a client you introduce invests in New Dawn and their E-2 visa is approved, we pay a partner fee of 12.5% of their franchise package price. At our $225,000 starting package, that's $28,125. If your client takes a larger package, the fee scales with it at 12.5%."
 - Add: "The fee is tied to visa approval — not to the introduction. That's intentional: you're compensated when your client succeeds."
 - Apply audience-specific closing paragraph:
   ${type === "immigration_attorney" ? 'For immigration_attorney: "The arrangement is structured as a co-education and marketing partnership — not a client referral fee — and the specifics of how it works for your firm depend on your state bar\'s guidelines. That\'s exactly why I\'d rather walk through it on a call than try to cover everything here."' : ""}

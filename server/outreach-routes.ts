@@ -39,7 +39,7 @@ async function callOpenAI(prompt: string, system: string): Promise<string> {
   return data.choices?.[0]?.message?.content || "No response.";
 }
 
-const AGENT_SYSTEM = `You are the Lead Generation & Outreach AI Agent for New Dawn Franchising — a U.S. property management franchise built exclusively for E-2 visa investors (minimum $250,000 investment). Your job is to find, qualify, and build referral partner relationships with immigration attorneys, relocation consultants, real estate brokers, business advisors, wealth managers, chambers of commerce, visa consultants, and franchise brokers who work with E-2 visa candidates. You write outreach copy that is professional, confident, non-salesy, and speaks the language of immigration and international business.`;
+const AGENT_SYSTEM = `You are the Lead Generation & Outreach AI Agent for New Dawn Franchising — a U.S. property management franchise built exclusively for E-2 visa investors (minimum $225,000 investment). Your job is to find, qualify, and build referral partner relationships with immigration attorneys, relocation consultants, real estate brokers, business advisors, wealth managers, chambers of commerce, visa consultants, and franchise brokers who work with E-2 visa candidates. You write outreach copy that is professional, confident, non-salesy, and speaks the language of immigration and international business.`;
 
 // ─── Route registration ───────────────────────────────────────────────────────
 
@@ -408,7 +408,7 @@ Create a 6-8 step sequence spanning 20 days. For each step provide:
 - subjectLine (for email only)
 - messageBody (full message text, channel-appropriate length)
 
-Return as JSON array. For emails: professional, 3-4 sentences, single CTA. For SMS: under 160 chars, warm tone, opt-out mention. For WhatsApp: conversational, brief. The value proposition: "$250K E-2 visa franchise, property management, operational platform, in-house buy-back program." Position as a referral partner opportunity — they send E-2 visa clients, we handle the investment.`;
+Return as JSON array. For emails: professional, 3-4 sentences, single CTA. For SMS: under 160 chars, warm tone, opt-out mention. For WhatsApp: conversational, brief. The value proposition: "$225K E-2 visa franchise, property management, operational platform, in-house buy-back program." Position as a referral partner opportunity — they send E-2 visa clients, we handle the investment.`;
 
     const result = await callOpenAI(prompt, AGENT_SYSTEM);
     try {

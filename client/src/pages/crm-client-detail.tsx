@@ -1551,13 +1551,13 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
                     <div className="bg-slate-900 text-white p-4 text-center">
                       <p className="text-[10px] uppercase tracking-widest text-slate-400 mb-1">E-2 Visa Investment Opportunity</p>
                       <p className="font-black text-base leading-snug">Own a U.S. Business.<br/>Secure Your E-2 Visa.</p>
-                      <p className="text-slate-400 mt-1 text-[11px]">A proven $250K franchise pathway in El Paso, Texas.</p>
+                      <p className="text-slate-400 mt-1 text-[11px]">A proven $225K franchise pathway in El Paso, Texas.</p>
                     </div>
                     <div className="bg-white p-4 text-slate-800 space-y-2">
                       <p className="text-[11px] text-slate-500">Dear {client.fullName.split(" ")[0]},</p>
                       <p className="text-[11px]">New Dawn Franchising specializes in E-2 visa compliant property management franchises in Texas.</p>
                       <ul className="text-[11px] space-y-0.5">
-                        <li>✅ $250K minimum — fully E-2 compliant</li>
+                        <li>✅ $225K minimum — fully E-2 compliant</li>
                         <li>✅ Funds held in escrow — full refund if visa denied</li>
                         <li>✅ Forbes 30 Under 30 leadership</li>
                       </ul>

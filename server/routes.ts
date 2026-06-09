@@ -583,13 +583,13 @@ export async function registerRoutes(
       "",
       "> Property management franchise built specifically for E-2 Treaty Investor Visa investors. " +
         "You own and direct a real U.S. business while an approved territory manager runs daily operations. " +
-        "Franchise packages from $250,000. Headquartered in El Paso, Texas. FDD available upon request.",
+        "Franchise packages from $225,000. Headquartered in El Paso, Texas. FDD available upon request.",
       "",
       "## Key Pages",
       ...pages.map(([path, desc]) => `- [${path}](${SITE_URL}${path}): ${desc}`),
       "",
       "## Key Facts",
-      "- Franchise investment: from $250,000, structured to meet E-2 visa requirements",
+      "- Franchise investment: from $225,000, structured to meet E-2 visa requirements",
       "- Model: single-family long-term rental property management",
       "- Location: El Paso, Texas; 300+ active management contracts in the network",
       "- Owner role: you direct the business and control the bank accounts; a territory manager runs daily operations",
@@ -1323,7 +1323,7 @@ Immigration attorneys, business brokers, financial advisors, visa consultants, b
 
 Pitch to referral partners:
 - "I wanted to introduce a franchise option you could offer E-2 clients who need a compliant business"
-- Emphasise: escrow protection (safe for their clients to recommend), fully managed (no experience needed), USCIS-compliant business plan included, $250K meets the investment threshold
+- Emphasise: escrow protection (safe for their clients to recommend), fully managed (no experience needed), USCIS-compliant business plan included, $225K meets the investment threshold
 - Mention the referral fee arrangement
 - Make them the hero to their client — you solve a hard problem for them
 

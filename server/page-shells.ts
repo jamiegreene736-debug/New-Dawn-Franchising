@@ -37,7 +37,7 @@ const shells: Record<string, PageShell> = {
   <section>
     <h2>How It Works</h2>
     <ol>
-      <li><strong>Invest &amp; Acquire Your Franchise</strong> — Purchase your New Dawn Franchising territory starting at $250,000. This structured investment is designed to meet E-2 visa capital requirements and gives you a real, operating business.</li>
+      <li><strong>Invest &amp; Acquire Your Franchise</strong> — Purchase your New Dawn Franchising territory starting at $225,000. This structured investment is designed to meet E-2 visa capital requirements and gives you a real, operating business.</li>
       <li><strong>Apply for Your E-2 Visa</strong> — Our partner immigration attorneys guide you through the E-2 visa application. You own and direct a legitimate U.S. business — that's the foundation of a strong E-2 petition.</li>
       <li><strong>Your Territory Manager Runs Operations</strong> — An approved territory representative manages day-to-day property management. You oversee the business, review reports, and make key decisions.</li>
       <li><strong>Grow Your Portfolio</strong> — Scale your property management portfolio, generate referral income through our affiliated real estate brokerage, and build equity in a real U.S. business.</li>
@@ -47,7 +47,7 @@ const shells: Record<string, PageShell> = {
   <section>
     <h2>Why New Dawn Franchising?</h2>
     <ul>
-      <li>Franchise packages from $250,000 — structured to meet E-2 visa requirements</li>
+      <li>Franchise packages from $225,000 — structured to meet E-2 visa requirements</li>
       <li>Proprietary technology powers the entire operation</li>
       <li>Territory-approved manager handles day-to-day operations</li>
       <li>In-house E-2 immigration attorneys and real estate professionals</li>
@@ -59,7 +59,7 @@ const shells: Record<string, PageShell> = {
 
   <section>
     <h2>Investment Overview</h2>
-    <p>Franchise packages start at $250,000. This covers your territory license, training, technology platform access, and operational setup. Financing options are available through our affiliated lending partners.</p>
+    <p>Franchise packages start at $225,000. This covers your territory license, training, technology platform access, and operational setup. Financing options are available through our affiliated lending partners.</p>
     <p>The E-2 visa requires a substantial and at-risk investment in a U.S. business. Our franchise is structured specifically to meet this requirement.</p>
   </section>
 
@@ -68,7 +68,7 @@ const shells: Record<string, PageShell> = {
     <h3>What is the E-2 visa?</h3>
     <p>The E-2 Treaty Investor Visa allows nationals of treaty countries to enter and work in the U.S. based on a substantial investment in a U.S. business. The investor must own and direct the enterprise.</p>
     <h3>How much do I need to invest?</h3>
-    <p>Our franchise packages start at $250,000. The E-2 visa does not have a fixed minimum, but the investment must be "substantial" relative to the total cost of the business.</p>
+    <p>Our franchise packages start at $225,000. The E-2 visa does not have a fixed minimum, but the investment must be "substantial" relative to the total cost of the business.</p>
     <h3>Do I have to do property management work myself?</h3>
     <p>The franchise is structured so you are the business director and decision-maker. You maintain full ownership control and oversight — including control over your bank accounts — while an approved territory representative manages day-to-day execution.</p>
     <h3>Can I live anywhere in the USA on the E-2 visa?</h3>
@@ -96,7 +96,7 @@ const shells: Record<string, PageShell> = {
       {
         question: "How much do I need to invest?",
         answer:
-          "Our franchise packages start at $250,000. The E-2 visa does not have a fixed minimum, but the investment must be \"substantial\" relative to the total cost of the business.",
+          "Our franchise packages start at $225,000. The E-2 visa does not have a fixed minimum, but the investment must be \"substantial\" relative to the total cost of the business.",
       },
       {
         question: "Do I have to do property management work myself?",
@@ -189,7 +189,7 @@ const shells: Record<string, PageShell> = {
   <section>
     <h2>E-2 Visa Requirements — and How We Satisfy Each One</h2>
     <ul>
-      <li><strong>Substantial investment:</strong> Our franchise packages start at $250,000 — a proven threshold that immigration attorneys consistently use for E-2 petitions.</li>
+      <li><strong>Substantial investment:</strong> Our franchise packages start at $225,000 — a proven threshold that immigration attorneys consistently use for E-2 petitions.</li>
       <li><strong>Capital at risk:</strong> Your franchise investment is a real, operating business. The capital is at commercial risk, satisfying the E-2 "at risk" requirement.</li>
       <li><strong>Ownership and direction:</strong> You are the franchise owner and director. You control the bank accounts, make all key business decisions, and oversee operations.</li>
       <li><strong>More than marginal enterprise:</strong> Our property management territories generate real revenue from day one, with a network of 300+ active management contracts.</li>
@@ -330,7 +330,7 @@ const shells: Record<string, PageShell> = {
     <h2>The New Dawn Process</h2>
     <ol>
       <li><strong>Discovery &amp; Information</strong> — Request our investor overview deck and FDD. Schedule an intro call with our team. Ask questions, review materials, and determine if New Dawn is the right fit.</li>
-      <li><strong>Franchise Agreement &amp; Investment</strong> — Sign the franchise agreement and place your investment starting at $250,000. This creates your legal franchise entity and activates your territory.</li>
+      <li><strong>Franchise Agreement &amp; Investment</strong> — Sign the franchise agreement and place your investment starting at $225,000. This creates your legal franchise entity and activates your territory.</li>
       <li><strong>E-2 Visa Application</strong> — Our partner immigration attorneys prepare and file your E-2 petition with all required documentation, including the FDD and proof of investment.</li>
       <li><strong>Approval &amp; Onboarding</strong> — Once approved, you complete our franchise onboarding program. Your territory manager is assigned and operations begin.</li>
       <li><strong>Ongoing Operations &amp; Growth</strong> — Your territory manager handles day-to-day management. You direct the business, review performance, and grow your portfolio.</li>

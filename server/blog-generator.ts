@@ -62,7 +62,7 @@ This topic is phrased the way people ask AI assistants and search engines. Struc
 Key facts to incorporate naturally:
 - New Dawn manages single-family long-term rentals in El Paso, Texas
 - The franchise network has 300+ active management contracts
-- Franchise packages start at $250,000, structured to meet E-2 visa requirements
+- Franchise packages start at $225,000, structured to meet E-2 visa requirements
 - Investors can live anywhere in the USA while owning the franchise
 - The franchise offers an in-house buy-back program after approximately 4 years
 - There is a referral program for franchisees through an affiliated real estate brokerage

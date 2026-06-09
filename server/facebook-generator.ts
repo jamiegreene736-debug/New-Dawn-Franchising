@@ -5,7 +5,7 @@ const openai = createLazyOpenAIClient();
 
 const POST_THEMES = [
   "E-2 visa investment opportunity through property management",
-  "Why Fort Worth Texas is a great market for rental property investment",
+  "Why El Paso Texas is a great market for rental property investment",
   "How hands-off franchise ownership works for international investors",
   "Benefits of single-family long-term rental management",
   "Success story style post about franchise investor lifestyle",
@@ -15,7 +15,7 @@ const POST_THEMES = [
   "What makes New Dawn Franchising different from other franchises",
   "How our proprietary technology streamlines property management",
   "Referral program benefits for franchise owners",
-  "Fort Worth real estate market update and investment insights",
+  "El Paso real estate market update and investment insights",
   "A day in the life of a New Dawn franchise owner",
   "How international investors can build wealth in American real estate",
   "Territory rights and what they mean for franchise owners",
@@ -32,12 +32,12 @@ export async function generateFacebookPost(): Promise<{ content: string; imagePr
 
   const theme = POST_THEMES[Math.floor(Math.random() * POST_THEMES.length)];
 
-  const prompt = `Write an engaging Facebook post for New Dawn Franchising LLC, a property management franchise in Fort Worth, Texas, targeting E-2 visa investors.
+  const prompt = `Write an engaging Facebook post for New Dawn Franchising LLC, a property management franchise in El Paso, Texas, targeting E-2 visa investors.
 
 Theme: ${theme}
 
 Key facts to incorporate naturally (pick 2-3, don't force all):
-- New Dawn manages single-family long-term rentals in Fort Worth, Texas
+- New Dawn manages single-family long-term rentals in El Paso, Texas
 - The franchise network has 300+ active contracts
 - Part of the New Dawn Franchising Group of Companies™
 - AI-powered operations with proprietary technology

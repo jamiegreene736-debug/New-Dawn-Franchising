@@ -3,7 +3,7 @@ ABOUT NEW DAWN FRANCHISING
 New Dawn Franchising LLC is a multi-vertical franchise platform specifically designed for E-2 visa investors. Founded by Dylan Delaney and based in El Paso, Texas, we help international investors enter the U.S. market through franchise options in Property Management, Telecom, and Insurance.
 
 THE FRANCHISE MODEL
-- Investment: $250,000 minimum (satisfies E-2 visa substantial investment requirement)
+- Investment: $225,000 minimum (satisfies E-2 visa substantial investment requirement)
 - Business types: Property Management, Telecom, or Insurance franchise options
 - Franchise provides: Systems, training, vendor relationships, proprietary software, AI-enabled dashboards, and ongoing support
 - The investor directs and controls the business without doing day-to-day manual operations
@@ -16,7 +16,7 @@ THE E-2 VISA
 - Must be from a treaty country (most countries qualify)
 - Allows the investor and their family to live and work in the U.S.
 - Must be able to "direct and develop" the enterprise
-- Our $250,000 franchise investment clearly satisfies the substantial investment requirement
+- Our $225,000 franchise investment clearly satisfies the substantial investment requirement
 - No minimum wage requirement — you earn from the business profits
 - Renewable every 2-5 years indefinitely as long as the business operates
 
@@ -50,7 +50,7 @@ WHO THIS IS FOR
 - Relocation consultants working with international families
 
 INVESTMENT STRUCTURE
-- $250,000 total investment
+- $225,000 total investment
 - Covers franchise fee, initial working capital, setup costs
 - Revenue model depends on the selected vertical and is reviewed through the FDD and discovery process
 - New Dawn focuses on recurring-revenue industries with systems for reporting and owner oversight

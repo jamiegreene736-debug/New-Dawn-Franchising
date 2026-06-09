@@ -133,7 +133,7 @@ export async function sendCrmPostcard(client: {
   <h1 style="font-size:26px;font-weight:900;line-height:1.3;margin-bottom:20px">
     Own a U.S. Business.<br/>Secure Your E-2 Visa.
   </h1>
-  <p style="font-size:13px;color:#94a3b8;margin-bottom:24px">A proven $250K franchise pathway in El Paso, Texas.</p>
+  <p style="font-size:13px;color:#94a3b8;margin-bottom:24px">A proven $225K franchise pathway in El Paso, Texas.</p>
   <div style="background:#1e293b;border-radius:8px;padding:16px;font-size:12px;color:#cbd5e1">
     New Dawn Franchising · newdawnfranchising.com
   </div>
@@ -145,7 +145,7 @@ export async function sendCrmPostcard(client: {
   <p style="font-size:14px;color:#0f172a;margin-bottom:16px">New Dawn Franchising specializes in E-2 visa compliant property management franchises in Texas.</p>
   <p style="font-size:13px;font-weight:600;color:#0f172a;margin-bottom:8px">Why investors choose us:</p>
   <ul style="list-style:none;padding:0;font-size:13px;line-height:2;color:#334155">
-    <li>✅ $250K minimum — fully E-2 compliant</li>
+    <li>✅ $225K minimum — fully E-2 compliant</li>
     <li>✅ Funds held in escrow — full refund if visa denied</li>
     <li>✅ Established operations in El Paso, TX</li>
     <li>✅ Forbes 30 Under 30 leadership</li>
@@ -209,10 +209,10 @@ export async function sendBrokerLetter(lead: {
 <html><body style="font-family:Georgia,serif;padding:60px;max-width:600px;margin:auto;color:#1a1a1a;line-height:1.8">
   <p>Dear ${firstName},</p>
   <p>I wanted to reach out personally because I believe we may have a compelling opportunity for your clients who are considering a move to the United States.</p>
-  <p>New Dawn Franchising has built a proven E-2 visa franchise model in El Paso, Texas. Our clients invest a minimum of $250,000 into an established franchise and use that investment as the basis for their E-2 visa application.</p>
+  <p>New Dawn Franchising has built a proven E-2 visa franchise model in El Paso, Texas. Our clients invest a minimum of $225,000 into an established franchise and use that investment as the basis for their E-2 visa application.</p>
   <p><strong>What this means for you as a referring broker:</strong></p>
   <ul>
-    <li>12.5% referral fee on every investment — <strong>$31,250 per client referred</strong></li>
+    <li>12.5% referral fee on every investment — <strong>$28,125 per client referred</strong></li>
     <li>Zero risk: all funds are held in escrow and returned in full if the visa is denied</li>
     <li>Backed by Forbes 30 Under 30 recognition and a track record of successful visa approvals</li>
   </ul>
@@ -281,7 +281,7 @@ export async function sendPartnerLetter(lead: {
     `<p>${firstName},</p>`,
     "<p>I sent you a note by email earlier this week, but I wanted to follow up the old-fashioned way because I think what we built is worth a few minutes of your attention.</p>",
     `<p>New Dawn Franchising is the first franchise system built specifically for E-2 visa investors. We give ${audienceSwap}</p>`,
-    "<p>What makes us different is how the investment is protected. The client's $250,000 sits in escrow — held by an attorney of their choosing — until their E-2 visa is approved. The business operates during that window, generating real activity and supporting a strong petition. If approved, escrow releases. If denied after the required application process, the client receives a full refund of their franchise investment.</p>",
+    "<p>What makes us different is how the investment is protected. The client's $225,000 sits in escrow — held by an attorney of their choosing — until their E-2 visa is approved. The business operates during that window, generating real activity and supporting a strong petition. If approved, escrow releases. If denied after the required application process, the client receives a full refund of their franchise investment.</p>",
     "<p>Enclosed is a one-page summary of how our structure maps to each E-2 requirement. I would welcome a short conversation — or I can send our FDD for your review.</p>",
     "<p>With appreciation,</p>",
     "<p><em>Dylan Delaney</em><br/>Founding Member and Franchise Development Manager<br/>New Dawn Franchising<br/>(346) 597-9994 | newdawnfranchising.com</p>",

@@ -82,7 +82,7 @@ export async function addToDnc(email?: string, phone?: string, domain?: string, 
 async function scoreLeadWithAI(lead: any, settings: any): Promise<{ score: number; reasoning: string }> {
   try {
     const prompt = `Score this REFERRAL PARTNER lead for New Dawn Franchising on a scale of 0-100.
-New Dawn Franchising sells US property management franchises (~$250K investment) as an E-2 Treaty Investor Visa pathway.
+New Dawn Franchising sells US property management franchises (~$225K investment) as an E-2 Treaty Investor Visa pathway.
 WE ARE NOT pitching the recipient on buying a franchise. We are finding people who REFER wealthy international clients to us.
 Higher scores = more likely to be a strong referral partner who regularly works with high-net-worth foreign nationals seeking US residency/investment options.
 
@@ -134,11 +134,11 @@ Reply with JSON: {"score": number, "reasoning": "2 sentences max"}`;
 async function draftOutreachEmail(lead: any, touchNumber: number, settings: any): Promise<{ subject: string; body: string }> {
   const voiceSamples = (settings?.dylanVoiceSamples ?? []).join("\n\n");
   const calendly = settings?.calendlyLink || "https://calendly.com/dylan-newdawn/intro";
-  const bio = settings?.dylanBio || "Dylan Delaney, Director of Franchise Development at New Dawn Franchising, helps wealthy foreign nationals buy US property management franchises (~$250K investment) as an E-2 Treaty Investor Visa pathway. New Dawn works with referral partners — immigration attorneys, business brokers, wealth managers, and relocation consultants — who introduce their international clients looking for a US visa-qualifying investment.";
+  const bio = settings?.dylanBio || "Dylan Delaney, Director of Franchise Development at New Dawn Franchising, helps wealthy foreign nationals buy US property management franchises (~$225K investment) as an E-2 Treaty Investor Visa pathway. New Dawn works with referral partners — immigration attorneys, business brokers, wealth managers, and relocation consultants — who introduce their international clients looking for a US visa-qualifying investment.";
 
   const touchInstructions: Record<number, string> = {
     1: `Touch 1 — Soft intro to a REFERRAL PARTNER. Max 120 words. Dylan introduces himself and explains that he works with professionals like them whose clients are wealthy foreign nationals seeking US investment opportunities. He's NOT asking them to buy anything — he wants to explore whether their clients might benefit from New Dawn's franchise-based E-2 visa pathway. Ask ONE genuine question about their international client base. No pitch. Warm, collegial tone (professional to professional).`,
-    2: `Touch 2 — Value add for a REFERRAL PARTNER. Max 160 words. Share something genuinely useful: how the E-2 franchise pathway works for their clients, a success story of a client who got their E-2 visa through a franchise purchase, or key data about the property management franchise opportunity ($250K investment, turnkey, qualifies for E-2 visa). Position this as a tool they can offer their clients. Still no hard ask.`,
+    2: `Touch 2 — Value add for a REFERRAL PARTNER. Max 160 words. Share something genuinely useful: how the E-2 franchise pathway works for their clients, a success story of a client who got their E-2 visa through a franchise purchase, or key data about the property management franchise opportunity ($225K investment, turnkey, qualifies for E-2 visa). Position this as a tool they can offer their clients. Still no hard ask.`,
     3: `Touch 3 — Direct ask for a REFERRAL PARTNER. Max 180 words. Invite them to a 20-minute Zoom call with Dylan to see if there's a fit for referring clients. Include the Calendly link: ${calendly}. Light urgency (limited El Paso territories available). Frame as: "I'd love to show you exactly how this works so you can decide if it's something worth mentioning to your clients."`,
     4: `Touch 4 — Final breakup for a REFERRAL PARTNER. Max 100 words. "I'll leave the door open" tone. Not needy. Acknowledge they're busy. Leave on good terms — if they ever have a client looking for a US visa-qualifying investment, Dylan's the person to call. Include Calendly link in case they change their mind.`,
   };

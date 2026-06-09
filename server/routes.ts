@@ -566,34 +566,36 @@ export async function registerRoutes(
   // llms.txt — a curated, AI-friendly map of the site (see llmstxt.org).
   app.get("/llms.txt", async (_req, res) => {
     const pages: Array<[string, string]> = [
-      ["/", "E-2 visa property management franchise — overview, how it works, FAQ"],
+      ["/", "Multi-vertical E-2 visa franchise platform (Property Management, Telecom, Insurance) — overview, how it works, FAQ"],
       ["/e2-fit", "Why New Dawn satisfies each E-2 Treaty Investor Visa requirement, plus E-2 FAQ"],
       ["/process", "Step-by-step franchise process from inquiry to E-2 approval and operations"],
-      ["/territories", "El Paso, TX market, 300+ active management contracts, territory details"],
-      ["/about", "Company background and the New Dawn Franchising Group of Companies"],
+      ["/territories", "El Paso, TX market and territory details for the property management vertical"],
+      ["/about", "Company background, the three verticals, and the New Dawn Franchising Group of Companies"],
       ["/team", "Leadership team and advisors"],
       ["/marketing", "Proprietary marketing system included for franchisees"],
       ["/real-estate", "Real estate referral income via Star Spangled Banner Realty"],
-      ["/blog", "Insights on E-2 visas, property management franchising, and Texas real estate"],
+      ["/blog", "Insights on E-2 visas, franchising, and U.S. business ownership for international investors"],
       ["/contact", "Request the FDD, overview deck, or an intro call"],
     ];
 
     const lines: string[] = [
       "# New Dawn Franchising",
       "",
-      "> Property management franchise built specifically for E-2 Treaty Investor Visa investors. " +
-        "You own and direct a real U.S. business while an approved territory manager runs daily operations. " +
-        "Franchise packages from $225,000. Headquartered in El Paso, Texas. FDD available upon request.",
+      "> Multi-vertical franchisor specializing in E-2 Treaty Investor Visa-qualifying franchises. " +
+        "Investors choose from three recurring-revenue industries — Property Management, Telecom, or Insurance — " +
+        "and direct a real U.S. business while New Dawn's operating teams handle daily execution. " +
+        "Franchise investment from $225,000. Headquartered in El Paso, Texas. FDD available upon request.",
       "",
       "## Key Pages",
       ...pages.map(([path, desc]) => `- [${path}](${SITE_URL}${path}): ${desc}`),
       "",
       "## Key Facts",
+      "- Identity: multi-vertical franchisor specialized for E-2 visa investors (not a single-industry franchise)",
+      "- Verticals: Property Management, Telecom, and Insurance — recurring-revenue industries chosen for E-2 fit",
       "- Franchise investment: from $225,000, structured to meet E-2 visa requirements",
-      "- Model: single-family long-term rental property management",
-      "- Location: El Paso, Texas; 300+ active management contracts in the network",
-      "- Owner role: you direct the business and control the bank accounts; a territory manager runs daily operations",
-      "- Support: in-house immigration attorneys, financing, and real estate brokerage",
+      "- Owner role: you direct the business and control the bank accounts; approved local teams run daily operations",
+      "- Headquarters: El Paso, Texas; owners may live anywhere in the U.S.",
+      "- Support: in-house immigration attorneys, financing, real estate brokerage, and proprietary technology",
       "- E-2 holders may live anywhere in the U.S.; spouse is eligible for work authorization",
       "",
       "## Contact",

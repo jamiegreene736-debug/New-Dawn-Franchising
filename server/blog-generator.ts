@@ -10,24 +10,24 @@ const openai = createLazyOpenAIClient();
 const BLOG_TOPICS = [
   "What is the best franchise for an E-2 visa?",
   "How much do you need to invest for an E-2 visa franchise?",
-  "Can you get an E-2 visa through a property management franchise?",
+  "Which industries work best for an E-2 visa franchise?",
+  "What franchise options qualify for the E-2 visa?",
+  "Is a property management franchise a good E-2 visa business?",
+  "Is a telecom franchise a good E-2 visa business?",
+  "Is an insurance franchise a good E-2 visa business?",
+  "How do you choose the right E-2 visa franchise vertical?",
+  "Why are recurring-revenue businesses good for the E-2 visa?",
   "Do you have to live in the US on an E-2 visa?",
   "How does a hands-off franchise work for E-2 visa investors?",
   "What is the difference between the E-2 and EB-5 visa?",
   "Can an E-2 visa lead to a green card?",
-  "Is property management a good business for an E-2 visa?",
   "How long does it take to get an E-2 visa through a franchise?",
   "What countries are eligible for the E-2 visa?",
   "Can my family come with me on an E-2 visa?",
-  "How much does it cost to buy a property management franchise?",
-  "Is El Paso a good market for rental property investment?",
   "What are the requirements for an E-2 visa investment?",
-  "How do E-2 visa investors make money with rental properties?",
-  "What does a territory manager do in a property management franchise?",
   "Can you renew an E-2 visa indefinitely?",
   "What is a franchise buy-back program and how does it work?",
-  "Why do international investors choose Texas for an E-2 business?",
-  "What makes single-family rental management profitable in Texas?",
+  "Why do international investors choose the USA for an E-2 business?",
 ];
 
 function slugify(text: string): string {
@@ -49,7 +49,7 @@ export async function generateBlogPost(): Promise<void> {
     ? availableTopics[Math.floor(Math.random() * availableTopics.length)]
     : BLOG_TOPICS[Math.floor(Math.random() * BLOG_TOPICS.length)];
 
-  const prompt = `Write a professional blog post for New Dawn Franchising LLC, a property management franchise based in El Paso, Texas, targeting E-2 visa investors.
+  const prompt = `Write a professional blog post for New Dawn Franchising LLC, a multi-vertical franchisor specializing in E-2 Treaty Investor Visa-qualifying franchises, headquartered in El Paso, Texas.
 
 Topic: ${topic}
 
@@ -60,14 +60,15 @@ This topic is phrased the way people ask AI assistants and search engines. Struc
 - Keep every claim specific and factual; avoid hype and vague superlatives.
 
 Key facts to incorporate naturally:
-- New Dawn manages single-family long-term rentals in El Paso, Texas
-- The franchise network has 300+ active management contracts
-- Franchise packages start at $225,000, structured to meet E-2 visa requirements
+- New Dawn is a multi-vertical franchisor for E-2 visa investors, not a single-industry franchise
+- Investors choose from three recurring-revenue verticals: Property Management, Telecom, and Insurance
+- These industries were selected for E-2 fit: recurring revenue, documented systems, supervisory control, staffing, and renewal-ready reporting
+- Franchise investment starts at $225,000, structured to meet E-2 visa requirements
+- Investors direct the business and control their bank accounts while approved local teams handle daily execution
 - Investors can live anywhere in the USA while owning the franchise
-- The franchise offers an in-house buy-back program after approximately 4 years
-- There is a referral program for franchisees through an affiliated real estate brokerage
+- New Dawn offers an in-house buy-back program after approximately 4 years
 - There is an E-2 to EB-5 visa pathway available
-- Investors maintain financial control (including their own bank accounts) while a territory-approved manager handles day-to-day operations
+- The property management vertical operates single-family long-term rentals in El Paso, Texas, with 300+ active contracts
 - Chris Von Pohlot is the Managing Director
 
 Format your response as JSON with these fields:

@@ -14,67 +14,80 @@ const EMAIL = "franchising@newdawnfranchising.com";
 
 const shells: Record<string, PageShell> = {
   "/": {
-    title: `${SITE} | E-2 Visa Property Management Franchise | El Paso, TX`,
+    title: `${SITE} | E-2 Visa Franchise Platform — Property Management, Telecom & Insurance | El Paso, TX`,
     description:
-      "New Dawn Franchising is a property management franchise built for E-2 visa investors. You direct the business — we handle daily operations. FDD available upon request.",
+      "New Dawn Franchising is a multi-vertical franchisor for E-2 visa investors. Choose from three recurring-revenue franchises — Property Management, Telecom, or Insurance. You direct the business; our teams run daily operations. Investment from $225,000. FDD available upon request.",
     html: `
 <main>
-  <h1>You Own It. You Direct It. We Run It.</h1>
-  <p>New Dawn Franchising is a property management franchise built specifically for E-2 visa investors. You maintain full control of your bank accounts and all business decisions — while our team handles the daily operational workload so you can focus on leading and growing your enterprise, exactly as the E-2 visa requires.</p>
+  <h1>Three Industries. One E-2 Platform.</h1>
+  <p>New Dawn Franchising is a multi-vertical franchisor built specifically for E-2 Treaty Investor Visa investors. Choose from three recurring-revenue franchise verticals — Property Management, Telecom, or Insurance — and direct a real, operating U.S. business while our teams handle the daily execution, exactly as the E-2 visa requires.</p>
   <p>${TAGLINE}</p>
   <p>Franchise Disclosure Document (FDD) available upon request. New Dawn Franchising is a registered franchisor.</p>
 
   <section>
-    <h2>Proprietary Technology. Built Exclusively for New Dawn Franchisees.</h2>
-    <p>Every New Dawn franchisee benefits from proprietary technology built exclusively for our system — from automated tenant communications and leasing workflows to marketing that works around the clock. This isn't off-the-shelf software. It's infrastructure we designed specifically for the E-2 property management model, so your business runs with the efficiency of a seasoned operation from day one.</p>
+    <h2>Our Three E-2 Franchise Verticals</h2>
+    <p>New Dawn selected three industries that lend themselves to recurring revenue, documented operating systems, supervisory control, staffing, and renewal-ready reporting — traits that support a credible E-2 business.</p>
     <ul>
-      <li>Automated tenant communication &amp; follow-up</li>
-      <li>Technology-assisted leasing and property marketing</li>
-      <li>Operational dashboards so you always know what's happening in your business</li>
+      <li><strong>Property Management</strong> — Long-term rental management operations with local execution teams and owner-level reporting.</li>
+      <li><strong>Telecom</strong> — Recurring-service telecom operations supported by centralized systems, sales workflows, and oversight dashboards.</li>
+      <li><strong>Insurance</strong> — Insurance-sector franchise operations designed around compliant supervision, client service, and recurring revenue.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Proprietary Technology Across Every Vertical</h2>
+    <p>Every New Dawn franchisee benefits from proprietary technology built exclusively for our multi-vertical system — from owner dashboards and client communications to marketing, reporting, and workflow automation. This isn't off-the-shelf software. It's infrastructure designed around E-2 investor oversight across Property Management, Telecom, and Insurance.</p>
+    <ul>
+      <li>Owner dashboards and operational reporting</li>
+      <li>Automated client communication &amp; follow-up</li>
+      <li>Marketing and lead generation that runs around the clock</li>
     </ul>
   </section>
 
   <section>
     <h2>How It Works</h2>
     <ol>
-      <li><strong>Invest &amp; Acquire Your Franchise</strong> — Purchase your New Dawn Franchising territory starting at $225,000. This structured investment is designed to meet E-2 visa capital requirements and gives you a real, operating business.</li>
-      <li><strong>Apply for Your E-2 Visa</strong> — Our partner immigration attorneys guide you through the E-2 visa application. You own and direct a legitimate U.S. business — that's the foundation of a strong E-2 petition.</li>
-      <li><strong>Your Territory Manager Runs Operations</strong> — An approved territory representative manages day-to-day property management. You oversee the business, review reports, and make key decisions.</li>
-      <li><strong>Grow Your Portfolio</strong> — Scale your property management portfolio, generate referral income through our affiliated real estate brokerage, and build equity in a real U.S. business.</li>
+      <li><strong>Choose Your Vertical &amp; Invest</strong> — Select Property Management, Telecom, or Insurance and acquire your New Dawn franchise starting at $225,000. This structured investment is designed to meet E-2 visa capital requirements and gives you a real, operating business.</li>
+      <li><strong>Apply for Your E-2 Visa</strong> — Our partner immigration attorneys guide you through the E-2 visa application. You own and direct a legitimate U.S. business — the foundation of a strong E-2 petition.</li>
+      <li><strong>Local Teams Run Daily Operations</strong> — Approved operating teams manage day-to-day execution in your chosen vertical. You oversee the business, review reports, and make the key decisions.</li>
+      <li><strong>Grow Your U.S. Enterprise</strong> — Scale your business, build equity, and maintain executive control while living anywhere in the United States.</li>
     </ol>
   </section>
 
   <section>
     <h2>Why New Dawn Franchising?</h2>
     <ul>
-      <li>Franchise packages from $225,000 — structured to meet E-2 visa requirements</li>
-      <li>Proprietary technology powers the entire operation</li>
-      <li>Territory-approved manager handles day-to-day operations</li>
-      <li>In-house E-2 immigration attorneys and real estate professionals</li>
+      <li>A multi-vertical E-2 platform — choose Property Management, Telecom, or Insurance</li>
+      <li>Franchise investment from $225,000 — structured to meet E-2 visa requirements</li>
+      <li>Proprietary technology powers every vertical</li>
+      <li>Approved local teams handle day-to-day operations</li>
+      <li>In-house E-2 immigration, finance, real estate, and legal professionals</li>
       <li>In-house buy-back program available after approximately 4 years</li>
-      <li>Located in El Paso, Texas — a growing rental market</li>
+      <li>Headquartered in El Paso, Texas, with domestic geographic flexibility for owners</li>
       <li>Part of the New Dawn Franchising Group of Companies™</li>
     </ul>
   </section>
 
   <section>
     <h2>Investment Overview</h2>
-    <p>Franchise packages start at $225,000. This covers your territory license, training, technology platform access, and operational setup. Financing options are available through our affiliated lending partners.</p>
-    <p>The E-2 visa requires a substantial and at-risk investment in a U.S. business. Our franchise is structured specifically to meet this requirement.</p>
+    <p>Franchise investment starts at $225,000, covering your franchise license, training, technology platform access, and operational setup. Financing options are available through our affiliated lending partners.</p>
+    <p>The E-2 visa requires a substantial and at-risk investment in a U.S. business. Each New Dawn vertical is structured specifically to meet this requirement.</p>
   </section>
 
   <section>
     <h2>Frequently Asked Questions</h2>
+    <h3>What is New Dawn Franchising?</h3>
+    <p>New Dawn Franchising is a multi-vertical franchisor specializing in E-2 Treaty Investor Visa-qualifying franchises. Investors choose from three recurring-revenue industries — Property Management, Telecom, or Insurance.</p>
     <h3>What is the E-2 visa?</h3>
     <p>The E-2 Treaty Investor Visa allows nationals of treaty countries to enter and work in the U.S. based on a substantial investment in a U.S. business. The investor must own and direct the enterprise.</p>
     <h3>How much do I need to invest?</h3>
-    <p>Our franchise packages start at $225,000. The E-2 visa does not have a fixed minimum, but the investment must be "substantial" relative to the total cost of the business.</p>
-    <h3>Do I have to do property management work myself?</h3>
-    <p>The franchise is structured so you are the business director and decision-maker. You maintain full ownership control and oversight — including control over your bank accounts — while an approved territory representative manages day-to-day execution.</p>
+    <p>New Dawn franchise investment starts at $225,000. The E-2 visa does not have a fixed minimum, but the investment must be "substantial" relative to the total cost of the business.</p>
+    <h3>How do I choose between Property Management, Telecom, and Insurance?</h3>
+    <p>The FDD and discovery process help you compare the three options. We look at your goals, market fit, investment preferences, operational comfort, and E-2 strategy, then walk you through which vertical is the strongest fit.</p>
+    <h3>Do I have to do the day-to-day work myself?</h3>
+    <p>No. Each New Dawn vertical is structured so you are the business director and decision-maker. You maintain ownership control, bank-account oversight, and executive supervision while approved local teams manage daily execution.</p>
     <h3>Can I live anywhere in the USA on the E-2 visa?</h3>
-    <p>Yes. E-2 visa holders are authorized to live anywhere in the United States. Your business is based in El Paso, Texas, but you are not required to live there.</p>
-    <h3>What is the in-house buy-back program?</h3>
-    <p>Our in-house buy-back program gives you a path to recover your investment. After approximately 4 years, we can work with you on an exit. Contact us for full details.</p>
+    <p>Yes. New Dawn is headquartered in El Paso, Texas, but qualified E-2 owners can live elsewhere in the United States while maintaining executive oversight of the franchise.</p>
   </section>
 
   <section>
@@ -89,6 +102,11 @@ const shells: Record<string, PageShell> = {
 </main>`,
     faq: [
       {
+        question: "What is New Dawn Franchising?",
+        answer:
+          "New Dawn Franchising is a multi-vertical franchisor specializing in E-2 Treaty Investor Visa-qualifying franchises. Investors choose from three recurring-revenue industries — Property Management, Telecom, or Insurance — and direct a real U.S. business while New Dawn's operating teams handle daily execution.",
+      },
+      {
         question: "What is the E-2 visa?",
         answer:
           "The E-2 Treaty Investor Visa allows nationals of treaty countries to enter and work in the U.S. based on a substantial investment in a U.S. business. The investor must own and direct the enterprise.",
@@ -96,36 +114,45 @@ const shells: Record<string, PageShell> = {
       {
         question: "How much do I need to invest?",
         answer:
-          "Our franchise packages start at $225,000. The E-2 visa does not have a fixed minimum, but the investment must be \"substantial\" relative to the total cost of the business.",
+          "New Dawn franchise investment starts at $225,000. The E-2 visa does not have a fixed minimum, but the investment must be \"substantial\" relative to the total cost of the business.",
       },
       {
-        question: "Do I have to do property management work myself?",
+        question: "How do I choose between Property Management, Telecom, and Insurance?",
         answer:
-          "The franchise is structured so you are the business director and decision-maker. You maintain full ownership control and oversight — including control over your bank accounts — while an approved territory representative manages day-to-day execution.",
+          "The FDD and discovery process help you compare the three options. We look at your goals, market fit, investment preferences, operational comfort, and E-2 strategy, then walk you through which vertical is the strongest fit.",
+      },
+      {
+        question: "Do I have to do the day-to-day work myself?",
+        answer:
+          "No. Each New Dawn vertical is structured so you are the business director and decision-maker. You maintain ownership control, bank-account oversight, and executive supervision while approved local teams manage daily execution.",
       },
       {
         question: "Can I live anywhere in the USA on the E-2 visa?",
         answer:
-          "Yes. E-2 visa holders are authorized to live anywhere in the United States. Your business is based in El Paso, Texas, but you are not required to live there.",
-      },
-      {
-        question: "What is the in-house buy-back program?",
-        answer:
-          "Our in-house buy-back program gives you a path to recover your investment. After approximately 4 years, we can work with you on an exit. Contact us for full details.",
+          "Yes. New Dawn is headquartered in El Paso, Texas, but qualified E-2 owners can live elsewhere in the United States while maintaining executive oversight of the franchise.",
       },
     ],
   },
 
   "/about": {
-    title: `About ${SITE} | Property Management Franchise for E-2 Visa Investors`,
+    title: `About ${SITE} | Multi-Vertical E-2 Visa Franchisor for International Investors`,
     description:
-      "Learn about New Dawn Franchising LLC — a property management franchise built specifically for E-2 visa investors, backed by the New Dawn Franchising Group of Companies™.",
+      "Learn about New Dawn Franchising LLC — a multi-vertical franchisor specializing in E-2 visa-qualifying franchises across Property Management, Telecom, and Insurance, backed by the New Dawn Franchising Group of Companies™.",
     html: `
 <main>
   <h1>About New Dawn Franchising</h1>
   <p>${TAGLINE}</p>
-  <p>New Dawn Franchising LLC is a property management franchise headquartered in El Paso, Texas. We work exclusively with E-2 visa investors who want to own a real, operating U.S. business — one they direct and control — while benefiting from a professionally managed operation.</p>
+  <p>New Dawn Franchising LLC is a multi-vertical franchisor headquartered in El Paso, Texas. We work exclusively with E-2 visa investors who want to own a real, operating U.S. business — one they direct and control — across three recurring-revenue industries: Property Management, Telecom, and Insurance.</p>
   <p>Unlike general-purpose franchises retrofitted for visa purposes, New Dawn was designed from the ground up with the E-2 investor in mind. Our legal structure, operating model, and proprietary technology all reflect the requirements of the E-2 treaty investor visa.</p>
+
+  <section>
+    <h2>Three Recurring-Revenue Verticals</h2>
+    <ul>
+      <li><strong>Property Management</strong> — Long-term rental management operations with local execution teams and owner-level reporting.</li>
+      <li><strong>Telecom</strong> — Recurring-service telecom operations supported by centralized systems, sales workflows, and oversight dashboards.</li>
+      <li><strong>Insurance</strong> — Insurance-sector franchise operations designed around compliant supervision, client service, and recurring revenue.</li>
+    </ul>
+  </section>
 
   <section>
     <h2>The New Dawn Franchising Group of Companies™</h2>
@@ -134,7 +161,7 @@ const shells: Record<string, PageShell> = {
       <li><strong>Star Spangled Banner Realty</strong> — An established real estate brokerage with dozens of experienced agents and over a decade of expertise across El Paso and beyond.</li>
       <li><strong>New Dawn Financing</strong> — In-house financing solutions to help franchise buyers structure their investment and meet E-2 capital requirements.</li>
       <li><strong>New Dawn Legal</strong> — Partner immigration attorneys specializing in E-2 visa applications for franchise investors.</li>
-      <li><strong>New Dawn Property Management</strong> — The operational arm that provides territory management services to New Dawn franchisees.</li>
+      <li><strong>New Dawn Property Management</strong> — The operational arm that provides management services for the property management vertical.</li>
     </ul>
   </section>
 
@@ -180,7 +207,7 @@ const shells: Record<string, PageShell> = {
   "/e2-fit": {
     title: `E-2 Visa Franchise Fit | Why New Dawn is the Right E-2 Business | ${SITE}`,
     description:
-      "New Dawn Franchising is built specifically for the E-2 Treaty Investor Visa. Learn why our property management franchise model satisfies E-2 requirements and how you can qualify.",
+      "New Dawn Franchising is built specifically for the E-2 Treaty Investor Visa. Learn why our multi-vertical franchise model — Property Management, Telecom, and Insurance — satisfies E-2 requirements and how you can qualify.",
     html: `
 <main>
   <h1>Why New Dawn is the Right E-2 Visa Franchise</h1>
@@ -421,8 +448,8 @@ export function getPageShell(pathname: string): PageShell | null {
 }
 
 export const defaultShell: PageShell = {
-  title: `${SITE} | E-2 Visa Property Management Franchise | El Paso, TX`,
+  title: `${SITE} | E-2 Visa Franchise Platform — Property Management, Telecom & Insurance | El Paso, TX`,
   description:
-    "New Dawn Franchising is a property management franchise built for E-2 visa investors. You direct the business — we handle daily operations. FDD available upon request.",
-  html: `<main><h1>${SITE}</h1><p>${TAGLINE}</p></main>`,
+    "New Dawn Franchising is a multi-vertical franchisor for E-2 visa investors — choose from Property Management, Telecom, or Insurance. You direct the business; our teams run daily operations. FDD available upon request.",
+  html: `<main><h1>${SITE}</h1><p>A multi-vertical franchisor for E-2 visa investors — Property Management, Telecom, and Insurance.</p><p>${TAGLINE}</p></main>`,
 };

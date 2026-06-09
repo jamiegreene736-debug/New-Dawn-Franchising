@@ -58,6 +58,7 @@ import {
   getContentDrafts, getMetaSuggestions, approveDraft, discardDraft, updateDraft,
   approveMetaSuggestion, requestDraft, pingSitemap,
 } from "./content-engine";
+import { INDEXNOW_KEY, indexNowKeyFilePath } from "./indexnow";
 import {
   trackVisit, identifyVisitorByForm, identifyVisitorByEmailClick,
   getLiveVisitors, getIdentifiedVisitors, getWatchlist,
@@ -507,6 +508,11 @@ export async function registerRoutes(
       console.error("Sitemap generation error:", err);
       res.status(500).send("Error generating sitemap");
     }
+  });
+
+  // IndexNow key-verification file — proves domain ownership to Bing/Yandex.
+  app.get(indexNowKeyFilePath, (_req, res) => {
+    res.set("Content-Type", "text/plain").send(INDEXNOW_KEY);
   });
 
   app.get("/robots.txt", (_req, res) => {

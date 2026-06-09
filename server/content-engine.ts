@@ -4,8 +4,10 @@ import { eq, desc, and } from "drizzle-orm";
 import { on, emit } from "./core/event-bus";
 import { emailQueue } from "./core/email-queue";
 import { notifications } from "./core/notifications";
+import { storage } from "./storage";
+import { submitToIndexNow } from "./indexnow";
 
-const SITE_URL = "https://www.newdawnfranchising.com";
+const SITE_URL = "https://newdawnfranchising.com";
 const JAMIE_EMAIL = "jamie.greene736@gmail.com";
 const FROM_EMAIL = "franchising@newdawnfranchising.com";
 
@@ -144,16 +146,23 @@ Return JSON:
 // ─── Sitemap Ping ─────────────────────────────────────────────────────────────
 
 export async function pingSitemap(): Promise<{ success: boolean; message: string }> {
-  const sitemapUrl = `${SITE_URL}/sitemap.xml`;
-  const pingUrl = `https://www.google.com/ping?sitemap=${encodeURIComponent(sitemapUrl)}`;
+  // Google's sitemap-ping endpoint was deprecated and removed in 2024. Notify
+  // Bing/Yandex (which support IndexNow) of the site's URLs instead. Google
+  // discovers updates via the sitemap submitted in Search Console.
+  const staticPaths = [
+    "/", "/about", "/team", "/e2-fit", "/process", "/territories",
+    "/marketing", "/real-estate", "/blog", "/quiz", "/contact",
+  ];
+  const urls = staticPaths.map((p) => `${SITE_URL}${p}`);
   try {
-    const res = await fetch(pingUrl, { signal: AbortSignal.timeout(10000) });
-    const message = res.ok ? "Sitemap pinged successfully" : `Ping failed: ${res.status}`;
-    console.log(`[ContentEngine] Sitemap ping: ${message}`);
-    return { success: res.ok, message };
-  } catch (err: any) {
-    return { success: false, message: err.message };
+    const posts = await storage.getBlogPosts();
+    for (const post of posts) urls.push(`${SITE_URL}/blog/${post.slug}`);
+  } catch {
+    // Blog list is optional; submit the static pages regardless.
   }
+  const result = await submitToIndexNow(urls);
+  console.log(`[ContentEngine] Sitemap ping (IndexNow): ${result.message}`);
+  return { success: result.success, message: result.message };
 }
 
 // ─── Event Listeners ──────────────────────────────────────────────────────────

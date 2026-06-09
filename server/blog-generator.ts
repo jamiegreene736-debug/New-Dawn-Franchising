@@ -1,6 +1,9 @@
 import cron from "node-cron";
 import { storage } from "./storage";
 import { createLazyOpenAIClient } from "./openai-client";
+import { submitToIndexNow } from "./indexnow";
+
+const SITE_URL = "https://newdawnfranchising.com";
 
 const openai = createLazyOpenAIClient();
 
@@ -104,6 +107,12 @@ Write in a professional but approachable tone. Focus on providing genuine, accur
     });
 
     console.log(`Blog post generated: "${parsed.title}"`);
+
+    // Notify Bing/Yandex of the new post via IndexNow.
+    await submitToIndexNow([
+      `${SITE_URL}/blog/${slug}`,
+      `${SITE_URL}/blog`,
+    ]);
   } catch (error) {
     console.error("Failed to generate blog post:", error);
   }

@@ -21,9 +21,10 @@ const SAME_AS = [
 ];
 
 const ORG_DESCRIPTION =
-  "Property management franchise built specifically for E-2 Treaty Investor Visa investors. " +
-  "You own and direct a real U.S. business while an approved territory manager runs daily operations. " +
-  "Franchise packages from $225,000. Headquartered in El Paso, Texas. FDD available upon request.";
+  "New Dawn Franchising is a multi-vertical franchisor specializing in E-2 Treaty Investor Visa-qualifying franchises. " +
+  "Investors choose from three recurring-revenue industries — Property Management, Telecom, or Insurance — and direct a real U.S. " +
+  "business while New Dawn's operating teams handle daily execution. Franchise investment from $225,000. " +
+  "Headquartered in El Paso, Texas. FDD available upon request.";
 
 /** Primary entity: the franchisor, typed as both Organization and LocalBusiness. */
 export function organizationNode(): Record<string, unknown> {
@@ -33,6 +34,7 @@ export function organizationNode(): Record<string, unknown> {
     name: "New Dawn Franchising LLC",
     alternateName: "New Dawn Franchising",
     legalName: "New Dawn Franchising LLC",
+    slogan: "Three industries. One E-2 platform.",
     url: SITE_URL,
     logo: { "@type": "ImageObject", url: LOGO_URL },
     image: OG_IMAGE,
@@ -58,9 +60,11 @@ export function organizationNode(): Record<string, unknown> {
     founder: { "@type": "Person", name: "Chris Von Pohlot" },
     knowsAbout: [
       "E-2 Treaty Investor Visa",
+      "Franchising for international investors",
       "Property management franchising",
-      "Real estate investment",
-      "Franchise ownership for international investors",
+      "Telecom franchising",
+      "Insurance franchising",
+      "Recurring-revenue business ownership",
     ],
     sameAs: SAME_AS,
   };
@@ -79,31 +83,59 @@ export function websiteNode(): Record<string, unknown> {
   };
 }
 
-/** The franchise opportunity as a Service with a priced Offer. */
+/** The three E-2 franchise verticals New Dawn offers. */
+const FRANCHISE_VERTICALS = [
+  {
+    name: "Property Management Franchise",
+    description:
+      "Long-term rental management operations with local execution teams and owner-level reporting.",
+  },
+  {
+    name: "Telecom Franchise",
+    description:
+      "Recurring-service telecom operations supported by centralized systems, sales workflows, and oversight dashboards.",
+  },
+  {
+    name: "Insurance Franchise",
+    description:
+      "Insurance-sector franchise operations designed around compliant supervision, client service, and recurring revenue.",
+  },
+];
+
+/** The multi-vertical franchise opportunity as a Service with a priced offer catalog. */
 export function franchiseServiceNode(): Record<string, unknown> {
   return {
     "@type": "Service",
     "@id": `${SITE_URL}/#franchise-offer`,
-    name: "E-2 Visa Property Management Franchise",
-    serviceType: "Property management franchise for E-2 visa investors",
+    name: "E-2 Visa Franchise Opportunities",
+    serviceType: "Franchise opportunities for E-2 Treaty Investor Visa investors",
     provider: { "@id": ORG_ID },
     areaServed: { "@type": "Country", name: "United States" },
     description:
-      "A property management franchise structured to meet E-2 Treaty Investor Visa requirements. " +
-      "Franchise packages start at $225,000 and include territory license, training, proprietary " +
-      "technology, and operational setup in El Paso, Texas.",
-    offers: {
-      "@type": "Offer",
-      price: "225000",
-      priceCurrency: "USD",
-      availability: "https://schema.org/InStock",
-      url: `${SITE_URL}/`,
-      priceSpecification: {
-        "@type": "PriceSpecification",
+      "New Dawn franchises three recurring-revenue verticals — Property Management, Telecom, and Insurance — " +
+      "each structured to meet E-2 Treaty Investor Visa requirements. Franchise investment starts at $225,000 and " +
+      "includes training, proprietary technology, and operational support.",
+    hasOfferCatalog: {
+      "@type": "OfferCatalog",
+      name: "E-2 Visa Franchise Verticals",
+      itemListElement: FRANCHISE_VERTICALS.map((v) => ({
+        "@type": "Offer",
+        itemOffered: {
+          "@type": "Service",
+          name: v.name,
+          description: v.description,
+          provider: { "@id": ORG_ID },
+        },
         price: "225000",
         priceCurrency: "USD",
-        minPrice: "225000",
-      },
+        availability: "https://schema.org/InStock",
+        url: `${SITE_URL}/`,
+        priceSpecification: {
+          "@type": "PriceSpecification",
+          priceCurrency: "USD",
+          minPrice: "225000",
+        },
+      })),
     },
   };
 }

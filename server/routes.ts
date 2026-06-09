@@ -467,15 +467,12 @@ export async function registerRoutes(
     { path: "/real-estate", priority: "0.7", changefreq: "monthly" },
     { path: "/blog", priority: "0.7", changefreq: "daily" },
     { path: "/quiz", priority: "0.6", changefreq: "monthly" },
-    { path: "/brokers", priority: "0.6", changefreq: "monthly" },
     { path: "/contact", priority: "0.8", changefreq: "monthly" },
   ];
 
   app.get("/sitemap.xml", async (_req, res) => {
+    const today = new Date().toISOString().split("T")[0];
     try {
-      const posts = await storage.getBlogPosts();
-      const today = new Date().toISOString().split("T")[0];
-
       let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
       xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
 
@@ -488,16 +485,26 @@ export async function registerRoutes(
         xml += `  </url>\n`;
       }
 
-      for (const post of posts) {
-        const lastmod = post.publishedAt
-          ? new Date(post.publishedAt).toISOString().split("T")[0]
-          : today;
-        xml += `  <url>\n`;
-        xml += `    <loc>${SITE_URL}/blog/${post.slug}</loc>\n`;
-        xml += `    <lastmod>${lastmod}</lastmod>\n`;
-        xml += `    <changefreq>monthly</changefreq>\n`;
-        xml += `    <priority>0.6</priority>\n`;
-        xml += `  </url>\n`;
+      // Blog posts are isolated: a database or data hiccup must never take down
+      // the whole sitemap, so on failure we still return the static pages (200).
+      try {
+        const posts = await storage.getBlogPosts();
+        for (const post of posts) {
+          if (!post?.slug) continue;
+          let lastmod = today;
+          if (post.publishedAt) {
+            const d = new Date(post.publishedAt);
+            if (!isNaN(d.getTime())) lastmod = d.toISOString().split("T")[0];
+          }
+          xml += `  <url>\n`;
+          xml += `    <loc>${SITE_URL}/blog/${post.slug}</loc>\n`;
+          xml += `    <lastmod>${lastmod}</lastmod>\n`;
+          xml += `    <changefreq>monthly</changefreq>\n`;
+          xml += `    <priority>0.6</priority>\n`;
+          xml += `  </url>\n`;
+        }
+      } catch (blogErr) {
+        console.error("Sitemap: blog posts unavailable, serving static pages only:", blogErr);
       }
 
       xml += `</urlset>`;

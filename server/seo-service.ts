@@ -446,7 +446,7 @@ Format as a plain numbered list (1. ... 2. ... 3. ... 4. ...). No intro, no outr
     ` : ""}
 
     <p style="font-size:13px;color:#9ca3af;margin:20px 0 0;border-top:1px solid #f3f4f6;padding-top:16px;">
-      View full SEO Command Center: <a href="https://newdawnfranchising.com/seo" style="color:#0f4c81;">newdawnfranchising.com/seo</a><br/>
+      View full SEO Command Center: <a href="https://www.newdawnfranchising.com/seo" style="color:#0f4c81;">newdawnfranchising.com/seo</a><br/>
       This brief is sent every morning at 9 AM ET.
     </p>
   </div>

@@ -7,7 +7,7 @@ import { notifications } from "./core/notifications";
 import { storage } from "./storage";
 import { submitToIndexNow } from "./indexnow";
 
-const SITE_URL = "https://newdawnfranchising.com";
+const SITE_URL = "https://www.newdawnfranchising.com";
 const JAMIE_EMAIL = "jamie.greene736@gmail.com";
 const FROM_EMAIL = "franchising@newdawnfranchising.com";
 

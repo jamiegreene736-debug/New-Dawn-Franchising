@@ -9,7 +9,7 @@ import type { BlogPost } from "@shared/schema";
  * each other by `@id`.
  */
 
-export const SITE_URL = "https://newdawnfranchising.com";
+export const SITE_URL = "https://www.newdawnfranchising.com";
 export const OG_IMAGE = `${SITE_URL}/opengraph.jpg`;
 export const LOGO_URL = `${SITE_URL}/favicon.png`;
 

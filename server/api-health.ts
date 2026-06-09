@@ -2,7 +2,7 @@ import { sendEmailFromSender } from "./email-service";
 
 const ALERT_TO = "jamie.greene736@gmail.com";
 const ALERT_FROM = "dylan@newdawnfranchising.com";
-const BASE_URL = process.env.BASE_URL || "https://newdawnfranchising.com";
+const BASE_URL = process.env.BASE_URL || "https://www.newdawnfranchising.com";
 
 export interface ApiHealthResult {
   name: string;

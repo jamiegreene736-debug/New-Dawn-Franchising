@@ -109,7 +109,7 @@ export async function sendWelcomeEmail(
               Thank you for your trust and confidence in New Dawn. We look forward to growing together.
             </p>
             <hr style="border:none;border-top:1px solid #eee;margin:32px 0;">
-            ${buildEmailSignature("dylan@newdawnfranchising.com", "https://newdawnfranchising.com")}
+            ${buildEmailSignature("dylan@newdawnfranchising.com", "https://www.newdawnfranchising.com")}
           </td>
         </tr>
       </table>
@@ -160,7 +160,7 @@ export async function sendWireReceiptEmail(
               Please retain this email for your records. A member of our team will follow up shortly with next steps for your onboarding.
             </p>
             <hr style="border:none;border-top:1px solid #eee;margin:32px 0;">
-            ${buildEmailSignature("dylan@newdawnfranchising.com", "https://newdawnfranchising.com")}
+            ${buildEmailSignature("dylan@newdawnfranchising.com", "https://www.newdawnfranchising.com")}
           </td>
         </tr>
       </table>

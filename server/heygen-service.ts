@@ -191,7 +191,7 @@ export async function createVideoRecord(params: {
   script: string; subjectLine?: string; deliveryChannel: string;
   franchiseeId?: string; dailyBatchId?: string; scriptTemplateId?: string;
 }): Promise<string> {
-  const appBase = process.env.APP_BASE_URL ?? "https://newdawnfranchising.com";
+  const appBase = process.env.APP_BASE_URL ?? "https://www.newdawnfranchising.com";
   const [row] = await db.insert(heygenVideos).values({
     leadId: params.leadId,
     leadName: params.leadName,
@@ -297,7 +297,7 @@ export async function sendVideo(videoId: string): Promise<void> {
   if (!video.videoUrl) throw new Error("Video URL not available");
 
   const trackingUrl = video.trackingUrl ?? video.videoUrl;
-  const appBase = process.env.APP_BASE_URL ?? "https://newdawnfranchising.com";
+  const appBase = process.env.APP_BASE_URL ?? "https://www.newdawnfranchising.com";
   const calendlyUrl = process.env.CALENDLY_API_KEY ? "https://calendly.com/dylan-newdawnfranchising" : "https://calendly.com/dylan-newdawnfranchising";
 
   if (video.deliveryChannel === "email" && video.leadEmail) {

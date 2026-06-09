@@ -676,7 +676,7 @@ function ContentSection() {
           <h3 className="font-semibold text-gray-800">Meta Tag Optimizer</h3>
           <p className="text-sm text-gray-500">Enter a URL on your site and get AI-optimized title and meta description suggestions.</p>
           <div className="flex gap-2">
-            <Input placeholder="https://newdawnfranchising.com/e2-fit" value={metaUrl} onChange={(e) => setMetaUrl(e.target.value)} />
+            <Input placeholder="https://www.newdawnfranchising.com/e2-fit" value={metaUrl} onChange={(e) => setMetaUrl(e.target.value)} />
             <Button onClick={generateMeta} disabled={metaLoading || !metaUrl.trim()}>
               {metaLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
               <span className="ml-1">{metaLoading ? "Analyzing..." : "Optimize"}</span>

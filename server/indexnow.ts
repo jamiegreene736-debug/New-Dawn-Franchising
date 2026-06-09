@@ -11,8 +11,8 @@
  * sitemap submission in Google Search Console.
  */
 
-const SITE_URL = "https://newdawnfranchising.com";
-const HOST = "newdawnfranchising.com";
+const SITE_URL = "https://www.newdawnfranchising.com";
+const HOST = "www.newdawnfranchising.com";
 
 // Public-by-design key (it is exposed in the key file). Override via env if desired.
 export const INDEXNOW_KEY = process.env.INDEXNOW_KEY || "01579a0bb477569ba9028876bc4ba744";

@@ -9,16 +9,16 @@ const DEFAULT_STEPS = [
     subject: "Partnership Opportunity — Property Management Franchise for E-2 Visa Investors",
     bodyHtml: `<div style="font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1a1a2e;">
   <p>Dear {{name}},</p>
-  <p>My name is the Franchise Development Team at <strong>New Dawn Franchising</strong>, a property management franchise based in Fort Worth, Texas, specifically designed for <strong>E-2 visa investors</strong>.</p>
+  <p>My name is the Franchise Development Team at <strong>New Dawn Franchising</strong>, a property management franchise based in El Paso, Texas, specifically designed for <strong>E-2 visa investors</strong>.</p>
   <p>We're reaching out because we believe there's a strong opportunity for us to work together. Many of your clients are likely looking for:</p>
   <ul>
-    <li>A qualifying E-2 visa business investment ($250K packages available)</li>
+    <li>A qualifying E-2 visa business investment ($225K packages available)</li>
     <li>A hands-off business model they can operate while transitioning to the U.S.</li>
     <li>A proven system with 300+ active rental contracts already in place</li>
   </ul>
   <p>Our franchise model is uniquely positioned for E-2 investors — franchisees maintain full financial control while our territory-approved managers handle day-to-day operations.</p>
   <p>Would you be open to a brief call to discuss how we might create a referral partnership? We offer competitive referral commissions for professionals who introduce qualified investors.</p>
-  <p>Best regards,<br/><strong>New Dawn Franchising</strong><br/>Fort Worth, Texas<br/>dylan@newdawnfranchising.com</p>
+  <p>Best regards,<br/><strong>New Dawn Franchising</strong><br/>El Paso, Texas<br/>dylan@newdawnfranchising.com</p>
 </div>`,
   },
   {
@@ -50,7 +50,7 @@ const DEFAULT_STEPS = [
   <h3 style="color: #c9a227;">The New Dawn Model</h3>
   <p><strong>What the investor does:</strong></p>
   <ul>
-    <li>Makes a $250K franchise investment (financing options available)</li>
+    <li>Makes a $225K franchise investment (financing options available)</li>
     <li>Maintains full financial oversight and control</li>
     <li>Receives ongoing reporting and performance updates</li>
   </ul>
@@ -94,14 +94,14 @@ const DEFAULT_STEPS = [
   <p>If any of your clients are ever looking for a <strong>property management franchise opportunity</strong> that qualifies for the E-2 investor visa, please keep New Dawn Franchising in mind.</p>
   <p><strong>Quick recap:</strong></p>
   <ul>
-    <li>$250K investment packages with financing available</li>
+    <li>$225K investment packages with financing available</li>
     <li>Hands-off model with territory-approved property managers</li>
-    <li>300+ active rental contracts in Fort Worth, Texas</li>
+    <li>300+ active rental contracts in El Paso, Texas</li>
     <li>Spouse visa strategy and in-house buy-back program</li>
     <li>Competitive referral commissions for introducing investors</li>
   </ul>
   <p>Feel free to reach out anytime at <a href="mailto:dylan@newdawnfranchising.com">dylan@newdawnfranchising.com</a>. We're always here.</p>
-  <p>Wishing you continued success,<br/><strong>New Dawn Franchising</strong><br/>Fort Worth, Texas</p>
+  <p>Wishing you continued success,<br/><strong>New Dawn Franchising</strong><br/>El Paso, Texas</p>
 </div>`,
   },
 ];

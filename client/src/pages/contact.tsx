@@ -260,7 +260,7 @@ export default function ContactPage() {
                             id="capitalRange"
                             value={state.capitalRange}
                             onChange={(e) => update("capitalRange", e.target.value)}
-                            placeholder="e.g., $250k–$350k"
+                            placeholder="e.g., $225k–$350k"
                           />
                         </div>
                       </div>

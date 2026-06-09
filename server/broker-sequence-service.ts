@@ -245,7 +245,7 @@ export async function handleEmailOpen(trackingToken: string): Promise<void> {
 
   const firstName = lead.fullName.split(" ")[0];
   const smsBody = isDay7
-    ? `Hey ${firstName} — saw you opened my email. Just want to flag: the $31,250 referral fee requires zero risk on your end. Funds are held in escrow until the visa clears. Happy to hop on a quick call this week — Dylan`
+    ? `Hey ${firstName} — saw you opened my email. Just want to flag: the $28,125 referral fee requires zero risk on your end. Funds are held in escrow until the visa clears. Happy to hop on a quick call this week — Dylan`
     : `Hey ${firstName}, Dylan here — I just sent you a quick email that might be relevant for one of your clients. Worth a 30-second look when you get a chance. No pitch, I promise. 🙂`;
 
   const result = await sendSms(lead.phone, smsBody);
@@ -264,8 +264,8 @@ async function draftEmail(lead: OutreachLead, touchNumber: number): Promise<{ su
   const touchInstructions: Record<number, string> = {
     1: `Touch 1 — Soft intro, ~120 words. Warm, curious tone. Reference something specific about their brokerage or market (${location}). Ask ONE genuine question about the type of clients they work with. Zero pitch. Zero mention of visa amounts or fees. Subject should feel personal, not like a campaign (e.g. "Quick question, ${firstName}").`,
     2: `Touch 2 — ~150 words. Credibility + social proof. Say you wanted to follow up. Introduce the concept briefly: you help international investors get E-2 Visas through a proven franchise model. Drop trust signals naturally: Forbes 30 Under 30 recognition, escrow-protected funds (client gets full refund if visa denied), established brand. Still zero referral fee mention. Soft CTA: "Happy to send over a one-pager if helpful."`,
-    3: `Touch 3 — ~180 words. "The Reveal". Subject: "Here's what's in it for you, ${firstName}" or "The part I haven't mentioned yet". Reveal the referral fee clearly: 12.5% of every investment = $31,250 per client referred. Reinforce zero risk: funds held in escrow, client gets a refund if visa is denied. Include Calendly link: ${CALENDLY}. Light urgency: El Paso territories are limited.`,
-    14: `Case study email — ~160 words. Brief anonymized success story: a client who came through a broker referral, invested $250K, got their E-2 Visa, and is now operating in the US. Reinforce escrow protection. End with Calendly link: ${CALENDLY} and: "Even if the timing isn't right now, I'd love to be your go-to when it is."`,
+    3: `Touch 3 — ~180 words. "The Reveal". Subject: "Here's what's in it for you, ${firstName}" or "The part I haven't mentioned yet". Reveal the referral fee clearly: 12.5% of every investment = $28,125 per client referred. Reinforce zero risk: funds held in escrow, client gets a refund if visa is denied. Include Calendly link: ${CALENDLY}. Light urgency: El Paso territories are limited.`,
+    14: `Case study email — ~160 words. Brief anonymized success story: a client who came through a broker referral, invested $225K, got their E-2 Visa, and is now operating in the US. Reinforce escrow protection. End with Calendly link: ${CALENDLY} and: "Even if the timing isn't right now, I'd love to be your go-to when it is."`,
     21: `Final breakup email — ~100 words. Subject: "Closing the loop, ${firstName}". Gracious, no guilt. Won't follow up again after this. Leave the door open. Re-include the referral fee and Calendly link: ${CALENDLY} one final time. Must feel genuinely human, not automated.`,
   };
 
@@ -304,7 +304,7 @@ function draftLinkedInMessage(lead: OutreachLead, touchNumber: number): string {
 
 function draftWhatsApp(lead: OutreachLead): string {
   const firstName = lead.fullName.split(" ")[0];
-  return `Hey ${firstName}, I know inboxes are brutal — totally get it. I've reached out a couple of times about a referral opportunity that pays $31,250 per client with zero downside risk. If you have one client thinking about a US move and $250K to invest, I'd love 20 minutes. Here's my Calendly: ${CALENDLY}. No pressure at all. — Dylan`;
+  return `Hey ${firstName}, I know inboxes are brutal — totally get it. I've reached out a couple of times about a referral opportunity that pays $28,125 per client with zero downside risk. If you have one client thinking about a US move and $225K to invest, I'd love 20 minutes. Here's my Calendly: ${CALENDLY}. No pressure at all. — Dylan`;
 }
 
 // ─── Execute individual event ─────────────────────────────────────────────────
@@ -445,7 +445,7 @@ async function executeEvent(event: OutreachSequenceEvent, lead: OutreachLead): P
 <p>I made this for you — a quick personal video explaining what we do and why it may be relevant for your clients.</p>
 ${thumbnail}
 ${videoUrl ? `<p><a href="${videoUrl}" style="color:#1a2a4a">▶ Watch the video</a></p>` : ""}
-<p>The short version: we help international investors get E-2 Visas through a proven franchise model in El Paso, TX. Brokers who refer clients earn $31,250 per referral. Funds are held in escrow — zero risk.</p>
+<p>The short version: we help international investors get E-2 Visas through a proven franchise model in El Paso, TX. Brokers who refer clients earn $28,125 per referral. Funds are held in escrow — zero risk.</p>
 <p>I'd love 20 minutes on a call: <a href="${CALENDLY}">${CALENDLY}</a></p>
 ${trackingPixel(token)}
 </body></html>`;

@@ -502,8 +502,8 @@ DEFAULTS
 ════════════════════════════════════════
 ABOUT NEW DAWN FRANCHISING
 ════════════════════════════════════════
-- Territories: El Paso, Houston, San Antonio, Dallas-Fort Worth (Texas)
-- Min investment ~$150,000 (E-2 substantiality requirement)
+- Territory: El Paso, Texas (the only active territory)
+- Min investment $225,000 (E-2 substantiality requirement)
 - Director-led model (investor directs business; territory manager runs day-to-day)
 - 14-day FDD review required before signing
 - E-2 requires: treaty country citizenship + substantial investment + active direction

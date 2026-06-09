@@ -23,7 +23,7 @@ const SAME_AS = [
 const ORG_DESCRIPTION =
   "Property management franchise built specifically for E-2 Treaty Investor Visa investors. " +
   "You own and direct a real U.S. business while an approved territory manager runs daily operations. " +
-  "Franchise packages from $250,000. Headquartered in El Paso, Texas. FDD available upon request.";
+  "Franchise packages from $225,000. Headquartered in El Paso, Texas. FDD available upon request.";
 
 /** Primary entity: the franchisor, typed as both Organization and LocalBusiness. */
 export function organizationNode(): Record<string, unknown> {
@@ -90,19 +90,19 @@ export function franchiseServiceNode(): Record<string, unknown> {
     areaServed: { "@type": "Country", name: "United States" },
     description:
       "A property management franchise structured to meet E-2 Treaty Investor Visa requirements. " +
-      "Franchise packages start at $250,000 and include territory license, training, proprietary " +
+      "Franchise packages start at $225,000 and include territory license, training, proprietary " +
       "technology, and operational setup in El Paso, Texas.",
     offers: {
       "@type": "Offer",
-      price: "250000",
+      price: "225000",
       priceCurrency: "USD",
       availability: "https://schema.org/InStock",
       url: `${SITE_URL}/`,
       priceSpecification: {
         "@type": "PriceSpecification",
-        price: "250000",
+        price: "225000",
         priceCurrency: "USD",
-        minPrice: "250000",
+        minPrice: "225000",
       },
     },
   };

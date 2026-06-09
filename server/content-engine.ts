@@ -26,7 +26,7 @@ async function callOpenAI(prompt: string, system: string, maxTokens = 3000): Pro
   return data.choices?.[0]?.message?.content || "";
 }
 
-const CONTENT_SYSTEM = `You are a professional content writer for New Dawn Franchising — a U.S. property management franchise tailored for E-2 visa investors (minimum $250,000 investment). Your target audience is: E-2 visa investors, immigration attorneys, relocation consultants, and franchise brokers. Write in a clear, professional, authoritative tone. Every article must be practical and rank-ready for SEO. Never use fluff. Always end with a strong CTA directing readers to contact New Dawn Franchising or request the FDD.`;
+const CONTENT_SYSTEM = `You are a professional content writer for New Dawn Franchising — a U.S. property management franchise tailored for E-2 visa investors (minimum $225,000 investment). Your target audience is: E-2 visa investors, immigration attorneys, relocation consultants, and franchise brokers. Write in a clear, professional, authoritative tone. Every article must be practical and rank-ready for SEO. Never use fluff. Always end with a strong CTA directing readers to contact New Dawn Franchising or request the FDD.`;
 
 // ─── Auto Blog Draft Generator ────────────────────────────────────────────────
 
@@ -46,7 +46,7 @@ Requirements:
 
 Priority content angles:
 - E-2 visa qualification requirements and how franchises help
-- Substantial investment requirement and how $250K property management satisfies it
+- Substantial investment requirement and how $225K property management satisfies it
 - "Direct and control" standard — operational without doing day-to-day work
 - El Paso, Texas as a strong E-2 visa market
 - E-2 vs EB-5 comparison

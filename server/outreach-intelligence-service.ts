@@ -48,7 +48,7 @@ async function callClaude(system: string, userMessage: string, maxTokens = 3000)
 const INTELLIGENCE_SYSTEM_PROMPT = `You are the autonomous outreach intelligence agent for New Dawn Franchising LLC, an E-2 visa property management franchise company based in El Paso, Texas.
 
 CRITICAL CONTEXT — READ THIS FIRST:
-New Dawn Franchising sells property management franchises (~$250K investment) that qualify as E-2 Treaty Investor Visa-qualifying investments. The E-2 visa allows treaty-country nationals to invest in a US business and live/work in the US.
+New Dawn Franchising sells property management franchises (~$225K investment) that qualify as E-2 Treaty Investor Visa-qualifying investments. The E-2 visa allows treaty-country nationals to invest in a US business and live/work in the US.
 
 YOUR MISSION: Find REFERRAL PARTNERS — professionals who regularly work with wealthy foreign nationals who may be interested in US residency through investment. We are NOT looking for investors directly. We want the attorneys, brokers, advisors, and consultants who INTRODUCE us to those wealthy investors.
 
@@ -227,7 +227,7 @@ async function extractLeadsFromSerp(
   try {
     const prompt = `Extract REFERRAL PARTNER leads from these search results for New Dawn Franchising.
 
-New Dawn sells US property management franchises (~$250K) as an E-2 Treaty Investor Visa pathway. We are looking for REFERRAL PARTNERS — professionals who work with wealthy foreign nationals seeking US residency through investment — NOT investors themselves.
+New Dawn sells US property management franchises (~$225K) as an E-2 Treaty Investor Visa pathway. We are looking for REFERRAL PARTNERS — professionals who work with wealthy foreign nationals seeking US residency through investment — NOT investors themselves.
 
 Category we're targeting: ${category} in ${country}
 

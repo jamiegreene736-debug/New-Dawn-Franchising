@@ -27,7 +27,7 @@ async function callOpenAI(prompt: string, system: string): Promise<string> {
   return data.choices?.[0]?.message?.content || "No response.";
 }
 
-const MEETING_SYSTEM = `You are a strategic business intelligence assistant for New Dawn Franchising (E-2 visa property management franchise, $250K minimum investment, El Paso TX). You help prepare Dylan and Jamie for meetings with potential referral partners. Be specific, professional, and actionable.`;
+const MEETING_SYSTEM = `You are a strategic business intelligence assistant for New Dawn Franchising (E-2 visa property management franchise, $225K minimum investment, El Paso TX). You help prepare Dylan and Jamie for meetings with potential referral partners. Be specific, professional, and actionable.`;
 
 // ─── Classify reply intent ─────────────────────────────────────────────────────
 
@@ -81,7 +81,7 @@ export async function generatePreMeetingBrief(meetingId: string): Promise<void> 
     franchise_broker: "Focus on: Commission structure, FDD availability, comparison to other E-2 qualifying franchises, brand strength.",
     real_estate: "Focus on: Property management franchise synergy, cross-referral opportunities, El Paso market conditions.",
     wealth_manager: "Focus on: ROI projections, capital deployment structure, exit strategy options, operational income potential.",
-    default: "Focus on: E-2 visa qualification, $250K investment structure, operational model, El Paso market opportunity.",
+    default: "Focus on: E-2 visa qualification, $225K investment structure, operational model, El Paso market opportunity.",
   };
 
   const talkingPoints = CATEGORY_TALKING_POINTS[lead?.category || "default"] || CATEGORY_TALKING_POINTS.default;
@@ -112,7 +112,7 @@ export async function generatePreMeetingBrief(meetingId: string): Promise<void> 
 
         <h2 style="color: #1a2a4a; font-size: 18px;">❓ Common Objections to Anticipate</h2>
         <ul style="line-height: 1.9; color: #374151;">
-          <li><strong>Cost:</strong> "$250K is above the E-2 minimum in many cases, but it signals a genuine investment and avoids USCIS scrutiny — plus it's backed by our buy-back program."</li>
+          <li><strong>Cost:</strong> "$225K is above the E-2 minimum in many cases, but it signals a genuine investment and avoids USCIS scrutiny — plus it's backed by our buy-back program."</li>
           <li><strong>Location:</strong> "El Paso is a prime market — border city with strong bilingual workforce, affordable operations, and consistent rental demand."</li>
           <li><strong>Operational:</strong> "The franchise provides the platform, vendors, and oversight structure so the investor can satisfy 'direct and control' without managing properties day-to-day."</li>
           <li><strong>Eligibility:</strong> "We have experience with multiple nationality E-2 treaty countries — let's confirm eligibility on the call."</li>

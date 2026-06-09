@@ -13,7 +13,7 @@ const COMPANY = {
   email: "dylan@newdawnfranchising.com",
   phone: "(346) 597-9994",
   website: "newdawnfranchising.com",
-  focus: "Fort Worth, Texas",
+  focus: "El Paso, Texas",
 };
 
 const PW = 612;
@@ -188,13 +188,13 @@ export function generateBrochurePDF(res: Response) {
   drawHeader();
 
   title("Why New Dawn?");
-  body("New Dawn Franchising offers a turnkey property management franchise in Fort Worth, Texas — specifically designed for international investors who want a hands-off business that qualifies for the U.S. E-2 Treaty Investor Visa.");
+  body("New Dawn Franchising offers a turnkey property management franchise in El Paso, Texas — specifically designed for international investors who want a hands-off business that qualifies for the U.S. E-2 Treaty Investor Visa.");
   body("With 300+ active management contracts already in operation, our proven model gives you a real, revenue-generating business from day one — without requiring you to do any property management work yourself.");
 
   gap(4);
   statBoxes([
     { stat: "300+", label: "Active Contracts" },
-    { stat: "$250K", label: "Starting Investment" },
+    { stat: "$225K", label: "Starting Investment" },
     { stat: "4–7 mo", label: "Visa Timeline" },
     { stat: "100%", label: "Hands-Off Model" },
   ]);
@@ -214,7 +214,7 @@ export function generateBrochurePDF(res: Response) {
 
   title("Perfect for E-2 Visa Investors");
   body("The E-2 Treaty Investor Visa requires a substantial, active investment in a real U.S. business. Our franchise checks every box:");
-  bullet("Substantial investment: Packages start at $250,000, meeting the E-2 threshold");
+  bullet("Substantial investment: Packages start at $225,000, meeting the E-2 threshold");
   bullet("Real and operating: 300+ active contracts generating revenue immediately");
   bullet("Not marginal: The business has capacity to generate significant returns beyond personal living expenses");
   bullet("Active direction: You direct and develop the business — even in a hands-off capacity");
@@ -225,9 +225,9 @@ export function generateBrochurePDF(res: Response) {
   gap(2);
   table([
     ["Feature", "Details"],
-    ["Starting Investment", "$250,000 (franchise packages available)"],
+    ["Starting Investment", "$225,000 (franchise packages available)"],
     ["Financing", "Available — speak with our team about options"],
-    ["Location", "Fort Worth, Texas (you don't need to live there)"],
+    ["Location", "El Paso, Texas (you don't need to live there)"],
     ["Business Type", "Long-term single-family rental management"],
     ["Contracts Included", "Active management contracts from day one"],
     ["Training & Support", "Comprehensive onboarding and ongoing support"],
@@ -254,7 +254,7 @@ export function generateBrochurePDF(res: Response) {
 
   gap(6);
   title("In-House Buy-Back Program");
-  body("Planning your exit? Our in-house buy-back program provides a clear pathway to recover your investment. Invest $250K, get your hands-off visa, live in the USA, build your business — and when you're ready (typically around 4 years), we have a program designed to help you transition out smoothly.");
+  body("Planning your exit? Our in-house buy-back program provides a clear pathway to recover your investment. Invest $225K, get your hands-off visa, live in the USA, build your business — and when you're ready (typically around 4 years), we have a program designed to help you transition out smoothly.");
 
   gap(6);
   title("Our Protections");
@@ -271,12 +271,12 @@ export function generateBrochurePDF(res: Response) {
   timeline("Phase 5", "Visa Interview & Approval", "2–4 Weeks", "Consular interview. Upon approval, you and your family can live and work in the USA.");
 
   gap(8);
-  title("Why Fort Worth, Texas?");
-  bullet("One of the fastest-growing cities in America — population up 25% in the last decade");
-  bullet("Strong rental demand driven by corporate relocations and population growth");
+  title("Why El Paso, Texas?");
+  bullet("Steady rental demand driven by Fort Bliss (one of the largest U.S. Army installations) and UTEP");
+  bullet("A large pool of affordable single-family homes — ideal stock for long-term rental management");
   bullet("No state income tax — maximizing your take-home returns");
-  bullet("Business-friendly regulations and a low cost of living compared to coastal cities");
-  bullet("Central U.S. location with two major international airports");
+  bullet("Landlord-friendly Texas market with clear eviction processes and a low regulatory burden");
+  bullet("Strategic U.S.–Mexico border location with strong, consistent rental demand");
 
   gap(10);
   title("Ready to Learn More?");

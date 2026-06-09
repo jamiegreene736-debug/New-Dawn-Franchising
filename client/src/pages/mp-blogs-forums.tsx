@@ -198,7 +198,7 @@ const ENTRIES: ForumEntry[] = [
     url: "https://www.entrepreneur.com/franchises",
     type: "Blog", audience: "both", activity: "Very High",
     description: "One of the most-read business publications globally. The franchise section reaches both investors looking for opportunities and consultants.",
-    tip: "Pitch a guest post: 'How a $250K Property Management Franchise Can Qualify You for the E-2 Visa.'",
+    tip: "Pitch a guest post: 'How a $225K Property Management Franchise Can Qualify You for the E-2 Visa.'",
   },
   {
     name: "Boundless Immigration Blog",

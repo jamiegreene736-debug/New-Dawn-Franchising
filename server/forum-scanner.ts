@@ -92,7 +92,7 @@ async function draftReply(
 ): Promise<string> {
   const prompt = `You are ${username || "a helpful community member"} posting on ${forumName}.
 
-A forum post has been found that's relevant to New Dawn Franchising — a $250,000 property management franchise in El Paso, TX designed specifically for E-2 Treaty Investor Visa applicants.
+A forum post has been found that's relevant to New Dawn Franchising — a $225,000 property management franchise in El Paso, TX designed specifically for E-2 Treaty Investor Visa applicants.
 
 POST TITLE: "${postTitle}"
 POST SNIPPET: "${postSnippet}"

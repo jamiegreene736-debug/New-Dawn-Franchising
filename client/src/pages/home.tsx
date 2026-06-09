@@ -587,7 +587,7 @@ function EmbassyTechnologyBridge() {
 
 // ── E-2 FAQ Accordion ─────────────────────────────────────────────────────────
 const E2_FAQ_ITEMS = [
-  { q: "How much do I need to invest?", a: "There is no fixed minimum, but the investment must be \"substantial\" relative to the cost of the business. Most E-2 investors invest $100,000 or more. Our franchise packages start at $250,000, which is designed to clearly meet the substantiality requirement." },
+  { q: "How much do I need to invest?", a: "There is no fixed minimum, but the investment must be \"substantial\" relative to the cost of the business. Most E-2 investors invest $100,000 or more. Our franchise packages start at $225,000, which is designed to clearly meet the substantiality requirement." },
   { q: "Does the E-2 lead to a green card?", a: "Not directly. However, a growing E-2 business can be a stepping stone to an EB-5 immigrant investor visa, which does lead to a green card (permanent residency)." },
   { q: "Can my spouse work in the US on E-2?", a: "Yes. Your spouse receives an E-2 dependent visa and can apply for work authorization (EAD), allowing them to work for any US employer." },
   { q: "How long does the process take?", a: "Typically 3–9 months from business setup to visa approval, depending on your country's embassy wait times. Use our embassy checker above to estimate your wait." },
@@ -1201,7 +1201,7 @@ export default function Home() {
             <SectionHeading
               testId="heading-investment"
               eyebrow="Investment"
-              title="Franchise packages from $250,000"
+              title="Franchise packages from $225,000"
               subtitle="A clear path to franchise ownership, a structured E-2 investor visa, and the freedom to live anywhere in the USA."
             />
 
@@ -1209,8 +1209,8 @@ export default function Home() {
               <FeatureCard
                 testId="card-inv-price"
                 icon={<DollarSign className="size-5 text-[hsl(var(--primary))]" />}
-                title="Packages from $250,000"
-                desc="Our franchise packages start at $250,000 — a structured investment designed to meet E-2 visa requirements while giving you a real, operating business in El Paso, Texas. Your funds are held in escrow during setup and released into the business once it is live and operational."
+                title="Packages from $225,000"
+                desc="Our franchise packages start at $225,000 — a structured investment designed to meet E-2 visa requirements while giving you a real, operating business in El Paso, Texas. Your funds are held in escrow during setup and released into the business once it is live and operational."
               />
               {/* Addition 2: escrow protection bullet */}
               <FeatureCard
@@ -1470,7 +1470,7 @@ export default function Home() {
                 },
                 {
                   q: "What is the in-house buy-back program?",
-                  a: "Looking to exit your franchise after a few years? Our in-house buy-back program gives you a path to recover your investment. Invest $250K, obtain your E-2 investor visa, live in the USA, build your business — and when you're ready (typically around 4 years), we can work with you on an exit. Contact us for full details.",
+                  a: "Looking to exit your franchise after a few years? Our in-house buy-back program gives you a path to recover your investment. Invest $225K, obtain your E-2 investor visa, live in the USA, build your business — and when you're ready (typically around 4 years), we can work with you on an exit. Contact us for full details.",
                   id: "buyback-program",
                 },
                 {

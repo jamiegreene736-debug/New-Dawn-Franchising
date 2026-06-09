@@ -30,6 +30,7 @@ const NAV = [
   { href: "/", label: "Home", id: "home" },
   { href: "/about", label: "About", id: "about" },
   { href: "/team", label: "Team", id: "team" },
+  { href: "/e2-visa-franchise", label: "E-2 Visa Franchise", id: "e2-visa-franchise" },
   { href: "/e2-fit", label: "Why E-2?", id: "e2" },
   { href: "/process", label: "Process", id: "process" },
   { href: "/territories", label: "Territories", id: "territories" },
@@ -56,6 +57,7 @@ const DESKTOP_NAV: DesktopNavEntry[] = [
   {
     label: "Franchise", id: "franchise-group",
     items: [
+      { href: "/e2-visa-franchise", label: "E-2 Visa Franchise", id: "e2-visa-franchise" },
       { href: "/e2-fit", label: "Why E-2?", id: "e2" },
       { href: "/process", label: "Process", id: "process" },
       { href: "/territories", label: "Territories", id: "territories" },

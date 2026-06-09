@@ -7,6 +7,7 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import AboutPage from "@/pages/about";
 import E2FitPage from "@/pages/e2-fit";
+import E2VisaFranchisePage from "@/pages/e2-visa-franchise";
 import TerritoriesPage from "@/pages/territories";
 import ContactPage from "@/pages/contact";
 import QuizPage from "@/pages/quiz";
@@ -63,6 +64,7 @@ function Router() {
             <Route path="/" component={Home} />
             <Route path="/about" component={AboutPage} />
             <Route path="/e2-fit" component={E2FitPage} />
+            <Route path="/e2-visa-franchise" component={E2VisaFranchisePage} />
             <Route path="/territories" component={TerritoriesPage} />
             <Route path="/quiz" component={QuizPage} />
             <Route path="/team" component={TeamPage} />

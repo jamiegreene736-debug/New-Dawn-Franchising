@@ -5,6 +5,7 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { pool } from "./db";
+import { ensureSchema } from "./ensure-schema";
 
 const app = express();
 const httpServer = createServer(app);
@@ -81,6 +82,9 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Ensure required tables exist (runs over Railway's internal network).
+  await ensureSchema();
+
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {

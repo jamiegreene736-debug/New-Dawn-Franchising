@@ -16,17 +16,14 @@ import {
   FileDown,
   Gavel,
   Globe2,
-  GraduationCap,
   Heart,
   Landmark,
-  LayoutDashboard,
   Mail,
   MapPin,
   Pause,
   Plane,
   Play,
   Printer,
-  Scale,
   Quote,
   RefreshCw,
   RotateCcw,
@@ -173,101 +170,18 @@ const FRANCHISE_VERTICALS = [
   },
 ];
 
-// --- Illustrated overview building blocks -------------------------------------
-// One small, reused visual vocabulary so the four scenes read as ONE product
-// instead of a pile of mismatched shapes. Every element is laid out with
-// flex/grid (never hand-tuned absolute pixel offsets), so nothing can collide
-// even at the smallest size (245px tall / ~320px wide).
-
-// A vertical industry/feature card: amber-on-navy icon badge + label (+ sub).
-function OverviewTile({
-  icon: Icon,
-  label,
-  sub,
+function CartoonPerson({
+  className = "",
+  shirt = "bg-[hsl(var(--accent))]",
 }: {
-  icon: typeof Building2;
-  label: string;
-  sub?: string;
+  className?: string;
+  shirt?: string;
 }) {
   return (
-    <div className="flex min-w-0 flex-col gap-2 rounded-2xl border border-white/80 bg-white/85 p-2.5 shadow-[0_10px_26px_rgba(15,35,64,0.10)] backdrop-blur">
-      <span className="grid size-8 place-items-center rounded-xl bg-[hsl(var(--primary))] shadow-sm">
-        <Icon className="size-4 text-[hsl(var(--accent))]" strokeWidth={2.2} />
-      </span>
-      <span className="min-w-0">
-        <span className="block truncate text-[12px] font-bold leading-tight text-[hsl(var(--primary))]">
-          {label}
-        </span>
-        {sub ? (
-          <span className="block truncate text-[10px] font-medium leading-tight text-[hsl(var(--primary))]/55">
-            {sub}
-          </span>
-        ) : null}
-      </span>
-    </div>
-  );
-}
-
-// A single checklist row used for the "E-2 fit" scene.
-function OverviewCheck({ label }: { label: string }) {
-  return (
-    <div className="flex items-center gap-1.5 rounded-xl border border-white/80 bg-white/85 px-2 py-2 shadow-sm backdrop-blur">
-      <CheckCircle2 className="size-4 shrink-0 text-emerald-600" strokeWidth={2.3} />
-      <span className="min-w-0 truncate text-[11px] font-semibold text-[hsl(var(--primary))]">
-        {label}
-      </span>
-    </div>
-  );
-}
-
-// A compact horizontal chip used beside a hero card (scenes 3 & 4).
-function OverviewMini({
-  icon: Icon,
-  label,
-}: {
-  icon: typeof Building2;
-  label: string;
-}) {
-  return (
-    <div className="flex items-center gap-2 rounded-xl border border-white/80 bg-white/85 px-2.5 shadow-sm backdrop-blur">
-      <span className="grid size-6 shrink-0 place-items-center rounded-lg bg-[hsl(var(--primary))]/10 text-[hsl(var(--primary))]">
-        <Icon className="size-3.5" strokeWidth={2.2} />
-      </span>
-      <span className="min-w-0 truncate text-[11px] font-semibold text-[hsl(var(--primary))]">
-        {label}
-      </span>
-    </div>
-  );
-}
-
-// Shared scene shell. Every scene is the SAME structure — amber eyebrow, a navy
-// title (max 2 lines, kept clear of the top-right play control), then one focal
-// composition centred in the space above the decorative horizon. Because the
-// play/pause control lives in the TOP-RIGHT corner (not the bottom), the full
-// height below the title is free, which is what keeps content from clipping at
-// 245px the way the old stacked layout did.
-function OverviewScene({
-  n,
-  eyebrow,
-  title,
-  children,
-}: {
-  n: 1 | 2 | 3 | 4;
-  eyebrow: string;
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className={`overview-scene overview-scene-${n} absolute inset-0 flex flex-col px-5 pb-5 pt-4`}>
-      <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-[hsl(var(--accent))]">
-        {eyebrow}
-      </div>
-      <h3 className="mt-1.5 max-w-[78%] text-pretty text-[1.12rem] font-bold leading-[1.12] tracking-tight text-[hsl(var(--primary))] md:text-[1.26rem]">
-        {title}
-      </h3>
-      <div className="mt-3 flex min-h-0 flex-1 items-center pb-2">
-        <div className="w-full">{children}</div>
-      </div>
+    <div className={`absolute w-12 ${className}`}>
+      <div className="mx-auto size-7 rounded-full border border-white/80 bg-[#f1c9a8] shadow-sm" />
+      <div className={`mt-1 h-11 rounded-t-3xl border border-white/70 ${shirt} shadow-lg`} />
+      <div className="mx-auto mt-1 h-5 w-8 rounded-b-xl bg-slate-700" />
     </div>
   );
 }
@@ -275,89 +189,123 @@ function OverviewScene({
 function HomepageVideoVisual({ isPlaying }: { isPlaying: boolean }) {
   return (
     <div
-      className={`overview-visual ${isPlaying ? "overview-visual-playing" : ""} group/visual relative min-h-[245px] overflow-hidden rounded-[1.5rem] border border-white/20 bg-black/25 shadow-2xl md:min-h-[265px] lg:min-h-[285px]`}
+      className={`overview-visual ${isPlaying ? "overview-visual-playing" : ""} relative min-h-[245px] overflow-hidden rounded-[1.5rem] border border-white/20 bg-black/25 shadow-2xl md:min-h-[265px] lg:min-h-[285px]`}
     >
-      {/* Neutral backdrop — sits fully behind every scene, carries no text, and
-          never reaches the top-right play control. A soft horizon makes the
-          lower band read as intentional ground rather than empty space. */}
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_84%_14%,rgba(245,158,11,0.16),transparent_46%),linear-gradient(135deg,#eaf1fb_0%,#f6faff_52%,#eaf5ef_100%)]" />
-        <div className="absolute inset-0 opacity-40 nh-fine-grid" />
-        <div className="absolute inset-x-0 bottom-0 h-16 bg-[linear-gradient(180deg,transparent,rgba(15,35,64,0.12))]" />
-        <div className="absolute inset-x-5 bottom-[3.1rem] h-px bg-[hsl(var(--primary))]/10" />
+      {/* Hero thumbnail: a richer placeholder composition for the future custom video artwork. */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(255,255,255,.92),transparent_26%),linear-gradient(135deg,#e7eef8_0%,#fff8e7_44%,#d7eee7_100%)]" />
+      <div className="absolute inset-0 opacity-50 nh-fine-grid" />
+      <div className="absolute inset-x-0 bottom-0 h-28 bg-[linear-gradient(180deg,transparent,rgba(15,35,64,.35))]" />
+      <div className="absolute left-5 top-5 rounded-2xl border border-white/75 bg-white/85 p-4 text-[hsl(var(--primary))] shadow-xl backdrop-blur">
+        <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/45">E-2 platform dashboard</div>
+        <div className="mt-2 grid grid-cols-3 gap-2">
+          {["Property", "Telecom", "Insurance"].map((label) => (
+            <div key={label} className="rounded-xl border bg-white/80 px-2 py-1.5 text-center shadow-sm">
+              <div className="mx-auto mb-1 h-1.5 w-8 rounded-full bg-[hsl(var(--accent))]" />
+              <div className="text-[10px] font-semibold leading-tight">{label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="absolute bottom-12 right-5 w-[38%] min-w-[160px] rounded-2xl border border-white/65 bg-[hsl(var(--primary))]/90 p-3 text-white shadow-2xl">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.16em] text-white/50">Live operations</div>
+            <div className="mt-1 text-sm font-semibold">Managed execution</div>
+          </div>
+          <div className="grid size-9 place-items-center rounded-2xl bg-white/10">
+            <ShieldCheck className="size-4 text-[hsl(var(--accent))]" />
+          </div>
+        </div>
+        <div className="mt-3 space-y-1.5">
+          <div className="h-2 rounded-full bg-white/15"><div className="h-2 w-[86%] rounded-full bg-[hsl(var(--accent))]" /></div>
+          <div className="h-2 rounded-full bg-white/15"><div className="h-2 w-[68%] rounded-full bg-emerald-400" /></div>
+          <div className="h-2 rounded-full bg-white/15"><div className="h-2 w-[74%] rounded-full bg-sky-300" /></div>
+        </div>
       </div>
 
-      {/* SCENE 1 — Three industries, one E-2 platform */}
-      <OverviewScene n={1} eyebrow="One E-2 platform" title="Three industries, one platform">
-        <div className="grid grid-cols-3 gap-2.5">
-          <OverviewTile icon={Building2} label="Property" sub="Management" />
-          <OverviewTile icon={Cpu} label="Telecom" sub="Services" />
-          <OverviewTile icon={ShieldCheck} label="Insurance" sub="Agency" />
+      <div className="overview-scene overview-scene-1 absolute inset-0">
+        <div className="absolute bottom-8 left-6 rounded-2xl border border-white/70 bg-white/85 px-4 py-3 text-[hsl(var(--primary))] shadow-xl backdrop-blur">
+          <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/45">Scene 1</div>
+          <div className="mt-1 text-sm font-semibold">Three franchise options built for E-2</div>
         </div>
-      </OverviewScene>
-
-      {/* SCENE 2 — Chosen for E-2 fit */}
-      <OverviewScene n={2} eyebrow="Chosen for E-2 fit" title="Built for recurring revenue">
-        <div className="grid grid-cols-2 gap-2">
-          <OverviewCheck label="Recurring revenue" />
-          <OverviewCheck label="Active oversight" />
-          <OverviewCheck label="Documented ops" />
-          <OverviewCheck label="Renewal-ready" />
+        <CartoonPerson className="bottom-20 left-16 overview-float" shirt="bg-[hsl(var(--primary))]" />
+        <div className="absolute bottom-24 left-32 h-24 w-40 rounded-2xl border border-white/75 bg-white/85 p-3 shadow-xl">
+          <div className="h-3 w-24 rounded-full bg-slate-300" />
+          <div className="mt-3 h-2 w-full rounded-full bg-slate-200" />
+          <div className="mt-2 h-2 w-4/5 rounded-full bg-slate-200" />
         </div>
-      </OverviewScene>
+      </div>
 
-      {/* SCENE 3 — AI plus local execution */}
-      <OverviewScene n={3} eyebrow="AI + local execution" title="Technology meets local teams">
-        <div className="flex items-stretch gap-2.5">
-          <div className="flex w-[44%] shrink-0 flex-col justify-center gap-1.5 rounded-2xl border border-white/15 bg-[hsl(var(--primary))] p-3 text-white shadow-[0_12px_30px_rgba(15,35,64,0.28)]">
-            <span className="grid size-8 place-items-center rounded-xl bg-white/10">
-              <Bot className="size-5 text-[hsl(var(--accent))]" strokeWidth={2.2} />
-            </span>
-            <span className="text-[12.5px] font-bold leading-tight">Proprietary AI</span>
-            <span className="text-[10px] font-medium leading-tight text-white/60">runs in the background</span>
-          </div>
-          <div className="grid flex-1 grid-rows-3 gap-1.5">
-            <OverviewMini icon={LayoutDashboard} label="Live dashboards" />
-            <OverviewMini icon={GraduationCap} label="Training" />
-            <OverviewMini icon={Users} label="Local teams" />
+      <div className="overview-scene overview-scene-2 absolute inset-0">
+        <div className="absolute bottom-8 left-6 rounded-2xl border border-white/70 bg-white/85 px-4 py-3 text-[hsl(var(--primary))] shadow-xl backdrop-blur">
+          <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/45">Scene 2</div>
+          <div className="mt-1 text-sm font-semibold">Selected for recurring-revenue fit</div>
+        </div>
+        <CartoonPerson className="bottom-20 left-10 overview-float" shirt="bg-emerald-500" />
+        <CartoonPerson className="bottom-20 left-24 overview-float-delayed" shirt="bg-sky-500" />
+        <CartoonPerson className="bottom-20 left-[9.5rem] overview-float" shirt="bg-amber-400" />
+        <div className="absolute bottom-20 right-8 hidden w-48 rounded-2xl border border-white/70 bg-[hsl(var(--primary))]/90 p-4 text-white shadow-xl sm:block">
+          <div className="text-[10px] uppercase tracking-[0.16em] text-white/55">Operations board</div>
+          <div className="mt-3 space-y-2">
+            <div className="h-2 rounded-full bg-white/20"><div className="h-2 w-[82%] rounded-full bg-[hsl(var(--accent))]" /></div>
+            <div className="h-2 rounded-full bg-white/20"><div className="h-2 w-[64%] rounded-full bg-emerald-400" /></div>
+            <div className="h-2 rounded-full bg-white/20"><div className="h-2 w-[72%] rounded-full bg-sky-300" /></div>
           </div>
         </div>
-      </OverviewScene>
+      </div>
 
-      {/* SCENE 4 — Build your U.S. enterprise */}
-      <OverviewScene n={4} eyebrow="Build your U.S. enterprise" title="Live and work in the USA">
-        <div className="flex items-stretch gap-2.5">
-          <div className="flex w-[44%] shrink-0 flex-col justify-center rounded-2xl border border-white/80 bg-white/85 p-3 shadow-md backdrop-blur">
-            <div className="flex items-center gap-2">
-              <span className="grid size-9 place-items-center rounded-xl bg-[hsl(var(--primary))]">
-                <Plane className="size-5 text-[hsl(var(--accent))]" strokeWidth={2.2} />
-              </span>
-              <span className="leading-none">
-                <span className="block text-[16px] font-extrabold leading-none text-[hsl(var(--primary))]">USA</span>
-                <span className="mt-0.5 block text-[9px] font-semibold uppercase tracking-[0.14em] text-[hsl(var(--primary))]/55">E-2 pathway</span>
-              </span>
+      <div className="overview-scene overview-scene-3 absolute inset-0">
+        <div className="absolute bottom-8 left-6 rounded-2xl border border-white/70 bg-white/85 px-4 py-3 text-[hsl(var(--primary))] shadow-xl backdrop-blur">
+          <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/45">Scene 3</div>
+          <div className="mt-1 text-sm font-semibold">AI infrastructure helps you scale</div>
+        </div>
+        {[0, 1, 2, 3, 4].map((row) =>
+          [0, 1].map((col) => (
+            <div
+              key={`${row}-${col}`}
+              className="absolute h-12 w-20 rounded-xl border border-white/75 bg-white/90 shadow-lg"
+              style={{ left: `${42 + col * 112}px`, bottom: `${82 + row * 18}px` }}
+            >
+              <div className="mx-auto mt-3 h-2 w-12 rounded-full bg-[hsl(var(--primary))]/25" />
+              <div className="mx-auto mt-2 h-2 w-8 rounded-full bg-[hsl(var(--accent))]" />
             </div>
-            <span className="mt-2 text-[10px] font-medium leading-tight text-[hsl(var(--primary))]/60">Live &amp; work with family</span>
-          </div>
-          <div className="grid flex-1 grid-rows-3 gap-1.5">
-            <OverviewMini icon={FileDown} label="Review the FDD" />
-            <OverviewMini icon={Scale} label="Compare options" />
-            <OverviewMini icon={MapPin} label="Inquire today" />
+          )),
+        )}
+        <div className="absolute bottom-20 right-10 grid size-24 place-items-center rounded-full border border-white/80 bg-[hsl(var(--primary))] text-center text-white shadow-2xl">
+          <div>
+            <div className="text-3xl font-bold text-[hsl(var(--accent))]">AI</div>
+            <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70">dashboards</div>
           </div>
         </div>
-      </OverviewScene>
+      </div>
 
-      {/* Play / pause control — top-right corner. Kept out of the scene flow so
-          no scene content has to dodge it, and the title's max-w-[78%] guarantees
-          it never runs underneath. */}
-      <div className="absolute right-3.5 top-3.5 z-20">
-        <div className="grid size-11 place-items-center rounded-full bg-white shadow-[0_0_0_5px_rgba(255,255,255,0.26),0_12px_30px_rgba(185,28,28,0.26)] ring-1 ring-black/5 transition group-hover/visual:scale-105 md:size-12">
+      <div className="overview-scene overview-scene-4 absolute inset-0">
+        <div className="absolute bottom-8 left-6 rounded-2xl border border-white/70 bg-white/85 px-4 py-3 text-[hsl(var(--primary))] shadow-xl backdrop-blur">
+          <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/45">Scene 4</div>
+          <div className="mt-1 text-sm font-semibold">Inquire to live and work in the USA</div>
+        </div>
+        <div className="absolute bottom-20 left-10 grid size-24 place-items-center rounded-3xl border border-white/75 bg-white/85 shadow-xl">
+          <ShieldCheck className="size-10 text-emerald-600" />
+        </div>
+        <div className="absolute bottom-28 left-36 rounded-2xl border border-white/75 bg-white/90 px-4 py-3 text-[hsl(var(--primary))] shadow-xl">
+          <div className="text-2xl font-bold text-[hsl(var(--accent))]">USA</div>
+          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-foreground/55">family pathway</div>
+        </div>
+        <CartoonPerson className="bottom-20 right-28 overview-float" shirt="bg-[hsl(var(--primary))]" />
+        <CartoonPerson className="bottom-20 right-14 overview-float-delayed" shirt="bg-[hsl(var(--accent))]" />
+      </div>
+
+      <div className="absolute bottom-4 right-4 z-20">
+        <div className="grid size-14 place-items-center rounded-full bg-white shadow-[0_0_0_6px_rgba(255,255,255,0.28),0_14px_36px_rgba(185,28,28,0.28)] ring-1 ring-black/5 transition group-hover:scale-105 md:size-16">
           {isPlaying ? (
-            <Pause className="size-5 fill-[hsl(var(--primary))] text-[hsl(var(--primary))]" />
+            <Pause className="size-6 fill-[hsl(var(--primary))] text-[hsl(var(--primary))] md:size-7" />
           ) : (
-            <span className="ml-0.5 block h-0 w-0 border-y-[8px] border-l-[14px] border-y-transparent border-l-red-600" />
+            <span className="ml-0.5 block h-0 w-0 border-y-[9px] border-l-[15px] border-y-transparent border-l-red-600 md:border-y-[11px] md:border-l-[18px]" />
           )}
         </div>
+      </div>
+      <div className="absolute bottom-4 left-4 max-w-[calc(100%-6rem)] truncate rounded-full border border-white/25 bg-black/40 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
+        Watch the illustrated 30-second overview
       </div>
     </div>
   );
@@ -368,6 +316,7 @@ function HomepageVideoCard({ hero = false }: { hero?: boolean }) {
   const [audioUrl, setAudioUrl] = useState("");
   const [isPlaying, setIsPlaying] = useState(false);
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [progress, setProgress] = useState(0);
 
   const playVoiceover = async () => {
     try {
@@ -383,6 +332,7 @@ function HomepageVideoCard({ hero = false }: { hero?: boolean }) {
       const audio = audioRef.current;
       if (!audio) return;
       audio.src = nextUrl;
+      setProgress(0);
       await audio.play();
       setIsPlaying(true);
       setStatus("idle");
@@ -401,6 +351,13 @@ function HomepageVideoCard({ hero = false }: { hero?: boolean }) {
     }
     await playVoiceover();
   };
+
+  // Drive the active caption from the actual audio progress so the visuals
+  // follow the voiceover (its length varies), instead of a fixed timeline.
+  const activeScene = Math.min(
+    VIDEO_SCENES.length - 1,
+    Math.floor(progress * VIDEO_SCENES.length),
+  );
 
   return (
     <div className="relative">
@@ -446,41 +403,52 @@ function HomepageVideoCard({ hero = false }: { hero?: boolean }) {
 
           {hero ? (
             <div className="relative mt-4 grid grid-cols-2 gap-2 md:grid-cols-4">
-              {VIDEO_SCENES.map((scene, index) => (
-                <div
-                  key={scene.time}
-                  className={`min-w-0 rounded-xl border border-white/15 bg-white/[0.08] p-2.5 backdrop-blur transition ${
-                    isPlaying ? "animate-[pulse_2.8s_ease-in-out_infinite]" : ""
-                  }`}
-                  style={{ animationDelay: `${index * 0.35}s` }}
-                >
-                  <div className="text-[11px] font-semibold text-[hsl(var(--accent))]">{scene.time}</div>
-                  <div className="mt-1 truncate text-[11px] font-semibold leading-tight text-white/90">
-                    {scene.title}
+              {VIDEO_SCENES.map((scene, index) => {
+                const active = (isPlaying || progress > 0) && index === activeScene;
+                return (
+                  <div
+                    key={scene.time}
+                    className={`min-w-0 rounded-xl border p-2.5 backdrop-blur transition-all duration-300 ${
+                      active
+                        ? "border-[hsl(var(--accent))] bg-white/[0.18] ring-1 ring-[hsl(var(--accent))]/60"
+                        : "border-white/15 bg-white/[0.08]"
+                    }`}
+                  >
+                    <div className="text-[11px] font-semibold text-[hsl(var(--accent))]">{scene.time}</div>
+                    <div className="mt-1 truncate text-[11px] font-semibold leading-tight text-white/90">
+                      {scene.title}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="relative mt-5 grid gap-3 md:grid-cols-2">
-              {VIDEO_SCENES.map((scene, index) => (
-                <div
-                  key={scene.time}
-                  className={`rounded-2xl border border-white/15 bg-white/[0.08] p-4 backdrop-blur transition ${
-                    isPlaying ? "animate-[pulse_2.8s_ease-in-out_infinite]" : ""
-                  }`}
-                  style={{ animationDelay: `${index * 0.35}s` }}
-                >
-                  <div className="text-xs font-semibold text-[hsl(var(--accent))]">{scene.time}</div>
-                  <div className="mt-2 text-sm font-semibold">{scene.title}</div>
-                  <div className="mt-2 text-xs leading-relaxed text-white/65">{scene.copy}</div>
-                </div>
-              ))}
+              {VIDEO_SCENES.map((scene, index) => {
+                const active = (isPlaying || progress > 0) && index === activeScene;
+                return (
+                  <div
+                    key={scene.time}
+                    className={`rounded-2xl border p-4 backdrop-blur transition-all duration-300 ${
+                      active
+                        ? "border-[hsl(var(--accent))] bg-white/[0.18] ring-1 ring-[hsl(var(--accent))]/60"
+                        : "border-white/15 bg-white/[0.08]"
+                    }`}
+                  >
+                    <div className="text-xs font-semibold text-[hsl(var(--accent))]">{scene.time}</div>
+                    <div className="mt-2 text-sm font-semibold">{scene.title}</div>
+                    <div className="mt-2 text-xs leading-relaxed text-white/65">{scene.copy}</div>
+                  </div>
+                );
+              })}
             </div>
           )}
 
           <div className="relative mt-4 h-2 overflow-hidden rounded-full bg-white/15">
-            <div className={`h-full rounded-full bg-[hsl(var(--accent))] ${isPlaying ? "animate-[overview-progress_30s_linear_forwards]" : "w-[18%]"}`} />
+            <div
+              className="h-full rounded-full bg-[hsl(var(--accent))] transition-[width] duration-150 ease-linear"
+              style={{ width: `${progress > 0 ? Math.min(100, progress * 100) : isPlaying ? 2 : 18}%` }}
+            />
           </div>
         </div>
       </button>
@@ -489,7 +457,20 @@ function HomepageVideoCard({ hero = false }: { hero?: boolean }) {
           Voiceover is not available yet. Check `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` in Railway.
         </p>
       )}
-      <audio ref={audioRef} onEnded={() => setIsPlaying(false)} preload="none" />
+      <audio
+        ref={audioRef}
+        preload="none"
+        onTimeUpdate={() => {
+          const a = audioRef.current;
+          if (a && a.duration && isFinite(a.duration)) {
+            setProgress(a.currentTime / a.duration);
+          }
+        }}
+        onEnded={() => {
+          setIsPlaying(false);
+          setProgress(1);
+        }}
+      />
     </div>
   );
 }
@@ -822,7 +803,7 @@ export default function Home() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.7, ease: "easeOut", delay: 0.05 }}
-                className="relative"
+                className="relative order-first lg:order-none"
               >
                 <HomepageVideoCard hero />
                 <div className="pointer-events-none absolute -inset-6 -z-10 rounded-[2.5rem] bg-gradient-to-tr from-[hsl(var(--accent))]/15 via-transparent to-[hsl(var(--primary))]/15 blur-2xl" />

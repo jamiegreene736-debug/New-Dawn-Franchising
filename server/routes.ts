@@ -89,6 +89,43 @@ function getElevenLabsConfig() {
   return { apiKey, voiceId, modelId };
 }
 
+// Cache the synthesized homepage voiceover so playback is instant. ElevenLabs
+// TTS takes several seconds, and without this it was re-synthesized on every
+// click ("takes a long time to play"). Warmed once at startup.
+let homepageVoiceoverCache: Buffer | null = null;
+
+async function synthHomepageVoiceover(): Promise<Buffer | null> {
+  const { apiKey, voiceId, modelId } = getElevenLabsConfig();
+  if (!apiKey || !voiceId) return null;
+  const elevenRes = await fetch(
+    `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "xi-api-key": apiKey },
+      body: JSON.stringify({
+        text: HOMEPAGE_OVERVIEW_VOICEOVER,
+        model_id: modelId,
+        voice_settings: { stability: 0.52, similarity_boost: 0.82, style: 0.24, use_speaker_boost: true },
+      }),
+    },
+  );
+  if (!elevenRes.ok) {
+    throw new Error(`ElevenLabs ${elevenRes.status}: ${(await elevenRes.text()).slice(0, 200)}`);
+  }
+  homepageVoiceoverCache = Buffer.from(await elevenRes.arrayBuffer());
+  return homepageVoiceoverCache;
+}
+
+/** Pre-generate the homepage voiceover at startup so even the first play is instant. */
+export async function warmHomepageVoiceover(): Promise<void> {
+  try {
+    const audio = await synthHomepageVoiceover();
+    if (audio) console.log(`[voiceover] homepage voiceover warmed (${(audio.length / 1024).toFixed(0)} KB)`);
+  } catch (err: any) {
+    console.error("[voiceover] warm failed:", err?.message);
+  }
+}
+
 function requireBrokerAuth(req: Request, res: Response, next: () => void) {
   if (!req.session.brokerId) {
     return res.status(401).json({ message: "Not authenticated" });
@@ -353,7 +390,7 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   app.get("/api/homepage-overview-voiceover", async (_req, res) => {
-    const { apiKey, voiceId, modelId } = getElevenLabsConfig();
+    const { apiKey, voiceId } = getElevenLabsConfig();
     if (!apiKey || !voiceId) {
       return res.status(503).json({
         message: "ElevenLabs voiceover is not configured",
@@ -362,42 +399,18 @@ export async function registerRoutes(
     }
 
     try {
-      const elevenRes = await fetch(
-        `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "xi-api-key": apiKey,
-          },
-          body: JSON.stringify({
-            text: HOMEPAGE_OVERVIEW_VOICEOVER,
-            model_id: modelId,
-            voice_settings: {
-              stability: 0.52,
-              similarity_boost: 0.82,
-              style: 0.24,
-              use_speaker_boost: true,
-            },
-          }),
-        },
-      );
-
-      if (!elevenRes.ok) {
-        const text = await elevenRes.text();
-        return res.status(elevenRes.status).json({
-          message: "Failed to generate ElevenLabs voiceover",
-          detail: text.slice(0, 500),
-        });
+      // Serve the cached audio if it's already been synthesized; otherwise
+      // synthesize once and cache it for every subsequent request.
+      const audio = homepageVoiceoverCache ?? (await synthHomepageVoiceover());
+      if (!audio) {
+        return res.status(503).json({ message: "ElevenLabs voiceover is not configured" });
       }
-
-      const audio = Buffer.from(await elevenRes.arrayBuffer());
       res.setHeader("Content-Type", "audio/mpeg");
-      res.setHeader("Cache-Control", "public, max-age=86400");
+      res.setHeader("Cache-Control", "public, max-age=604800, immutable");
       res.setHeader("Content-Length", String(audio.length));
       return res.send(audio);
     } catch (err: any) {
-      return res.status(500).json({
+      return res.status(502).json({
         message: "Failed to generate homepage voiceover",
         detail: err.message,
       });

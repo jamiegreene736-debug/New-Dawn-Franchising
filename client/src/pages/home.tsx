@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowRight,
   Banknote,
@@ -126,26 +126,43 @@ function FeatureCard({
   );
 }
 
-const VIDEO_SCENES = [
+// Each scene is shown one at a time, in sync with its narration segment
+// (server: OVERVIEW_SEGMENTS). Keep the count and order matched.
+const OVERVIEW_SCENES = [
   {
-    time: "0:00",
-    title: "Three industries, one E-2 platform",
-    copy: "Choose Property Management, Telecom, or Insurance from a platform designed for treaty-investor business ownership.",
+    id: "platform",
+    kicker: "The platform",
+    title: "One platform. Three franchises.",
+    copy: "A multi-vertical franchise built for the E-2 visa — you own and direct it, our teams run it.",
+    icon: Globe2,
   },
   {
-    time: "0:06",
-    title: "Chosen for E-2 fit",
-    copy: "We selected recurring-revenue industries that support active oversight, documentation, staffing, and renewal readiness.",
+    id: "property",
+    kicker: "Vertical 1",
+    title: "Property Management",
+    copy: "Long-term rental management with local execution teams and owner-level reporting.",
+    icon: Building2,
   },
   {
-    time: "0:13",
-    title: "AI plus local execution",
-    copy: "Proprietary AI, dashboards, training, and operating teams help you expand while day-to-day workflows are handled.",
+    id: "telecom",
+    kicker: "Vertical 2",
+    title: "Telecom",
+    copy: "Recurring-service operations with centralized systems, sales workflows, and oversight dashboards.",
+    icon: Cpu,
   },
   {
-    time: "0:20",
-    title: "Build your U.S. enterprise",
-    copy: "Review the FDD, compare your options, and inquire today to live and work anywhere in the USA.",
+    id: "insurance",
+    kicker: "Vertical 3",
+    title: "Insurance",
+    copy: "Compliant supervision, client service, and steady recurring revenue.",
+    icon: ShieldCheck,
+  },
+  {
+    id: "cta",
+    kicker: "Get started",
+    title: "Investment from $225,000",
+    copy: "Structured for the E-2 visa. Request the FDD to compare your three options.",
+    icon: CheckCircle2,
   },
 ];
 
@@ -170,172 +187,46 @@ const FRANCHISE_VERTICALS = [
   },
 ];
 
-function CartoonPerson({
-  className = "",
-  shirt = "bg-[hsl(var(--accent))]",
-}: {
-  className?: string;
-  shirt?: string;
-}) {
-  return (
-    <div className={`absolute w-12 ${className}`}>
-      <div className="mx-auto size-7 rounded-full border border-white/80 bg-[#f1c9a8] shadow-sm" />
-      <div className={`mt-1 h-11 rounded-t-3xl border border-white/70 ${shirt} shadow-lg`} />
-      <div className="mx-auto mt-1 h-5 w-8 rounded-b-xl bg-slate-700" />
-    </div>
-  );
-}
-
-function HomepageVideoVisual({ isPlaying }: { isPlaying: boolean }) {
-  return (
-    <div
-      className={`overview-visual ${isPlaying ? "overview-visual-playing" : ""} relative min-h-[245px] overflow-hidden rounded-[1.5rem] border border-white/20 bg-black/25 shadow-2xl md:min-h-[265px] lg:min-h-[285px]`}
-    >
-      {/* Hero thumbnail: a richer placeholder composition for the future custom video artwork. */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(255,255,255,.92),transparent_26%),linear-gradient(135deg,#e7eef8_0%,#fff8e7_44%,#d7eee7_100%)]" />
-      <div className="absolute inset-0 opacity-50 nh-fine-grid" />
-      <div className="absolute inset-x-0 bottom-0 h-28 bg-[linear-gradient(180deg,transparent,rgba(15,35,64,.35))]" />
-      <div className="absolute left-5 top-5 rounded-2xl border border-white/75 bg-white/85 p-4 text-[hsl(var(--primary))] shadow-xl backdrop-blur">
-        <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/45">E-2 platform dashboard</div>
-        <div className="mt-2 grid grid-cols-3 gap-2">
-          {["Property", "Telecom", "Insurance"].map((label) => (
-            <div key={label} className="rounded-xl border bg-white/80 px-2 py-1.5 text-center shadow-sm">
-              <div className="mx-auto mb-1 h-1.5 w-8 rounded-full bg-[hsl(var(--accent))]" />
-              <div className="text-[10px] font-semibold leading-tight">{label}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="absolute bottom-12 right-5 w-[38%] min-w-[160px] rounded-2xl border border-white/65 bg-[hsl(var(--primary))]/90 p-3 text-white shadow-2xl">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <div className="text-[10px] uppercase tracking-[0.16em] text-white/50">Live operations</div>
-            <div className="mt-1 text-sm font-semibold">Managed execution</div>
-          </div>
-          <div className="grid size-9 place-items-center rounded-2xl bg-white/10">
-            <ShieldCheck className="size-4 text-[hsl(var(--accent))]" />
-          </div>
-        </div>
-        <div className="mt-3 space-y-1.5">
-          <div className="h-2 rounded-full bg-white/15"><div className="h-2 w-[86%] rounded-full bg-[hsl(var(--accent))]" /></div>
-          <div className="h-2 rounded-full bg-white/15"><div className="h-2 w-[68%] rounded-full bg-emerald-400" /></div>
-          <div className="h-2 rounded-full bg-white/15"><div className="h-2 w-[74%] rounded-full bg-sky-300" /></div>
-        </div>
-      </div>
-
-      <div className="overview-scene overview-scene-1 absolute inset-0">
-        <div className="absolute bottom-8 left-6 rounded-2xl border border-white/70 bg-white/85 px-4 py-3 text-[hsl(var(--primary))] shadow-xl backdrop-blur">
-          <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/45">Scene 1</div>
-          <div className="mt-1 text-sm font-semibold">Three franchise options built for E-2</div>
-        </div>
-        <CartoonPerson className="bottom-20 left-16 overview-float" shirt="bg-[hsl(var(--primary))]" />
-        <div className="absolute bottom-24 left-32 h-24 w-40 rounded-2xl border border-white/75 bg-white/85 p-3 shadow-xl">
-          <div className="h-3 w-24 rounded-full bg-slate-300" />
-          <div className="mt-3 h-2 w-full rounded-full bg-slate-200" />
-          <div className="mt-2 h-2 w-4/5 rounded-full bg-slate-200" />
-        </div>
-      </div>
-
-      <div className="overview-scene overview-scene-2 absolute inset-0">
-        <div className="absolute bottom-8 left-6 rounded-2xl border border-white/70 bg-white/85 px-4 py-3 text-[hsl(var(--primary))] shadow-xl backdrop-blur">
-          <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/45">Scene 2</div>
-          <div className="mt-1 text-sm font-semibold">Selected for recurring-revenue fit</div>
-        </div>
-        <CartoonPerson className="bottom-20 left-10 overview-float" shirt="bg-emerald-500" />
-        <CartoonPerson className="bottom-20 left-24 overview-float-delayed" shirt="bg-sky-500" />
-        <CartoonPerson className="bottom-20 left-[9.5rem] overview-float" shirt="bg-amber-400" />
-        <div className="absolute bottom-20 right-8 hidden w-48 rounded-2xl border border-white/70 bg-[hsl(var(--primary))]/90 p-4 text-white shadow-xl sm:block">
-          <div className="text-[10px] uppercase tracking-[0.16em] text-white/55">Operations board</div>
-          <div className="mt-3 space-y-2">
-            <div className="h-2 rounded-full bg-white/20"><div className="h-2 w-[82%] rounded-full bg-[hsl(var(--accent))]" /></div>
-            <div className="h-2 rounded-full bg-white/20"><div className="h-2 w-[64%] rounded-full bg-emerald-400" /></div>
-            <div className="h-2 rounded-full bg-white/20"><div className="h-2 w-[72%] rounded-full bg-sky-300" /></div>
-          </div>
-        </div>
-      </div>
-
-      <div className="overview-scene overview-scene-3 absolute inset-0">
-        <div className="absolute bottom-8 left-6 rounded-2xl border border-white/70 bg-white/85 px-4 py-3 text-[hsl(var(--primary))] shadow-xl backdrop-blur">
-          <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/45">Scene 3</div>
-          <div className="mt-1 text-sm font-semibold">AI infrastructure helps you scale</div>
-        </div>
-        {[0, 1, 2, 3, 4].map((row) =>
-          [0, 1].map((col) => (
-            <div
-              key={`${row}-${col}`}
-              className="absolute h-12 w-20 rounded-xl border border-white/75 bg-white/90 shadow-lg"
-              style={{ left: `${42 + col * 112}px`, bottom: `${82 + row * 18}px` }}
-            >
-              <div className="mx-auto mt-3 h-2 w-12 rounded-full bg-[hsl(var(--primary))]/25" />
-              <div className="mx-auto mt-2 h-2 w-8 rounded-full bg-[hsl(var(--accent))]" />
-            </div>
-          )),
-        )}
-        <div className="absolute bottom-20 right-10 grid size-24 place-items-center rounded-full border border-white/80 bg-[hsl(var(--primary))] text-center text-white shadow-2xl">
-          <div>
-            <div className="text-3xl font-bold text-[hsl(var(--accent))]">AI</div>
-            <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-white/70">dashboards</div>
-          </div>
-        </div>
-      </div>
-
-      <div className="overview-scene overview-scene-4 absolute inset-0">
-        <div className="absolute bottom-8 left-6 rounded-2xl border border-white/70 bg-white/85 px-4 py-3 text-[hsl(var(--primary))] shadow-xl backdrop-blur">
-          <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/45">Scene 4</div>
-          <div className="mt-1 text-sm font-semibold">Inquire to live and work in the USA</div>
-        </div>
-        <div className="absolute bottom-20 left-10 grid size-24 place-items-center rounded-3xl border border-white/75 bg-white/85 shadow-xl">
-          <ShieldCheck className="size-10 text-emerald-600" />
-        </div>
-        <div className="absolute bottom-28 left-36 rounded-2xl border border-white/75 bg-white/90 px-4 py-3 text-[hsl(var(--primary))] shadow-xl">
-          <div className="text-2xl font-bold text-[hsl(var(--accent))]">USA</div>
-          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-foreground/55">family pathway</div>
-        </div>
-        <CartoonPerson className="bottom-20 right-28 overview-float" shirt="bg-[hsl(var(--primary))]" />
-        <CartoonPerson className="bottom-20 right-14 overview-float-delayed" shirt="bg-[hsl(var(--accent))]" />
-      </div>
-
-      <div className="absolute bottom-4 right-4 z-20">
-        <div className="grid size-14 place-items-center rounded-full bg-white shadow-[0_0_0_6px_rgba(255,255,255,0.28),0_14px_36px_rgba(185,28,28,0.28)] ring-1 ring-black/5 transition group-hover:scale-105 md:size-16">
-          {isPlaying ? (
-            <Pause className="size-6 fill-[hsl(var(--primary))] text-[hsl(var(--primary))] md:size-7" />
-          ) : (
-            <span className="ml-0.5 block h-0 w-0 border-y-[9px] border-l-[15px] border-y-transparent border-l-red-600 md:border-y-[11px] md:border-l-[18px]" />
-          )}
-        </div>
-      </div>
-      <div className="absolute bottom-4 left-4 max-w-[calc(100%-6rem)] truncate rounded-full border border-white/25 bg-black/40 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
-        Watch the illustrated 30-second overview
-      </div>
-    </div>
-  );
-}
-
 function HomepageVideoCard({ hero = false }: { hero?: boolean }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [audioUrl, setAudioUrl] = useState("");
+  const blobsRef = useRef<string[] | null>(null);
+  const sceneRef = useRef(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
-  const [progress, setProgress] = useState(0);
+  const [activeScene, setActiveScene] = useState(0);
+  const [progress, setProgress] = useState(0); // progress within the current scene
 
-  const playVoiceover = async () => {
+  const playScene = (i: number) => {
+    sceneRef.current = i;
+    setActiveScene(i);
+    setProgress(0);
+    const audio = audioRef.current;
+    const blobs = blobsRef.current;
+    if (!audio || !blobs) return;
+    audio.src = blobs[i];
+    audio.play().catch(() => {});
+  };
+
+  const startPlayback = async () => {
     try {
       setStatus("loading");
-      let nextUrl = audioUrl;
-      if (!nextUrl) {
-        const res = await fetch("/api/homepage-overview-voiceover");
-        if (!res.ok) throw new Error("Voiceover unavailable");
-        const blob = await res.blob();
-        nextUrl = URL.createObjectURL(blob);
-        setAudioUrl(nextUrl);
+      if (!blobsRef.current) {
+        // Fetch every scene's narration up front (cached server-side), so the
+        // scenes advance with no gaps.
+        blobsRef.current = await Promise.all(
+          OVERVIEW_SCENES.map((_, i) =>
+            fetch(`/api/homepage-overview-voiceover/${i}`)
+              .then((r) => {
+                if (!r.ok) throw new Error("voiceover unavailable");
+                return r.blob();
+              })
+              .then((b) => URL.createObjectURL(b)),
+          ),
+        );
       }
-      const audio = audioRef.current;
-      if (!audio) return;
-      audio.src = nextUrl;
-      setProgress(0);
-      await audio.play();
-      setIsPlaying(true);
       setStatus("idle");
+      setIsPlaying(true);
+      playScene(0);
     } catch {
       setStatus("error");
       setIsPlaying(false);
@@ -349,15 +240,22 @@ function HomepageVideoCard({ hero = false }: { hero?: boolean }) {
       setIsPlaying(false);
       return;
     }
-    await playVoiceover();
+    // Resume mid-scene if audio is loaded and not finished; otherwise (re)start.
+    if (audio && audio.src && !audio.ended) {
+      try {
+        await audio.play();
+        setIsPlaying(true);
+        return;
+      } catch {
+        /* fall through to a fresh start */
+      }
+    }
+    await startPlayback();
   };
 
-  // Drive the active caption from the actual audio progress so the visuals
-  // follow the voiceover (its length varies), instead of a fixed timeline.
-  const activeScene = Math.min(
-    VIDEO_SCENES.length - 1,
-    Math.floor(progress * VIDEO_SCENES.length),
-  );
+  const scene = OVERVIEW_SCENES[activeScene];
+  const SceneIcon = scene.icon;
+  const overall = (activeScene + progress) / OVERVIEW_SCENES.length;
 
   return (
     <div className="relative">
@@ -367,94 +265,77 @@ function HomepageVideoCard({ hero = false }: { hero?: boolean }) {
         onClick={togglePlayback}
         disabled={status === "loading"}
         className="group block w-full overflow-hidden rounded-[2rem] border border-white/80 bg-[hsl(var(--primary))] text-left shadow-2xl transition hover:-translate-y-0.5 hover:shadow-[0_30px_90px_rgba(15,23,42,0.30)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[hsl(var(--accent))]/40 disabled:cursor-wait"
-        aria-label={isPlaying ? "Pause the 30-second illustrated overview" : "Play the 30-second illustrated overview"}
+        aria-label={isPlaying ? "Pause the 30-second overview" : "Play the 30-second overview"}
       >
-        <div className={`relative p-4 text-white md:p-5 ${hero ? "min-h-0" : "min-h-[520px]"}`}>
-          <div className="absolute inset-0 opacity-25 nh-fine-grid" />
-          <div className="absolute inset-x-0 top-0 h-36 bg-[linear-gradient(180deg,rgba(255,255,255,.16),transparent)]" />
-          <div className="absolute right-5 top-5 z-20 rounded-full border border-white/20 bg-black/25 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/80 backdrop-blur md:hidden">
-            {isPlaying ? "Playing" : "30-sec overview"}
-          </div>
+        <div className="relative p-4 text-white md:p-5">
+          <div className="absolute inset-0 opacity-20 nh-fine-grid" />
 
-          <div className="relative flex items-start justify-between gap-4">
+          {/* Header */}
+          <div className="relative flex items-center justify-between gap-4">
             <div>
-              <div className="text-[11px] uppercase tracking-[0.2em] text-white/55">30-Second Illustrated Overview</div>
-              <div className="mt-1 font-serif text-2xl leading-tight text-white md:text-[1.75rem]">Three Industries. One E-2 Platform.</div>
+              <div className="text-[11px] uppercase tracking-[0.2em] text-white/55">
+                {status === "loading" ? "Loading…" : "30-Second Overview"}
+              </div>
+              <div className="mt-1 font-serif text-xl leading-tight text-white md:text-2xl">New Dawn Franchising</div>
             </div>
-            <div className="grid size-11 shrink-0 place-items-center rounded-full border border-white/20 bg-white/10">
-              <Volume2 className="size-5 text-[hsl(var(--accent))]" />
-            </div>
-          </div>
-
-          <div className="relative mt-3 grid gap-2 sm:grid-cols-2">
-            <div className="flex items-center gap-2 rounded-xl border border-white/15 bg-white/[0.08] px-3 py-2 text-xs font-semibold text-white/85 backdrop-blur">
-              <Building2 className="size-4 shrink-0 text-[hsl(var(--accent))]" />
-              <span>Chosen for E-2 fit</span>
-            </div>
-            <div className="flex items-center gap-2 rounded-xl border border-white/15 bg-white/[0.08] px-3 py-2 text-xs font-semibold text-white/85 backdrop-blur">
-              <Users className="size-4 shrink-0 text-[hsl(var(--accent))]" />
-              <span>Property · Telecom · Insurance</span>
+            <div className="grid size-12 shrink-0 place-items-center rounded-full bg-white shadow-lg ring-1 ring-black/5 transition group-hover:scale-105">
+              {isPlaying ? (
+                <Pause className="size-5 fill-[hsl(var(--primary))] text-[hsl(var(--primary))]" />
+              ) : (
+                <Play className="ml-0.5 size-5 fill-red-600 text-red-600" />
+              )}
             </div>
           </div>
 
-          <div className="mt-3">
-            <HomepageVideoVisual isPlaying={isPlaying} />
+          {/* Scene stage — one scene at a time; nothing overlaps the text */}
+          <div className="relative mt-4 grid min-h-[230px] place-items-center overflow-hidden rounded-2xl border border-white/15 bg-[radial-gradient(circle_at_20%_18%,rgba(255,255,255,0.16),transparent_42%),linear-gradient(135deg,rgba(255,255,255,0.10),rgba(0,0,0,0.18))] p-6 md:min-h-[250px]">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={scene.id}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -12 }}
+                transition={{ duration: 0.4, ease: "easeOut" }}
+                className="flex flex-col items-center text-center"
+              >
+                <div className="grid size-16 place-items-center rounded-2xl border border-white/25 bg-white/10 text-[hsl(var(--accent))] shadow-lg">
+                  <SceneIcon className="size-8" />
+                </div>
+                <div className="mt-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-[hsl(var(--accent))]">
+                  {scene.kicker}
+                </div>
+                <div className="mt-1 text-balance text-2xl font-semibold leading-tight md:text-[1.7rem]">
+                  {scene.title}
+                </div>
+                <p className="mt-2 max-w-md text-pretty text-sm leading-relaxed text-white/75">{scene.copy}</p>
+              </motion.div>
+            </AnimatePresence>
           </div>
 
-          {hero ? (
-            <div className="relative mt-4 grid grid-cols-2 gap-2 md:grid-cols-4">
-              {VIDEO_SCENES.map((scene, index) => {
-                const active = (isPlaying || progress > 0) && index === activeScene;
-                return (
-                  <div
-                    key={scene.time}
-                    className={`min-w-0 rounded-xl border p-2.5 backdrop-blur transition-all duration-300 ${
-                      active
-                        ? "border-[hsl(var(--accent))] bg-white/[0.18] ring-1 ring-[hsl(var(--accent))]/60"
-                        : "border-white/15 bg-white/[0.08]"
-                    }`}
-                  >
-                    <div className="text-[11px] font-semibold text-[hsl(var(--accent))]">{scene.time}</div>
-                    <div className="mt-1 truncate text-[11px] font-semibold leading-tight text-white/90">
-                      {scene.title}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="relative mt-5 grid gap-3 md:grid-cols-2">
-              {VIDEO_SCENES.map((scene, index) => {
-                const active = (isPlaying || progress > 0) && index === activeScene;
-                return (
-                  <div
-                    key={scene.time}
-                    className={`rounded-2xl border p-4 backdrop-blur transition-all duration-300 ${
-                      active
-                        ? "border-[hsl(var(--accent))] bg-white/[0.18] ring-1 ring-[hsl(var(--accent))]/60"
-                        : "border-white/15 bg-white/[0.08]"
-                    }`}
-                  >
-                    <div className="text-xs font-semibold text-[hsl(var(--accent))]">{scene.time}</div>
-                    <div className="mt-2 text-sm font-semibold">{scene.title}</div>
-                    <div className="mt-2 text-xs leading-relaxed text-white/65">{scene.copy}</div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          {/* Scene indicator dots */}
+          <div className="relative mt-4 flex items-center justify-center gap-1.5">
+            {OVERVIEW_SCENES.map((s, i) => (
+              <span
+                key={s.id}
+                className={`h-1.5 rounded-full transition-all duration-300 ${
+                  i === activeScene ? "w-6 bg-[hsl(var(--accent))]" : "w-1.5 bg-white/25"
+                }`}
+              />
+            ))}
+          </div>
 
-          <div className="relative mt-4 h-2 overflow-hidden rounded-full bg-white/15">
+          {/* Progress bar */}
+          <div className="relative mt-3 h-1.5 overflow-hidden rounded-full bg-white/15">
             <div
               className="h-full rounded-full bg-[hsl(var(--accent))] transition-[width] duration-150 ease-linear"
-              style={{ width: `${progress > 0 ? Math.min(100, progress * 100) : isPlaying ? 2 : 18}%` }}
+              style={{ width: `${isPlaying || overall > 0 ? Math.min(100, overall * 100) : 4}%` }}
             />
           </div>
         </div>
       </button>
       {status === "error" && (
         <p className="mt-3 text-sm text-red-600">
-          Voiceover is not available yet. Check `ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` in Railway.
+          Voiceover unavailable. Check ELEVENLABS_API_KEY and ELEVENLABS_VOICE_ID in Railway.
         </p>
       )}
       <audio
@@ -462,13 +343,18 @@ function HomepageVideoCard({ hero = false }: { hero?: boolean }) {
         preload="none"
         onTimeUpdate={() => {
           const a = audioRef.current;
-          if (a && a.duration && isFinite(a.duration)) {
-            setProgress(a.currentTime / a.duration);
-          }
+          if (a && a.duration && isFinite(a.duration)) setProgress(a.currentTime / a.duration);
         }}
         onEnded={() => {
-          setIsPlaying(false);
-          setProgress(1);
+          const next = sceneRef.current + 1;
+          if (next < OVERVIEW_SCENES.length) {
+            playScene(next);
+          } else {
+            setIsPlaying(false);
+            setProgress(0);
+            setActiveScene(0);
+            sceneRef.current = 0;
+          }
         }}
       />
     </div>

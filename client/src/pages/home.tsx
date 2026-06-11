@@ -333,7 +333,7 @@ function HomepageVideoCard({ hero = false }: { hero?: boolean }) {
           </div>
 
           {/* Scene stage — one scene at a time; nothing overlaps the text */}
-          <div className="relative mt-4 grid min-h-[270px] place-items-center overflow-hidden rounded-2xl border border-white/15 bg-[radial-gradient(circle_at_20%_18%,rgba(255,255,255,0.16),transparent_42%),linear-gradient(135deg,rgba(255,255,255,0.10),rgba(0,0,0,0.18))] p-6 md:min-h-[300px] md:p-7 lg:min-h-[330px]">
+          <div className="relative mt-4 grid min-h-[300px] place-items-center overflow-hidden rounded-2xl border border-white/15 bg-[radial-gradient(circle_at_20%_18%,rgba(255,255,255,0.16),transparent_42%),linear-gradient(135deg,rgba(255,255,255,0.10),rgba(0,0,0,0.18))] p-6 md:min-h-[340px] md:p-7 lg:min-h-[370px]">
             <AnimatePresence mode="wait">
               <motion.div
                 key={scene.id}
@@ -343,8 +343,8 @@ function HomepageVideoCard({ hero = false }: { hero?: boolean }) {
                 transition={{ duration: 0.4, ease: "easeOut" }}
                 className="flex flex-col items-center text-center"
               >
-                <div className="grid size-16 place-items-center rounded-2xl border border-white/25 bg-white/10 text-[hsl(var(--accent))] shadow-lg md:size-[4.5rem]">
-                  <SceneIcon className="size-8 md:size-9" />
+                <div className="grid size-16 place-items-center rounded-2xl border border-white/25 bg-white/10 text-[hsl(var(--accent))] shadow-lg md:size-20">
+                  <SceneIcon className="size-8 md:size-10" />
                 </div>
                 <div className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-[hsl(var(--accent))]">
                   {scene.kicker}
@@ -597,7 +597,7 @@ export default function Home() {
           <div className="absolute inset-0 -z-10 opacity-60 nh-fine-grid" />
           <div className="nh-container py-5 md:py-8 lg:py-10">
             {/* Redesigned hero: clearer conversion path on the left, video as the visual anchor on the right. */}
-            <div className="grid items-start gap-8 lg:grid-cols-[0.82fr_1.18fr] xl:gap-12">
+            <div className="grid items-start gap-8 lg:grid-cols-[0.8fr_1.2fr] xl:gap-12">
               <motion.div
                 initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}

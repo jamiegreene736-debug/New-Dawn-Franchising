@@ -6,6 +6,7 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import { pool } from "./db";
 import { ensureSchema } from "./ensure-schema";
+import { seedBlogPostsIfEmpty } from "./seed-posts";
 
 const app = express();
 const httpServer = createServer(app);
@@ -84,6 +85,8 @@ app.use((req, res, next) => {
 (async () => {
   // Ensure required tables exist (runs over Railway's internal network).
   await ensureSchema();
+  // Publish the starter blog posts the first time the blog is empty.
+  await seedBlogPostsIfEmpty();
 
   await registerRoutes(httpServer, app);
 

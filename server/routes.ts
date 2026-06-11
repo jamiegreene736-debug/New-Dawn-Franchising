@@ -1,5 +1,6 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
+import { createHash } from "node:crypto";
 import path from "path";
 import bcrypt from "bcryptjs";
 import { storage } from "./storage";
@@ -89,6 +90,9 @@ const OVERVIEW_SEGMENTS = [
   "We also reward our partners: brokers and advisors earn a referral fee for every qualified investor they introduce.",
   "Get started from two hundred twenty-five thousand dollars. Request the F D D today and compare your three options.",
 ];
+
+// Changes whenever the narration changes, so cached audio URLs bust automatically.
+const OVERVIEW_VERSION = createHash("sha1").update(OVERVIEW_SEGMENTS.join("|")).digest("hex").slice(0, 10);
 
 function getElevenLabsConfig() {
   const apiKey =
@@ -410,6 +414,13 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  // Manifest: tells the client the current narration version + scene count so it
+  // can request versioned (cache-busting) audio URLs. Never cached.
+  app.get("/api/homepage-overview-voiceover", (_req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ version: OVERVIEW_VERSION, count: OVERVIEW_SEGMENTS.length });
+  });
+
   app.get("/api/homepage-overview-voiceover/:index", async (req, res) => {
     const { apiKey, voiceId } = getElevenLabsConfig();
     if (!apiKey || !voiceId) {

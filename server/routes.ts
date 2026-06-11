@@ -73,8 +73,17 @@ import { callClaude } from "./chat-service";
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "dylan@newdawnfranchising.com").toLowerCase().trim();
 const ADMIN_PASSWORD = (process.env.ADMIN_PASSWORD || "NewHorizons@12").trim();
 
-const HOMEPAGE_OVERVIEW_VOICEOVER =
-  "New Dawn Franchising is a multi-vertical franchise platform built for qualified E-2 investors who want to live and work in the United States with their families. Choose from Property Management, Telecom, or Insurance. We selected these industries because they can support recurring revenue, active executive oversight, documented operations, staffing, and renewal-ready reporting. You own and direct the business while New Dawn provides proprietary AI technology, dashboards, training, and local operating teams for daily execution. Request the FDD today to compare your options and build a real U.S. enterprise designed around treaty-investor requirements.";
+// Per-scene narration for the homepage overview. Each segment corresponds 1:1
+// with a scene in the front-end player, so the voice stays in sync with the
+// scene that is on screen. ("two hundred twenty-five thousand" / "F D D" are
+// spelled for natural text-to-speech pronunciation.)
+const OVERVIEW_SEGMENTS = [
+  "New Dawn Franchising is a multi-vertical franchise platform built for the E-2 Treaty Investor Visa. You choose one of three recurring-revenue businesses and direct it, while our teams handle the day to day.",
+  "The first vertical is property management — long-term rental management, run by approved local teams, with clear owner-level reporting.",
+  "The second is telecom — a recurring-service business supported by centralized systems, sales workflows, and oversight dashboards.",
+  "The third is insurance — built around compliant supervision, client service, and steady recurring revenue.",
+  "Each option starts at two hundred twenty-five thousand dollars and is structured for the E-2 visa. You own and direct the business while we run the day to day. Request the F D D today to compare your three options.",
+];
 
 function getElevenLabsConfig() {
   const apiKey =
@@ -89,21 +98,22 @@ function getElevenLabsConfig() {
   return { apiKey, voiceId, modelId };
 }
 
-// Cache the synthesized homepage voiceover so playback is instant. ElevenLabs
-// TTS takes several seconds, and without this it was re-synthesized on every
-// click ("takes a long time to play"). Warmed once at startup.
-let homepageVoiceoverCache: Buffer | null = null;
+// Cache each synthesized voiceover segment so playback is instant. ElevenLabs
+// TTS takes several seconds; without caching it was re-synthesized on every
+// play. Warmed at startup.
+const voiceoverCache: (Buffer | null)[] = OVERVIEW_SEGMENTS.map(() => null);
 
-async function synthHomepageVoiceover(): Promise<Buffer | null> {
+async function synthOverviewSegment(index: number): Promise<Buffer | null> {
   const { apiKey, voiceId, modelId } = getElevenLabsConfig();
-  if (!apiKey || !voiceId) return null;
+  const text = OVERVIEW_SEGMENTS[index];
+  if (!apiKey || !voiceId || !text) return null;
   const elevenRes = await fetch(
     `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json", "xi-api-key": apiKey },
       body: JSON.stringify({
-        text: HOMEPAGE_OVERVIEW_VOICEOVER,
+        text,
         model_id: modelId,
         voice_settings: { stability: 0.52, similarity_boost: 0.82, style: 0.24, use_speaker_boost: true },
       }),
@@ -112,18 +122,24 @@ async function synthHomepageVoiceover(): Promise<Buffer | null> {
   if (!elevenRes.ok) {
     throw new Error(`ElevenLabs ${elevenRes.status}: ${(await elevenRes.text()).slice(0, 200)}`);
   }
-  homepageVoiceoverCache = Buffer.from(await elevenRes.arrayBuffer());
-  return homepageVoiceoverCache;
+  voiceoverCache[index] = Buffer.from(await elevenRes.arrayBuffer());
+  return voiceoverCache[index];
 }
 
-/** Pre-generate the homepage voiceover at startup so even the first play is instant. */
+/** Pre-generate all homepage voiceover segments at startup so the first play is instant. */
 export async function warmHomepageVoiceover(): Promise<void> {
-  try {
-    const audio = await synthHomepageVoiceover();
-    if (audio) console.log(`[voiceover] homepage voiceover warmed (${(audio.length / 1024).toFixed(0)} KB)`);
-  } catch (err: any) {
-    console.error("[voiceover] warm failed:", err?.message);
+  const { apiKey, voiceId } = getElevenLabsConfig();
+  if (!apiKey || !voiceId) return;
+  for (let i = 0; i < OVERVIEW_SEGMENTS.length; i++) {
+    try {
+      await synthOverviewSegment(i);
+    } catch (err: any) {
+      console.error(`[voiceover] warm segment ${i} failed:`, err?.message);
+    }
   }
+  console.log(
+    `[voiceover] homepage voiceover warmed (${voiceoverCache.filter(Boolean).length}/${OVERVIEW_SEGMENTS.length} segments)`,
+  );
 }
 
 function requireBrokerAuth(req: Request, res: Response, next: () => void) {
@@ -389,7 +405,7 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  app.get("/api/homepage-overview-voiceover", async (_req, res) => {
+  app.get("/api/homepage-overview-voiceover/:index", async (req, res) => {
     const { apiKey, voiceId } = getElevenLabsConfig();
     if (!apiKey || !voiceId) {
       return res.status(503).json({
@@ -398,10 +414,15 @@ export async function registerRoutes(
       });
     }
 
+    const index = parseInt(req.params.index, 10);
+    if (!Number.isInteger(index) || index < 0 || index >= OVERVIEW_SEGMENTS.length) {
+      return res.status(404).json({ message: "Unknown voiceover segment" });
+    }
+
     try {
-      // Serve the cached audio if it's already been synthesized; otherwise
-      // synthesize once and cache it for every subsequent request.
-      const audio = homepageVoiceoverCache ?? (await synthHomepageVoiceover());
+      // Serve the cached segment if it's been synthesized; otherwise synthesize
+      // once and cache it for every subsequent request.
+      const audio = voiceoverCache[index] ?? (await synthOverviewSegment(index));
       if (!audio) {
         return res.status(503).json({ message: "ElevenLabs voiceover is not configured" });
       }

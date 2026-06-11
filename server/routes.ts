@@ -78,11 +78,16 @@ const ADMIN_PASSWORD = (process.env.ADMIN_PASSWORD || "NewHorizons@12").trim();
 // scene that is on screen. ("two hundred twenty-five thousand" / "F D D" are
 // spelled for natural text-to-speech pronunciation.)
 const OVERVIEW_SEGMENTS = [
-  "New Dawn Franchising is a multi-vertical franchise platform built for the E-2 Treaty Investor Visa. You choose one of three recurring-revenue businesses and direct it, while our teams handle the day to day.",
-  "The first vertical is property management — long-term rental management, run by approved local teams, with clear owner-level reporting.",
-  "The second is telecom — a recurring-service business supported by centralized systems, sales workflows, and oversight dashboards.",
-  "The third is insurance — built around compliant supervision, client service, and steady recurring revenue.",
-  "Each option starts at two hundred twenty-five thousand dollars and is structured for the E-2 visa. You own and direct the business while we run the day to day. Request the F D D today to compare your three options.",
+  "New Dawn Franchising is the first franchise built from the ground up for the E-2 Treaty Investor Visa — designed around what treaty investors actually need, not a general business retrofitted for the visa.",
+  "You own and direct a real U.S. business while our local teams handle the day-to-day operations. And you can live anywhere in the United States with your family.",
+  "Choose from three recurring-revenue franchises: property management, telecom, or insurance — each selected to fit the E-2 visa.",
+  "These are recurring-revenue businesses, designed to generate steady, ongoing returns. Full financial details are in the F D D.",
+  "We stand behind your application. If your E-2 visa is not approved, you get your investment back.",
+  "Your money stays protected. Your two hundred twenty-five thousand dollars is held in escrow until your visa is approved, then it is released to fund your operating business.",
+  "And when you are ready to move on, our in-house buy-back program gives you a clear path to recover your investment, typically after about four years.",
+  "You are backed by an experienced team — in-house immigration, finance, real estate, and legal professionals, each with over a decade of proven success. So you can invest with confidence.",
+  "We also reward our partners: brokers and advisors earn a referral fee for every qualified investor they introduce.",
+  "Get started from two hundred twenty-five thousand dollars. Request the F D D today and compare your three options.",
 ];
 
 function getElevenLabsConfig() {

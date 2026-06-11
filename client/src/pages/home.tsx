@@ -689,8 +689,18 @@ export default function Home() {
                 <p data-testid="text-fdd-credibility" className="mt-3 text-xs text-muted-foreground/70">
                   Franchise Disclosure Document (FDD) available upon request. New Dawn Franchising is a registered franchisor.
                 </p>
+              </motion.div>
 
-                <div className="mt-5 grid gap-0 overflow-hidden rounded-2xl border bg-white/80 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/60 md:max-w-3xl md:grid-cols-3">
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.7, ease: "easeOut", delay: 0.05 }}
+                className="relative order-first lg:order-none"
+              >
+                <HomepageVideoCard hero />
+                <div className="pointer-events-none absolute -inset-6 -z-10 rounded-[2.5rem] bg-gradient-to-tr from-[hsl(var(--accent))]/15 via-transparent to-[hsl(var(--primary))]/15 blur-2xl" />
+
+                <div className="mt-5 grid gap-0 overflow-hidden rounded-2xl border bg-white/80 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/60 md:grid-cols-3">
                   {[
                     {
                       id: "1",
@@ -725,19 +735,9 @@ export default function Home() {
                     </div>
                   ))}
                 </div>
-                <p className="mt-3 max-w-2xl text-xs text-muted-foreground/70">
+                <p className="mt-3 text-xs text-muted-foreground/70">
                   Structured investment with built-in investor protection. Full details provided in the Franchise Disclosure Document.
                 </p>
-              </motion.div>
-
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.7, ease: "easeOut", delay: 0.05 }}
-                className="relative order-first lg:order-none"
-              >
-                <HomepageVideoCard hero />
-                <div className="pointer-events-none absolute -inset-6 -z-10 rounded-[2.5rem] bg-gradient-to-tr from-[hsl(var(--accent))]/15 via-transparent to-[hsl(var(--primary))]/15 blur-2xl" />
               </motion.div>
             </div>
           </div>

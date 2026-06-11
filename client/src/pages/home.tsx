@@ -333,7 +333,7 @@ function HomepageVideoCard({ hero = false }: { hero?: boolean }) {
           </div>
 
           {/* Scene stage — one scene at a time; nothing overlaps the text */}
-          <div className="relative mt-4 grid min-h-[320px] place-items-center overflow-hidden rounded-2xl border border-white/15 bg-[radial-gradient(circle_at_20%_18%,rgba(255,255,255,0.16),transparent_42%),linear-gradient(135deg,rgba(255,255,255,0.10),rgba(0,0,0,0.18))] p-6 md:min-h-[400px] md:p-8 lg:min-h-[460px]">
+          <div className="relative mt-4 grid min-h-[270px] place-items-center overflow-hidden rounded-2xl border border-white/15 bg-[radial-gradient(circle_at_20%_18%,rgba(255,255,255,0.16),transparent_42%),linear-gradient(135deg,rgba(255,255,255,0.10),rgba(0,0,0,0.18))] p-6 md:min-h-[300px] md:p-7 lg:min-h-[330px]">
             <AnimatePresence mode="wait">
               <motion.div
                 key={scene.id}
@@ -343,16 +343,16 @@ function HomepageVideoCard({ hero = false }: { hero?: boolean }) {
                 transition={{ duration: 0.4, ease: "easeOut" }}
                 className="flex flex-col items-center text-center"
               >
-                <div className="grid size-20 place-items-center rounded-2xl border border-white/25 bg-white/10 text-[hsl(var(--accent))] shadow-lg md:size-24">
-                  <SceneIcon className="size-10 md:size-12" />
+                <div className="grid size-16 place-items-center rounded-2xl border border-white/25 bg-white/10 text-[hsl(var(--accent))] shadow-lg md:size-[4.5rem]">
+                  <SceneIcon className="size-8 md:size-9" />
                 </div>
-                <div className="mt-5 text-xs font-semibold uppercase tracking-[0.18em] text-[hsl(var(--accent))]">
+                <div className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-[hsl(var(--accent))]">
                   {scene.kicker}
                 </div>
-                <div className="mt-2 text-balance text-2xl font-semibold leading-tight md:text-4xl">
+                <div className="mt-2 text-balance text-2xl font-semibold leading-tight md:text-3xl">
                   {scene.title}
                 </div>
-                <p className="mt-3 max-w-lg text-pretty text-sm leading-relaxed text-white/75 md:text-base">{scene.copy}</p>
+                <p className="mt-2 max-w-lg text-pretty text-sm leading-relaxed text-white/75 md:text-base">{scene.copy}</p>
               </motion.div>
             </AnimatePresence>
           </div>
@@ -597,7 +597,7 @@ export default function Home() {
           <div className="absolute inset-0 -z-10 opacity-60 nh-fine-grid" />
           <div className="nh-container py-5 md:py-8 lg:py-10">
             {/* Redesigned hero: clearer conversion path on the left, video as the visual anchor on the right. */}
-            <div className="grid items-center gap-8 lg:grid-cols-[0.78fr_1.22fr] xl:gap-12">
+            <div className="grid items-start gap-8 lg:grid-cols-[0.82fr_1.18fr] xl:gap-12">
               <motion.div
                 initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}

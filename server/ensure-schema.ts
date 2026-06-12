@@ -59,6 +59,39 @@ const STATEMENTS: string[] = [
     CONSTRAINT "session_pkey" PRIMARY KEY ("sid")
   )`,
   `CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire")`,
+  // `heygen_videos` backs the HeyGen video pipeline. A missing table makes the
+  // every-3-minute poll cron (pollAllRenderingVideos) throw `relation
+  // "heygen_videos" does not exist` on each run. Columns mirror the Drizzle
+  // `heygenVideos` table in shared/schema.ts exactly.
+  `CREATE TABLE IF NOT EXISTS heygen_videos (
+    id                   varchar    PRIMARY KEY DEFAULT gen_random_uuid(),
+    lead_id              varchar    NOT NULL,
+    lead_name            text,
+    lead_email           text,
+    lead_phone           text,
+    franchisee_id        varchar,
+    script               text       NOT NULL,
+    heygen_video_id      varchar,
+    status               varchar    NOT NULL DEFAULT 'pending',
+    video_url            text,
+    thumbnail_url        text,
+    tracking_token       varchar    UNIQUE DEFAULT gen_random_uuid(),
+    tracking_url         text,
+    delivery_channel     varchar    DEFAULT 'email',
+    delivery_status      varchar    NOT NULL DEFAULT 'not_sent',
+    sent_at              timestamp,
+    clicked_at           timestamp,
+    render_started_at    timestamp,
+    render_completed_at  timestamp,
+    render_duration_sec  integer,
+    daily_batch_id       varchar,
+    script_template_id   varchar,
+    subject_line         text,
+    email_body           text,
+    error_message        text,
+    created_at           timestamp  NOT NULL DEFAULT now(),
+    updated_at           timestamp  NOT NULL DEFAULT now()
+  )`,
 ];
 
 export async function ensureSchema(): Promise<void> {
@@ -73,7 +106,7 @@ export async function ensureSchema(): Promise<void> {
   }
 
   // Verify the tables are queryable so the boot logs give a definitive answer.
-  for (const table of ["blog_posts", "brokers", "session"]) {
+  for (const table of ["blog_posts", "brokers", "session", "heygen_videos"]) {
     try {
       const r = await pool.query(`SELECT count(*)::int AS n FROM ${table}`);
       console.log(`[ensure-schema] ${table} is ready (${r.rows[0].n} rows)`);

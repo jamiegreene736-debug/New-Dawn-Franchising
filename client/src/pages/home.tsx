@@ -323,11 +323,11 @@ function HomepageVideoCard({ hero = false }: { hero?: boolean }) {
               </div>
               <div className="mt-1 font-serif text-xl leading-tight text-white md:text-2xl">New Dawn Franchising</div>
             </div>
-            <div className="grid size-12 shrink-0 place-items-center rounded-full bg-white shadow-lg ring-1 ring-black/5 transition group-hover:scale-105">
+            <div className="grid size-11 shrink-0 place-items-center rounded-full border border-white/20 bg-white/10 transition group-hover:scale-105">
               {isPlaying ? (
-                <Pause className="size-5 fill-[hsl(var(--primary))] text-[hsl(var(--primary))]" />
+                <Pause className="size-5 text-[hsl(var(--accent))]" />
               ) : (
-                <Play className="ml-0.5 size-5 fill-red-600 text-red-600" />
+                <Volume2 className="size-5 text-[hsl(var(--accent))]" />
               )}
             </div>
           </div>
@@ -355,6 +355,15 @@ function HomepageVideoCard({ hero = false }: { hero?: boolean }) {
                 <p className="mt-2 max-w-lg text-pretty text-sm leading-relaxed text-white/75 md:text-base">{scene.copy}</p>
               </motion.div>
             </AnimatePresence>
+
+            {/* Large, obvious play CTA while idle so it clearly reads as a video */}
+            {!isPlaying && (
+              <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center bg-[hsl(var(--primary))]/30">
+                <div className="grid size-20 place-items-center rounded-full bg-white shadow-2xl ring-1 ring-black/5 transition duration-300 group-hover:scale-110 md:size-24">
+                  <span className="ml-1.5 block h-0 w-0 border-y-[16px] border-l-[26px] border-y-transparent border-l-red-600 md:border-y-[18px] md:border-l-[30px]" />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Scene indicator dots */}
@@ -718,7 +727,7 @@ export default function Home() {
                       title: "Your investment is returned from escrow",
                     },
                   ].map((item) => (
-                    <div key={item.id} className="border-b p-3.5 last:border-b-0 md:border-b-0 md:border-r md:last:border-r-0">
+                    <div key={item.id} className="border-b px-4 py-5 last:border-b-0 md:border-b-0 md:border-r md:px-5 md:last:border-r-0">
                       <div className="flex items-start gap-3">
                         <div className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-[hsl(var(--primary))]/8 text-[11px] font-bold text-[hsl(var(--primary))]">
                           {item.id}

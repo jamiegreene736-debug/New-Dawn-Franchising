@@ -48,6 +48,13 @@ import { smartSmsDelay, smartWhatsAppDelay, isOptimalSmsWindow, nextWindowDescri
 import { sendWhatsAppMessage as sendWhatsApp, sendWhatsAppTemplate, WHATSAPP_TEMPLATES } from "./meta-whatsapp-service";
 import { sendRinglessVoicemail, getVoicemailStatus, VOICEMAIL_SCRIPTS } from "./voicemail-service";
 import { runEnrichmentSearch, enrichSingleCompany, findSimilarCompanies, getEnrichmentApiStatus } from "./prospect-enrichment";
+import {
+  seamlessContactSearch,
+  seamlessCompanySearch,
+  seamlessRevealContacts,
+  parseNaturalLanguageToFilters,
+  type LeadSearchFilters,
+} from "./seamless-prospects";
 import { seedContactEnrichment } from "./people-finder";
 import { calculateDecisionMakerScore } from "./decision-maker-scorer";
 import { whitePageslookup, whitepagesVerifyPhone } from "./whitepages-service";
@@ -1626,6 +1633,69 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
 
   app.get("/api/crm/enrichment-status", requireAdminAuth, (_req, res) => {
     res.json(getEnrichmentApiStatus());
+  });
+
+  // ─── Seamless.AI Lead Research (search free · reveal spends credits) ────────
+  // Unified contact/company search. Optionally parses a natural-language query
+  // (aiQuery) into structured filters first, then searches Seamless. Email/phone
+  // are NOT included here — they are revealed on demand via /seamless-reveal.
+  app.post("/api/crm/prospects/seamless-search", requireAdminAuth, async (req, res) => {
+    try {
+      if (!process.env.SEAMLESS_API_KEY) {
+        return res.status(503).json({ message: "Seamless.AI is not configured (SEAMLESS_API_KEY missing)." });
+      }
+      const { mode, aiQuery, nextToken } = req.body as {
+        mode?: "contacts" | "companies";
+        filters?: LeadSearchFilters;
+        aiQuery?: string;
+        nextToken?: string | null;
+      };
+      let filters: LeadSearchFilters = (req.body?.filters as LeadSearchFilters) || {};
+
+      // If a natural-language query is supplied, parse it and merge over the
+      // explicit filters (explicit values the user typed win; parsed fills gaps).
+      let appliedFilters = filters;
+      if (aiQuery && aiQuery.trim()) {
+        const parsed = await parseNaturalLanguageToFilters(aiQuery.trim());
+        const explicit = Object.fromEntries(
+          Object.entries(filters).filter(([, v]) => (Array.isArray(v) ? v.length > 0 : !!v)),
+        ) as LeadSearchFilters;
+        appliedFilters = { ...parsed, ...explicit };
+      }
+
+      const hasAnyFilter = Object.values(appliedFilters).some((v) => (Array.isArray(v) ? v.length > 0 : !!v));
+      if (!hasAnyFilter) {
+        return res.status(400).json({ message: "Add at least one filter or type what you're looking for." });
+      }
+
+      const result = mode === "companies"
+        ? await seamlessCompanySearch(appliedFilters, { nextToken })
+        : await seamlessContactSearch(appliedFilters, { nextToken });
+
+      res.json({ ...result, appliedFilters });
+    } catch (err: any) {
+      console.error("Seamless search error:", err);
+      res.status(500).json({ message: err.message || "Seamless search failed" });
+    }
+  });
+
+  // Reveal email + phone for the given Seamless searchResultIds. Spends ~1
+  // Seamless credit per contact.
+  app.post("/api/crm/prospects/seamless-reveal", requireAdminAuth, async (req, res) => {
+    try {
+      if (!process.env.SEAMLESS_API_KEY) {
+        return res.status(503).json({ message: "Seamless.AI is not configured (SEAMLESS_API_KEY missing)." });
+      }
+      const { searchResultIds } = req.body as { searchResultIds?: string[] };
+      if (!Array.isArray(searchResultIds) || searchResultIds.length === 0) {
+        return res.status(400).json({ message: "searchResultIds is required" });
+      }
+      const results = await seamlessRevealContacts(searchResultIds.slice(0, 50));
+      res.json({ results });
+    } catch (err: any) {
+      console.error("Seamless reveal error:", err);
+      res.status(500).json({ message: err.message || "Seamless reveal failed" });
+    }
   });
 
   // ─── Whitepages manual enrichment ─────────────────────────────────────────

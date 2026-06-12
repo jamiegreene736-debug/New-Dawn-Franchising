@@ -86,6 +86,15 @@ export interface SeamlessPerson {
   country: string | null;
   city: string | null;
   state: string | null;
+  // Company-level metadata that the free /search/contacts step returns up-front
+  // (no credits). Used to render Seamless-style result cards before reveal.
+  industries?: string[] | null;
+  employeeSizeRange?: string | null;
+  companyRevenue?: string | null;
+  companyType?: string | null;
+  companyCity?: string | null;
+  companyState?: string | null;
+  companyCountry?: string | null;
 }
 
 /**
@@ -109,19 +118,103 @@ export interface SeamlessContactFilters {
   titles?: string[]; // jobTitle
   seniorities?: string[]; // seniority (e.g. "C-Level", "VP", "Manager")
   departments?: string[];
-  keywords?: string; // contactKeyword
-  fullName?: string;
-  companyName?: string;
+  keywords?: string; // contactKeyword (single, legacy)
+  keywordList?: string[]; // contactKeyword (multiple)
+  fullName?: string; // legacy single
+  fullNames?: string[]; // fullName (multiple)
+  companyName?: string; // legacy single
+  companyNames?: string[]; // companyName (multiple)
+  companyNameSearchType?: "default" | "related" | "exact";
   companyDomains?: string[]; // companyDomain
   countries?: string[]; // contactCountry (full names, e.g. "United States")
-  states?: string[];
+  states?: string[]; // contactState
+  zipCodes?: string[]; // contactZipCode
+  locationType?: "bothOR" | "bothAND" | "company" | "contact";
+  // Company-level filters (apply to the contact's current company)
+  industries?: string[]; // industry
+  companySizes?: string[]; // companySize bands (e.g. "201 - 500")
+  companyRevenues?: string[]; // companyRevenue bands (e.g. "$5M - $20M")
+  technologies?: string[];
+  technologiesIsOr?: boolean;
+  companyType?: "Public" | "Private";
+  companyFoundedOn?: string[]; // e.g. "Last 1-3 Years"
+  newsTypes?: string[];
+  pastCompanyNames?: string[]; // pastCompany.names
+  jobChangeType?: string; // jobChanges.changeType
   limit?: number;
   nextToken?: string | null;
+}
+
+// ─── Company search (POST /search/companies) ────────────────────────────────
+
+export interface SeamlessCompanyFilters {
+  companyNames?: string[];
+  companyNameSearchType?: "default" | "related" | "exact";
+  companyDomains?: string[];
+  states?: string[]; // companyState
+  countries?: string[]; // companyCountry
+  zipCodes?: string[]; // companyZipCode
+  industries?: string[];
+  keywordList?: string[]; // companyKeyword
+  companySizes?: string[];
+  companyRevenues?: string[];
+  technologies?: string[];
+  technologiesIsOr?: boolean;
+  companyType?: "Public" | "Private";
+  foundedOn?: string[];
+  newsTypes?: string[];
+  limit?: number;
+  nextToken?: string | null;
+}
+
+export interface SeamlessCompany {
+  searchResultId: string | null;
+  name: string;
+  domain: string | null;
+  website: string | null;
+  description: string | null;
+  industries: string[];
+  employeeSizeRange: string | null;
+  employeeCount: string | null;
+  revenueRange: string | null;
+  companyType: string | null;
+  foundedOn: string | null;
+  numContacts: string | null;
+  linkedinUrl: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  address: string | null;
+}
+
+interface SeamlessCompanyItem {
+  searchResultId?: string;
+  name?: string;
+  domain?: string;
+  description?: string;
+  industries?: string[];
+  staffCountRange?: string;
+  employeeCount?: string;
+  revenueRange?: string;
+  annualRevenue?: string;
+  companyType?: string;
+  foundedOn?: string;
+  numContacts?: string;
+  liUrl?: string;
+  companyLIURL?: string;
+  street1?: string;
+  street2?: string;
+  city?: string;
+  state?: string;
+  postCode?: string;
+  country?: string;
 }
 
 interface SeamlessSearchItem {
   searchResultId?: string;
   name?: string;
+  firstName?: string;
+  lastName?: string;
   company?: string;
   title?: string;
   department?: string;
@@ -131,6 +224,13 @@ interface SeamlessSearchItem {
   state?: string;
   country?: string;
   liUrl?: string;
+  industries?: string[];
+  employeeSizeRange?: string;
+  companyRevenue?: string;
+  companyType?: string;
+  companyCity?: string;
+  companyState?: string;
+  companyCountry?: string;
 }
 
 interface SeamlessEnrichedContact {
@@ -186,7 +286,9 @@ function splitName(full: string): { firstName: string; lastName: string } {
 }
 
 function mapSearchItem(item: SeamlessSearchItem): SeamlessPerson {
-  const { firstName, lastName } = splitName(item.name || "");
+  const split = splitName(item.name || "");
+  const firstName = item.firstName || split.firstName;
+  const lastName = item.lastName || split.lastName;
   return {
     searchResultId: item.searchResultId || null,
     firstName,
@@ -206,6 +308,40 @@ function mapSearchItem(item: SeamlessSearchItem): SeamlessPerson {
     country: item.country || null,
     city: item.city || null,
     state: item.state || null,
+    industries: item.industries || null,
+    employeeSizeRange: item.employeeSizeRange || null,
+    companyRevenue: item.companyRevenue || null,
+    companyType: item.companyType || null,
+    companyCity: item.companyCity || null,
+    companyState: item.companyState || null,
+    companyCountry: item.companyCountry || null,
+  };
+}
+
+function mapCompanyItem(item: SeamlessCompanyItem): SeamlessCompany {
+  const domain = item.domain || null;
+  const website = domain ? `https://${domain.replace(/^https?:\/\//, "")}` : null;
+  const addressParts = [item.street1, item.city, item.state, item.postCode, item.country]
+    .map((s) => (s || "").trim())
+    .filter(Boolean);
+  return {
+    searchResultId: item.searchResultId || null,
+    name: item.name || domain || "Unknown company",
+    domain,
+    website,
+    description: item.description || null,
+    industries: Array.isArray(item.industries) ? item.industries : [],
+    employeeSizeRange: item.staffCountRange || null,
+    employeeCount: item.employeeCount || null,
+    revenueRange: item.revenueRange || item.annualRevenue || null,
+    companyType: item.companyType || null,
+    foundedOn: item.foundedOn || null,
+    numContacts: item.numContacts || null,
+    linkedinUrl: item.liUrl || item.companyLIURL || null,
+    city: item.city || null,
+    state: item.state || null,
+    country: item.country || null,
+    address: addressParts.length ? addressParts.join(", ") : null,
   };
 }
 
@@ -265,9 +401,22 @@ function mapEnrichedContact(
 /** Step 1: search the Seamless DB. No credits. Returns lightweight matches. */
 async function searchContactsRaw(
   filters: SeamlessContactFilters,
-): Promise<SeamlessSearchItem[]> {
+): Promise<{ items: SeamlessSearchItem[]; nextToken: string | null }> {
   const apiKey = getKey();
-  if (!apiKey) return [];
+  if (!apiKey) return { items: [], nextToken: null };
+
+  const companyNames = [
+    ...(filters.companyName ? [filters.companyName] : []),
+    ...(filters.companyNames || []),
+  ];
+  const fullNames = [
+    ...(filters.fullName ? [filters.fullName] : []),
+    ...(filters.fullNames || []),
+  ];
+  const keywords = [
+    ...(filters.keywords ? [filters.keywords] : []),
+    ...(filters.keywordList || []),
+  ];
 
   const body: Record<string, unknown> = {
     limit: Math.min(filters.limit || 25, 100),
@@ -275,12 +424,27 @@ async function searchContactsRaw(
   if (filters.titles?.length) body.jobTitle = filters.titles;
   if (filters.seniorities?.length) body.seniority = filters.seniorities;
   if (filters.departments?.length) body.department = filters.departments;
-  if (filters.keywords) body.contactKeyword = [filters.keywords];
-  if (filters.fullName) body.fullName = filters.fullName;
-  if (filters.companyName) body.companyName = [filters.companyName];
+  if (keywords.length) body.contactKeyword = keywords;
+  if (fullNames.length) body.fullName = fullNames;
+  if (companyNames.length) body.companyName = companyNames.slice(0, 100);
+  if (filters.companyNameSearchType) body.companyNameSearchType = filters.companyNameSearchType;
   if (filters.companyDomains?.length) body.companyDomain = filters.companyDomains;
   if (filters.countries?.length) body.contactCountry = filters.countries;
   if (filters.states?.length) body.contactState = filters.states;
+  if (filters.zipCodes?.length) body.contactZipCode = filters.zipCodes;
+  if (filters.locationType) body.locationType = filters.locationType;
+  if (filters.industries?.length) body.industry = filters.industries.slice(0, 5);
+  if (filters.companySizes?.length) body.companySize = filters.companySizes;
+  if (filters.companyRevenues?.length) body.companyRevenue = filters.companyRevenues;
+  if (filters.technologies?.length) {
+    body.technologies = filters.technologies;
+    if (filters.technologiesIsOr !== undefined) body.technologiesIsOr = filters.technologiesIsOr;
+  }
+  if (filters.companyType) body.companyType = filters.companyType;
+  if (filters.companyFoundedOn?.length) body.companyFoundedOn = filters.companyFoundedOn.slice(0, 4);
+  if (filters.newsTypes?.length) body.newsTypes = filters.newsTypes;
+  if (filters.pastCompanyNames?.length) body.pastCompany = { names: filters.pastCompanyNames.slice(0, 100) };
+  if (filters.jobChangeType) body.jobChanges = { changeType: filters.jobChangeType };
   if (filters.nextToken) body.nextToken = filters.nextToken;
 
   try {
@@ -290,11 +454,61 @@ async function searchContactsRaw(
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
-    if (!res.ok) return [];
-    const json = (await res.json()) as { data?: SeamlessSearchItem[] };
-    return Array.isArray(json.data) ? json.data : [];
+    if (!res.ok) return { items: [], nextToken: null };
+    const json = (await res.json()) as { data?: SeamlessSearchItem[]; nextToken?: string };
+    return {
+      items: Array.isArray(json.data) ? json.data : [],
+      nextToken: json.nextToken || null,
+    };
   } catch {
-    return [];
+    return { items: [], nextToken: null };
+  }
+}
+
+/** Company search. No credits. Returns lightweight company matches. */
+async function searchCompaniesRaw(
+  filters: SeamlessCompanyFilters,
+): Promise<{ items: SeamlessCompanyItem[]; nextToken: string | null }> {
+  const apiKey = getKey();
+  if (!apiKey) return { items: [], nextToken: null };
+
+  const body: Record<string, unknown> = {
+    limit: Math.min(filters.limit || 25, 100),
+  };
+  if (filters.companyNames?.length) body.companyName = filters.companyNames.slice(0, 100);
+  if (filters.companyNameSearchType) body.companyNameSearchType = filters.companyNameSearchType;
+  if (filters.companyDomains?.length) body.companyDomain = filters.companyDomains;
+  if (filters.states?.length) body.companyState = filters.states;
+  if (filters.countries?.length) body.companyCountry = filters.countries;
+  if (filters.zipCodes?.length) body.companyZipCode = filters.zipCodes;
+  if (filters.industries?.length) body.industry = filters.industries;
+  if (filters.keywordList?.length) body.companyKeyword = filters.keywordList;
+  if (filters.companySizes?.length) body.companySize = filters.companySizes;
+  if (filters.companyRevenues?.length) body.companyRevenue = filters.companyRevenues;
+  if (filters.technologies?.length) {
+    body.technologies = filters.technologies;
+    if (filters.technologiesIsOr !== undefined) body.technologiesIsOr = filters.technologiesIsOr;
+  }
+  if (filters.companyType) body.companyType = filters.companyType;
+  if (filters.foundedOn?.length) body.foundedOn = filters.foundedOn;
+  if (filters.newsTypes?.length) body.newsTypes = filters.newsTypes;
+  if (filters.nextToken) body.nextToken = filters.nextToken;
+
+  try {
+    const res = await fetch(`${SEAMLESS_BASE}/search/companies`, {
+      method: "POST",
+      headers: authHeaders(apiKey),
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+    if (!res.ok) return { items: [], nextToken: null };
+    const json = (await res.json()) as { data?: SeamlessCompanyItem[]; nextToken?: string };
+    return {
+      items: Array.isArray(json.data) ? json.data : [],
+      nextToken: json.nextToken || null,
+    };
+  } catch {
+    return { items: [], nextToken: null };
   }
 }
 
@@ -428,9 +642,46 @@ export async function seamlessFindPeople(
   filters: SeamlessContactFilters,
   opts: { enrich?: boolean } = {},
 ): Promise<SeamlessPerson[]> {
-  const items = (await searchContactsRaw(filters)).map(mapSearchItem);
+  const items = (await searchContactsRaw(filters)).items.map(mapSearchItem);
   if (!opts.enrich || items.length === 0) return items;
   return enrichBySearchIds(items);
+}
+
+/**
+ * Free contact search returning rich, search-level people (names, titles,
+ * company metadata, LinkedIn — NO email/phone, NO credits) plus the pagination
+ * cursor. This is the surface the Seamless-style Lead Research UI drives.
+ */
+export async function seamlessSearchContacts(
+  filters: SeamlessContactFilters,
+): Promise<{ people: SeamlessPerson[]; nextToken: string | null }> {
+  const { items, nextToken } = await searchContactsRaw(filters);
+  return { people: items.map(mapSearchItem), nextToken };
+}
+
+/** Free company search returning rich, search-level companies + cursor. */
+export async function seamlessSearchCompanies(
+  filters: SeamlessCompanyFilters,
+): Promise<{ companies: SeamlessCompany[]; nextToken: string | null }> {
+  const { items, nextToken } = await searchCompaniesRaw(filters);
+  return { companies: items.map(mapCompanyItem), nextToken };
+}
+
+/**
+ * Reveal (enrich) the given search results' email + phone. Consumes ~1 Seamless
+ * credit per contact. Returns the enriched person keyed by searchResultId so the
+ * caller can merge the result back onto the displayed row.
+ */
+export async function seamlessRevealBySearchIds(
+  ids: string[],
+): Promise<Array<{ searchResultId: string | null; person: SeamlessPerson }>> {
+  if (!getKey() || ids.length === 0) return [];
+  const requestIds = await submitResearch({ searchResultIds: ids.slice(0, 100) });
+  const enriched = await pollResearch(requestIds);
+  return enriched.map((r) => ({
+    searchResultId: r.searchResultId ?? null,
+    person: mapEnrichedContact(r.contact),
+  }));
 }
 
 /** Enrich people by identity (name+company/domain, email, or LinkedIn URL). */

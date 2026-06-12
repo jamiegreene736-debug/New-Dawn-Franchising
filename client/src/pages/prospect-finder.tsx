@@ -6,7 +6,7 @@ import {
   MapPin, Phone, Search, Trash2, Mail, Linkedin, Star, Check, Info,
   Building2, Users, UserPlus, Bookmark, Eye, EyeOff, RefreshCw,
   PhoneCall, CheckCircle2, AlertCircle, Plus, ListPlus, FolderOpen, X, PhoneOff, Edit2, SlidersHorizontal, Tag, ShieldCheck,
-  MessageCircle, Send,
+  MessageCircle, Send, Sparkles,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import { apiRequest } from "@/lib/queryClient";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
+import SeamlessSearchPanel, { type LeadFilters, EMPTY_FILTERS, countActiveFilters } from "@/components/seamless-search-panel";
 
 const US_STATES = [
   "Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut",
@@ -65,6 +66,10 @@ interface EnrichedContact {
   internationalBio: boolean;
   ailaNumber: boolean;
   address?: string | null;
+  searchResultId?: string | null;
+  revealed?: boolean;
+  industries?: string[] | null;
+  employeeSizeRange?: string | null;
 }
 
 interface EnrichedCompany {
@@ -85,7 +90,6 @@ interface EnrichedCompany {
   description?: string | null;
 }
 
-interface Category { id: string; label: string; query: string; }
 interface SavedProspect {
   id: string; name: string; company: string | null; email: string | null;
   phone: string | null; website: string | null; address: string | null;
@@ -174,47 +178,6 @@ function AddressValidityBadge({ validity }: { validity?: string }) {
 }
 
 
-function StageProgressBar({
-  stages,
-  currentStage,
-  footer,
-}: {
-  stages: { label: string; pct: number }[];
-  currentStage: number;
-  footer?: string;
-}) {
-  return (
-    <div className="rounded-lg border bg-muted/40 p-3 space-y-2.5">
-      <div className="flex items-center gap-1.5 flex-wrap">
-        {stages.map((s, i) => {
-          const idx = i + 1;
-          const done = currentStage > idx;
-          const active = currentStage === idx;
-          return (
-            <span
-              key={idx}
-              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium border transition-all ${
-                done   ? "bg-green-50 text-green-700 border-green-200" :
-                active ? "bg-blue-50 text-blue-700 border-blue-200 animate-pulse" :
-                         "bg-gray-50 text-gray-400 border-gray-200"
-              }`}
-            >
-              {done ? "✓" : active ? <Loader2 className="size-2.5 animate-spin" /> : <span className="size-2 rounded-full bg-gray-300 inline-block" />}
-              {s.label}
-            </span>
-          );
-        })}
-      </div>
-      <div className="h-1.5 w-full rounded-full bg-gray-200 overflow-hidden">
-        <div
-          className="h-1.5 rounded-full bg-blue-500 transition-all duration-[2000ms] ease-out"
-          style={{ width: `${stages[Math.min(currentStage - 1, stages.length - 1)]?.pct ?? 5}%` }}
-        />
-      </div>
-      {footer && <p className="text-[11px] text-muted-foreground">{footer}</p>}
-    </div>
-  );
-}
 
 type WaState = "idle" | "checking" | "confirmed" | "not_found" | "error" | "sent";
 
@@ -226,6 +189,8 @@ function ContactCard({
   onAddToList,
   isSaving,
   isAddedToCrm,
+  onReveal,
+  isRevealing,
 }: {
   contact: EnrichedContact;
   isSelected: boolean;
@@ -234,6 +199,8 @@ function ContactCard({
   onAddToList: () => void;
   isSaving: boolean;
   isAddedToCrm?: boolean;
+  onReveal?: () => void;
+  isRevealing?: boolean;
 }) {
   const [showBio, setShowBio] = useState(false);
   const [waState, setWaState] = useState<WaState>("idle");
@@ -328,6 +295,18 @@ function ContactCard({
           )}
 
           <div className="flex flex-wrap gap-x-3 gap-y-1.5 text-xs text-muted-foreground mt-1">
+            {onReveal && !contact.revealed && !contact.email && !contact.phone && (
+              <button
+                onClick={onReveal}
+                disabled={isRevealing}
+                data-testid={`reveal-${contact.id}`}
+                title="Reveal email & phone via Seamless.AI (uses ~1 credit)"
+                className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20 transition-colors disabled:opacity-50"
+              >
+                {isRevealing ? <Loader2 className="size-3 animate-spin" /> : <Sparkles className="size-3" />}
+                {isRevealing ? "Revealing…" : "Reveal email & phone"}
+              </button>
+            )}
             {contact.email && (
               <span className="flex items-center gap-1.5 flex-wrap">
                 <a href={`mailto:${contact.email}`} className="flex items-center gap-1 hover:text-foreground">
@@ -429,12 +408,12 @@ function ContactCard({
                   </button>
                 )}
               </span>
-            ) : (
+            ) : contact.revealed ? (
               <span className="flex items-center gap-1 text-red-400/70" title="No phone number found">
                 <PhoneOff className="size-3" />
                 <span className="text-[10px]">No phone</span>
               </span>
-            )}
+            ) : null}
             {contact.linkedinUrl && (
               <a href={contact.linkedinUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 hover:text-foreground">
                 <Linkedin className="size-3 text-[#0A66C2]" /> LinkedIn
@@ -619,6 +598,10 @@ function CompanySection({
   savingIds,
   addedToCrmIds,
   onClickEnrichedBadge,
+  onRevealContact,
+  revealingIds,
+  onFindPeople,
+  isFindingPeople,
 }: {
   company: EnrichedCompany;
   showAll: boolean;
@@ -629,6 +612,10 @@ function CompanySection({
   savingIds: Set<string>;
   addedToCrmIds: Set<string>;
   onClickEnrichedBadge: () => void;
+  onRevealContact: (contact: EnrichedContact) => void;
+  revealingIds: Set<string>;
+  onFindPeople?: () => void;
+  isFindingPeople?: boolean;
 }) {
   const [expanded, setExpanded] = useState(true);
 
@@ -692,7 +679,17 @@ function CompanySection({
               +{company.contacts.length} {company.enrichmentStatus === "complete" ? "Enriched" : "Partial"}
             </button>
           )}
-          {!isEnriched && (
+          {!isEnriched && onFindPeople && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onFindPeople(); }}
+              disabled={isFindingPeople}
+              className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border font-semibold bg-primary/10 text-primary border-primary/30 hover:bg-primary/20 transition-colors disabled:opacity-50"
+            >
+              {isFindingPeople ? <Loader2 className="size-3 animate-spin" /> : <Users className="size-3" />}
+              {isFindingPeople ? "Finding…" : "Find decision-makers"}
+            </button>
+          )}
+          {!isEnriched && !onFindPeople && (
             <span className="text-[10px] px-1.5 py-0.5 rounded-full border bg-gray-50 text-gray-500 border-gray-200">
               No contacts
             </span>
@@ -704,11 +701,21 @@ function CompanySection({
       {expanded && (
         <div className="p-3 space-y-2">
           {visibleContacts.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-3">
-              {company.contacts.length === 0
-                ? "No individual contacts found for this company."
-                : "No hot or warm leads — click \"Show all\" to see all contacts."}
-            </p>
+            company.contacts.length === 0 && onFindPeople ? (
+              <div className="text-center py-3">
+                <p className="text-sm text-muted-foreground mb-2">No decision-makers loaded yet for this company.</p>
+                <Button size="sm" variant="outline" className="gap-1.5" disabled={isFindingPeople} onClick={onFindPeople}>
+                  {isFindingPeople ? <Loader2 className="size-3.5 animate-spin" /> : <Users className="size-3.5" />}
+                  Find decision-makers
+                </Button>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-3">
+                {company.contacts.length === 0
+                  ? "No individual contacts found for this company."
+                  : "No hot or warm leads — click \"Show all\" to see all contacts."}
+              </p>
+            )
           ) : (
             visibleContacts.map((contact) => (
               <ContactCard
@@ -720,6 +727,8 @@ function CompanySection({
                 onAddToList={() => onAddContactToList(contact)}
                 isSaving={savingIds.has(contact.id)}
                 isAddedToCrm={addedToCrmIds.has(contact.id)}
+                onReveal={() => onRevealContact(contact)}
+                isRevealing={revealingIds.has(contact.id)}
               />
             ))
           )}
@@ -737,23 +746,13 @@ function CompanySection({
 export default function ProspectFinder() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [category, setCategory] = useState("");
-  const [locationType, setLocationType] = useState<"us_state" | "country">("us_state");
-  const [selectedState, setSelectedState] = useState("");
-  const [selectedCountry, setSelectedCountry] = useState("");
-  const [customLocation, setCustomLocation] = useState("");
   const [viewTab, setViewTab] = useState<"search" | "saved">("search");
-  const [searchMode, setSearchMode] = useState<"category" | "url" | "similar" | "seed">("category");
-  const [urlInput, setUrlInput] = useState("");
-  const [urlName, setUrlName] = useState("");
-  const [urlTag, setUrlTag] = useState("");
-  const [urlPersonName, setUrlPersonName] = useState("");
-  const [similarUrl, setSimilarUrl] = useState("");
-  const [similarTag, setSimilarTag] = useState("");
-  const [similarQueries, setSimilarQueries] = useState<string[]>([]);
-  const [similarStage, setSimilarStage] = useState(0);
-  const [urlStage, setUrlStage] = useState(0);
-  const [categoryStage, setCategoryStage] = useState(0);
+  // ── Seamless.AI Lead Research search state ──
+  const [searchTab, setSearchTab] = useState<"contacts" | "companies">("contacts");
+  const [filters, setFilters] = useState<LeadFilters>({ ...EMPTY_FILTERS });
+  const [aiQuery, setAiQuery] = useState("");
+  const [revealingIds, setRevealingIds] = useState<Set<string>>(new Set());
+  const [findingCompanyIds, setFindingCompanyIds] = useState<Set<string>>(new Set());
   const [showAll, setShowAll] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
@@ -788,23 +787,12 @@ export default function ProspectFinder() {
   const [showNewListInPicker, setShowNewListInPicker] = useState(false);
   const [listPickerAdding, setListPickerAdding] = useState(false);
 
-  // Seed contact state
-  const [seedFirstName, setSeedFirstName] = useState("");
-  const [seedLastName, setSeedLastName] = useState("");
-  const [seedCompany, setSeedCompany] = useState("");
-  const [seedWebsite, setSeedWebsite] = useState("");
-  const [seedLoading, setSeedLoading] = useState(false);
-  const [seedResult, setSeedResult] = useState<EnrichedContact | null>(null);
-  const [seedError, setSeedError] = useState<string | null>(null);
-
   useEffect(() => {
     if (!openAddToList) return;
     const handler = () => setOpenAddToList(null);
     document.addEventListener("click", handler, true);
     return () => document.removeEventListener("click", handler, true);
   }, [openAddToList]);
-
-  const { data: categories = [] } = useQuery<Category[]>({ queryKey: ["/api/crm/prospect-categories"] });
 
   const { data: savedProspects = [] } = useQuery<SavedProspect[]>({ queryKey: ["/api/crm/prospects"] });
 
@@ -824,302 +812,162 @@ export default function ProspectFinder() {
     queryKey: ["/api/crm/enrichment-status"],
   });
 
-  const getLocation = () => {
-    if (locationType === "us_state") return selectedState ? `${selectedState}, USA` : "";
-    if (selectedCountry === "United States") return customLocation ? `${customLocation}, USA` : "United States";
-    return selectedCountry;
+  // ── Seamless.AI search helpers ──────────────────────────────────────────────
+  const toSearchFilters = (f: LeadFilters) => ({
+    jobTitle: f.jobTitle,
+    seniority: f.seniority,
+    department: f.department,
+    industry: f.industry,
+    companySize: f.companySize,
+    companyRevenue: f.companyRevenue,
+    companyName: f.companyName,
+    companyDomain: f.companyDomain,
+    contactState: f.contactState,
+    contactCountry: f.contactCountry,
+    keywords: f.keywords,
+    fullName: f.fullName,
+    companyType: f.companyType,
+    companyFoundedOn: f.companyFoundedOn,
+  });
+
+  const runSeamlessSearch = async (body: Record<string, unknown>) => {
+    const res = await fetch("/api/crm/prospects/seamless-search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(60_000),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      let msg = text;
+      try { msg = JSON.parse(text).message || text; } catch { /* raw */ }
+      throw new Error(msg || res.statusText);
+    }
+    return res.json() as Promise<{
+      companies: EnrichedCompany[];
+      totalContacts: number;
+      enrichedCount: number;
+      nextToken: string | null;
+      appliedFilters?: LeadFilters;
+    }>;
   };
 
-  const CATEGORY_STAGES = [
-    { label: "Finding companies",      pct: 18 },
-    { label: "Scraping team pages",    pct: 42 },
-    { label: "Finding decision-makers", pct: 72 },
-    { label: "Scoring contacts",       pct: 90 },
-  ];
-
-  const URL_STAGES = [
-    { label: "Scraping website",       pct: 18 },
-    { label: "Searching Seamless.AI",  pct: 42 },
-    { label: "Finding people",         pct: 72 },
-    { label: "Scoring contacts",       pct: 90 },
-  ];
-
-  const runFetchWithStages = async (
-    url: string, body: object,
-    setStage: (n: number) => void,
-    stageTimings: number[],   // ms offsets for stages 2,3,4
-    abortMs: number,
+  const applyResults = (
+    data: { companies: EnrichedCompany[]; totalContacts: number },
+    label: string,
   ) => {
-    setStage(1);
-    const controller = new AbortController();
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    stageTimings.forEach((ms, i) => {
-      timers.push(setTimeout(() => setStage(i + 2), ms));
-    });
-    const hardAbort = setTimeout(() => controller.abort(), abortMs);
-    try {
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-        credentials: "include",
-        signal: controller.signal,
-      });
-      timers.forEach(clearTimeout);
-      clearTimeout(hardAbort);
-      if (!res.ok) {
-        const text = await res.text();
-        let msg = text;
-        try { msg = JSON.parse(text).message || text; } catch { /* raw */ }
-        throw new Error(msg || res.statusText);
-      }
-      return res.json();
-    } catch (err: any) {
-      timers.forEach(clearTimeout);
-      clearTimeout(hardAbort);
-      if (err.name === "AbortError") throw new Error("Search timed out — please try again");
-      throw err;
-    }
+    setCompanies(data.companies);
+    setHasSearched(true);
+    setSelected(new Set());
+    setShowAll(true);
+    const msg = searchTab === "companies"
+      ? `Found ${data.companies.length} companies — open one to find its decision-makers`
+      : data.totalContacts > 0
+        ? `Found ${data.totalContacts} contacts across ${data.companies.length} companies`
+        : "No matching contacts — try adjusting your filters";
+    toast({ title: label, description: msg });
   };
 
   const searchMutation = useMutation({
     mutationFn: async () => {
-      const location = getLocation();
-      if (!category || !location) throw new Error("Please select a category and location");
-      return runFetchWithStages(
-        "/api/crm/prospects/search-v2",
-        { category, location },
-        setCategoryStage,
-        [10_000, 20_000, 32_000],
-        60_000,
-      );
+      if (countActiveFilters(filters) === 0) throw new Error("Add at least one filter, or use AI Search above.");
+      return runSeamlessSearch({ mode: searchTab, filters: toSearchFilters(filters) });
     },
-    onSuccess: (data: { companies: EnrichedCompany[]; totalContacts: number; enrichedCount: number }) => {
-      setCategoryStage(0);
-      setCompanies(data.companies);
-      setHasSearched(true);
-      setSelected(new Set());
-      const msg = data.totalContacts > 0
-        ? `Found ${data.totalContacts} individual contacts across ${data.companies.length} companies`
-        : `Found ${data.companies.length} companies but no individual contacts were extracted`;
-      toast({ title: "Search complete", description: msg });
-    },
-    onError: (err: Error) => { setCategoryStage(0); toast({ title: "Search failed", description: err.message, variant: "destructive" }); },
+    onSuccess: (data) => applyResults(data, "Search complete"),
+    onError: (err: Error) => toast({ title: "Search failed", description: err.message, variant: "destructive" }),
   });
 
-  const urlSearchMutation = useMutation({
+  const aiSearchMutation = useMutation({
     mutationFn: async () => {
-      if (!urlInput.trim()) throw new Error("Please enter a company website URL");
-
-      // Run URL enrichment + optional targeted person seed in parallel
-      const [urlData, seedRaw] = await Promise.all([
-        runFetchWithStages(
-          "/api/crm/prospects/enrich-url",
-          { url: urlInput.trim(), name: urlName.trim() || undefined, category: urlTag.trim() || "Custom", location: "Global" },
-          setUrlStage,
-          [8_000, 16_000, 28_000],
-          55_000,
-        ) as Promise<{ companies: EnrichedCompany[]; totalContacts: number; enrichedCount: number }>,
-
-        // If a person name is specified, also run targeted seed enrichment
-        urlPersonName.trim()
-          ? (async () => {
-              const parts = urlPersonName.trim().split(/\s+/);
-              const firstName = parts[0];
-              const lastName = parts.slice(1).join(" ") || "";
-              if (!firstName || !lastName) return null;
-              try {
-                const r = await fetch("/api/crm/prospects/seed-contact", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  credentials: "include",
-                  body: JSON.stringify({
-                    firstName,
-                    lastName,
-                    company: urlName.trim() || "",
-                    website: urlInput.trim(),
-                  }),
-                });
-                if (!r.ok) return null;
-                return r.json();
-              } catch { return null; }
-            })()
-          : Promise.resolve(null),
-      ]);
-
-      // Merge seeded person into the first company's contacts (if found and not a dupe)
-      if (seedRaw && urlData.companies.length > 0) {
-        const company = urlData.companies[0];
-        const seedFullName = (seedRaw.fullName || "").toLowerCase();
-        const alreadyPresent = company.contacts.some(
-          (c: EnrichedContact) => c.fullName.toLowerCase() === seedFullName
-        );
-        if (!alreadyPresent) {
-          const seededContact: EnrichedContact = {
-            id: `seed-${Date.now()}`,
-            companyId: company.id,
-            companyName: company.name,
-            fullName: seedRaw.fullName,
-            firstName: seedRaw.firstName,
-            lastName: seedRaw.lastName,
-            jobTitle: seedRaw.jobTitle ?? null,
-            seniority: seedRaw.seniority ?? "associate",
-            email: seedRaw.email ?? null,
-            emailVerified: seedRaw.emailVerified ?? false,
-            emailConfidence: seedRaw.emailConfidence ?? 0,
-            emailStatus: seedRaw.emailStatus ?? "not_found",
-            phone: seedRaw.phone ?? null,
-            phoneType: seedRaw.phoneType ?? null,
-            whatsappEligible: seedRaw.whatsappEligible ?? false,
-            linkedinUrl: seedRaw.linkedinUrl ?? null,
-            bio: seedRaw.bio ?? null,
-            sources: ["targeted", ...(seedRaw.sources ?? [])],
-            decisionMakerScore: seedRaw.decisionMakerScore ?? 0,
-            scoreBreakdown: seedRaw.scoreBreakdown ?? {
-              titleScore: 0, reachabilityScore: 0, relevanceScore: 0,
-              total: 0, tier: "unqualified", tierLabel: "Unqualified", tierEmoji: "⚪",
-            },
-            e2ViaBio: seedRaw.e2ViaBio ?? false,
-            internationalBio: seedRaw.internationalBio ?? false,
-            ailaNumber: seedRaw.ailaNumber ?? false,
-            address: seedRaw.address ?? null,
-          };
-          // Pin the targeted contact at the top
-          company.contacts = [seededContact, ...company.contacts];
-          urlData.totalContacts += 1;
-        }
-      }
-
-      return urlData;
+      if (!aiQuery.trim()) throw new Error("Type what you're looking for first.");
+      return runSeamlessSearch({ mode: searchTab, filters: toSearchFilters(filters), aiQuery: aiQuery.trim() });
     },
-    onSuccess: (data: { companies: EnrichedCompany[]; totalContacts: number; enrichedCount: number }) => {
-      setUrlStage(0);
-      setCompanies(data.companies);
-      setHasSearched(true);
-      setSelected(new Set());
-      setShowAll(true);
-      const msg = data.totalContacts > 0
-        ? `Found ${data.totalContacts} contacts at ${data.companies[0]?.name}`
-        : `No contacts found at ${data.companies[0]?.name} — try a different URL`;
-      toast({ title: "Enrichment complete", description: msg });
+    onSuccess: (data) => {
+      if (data.appliedFilters) setFilters({ ...EMPTY_FILTERS, ...data.appliedFilters });
+      applyResults(data, "AI search complete");
     },
-    onError: (err: Error) => { setUrlStage(0); toast({ title: "Enrichment failed", description: err.message, variant: "destructive" }); },
+    onError: (err: Error) => toast({ title: "AI search failed", description: err.message, variant: "destructive" }),
   });
 
-  const SIMILAR_STAGES = [
-    { label: "Reading website",       pct: 8  },
-    { label: "Building queries",      pct: 22 },
-    { label: "Finding companies",     pct: 50 },
-    { label: "Enriching contacts",    pct: 88 },
-  ];
+  const isSearchPending = searchMutation.isPending || aiSearchMutation.isPending;
 
-  const similarSearchMutation = useMutation({
-    mutationFn: async () => {
-      if (!similarUrl.trim()) throw new Error("Please enter a reference company URL");
-      setSimilarStage(1);
-      const controller = new AbortController();
-      const timers: ReturnType<typeof setTimeout>[] = [];
-      timers.push(setTimeout(() => setSimilarStage(2), 9_000));
-      timers.push(setTimeout(() => setSimilarStage(3), 18_000));
-      timers.push(setTimeout(() => setSimilarStage(4), 32_000));
-      const hardAbort = setTimeout(() => controller.abort(), 88_000);
-      try {
-        const res = await fetch("/api/crm/prospects/find-similar", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url: similarUrl.trim(), category: similarTag.trim() || "Similar Companies" }),
-          credentials: "include",
-          signal: controller.signal,
-        });
-        timers.forEach(clearTimeout);
-        clearTimeout(hardAbort);
-        if (!res.ok) {
-          const text = await res.text();
-          let msg = text;
-          try { msg = JSON.parse(text).message || text; } catch { /* raw */ }
-          throw new Error(msg || res.statusText);
-        }
-        return res.json();
-      } catch (err: any) {
-        timers.forEach(clearTimeout);
-        clearTimeout(hardAbort);
-        if (err.name === "AbortError") throw new Error("Search timed out after 90 seconds — please try again");
-        throw err;
-      }
-    },
-    onSuccess: (data: { companies: EnrichedCompany[]; totalContacts: number; enrichedCount: number; searchQueries: string[] }) => {
-      setSimilarStage(0);
-      setCompanies(data.companies);
-      setHasSearched(true);
-      setSelected(new Set());
-      setSimilarQueries(data.searchQueries || []);
-      const msg = data.totalContacts > 0
-        ? `Found ${data.totalContacts} contacts across ${data.companies.length} similar companies`
-        : `Found ${data.companies.length} similar companies — no individual contacts extracted yet`;
-      toast({ title: "Discovery complete", description: msg });
-    },
-    onError: (err: Error) => {
-      setSimilarStage(0);
-      toast({ title: "Discovery failed", description: err.message, variant: "destructive" });
-    },
-  });
-
-  const isSearchPending = searchMutation.isPending || urlSearchMutation.isPending || similarSearchMutation.isPending;
-
-  const handleSeedContact = async () => {
-    if (!seedFirstName.trim() || !seedLastName.trim() || !seedCompany.trim()) return;
-    setSeedLoading(true);
-    setSeedResult(null);
-    setSeedError(null);
+  // Reveal email + phone for one or more contacts (spends Seamless credits).
+  const revealContacts = async (contactIds: string[]) => {
+    const all = companies.flatMap((c) => c.contacts);
+    const targets = all.filter((c) => contactIds.includes(c.id) && c.searchResultId && !c.revealed);
+    if (targets.length === 0) return;
+    const targetIds = new Set(targets.map((t) => t.id));
+    const bySr = new Map(targets.map((t) => [t.searchResultId as string, t.id]));
+    setRevealingIds((s) => new Set([...Array.from(s), ...targets.map((t) => t.id)]));
     try {
-      const res = await apiRequest("POST", "/api/crm/prospects/seed-contact", {
-        firstName: seedFirstName.trim(),
-        lastName: seedLastName.trim(),
-        company: seedCompany.trim(),
-        website: seedWebsite.trim() || undefined,
+      const res = await apiRequest("POST", "/api/crm/prospects/seamless-reveal", {
+        searchResultIds: targets.map((t) => t.searchResultId),
       });
-      const raw = await res.json() as any;
-      // Convert FoundPerson+score to EnrichedContact for ContactCard
-      const contact: EnrichedContact = {
-        id: `seed-${Date.now()}`,
-        companyId: "seed",
-        companyName: seedCompany.trim(),
-        fullName: raw.fullName,
-        firstName: raw.firstName,
-        lastName: raw.lastName,
-        jobTitle: raw.jobTitle ?? null,
-        seniority: raw.seniority ?? "associate",
-        email: raw.email ?? null,
-        emailVerified: raw.emailVerified ?? false,
-        emailConfidence: raw.emailConfidence ?? 0,
-        emailStatus: raw.emailStatus ?? "not_found",
-        phone: raw.phone ?? null,
-        phoneType: raw.phoneType ?? null,
-        whatsappEligible: raw.whatsappEligible ?? false,
-        linkedinUrl: raw.linkedinUrl ?? null,
-        bio: raw.bio ?? null,
-        sources: raw.sources ?? [],
-        decisionMakerScore: raw.decisionMakerScore ?? 0,
-        scoreBreakdown: raw.scoreBreakdown ?? {
-          titleScore: 0, reachabilityScore: 0, relevanceScore: 0,
-          total: 0, tier: "unqualified", tierLabel: "Unqualified", tierEmoji: "⚪",
-        },
-        e2ViaBio: raw.e2ViaBio ?? false,
-        internationalBio: raw.internationalBio ?? false,
-        ailaNumber: raw.ailaNumber ?? false,
-        address: raw.address ?? null,
-      };
-      setSeedResult(contact);
+      const data = (await res.json()) as { results: Array<any> };
+      const byId = new Map<string, any>();
+      for (const r of data.results || []) {
+        const id = r.searchResultId ? bySr.get(r.searchResultId) : undefined;
+        if (id) byId.set(id, r);
+      }
+      let withContact = 0;
+      setCompanies((prev) => prev.map((co) => ({
+        ...co,
+        contacts: co.contacts.map((ct) => {
+          if (!targetIds.has(ct.id)) return ct;
+          const r = byId.get(ct.id);
+          if (!r) return { ...ct, revealed: true };
+          if (r.email || r.phone) withContact++;
+          return {
+            ...ct,
+            email: r.email ?? ct.email,
+            emailConfidence: r.emailConfidence ?? ct.emailConfidence,
+            emailStatus: r.emailStatus ?? ct.emailStatus,
+            emailVerified: r.emailVerified ?? ct.emailVerified,
+            phone: r.phone ?? ct.phone,
+            phoneType: r.phoneType ?? ct.phoneType,
+            whatsappEligible: r.whatsappEligible ?? ct.whatsappEligible,
+            linkedinUrl: r.linkedinUrl ?? ct.linkedinUrl,
+            decisionMakerScore: r.decisionMakerScore ?? ct.decisionMakerScore,
+            scoreBreakdown: r.scoreBreakdown ?? ct.scoreBreakdown,
+            revealed: true,
+          };
+        }),
+      })));
       toast({
-        title: "Contact found",
-        description: raw.sources?.length
-          ? `Found via: ${(raw.sources as string[]).join(", ")}`
-          : "No external sources found — partial result",
+        title: "Reveal complete",
+        description: withContact > 0
+          ? `Revealed contact info for ${withContact} of ${targets.length}`
+          : "Seamless returned no email/phone for the selected contact(s)",
       });
     } catch (err: any) {
-      setSeedError(err.message || "No data found for this person. Try adding a website URL or check the name spelling.");
+      toast({ title: "Reveal failed", description: err.message, variant: "destructive" });
     } finally {
-      setSeedLoading(false);
+      setRevealingIds((s) => { const n = new Set(s); targets.forEach((t) => n.delete(t.id)); return n; });
+    }
+  };
+
+  // Companies tab: load decision-makers for one company (scoped contact search).
+  const findPeopleForCompany = async (company: EnrichedCompany) => {
+    const f = company.domain ? { companyDomain: [company.domain] } : { companyName: [company.name] };
+    setFindingCompanyIds((s) => new Set([...Array.from(s), company.id]));
+    try {
+      const data = await runSeamlessSearch({ mode: "contacts", filters: f });
+      const found = (data.companies || []).flatMap((c) => c.contacts);
+      setCompanies((prev) => prev.map((c) => c.id === company.id
+        ? {
+            ...c,
+            contacts: found.map((ct) => ({ ...ct, companyId: c.id, companyName: c.name })),
+            enrichmentStatus: (found.length ? "complete" : "no_contacts") as EnrichedCompany["enrichmentStatus"],
+          }
+        : c));
+      if (found.length === 0) {
+        toast({ title: "No decision-makers found", description: `Seamless returned no contacts for ${company.name}` });
+      }
+    } catch (err: any) {
+      toast({ title: "Lookup failed", description: err.message, variant: "destructive" });
+    } finally {
+      setFindingCompanyIds((s) => { const n = new Set(s); n.delete(company.id); return n; });
     }
   };
 
@@ -1129,8 +977,8 @@ export default function ProspectFinder() {
     try {
       await apiRequest("POST", "/api/crm/prospects/save-individual", {
         contact: { ...contact, website: parentCompany?.website || null },
-        category: searchMode === "url" ? (urlTag.trim() || "Custom") : searchMode === "similar" ? (similarTag.trim() || "Similar Companies") : category,
-        location: searchMode === "url" || searchMode === "similar" ? "Global" : getLocation(),
+        category: parentCompany?.searchCategory || "Seamless Search",
+        location: parentCompany?.searchLocation || "Global",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects"] });
       toast({ title: `${contact.fullName} saved to prospect list` });
@@ -1218,8 +1066,8 @@ export default function ProspectFinder() {
       const parentCompany = companies.find((c) => c.id === contact.companyId);
       const res = await apiRequest("POST", "/api/crm/prospects/save-individual", {
         contact: { ...contact, website: parentCompany?.website || null },
-        category: searchMode === "url" ? (urlTag.trim() || "Custom") : searchMode === "similar" ? (similarTag.trim() || "Similar Companies") : category,
-        location: searchMode === "url" || searchMode === "similar" ? "Global" : getLocation(),
+        category: parentCompany?.searchCategory || "Seamless Search",
+        location: parentCompany?.searchLocation || "Global",
       });
       const saved = await res.json();
       queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects"] });
@@ -1244,8 +1092,8 @@ export default function ProspectFinder() {
       const parentCompany = companies.find((c) => c.id === contact.companyId);
       const res = await apiRequest("POST", "/api/crm/prospects/save-individual", {
         contact: { ...contact, website: parentCompany?.website || null },
-        category: searchMode === "url" ? (urlTag.trim() || "Custom") : searchMode === "similar" ? (similarTag.trim() || "Similar Companies") : category,
-        location: searchMode === "url" || searchMode === "similar" ? "Global" : getLocation(),
+        category: parentCompany?.searchCategory || "Seamless Search",
+        location: parentCompany?.searchLocation || "Global",
       });
       const saved = await res.json();
       setListPickerProspectId(saved.id);
@@ -1386,6 +1234,7 @@ export default function ProspectFinder() {
 
   const allContacts = companies.flatMap((c) => c.contacts);
   const hotWarmCount = allContacts.filter((c) => c.scoreBreakdown.tier === "hot" || c.scoreBreakdown.tier === "warm").length;
+  const selectedRevealableCount = allContacts.filter((c) => selected.has(c.id) && c.searchResultId && !c.revealed).length;
 
   // Derive unique category/location values from search results for filter dropdowns
   const uniqueCategories = Array.from(new Set(companies.map((c) => c.searchCategory).filter(Boolean))).sort();
@@ -1485,29 +1334,18 @@ export default function ProspectFinder() {
     downloadCsv(rows, `search_results_${dateStr}.csv`);
   };
 
-  const activeApis = enrichmentStatus ? Object.values(enrichmentStatus).filter(Boolean).length : 0;
-  const totalApis = 6; // seamless, hunter, zerobounce, proxycurl, whitepages, pdl
+  const seamlessConnected = !!enrichmentStatus?.seamless;
 
   return (
     <div className="space-y-4 p-1">
-      {/* API Status Banner */}
-      {enrichmentStatus && activeApis < totalApis && (
+      {/* Seamless.AI connection banner */}
+      {enrichmentStatus && !seamlessConnected && (
         <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm">
           <Info className="size-4 text-amber-600 shrink-0 mt-0.5" />
           <div>
-            <p className="font-medium text-amber-800">
-              {activeApis === 0 ? "Enrichment running on website scraping only" : `${activeApis} of ${totalApis} enrichment sources active`}
-            </p>
+            <p className="font-medium text-amber-800">Seamless.AI is not connected</p>
             <p className="text-xs text-amber-700 mt-0.5">
-              Active: Website Scraping
-              {enrichmentStatus.pdl && " · People Data Labs (emails + international)"}
-              {enrichmentStatus.seamless && " · Seamless.AI (emails + LinkedIn)"}
-              {enrichmentStatus.hunter && " · Hunter.io (email patterns)"}
-              {enrichmentStatus.proxycurl && " · Proxycurl (LinkedIn employees)"}
-              {enrichmentStatus.zerobounce && " · ZeroBounce (email verification)"}
-              {enrichmentStatus.whitepages && " · Whitepages (US addresses + phones)"}
-              {!enrichmentStatus.seamless && !enrichmentStatus.pdl && " — Add Seamless.AI or People Data Labs for broader coverage"}
-              {enrichmentStatus.seamless && !enrichmentStatus.zerobounce && " — Add ZeroBounce key to verify emails before outreach"}
+              Lead Research is powered entirely by Seamless.AI. Add your <code className="font-mono">SEAMLESS_API_KEY</code> in Railway → Variables to enable contact &amp; company search.
             </p>
           </div>
         </div>
@@ -1528,312 +1366,18 @@ export default function ProspectFinder() {
       {/* ── Search Tab ── */}
       {viewTab === "search" && (
         <div className="space-y-4">
-          {/* Search controls */}
-          <Card className="p-4 space-y-3">
-            {/* Mode switcher */}
-            <div className="inline-flex rounded-md border border-input bg-muted p-0.5 gap-0.5 flex-wrap">
-              {(["category", "url", "similar", "seed"] as const).map((mode) => (
-                <button
-                  key={mode}
-                  onClick={() => {
-                    setSearchMode(mode);
-                    setHasSearched(false);
-                    setCompanies([]);
-                    setSimilarQueries([]);
-                    if (mode === "seed") { setSeedResult(null); setSeedError(null); }
-                  }}
-                  className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
-                    searchMode === mode
-                      ? "bg-background shadow-sm text-foreground"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {mode === "category" ? "By Category & Location"
-                    : mode === "url" ? "By Company URL"
-                    : mode === "similar" ? "Find Similar Companies"
-                    : "🎯 Seed a Contact"}
-                </button>
-              ))}
-            </div>
-
-            {searchMode === "category" ? (
-              <>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div>
-                    <label className="text-xs font-semibold text-muted-foreground mb-1 block">Category</label>
-                    <div className="relative">
-                      <select value={category} onChange={(e) => setCategory(e.target.value)}
-                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm appearance-none pr-8">
-                        <option value="">Select category…</option>
-                        {categories.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-                      </select>
-                      <ChevronDown className="pointer-events-none absolute right-2 top-2.5 size-4 text-muted-foreground" />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-muted-foreground mb-1 block">Location type</label>
-                    <div className="relative">
-                      <select value={locationType} onChange={(e) => setLocationType(e.target.value as "us_state" | "country")}
-                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm appearance-none pr-8">
-                        <option value="us_state">US State</option>
-                        <option value="country">Country</option>
-                      </select>
-                      <ChevronDown className="pointer-events-none absolute right-2 top-2.5 size-4 text-muted-foreground" />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-muted-foreground mb-1 block">
-                      {locationType === "us_state" ? "State" : "Country"}
-                    </label>
-                    <div className="relative">
-                      <select
-                        value={locationType === "us_state" ? selectedState : selectedCountry}
-                        onChange={(e) => locationType === "us_state" ? setSelectedState(e.target.value) : setSelectedCountry(e.target.value)}
-                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm appearance-none pr-8">
-                        <option value="">Select…</option>
-                        {(locationType === "us_state" ? US_STATES : COUNTRIES).map((s) => <option key={s} value={s}>{s}</option>)}
-                      </select>
-                      <ChevronDown className="pointer-events-none absolute right-2 top-2.5 size-4 text-muted-foreground" />
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <Button onClick={() => searchMutation.mutate()} disabled={isSearchPending || !category || !getLocation()} className="gap-2">
-                    {searchMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
-                    {searchMutation.isPending ? "Searching…" : "Find Decision Makers"}
-                  </Button>
-                  {searchMutation.isPending && categoryStage > 0 && (
-                    <StageProgressBar stages={CATEGORY_STAGES} currentStage={categoryStage} footer="Usually completes in 30–45 seconds." />
-                  )}
-                </div>
-              </>
-            ) : searchMode === "url" ? (
-              <>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">
-                    Enter any company website directly — the system will scrape their team page, search Seamless.AI, and surface individual decision-makers with contact info.
-                  </p>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="sm:col-span-2">
-                    <label className="text-xs font-semibold text-muted-foreground mb-1 block">Company Website URL <span className="text-red-500">*</span></label>
-                    <Input
-                      value={urlInput}
-                      onChange={(e) => setUrlInput(e.target.value)}
-                      placeholder="https://visafranchise.com"
-                      className="h-9 text-sm"
-                      onKeyDown={(e) => { if (e.key === "Enter" && urlInput.trim()) urlSearchMutation.mutate(); }}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-muted-foreground mb-1 block">Tag / Category <span className="text-muted-foreground font-normal">(optional)</span></label>
-                    <Input
-                      value={urlTag}
-                      onChange={(e) => setUrlTag(e.target.value)}
-                      placeholder="e.g. Franchise Consultants"
-                      className="h-9 text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-muted-foreground mb-1 block">Company Name <span className="text-muted-foreground font-normal">(optional)</span></label>
-                    <Input
-                      value={urlName}
-                      onChange={(e) => setUrlName(e.target.value)}
-                      placeholder="e.g. Visa Franchise"
-                      className="h-9 text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-muted-foreground mb-1 block">
-                      Looking for a specific person?{" "}
-                      <span className="text-muted-foreground font-normal">(optional — uses deep targeted search)</span>
-                    </label>
-                    <Input
-                      data-testid="url-person-name"
-                      value={urlPersonName}
-                      onChange={(e) => setUrlPersonName(e.target.value)}
-                      placeholder="e.g. Chris Pohlot"
-                      className="h-9 text-sm"
-                      onKeyDown={(e) => { if (e.key === "Enter" && urlInput.trim()) urlSearchMutation.mutate(); }}
-                    />
-                    {urlPersonName.trim() && urlPersonName.trim().split(/\s+/).length < 2 && (
-                      <p className="text-[11px] text-amber-600 mt-1">Enter both first and last name for best results</p>
-                    )}
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <Button onClick={() => urlSearchMutation.mutate()} disabled={isSearchPending || !urlInput.trim()} className="gap-2">
-                    {urlSearchMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
-                    {urlSearchMutation.isPending
-                      ? (urlPersonName.trim() ? "Enriching company + targeting person…" : "Enriching…")
-                      : (urlPersonName.trim() ? "Find Company + Person" : "Enrich This Company")}
-                  </Button>
-                  {urlSearchMutation.isPending && urlStage > 0 && (
-                    <StageProgressBar stages={URL_STAGES} currentStage={urlStage} footer="Usually completes in 20–45 seconds." />
-                  )}
-                </div>
-              </>
-            ) : searchMode === "similar" ? (
-              /* ── Similar Companies mode ── */
-              <>
-                <div>
-                  <p className="text-xs text-muted-foreground">
-                    Enter any company whose business model you want to replicate in your prospecting. The system reads their website, generates targeted search queries, finds similar companies, and enriches them for decision-makers — automatically.
-                  </p>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="sm:col-span-2">
-                    <label className="text-xs font-semibold text-muted-foreground mb-1 block">Reference Company URL <span className="text-red-500">*</span></label>
-                    <Input
-                      value={similarUrl}
-                      onChange={(e) => setSimilarUrl(e.target.value)}
-                      placeholder="https://visafranchise.com"
-                      className="h-9 text-sm"
-                      onKeyDown={(e) => { if (e.key === "Enter" && similarUrl.trim()) similarSearchMutation.mutate(); }}
-                    />
-                    <p className="text-[11px] text-muted-foreground mt-1">The system will read this site to understand what they do, then discover similar companies.</p>
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-muted-foreground mb-1 block">Tag / Category <span className="text-muted-foreground font-normal">(optional)</span></label>
-                    <Input
-                      value={similarTag}
-                      onChange={(e) => setSimilarTag(e.target.value)}
-                      placeholder="e.g. Franchise Consultants"
-                      className="h-9 text-sm"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <Button onClick={() => similarSearchMutation.mutate()} disabled={isSearchPending || !similarUrl.trim()} className="gap-2">
-                    {similarSearchMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
-                    {similarSearchMutation.isPending ? "Searching…" : "Find Similar Companies"}
-                  </Button>
-
-                  {similarSearchMutation.isPending && similarStage > 0 && (
-                    <StageProgressBar stages={SIMILAR_STAGES} currentStage={similarStage} footer="This typically takes 60–85 seconds. You can continue browsing other tabs." />
-                  )}
-                </div>
-                {similarQueries.length > 0 && (
-                  <div className="pt-1">
-                    <p className="text-[11px] text-muted-foreground font-semibold uppercase tracking-wide mb-1">Search queries used</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {similarQueries.map((q, i) => (
-                        <span key={i} className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs text-muted-foreground border">{q}</span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : (
-              /* ── Seed Contact mode ── */
-              <>
-                <div>
-                  <p className="text-xs text-muted-foreground">
-                    Already know who you're looking for? Type their name and company — the system will search Seamless.AI, Hunter, Whitepages, and LinkedIn specifically for that one person and return everything it finds.
-                  </p>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className="text-xs font-semibold text-muted-foreground mb-1 block">First Name <span className="text-red-500">*</span></label>
-                    <Input
-                      data-testid="seed-first-name"
-                      value={seedFirstName}
-                      onChange={(e) => setSeedFirstName(e.target.value)}
-                      placeholder="Chris"
-                      className="h-9 text-sm"
-                      onKeyDown={(e) => { if (e.key === "Enter") handleSeedContact(); }}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-muted-foreground mb-1 block">Last Name <span className="text-red-500">*</span></label>
-                    <Input
-                      data-testid="seed-last-name"
-                      value={seedLastName}
-                      onChange={(e) => setSeedLastName(e.target.value)}
-                      placeholder="Pohlot"
-                      className="h-9 text-sm"
-                      onKeyDown={(e) => { if (e.key === "Enter") handleSeedContact(); }}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-muted-foreground mb-1 block">Company Name <span className="text-red-500">*</span></label>
-                    <Input
-                      data-testid="seed-company"
-                      value={seedCompany}
-                      onChange={(e) => setSeedCompany(e.target.value)}
-                      placeholder="AltBanc"
-                      className="h-9 text-sm"
-                      onKeyDown={(e) => { if (e.key === "Enter") handleSeedContact(); }}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-muted-foreground mb-1 block">Company Website <span className="text-muted-foreground font-normal">(optional — helps Hunter find the email)</span></label>
-                    <Input
-                      data-testid="seed-website"
-                      value={seedWebsite}
-                      onChange={(e) => setSeedWebsite(e.target.value)}
-                      placeholder="https://altbanc.us"
-                      className="h-9 text-sm"
-                      onKeyDown={(e) => { if (e.key === "Enter") handleSeedContact(); }}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <Button
-                    data-testid="btn-seed-contact"
-                    onClick={handleSeedContact}
-                    disabled={seedLoading || !seedFirstName.trim() || !seedLastName.trim() || !seedCompany.trim()}
-                    className="gap-2"
-                  >
-                    {seedLoading ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
-                    {seedLoading ? "Searching all sources…" : "Find This Person"}
-                  </Button>
-                  {seedLoading && (
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Loader2 className="size-3.5 animate-spin" />
-                      Checking Seamless.AI · Hunter · SerpAPI · Whitepages — usually 15–30 seconds
-                    </div>
-                  )}
-                </div>
-                {/* Seed result */}
-                {seedError && (
-                  <div className="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                    <AlertCircle className="size-4 shrink-0" />
-                    {seedError}
-                  </div>
-                )}
-                {seedResult && !seedError && (
-                  <div className="space-y-2 pt-1">
-                    <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wide">Result</p>
-                    <ContactCard
-                      contact={seedResult}
-                      isSelected={false}
-                      onToggle={() => {}}
-                      onSave={async () => {
-                        try {
-                          await apiRequest("POST", "/api/crm/prospects/save-individual", {
-                            contact: seedResult,
-                            category: "Seeded Contact",
-                            location: "Manual",
-                          });
-                          queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects"] });
-                          toast({ title: "Saved to prospect list" });
-                        } catch {
-                          toast({ title: "Failed to save", variant: "destructive" });
-                        }
-                      }}
-                      onAddToList={() => {
-                        setListPickerContact(seedResult);
-                        setListPickerProspectId(null);
-                      }}
-                      isSaving={false}
-                      isAddedToCrm={false}
-                    />
-                  </div>
-                )}
-              </>
-            )}
-          </Card>
+          {/* Seamless.AI search */}
+          <SeamlessSearchPanel
+            searchTab={searchTab}
+            setSearchTab={(t) => { setSearchTab(t); setHasSearched(false); setCompanies([]); }}
+            filters={filters}
+            setFilters={setFilters}
+            aiQuery={aiQuery}
+            setAiQuery={setAiQuery}
+            onSearch={() => searchMutation.mutate()}
+            onAiSearch={() => aiSearchMutation.mutate()}
+            isSearching={isSearchPending}
+          />
 
           {/* Results */}
           {hasSearched && (
@@ -1887,6 +1431,18 @@ export default function ProspectFinder() {
                       {showAll ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
                       {showAll ? "Hot/Warm only" : "Show all"}
                     </Button>
+                    {selectedRevealableCount > 0 && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1 h-7 text-xs border-primary/40 text-primary"
+                        onClick={() => revealContacts(Array.from(selected))}
+                        data-testid="bulk-reveal-btn"
+                        title="Reveal email & phone for selected contacts (uses ~1 Seamless credit each)"
+                      >
+                        <Sparkles className="size-3.5" /> Reveal {selectedRevealableCount}
+                      </Button>
+                    )}
                     {selected.size > 0 && (
                       <Button
                         size="sm"
@@ -2043,6 +1599,10 @@ export default function ProspectFinder() {
                       savingIds={savingIds}
                       addedToCrmIds={addedToCrmIds}
                       onClickEnrichedBadge={() => setFilterEnrichedOnly(true)}
+                      onRevealContact={(c) => revealContacts([c.id])}
+                      revealingIds={revealingIds}
+                      onFindPeople={searchTab === "companies" ? () => findPeopleForCompany(company) : undefined}
+                      isFindingPeople={findingCompanyIds.has(company.id)}
                     />
                   ))}
                 </div>
@@ -2050,13 +1610,14 @@ export default function ProspectFinder() {
             </div>
           )}
 
-          {!hasSearched && !searchMutation.isPending && (
+          {!hasSearched && !isSearchPending && (
             <Card className="p-10 text-center">
               <Search className="size-10 text-muted-foreground/40 mx-auto mb-3" />
-              <p className="font-medium">Find individual decision-makers</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                Select a category and location, then click "Find Decision Makers". The system will search companies,
-                scrape their team pages, and score each contact by seniority, reachability, and E-2 relevance.
+              <p className="font-medium">Find decision-makers with Seamless.AI</p>
+              <p className="text-sm text-muted-foreground mt-1 max-w-xl mx-auto">
+                Type who you're looking for in the AI Search box (e.g. “Finance CEOs in Texas with more than 500 employees”),
+                or set filters above and hit Search. Results are free — reveal email &amp; phone on demand (~1 credit each),
+                then add the best leads straight to your CRM.
               </p>
             </Card>
           )}

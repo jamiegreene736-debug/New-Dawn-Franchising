@@ -27,6 +27,26 @@ const STATEMENTS: string[] = [
   `ALTER TABLE blog_posts ADD COLUMN IF NOT EXISTS generated_by_ai text DEFAULT 'true'`,
   `ALTER TABLE blog_posts ADD COLUMN IF NOT EXISTS published_at timestamp NOT NULL DEFAULT now()`,
   `ALTER TABLE blog_posts ADD COLUMN IF NOT EXISTS created_at timestamp NOT NULL DEFAULT now()`,
+  // `brokers` backs the admin/broker login. A missing table or column makes
+  // getBrokerByEmail() throw, which surfaces as a 500 "Login failed".
+  `CREATE TABLE IF NOT EXISTS brokers (
+    id                  varchar    PRIMARY KEY DEFAULT gen_random_uuid(),
+    full_name           text       NOT NULL,
+    email               text       NOT NULL UNIQUE,
+    phone               text,
+    company             text,
+    password_hash       text       NOT NULL,
+    agreement_signed    boolean    NOT NULL DEFAULT false,
+    agreement_signed_at timestamp,
+    agreement_pdf       text,
+    created_at          timestamp  NOT NULL DEFAULT now()
+  )`,
+  `ALTER TABLE brokers ADD COLUMN IF NOT EXISTS phone text`,
+  `ALTER TABLE brokers ADD COLUMN IF NOT EXISTS company text`,
+  `ALTER TABLE brokers ADD COLUMN IF NOT EXISTS agreement_signed boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE brokers ADD COLUMN IF NOT EXISTS agreement_signed_at timestamp`,
+  `ALTER TABLE brokers ADD COLUMN IF NOT EXISTS agreement_pdf text`,
+  `ALTER TABLE brokers ADD COLUMN IF NOT EXISTS created_at timestamp NOT NULL DEFAULT now()`,
 ];
 
 export async function ensureSchema(): Promise<void> {
@@ -40,11 +60,13 @@ export async function ensureSchema(): Promise<void> {
     }
   }
 
-  // Verify the table is queryable so the boot logs give a definitive answer.
-  try {
-    const r = await pool.query(`SELECT count(*)::int AS n FROM blog_posts`);
-    console.log(`[ensure-schema] blog_posts is ready (${r.rows[0].n} rows)`);
-  } catch (err: any) {
-    console.error(`[ensure-schema] blog_posts is NOT ready: ${err?.message}`);
+  // Verify the tables are queryable so the boot logs give a definitive answer.
+  for (const table of ["blog_posts", "brokers"]) {
+    try {
+      const r = await pool.query(`SELECT count(*)::int AS n FROM ${table}`);
+      console.log(`[ensure-schema] ${table} is ready (${r.rows[0].n} rows)`);
+    } catch (err: any) {
+      console.error(`[ensure-schema] ${table} is NOT ready: ${err?.message}`);
+    }
   }
 }

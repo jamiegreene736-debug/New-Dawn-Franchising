@@ -37,7 +37,11 @@ app.use(express.urlencoded({ extended: false }));
 const PgSession = connectPgSimple(session);
 app.use(
   session({
-    store: new PgSession({ pool, createTableIfMissing: true }),
+    // The `session` table is provisioned by ensureSchema() via raw SQL on boot.
+    // Do NOT use connect-pg-simple's `createTableIfMissing`: it reads a bundled
+    // `table.sql` asset at runtime, which esbuild does not emit into dist/, so it
+    // throws ENOENT and breaks every session read/write. See server/ensure-schema.ts.
+    store: new PgSession({ pool }),
     secret: process.env.SESSION_SECRET || "nhf-session-secret-2026",
     resave: false,
     saveUninitialized: false,

@@ -949,6 +949,7 @@ export async function registerRoutes(
       req.session.brokerId = broker.id;
       res.json({ id: broker.id, fullName: broker.fullName, email: broker.email, agreementSigned: broker.agreementSigned });
     } catch (err) {
+      console.error("[brokers/login] failed:", err);
       res.status(500).json({ message: "Login failed" });
     }
   });
@@ -1095,6 +1096,7 @@ export async function registerRoutes(
       req.session.brokerId = broker.id;
       return res.json({ role: "broker", id: broker.id, fullName: broker.fullName, email: broker.email, agreementSigned: broker.agreementSigned });
     } catch (err) {
+      console.error("[auth/login] failed:", err);
       res.status(500).json({ message: "Login failed" });
     }
   });

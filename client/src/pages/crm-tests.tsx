@@ -43,7 +43,7 @@ export default function CrmTestsPage() {
   const groups = [
     { label: "Database Tests", prefix: ["contacts table", "contact_activities", "contact_tasks", "pipeline_deals", "saved_segments"] },
     { label: "Lead Scoring Tests", prefix: ["UAE attorney", "Bounced contact", "Score is capped", "Score recalculates"] },
-    { label: "Apollo Tests", prefix: ["Apollo status", "Apollo API key"] },
+    { label: "Seamless Tests", prefix: ["Seamless status", "Seamless API key"] },
     { label: "Contact CRUD Tests", prefix: ["POST /api/contacts", "GET contact", "PATCH contact", "Soft delete", "Bulk tag"] },
     { label: "Pipeline Tests", prefix: ["Pipeline deals"] },
     { label: "Segment Tests", prefix: ["Empty segment"] },

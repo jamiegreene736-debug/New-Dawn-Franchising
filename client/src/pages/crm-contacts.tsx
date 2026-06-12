@@ -176,7 +176,7 @@ function AddContactModal({ onClose, onSaved }: { onClose: () => void; onSaved: (
               <label className="text-sm font-medium">Source</label>
               <select data-testid="select-contact-source" value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })}
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm">
-                {["Manual", "Apollo", "Apify/Google", "Apify/LinkedIn"].map((s) => <option key={s} value={s}>{s}</option>)}
+                {["Manual", "Seamless", "Apify/Google", "Apify/LinkedIn"].map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
             <div>
@@ -435,7 +435,7 @@ export default function CrmContactsPage() {
             <div>
               <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1 block">Source</label>
               <div className="space-y-1">
-                {["Apollo", "Manual", "Apify/Google", "Apify/LinkedIn"].map((s) => (
+                {["Seamless", "Manual", "Apify/Google", "Apify/LinkedIn"].map((s) => (
                   <label key={s} className="flex items-center gap-2 text-sm cursor-pointer">
                     <input type="checkbox" checked={filters.source.includes(s)}
                       onChange={(e) => {

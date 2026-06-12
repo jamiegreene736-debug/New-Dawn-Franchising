@@ -45,21 +45,26 @@ async function checkOpenAI(): Promise<ApiHealthResult> {
   }
 }
 
-async function checkApollo(): Promise<ApiHealthResult> {
-  const key = process.env.APOLLO_API_KEY;
+async function checkSeamless(): Promise<ApiHealthResult> {
+  const key = process.env.SEAMLESS_API_KEY;
   const start = Date.now();
-  if (!key) return result("apollo", "Apollo.io", "unconfigured", "API key not set", undefined, "data");
+  if (!key) return result("seamless", "Seamless.AI", "unconfigured", "API key not set", undefined, "data");
   try {
-    const res = await fetch("https://api.apollo.io/api/v1/auth/health", {
-      headers: { "Content-Type": "application/json", "x-api-key": key },
+    // A cheap search validates the key without consuming research credits.
+    const res = await fetch("https://api.seamless.ai/api/client/v1/search/contacts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Token: key },
+      body: JSON.stringify({ limit: 1, companyName: ["Seamless.AI"] }),
       signal: AbortSignal.timeout(8000),
     });
-    if (!res.ok) return result("apollo", "Apollo.io", "error", `HTTP ${res.status}`, Date.now() - start, "data");
-    const body = await res.json() as any;
-    const isOk = body?.is_logged_in === true || res.ok;
-    return result("apollo", "Apollo.io", isOk ? "ok" : "error", isOk ? "Authenticated" : "Auth failed", Date.now() - start, "data");
+    if (res.status === 401 || res.status === 403) {
+      return result("seamless", "Seamless.AI", "error", "Auth failed", Date.now() - start, "data");
+    }
+    if (!res.ok) return result("seamless", "Seamless.AI", "error", `HTTP ${res.status}`, Date.now() - start, "data");
+    const credits = res.headers.get("X-PublicAPI-Credits");
+    return result("seamless", "Seamless.AI", "ok", credits ? `Authenticated · ${credits} credits` : "Authenticated", Date.now() - start, "data");
   } catch (e: any) {
-    return result("apollo", "Apollo.io", "error", e.message, Date.now() - start, "data");
+    return result("seamless", "Seamless.AI", "error", e.message, Date.now() - start, "data");
   }
 }
 
@@ -252,7 +257,7 @@ function result(
 export async function runAllHealthChecks(): Promise<ApiHealthResult[]> {
   const results = await Promise.allSettled([
     checkOpenAI(),
-    checkApollo(),
+    checkSeamless(),
     checkHunter(),
     checkApify(),
     checkCalendly(),

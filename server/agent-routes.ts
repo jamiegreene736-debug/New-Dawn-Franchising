@@ -13,7 +13,7 @@ import { sendWhatsAppMessage as sendWhatsApp } from "./meta-whatsapp-service";
 import { eq, desc, and, sql, or, ilike, inArray } from "drizzle-orm";
 import {
   getAgentStats, runDailyPreparation, runDailyBrief, portalApprove, portalHold,
-  discoverLeadsFromApollo, enrichAndScoreNewLeads, executeBatch, importLeadManually,
+  discoverLeadsFromSeamless, enrichAndScoreNewLeads, executeBatch, importLeadManually,
   addToDnc,
 } from "./agent-service";
 import { getUpcomingBookings, getRecentBookings, getCalendlyStats, isCalendlyConfigured } from "./calendly-service";
@@ -71,7 +71,7 @@ router.post("/run/brief", async (_req, res) => {
 router.post("/run/discover", async (req, res) => {
   const { max = 20 } = req.body;
   res.json({ ok: true, message: "Discovery started" });
-  discoverLeadsFromApollo(max).catch(e => console.error("[Agent] Manual discover error:", e));
+  discoverLeadsFromSeamless(max).catch(e => console.error("[Agent] Manual discover error:", e));
 });
 
 router.post("/run/score", async (_req, res) => {
@@ -347,7 +347,7 @@ router.get("/calendly/recent", async (_req, res) => {
 router.get("/integrations", async (_req, res) => {
   res.json({
     openai: !!(process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY),
-    apollo: !!process.env.APOLLO_API_KEY,
+    seamless: !!process.env.SEAMLESS_API_KEY,
     hunter: !!process.env.HUNTER_API_KEY,
     apify: await isApifyConfigured(),
     calendly: isCalendlyConfigured(),
@@ -425,7 +425,7 @@ AVAILABLE TOOLS
 TOOL: find_new_leads
 Finds and saves real people to the leads system using the FULL multi-source enrichment pipeline.
 
-BROKER persona: Runs the complete enrichment pipeline — Google Maps + web search finds real law firms/consulting firms, then Apollo enriches with staff contacts + emails + seniority, Hunter fills missing emails via domain patterns, ZeroBounce verifies emails, Twilio validates phone types, decision-maker scoring ranks contacts by title/reachability/E-2 relevance. Results include verified emails, phone numbers, and quality scores.
+BROKER persona: Runs the complete enrichment pipeline — Google Maps + web search finds real law firms/consulting firms, then Seamless.AI enriches with staff contacts + emails + seniority, Hunter fills missing emails via domain patterns, ZeroBounce verifies emails, Twilio validates phone types, decision-maker scoring ranks contacts by title/reachability/E-2 relevance. Results include verified emails, phone numbers, and quality scores.
 
 INVESTOR persona: Searches LinkedIn profiles of business owners/CEOs/founders from E-2 treaty countries.
 
@@ -438,7 +438,7 @@ Args:
 Example: {"tool":"find_new_leads","args":{"count":50,"persona":"broker","locations":["Florida"],"add_to_list":"brokers"}}
 
 TOOL: find_people_at_company
-Finds ALL people who work at a specific company website using the full enrichment pipeline (Apollo by domain → website team page scraping → Hunter email discovery → ZeroBounce verification → decision-maker scoring). Use this when the user provides a specific company URL like "find everyone at visafranchise.com" or "who works at smithimmigration.com".
+Finds ALL people who work at a specific company website using the full enrichment pipeline (Seamless.AI by domain → website team page scraping → Hunter email discovery → ZeroBounce verification → decision-maker scoring). Use this when the user provides a specific company URL like "find everyone at visafranchise.com" or "who works at smithimmigration.com".
 
 Args:
   url          (string, required) — the company website URL e.g. "visafranchise.com" or "https://smithimmigration.com"
@@ -623,7 +623,7 @@ async function execFindNewLeads(args: {
 
     const skipNote = skipped > 0 ? ` (${skipped} duplicates skipped)` : "";
     const listSummary = listId ? ` and added to the **"${args.add_to_list}"** list` : "";
-    const sourceNote = `\n\n_Source pipeline: Google Maps + Web search → Apollo → Hunter → ZeroBounce email verification → Twilio phone lookup → decision-maker scoring_`;
+    const sourceNote = `\n\n_Source pipeline: Google Maps + Web search → Seamless.AI → Hunter → ZeroBounce email verification → Twilio phone lookup → decision-maker scoring_`;
     let reply = `Found and saved **${saved.length}** enriched ${args.persona}(s) from ${locsToSearch.join(", ")}${listSummary}${skipNote}:\n\n`;
     reply += saved.map((s, i) => `${i + 1}. ${s}`).join("\n");
     if (saved.length < target) {
@@ -993,8 +993,8 @@ async function execScheduleJob(args: {
 
 // ── Tool dispatcher ─────────────────────────────────────────────────────────
 const TOOL_LABELS: Record<string, string> = {
-  find_new_leads: "🔍 Running enrichment pipeline — Google Maps → Apollo → Hunter → ZeroBounce → scoring... (may take 20-40s)",
-  find_people_at_company: "🔍 Scraping company website → Apollo → Hunter → ZeroBounce → scoring... (may take 30-60s)",
+  find_new_leads: "🔍 Running enrichment pipeline — Google Maps → Seamless.AI → Hunter → ZeroBounce → scoring... (may take 20-40s)",
+  find_people_at_company: "🔍 Scraping company website → Seamless.AI → Hunter → ZeroBounce → scoring... (may take 30-60s)",
   add_to_prospect_list: "📋 Adding to prospect list...",
   get_agent_leads: "📊 Loading current leads...",
   get_pipeline_summary: "📈 Pulling CRM pipeline...",

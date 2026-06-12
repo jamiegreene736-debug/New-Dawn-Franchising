@@ -1,9 +1,9 @@
 // Proxycurl shut down July 2025.
-// LinkedIn employee discovery is now handled by Apollo's domain search (apolloSearchByDomain).
+// LinkedIn employee discovery is now handled by Seamless.AI's domain search (seamlessSearchByDomain).
 // This file is kept as a stub so any lingering imports don't break compilation.
 
 export function getProxycurlStatus() {
-  return { configured: false, provider: "Apollo (LinkedIn via domain)" };
+  return { configured: false, provider: "Seamless.AI (LinkedIn via domain)" };
 }
 
 export interface LinkedInEmployee {
@@ -25,12 +25,12 @@ export interface LinkedInProfile {
   location: string | null;
 }
 
-/** @deprecated — use apolloSearchByDomain from apollo-service.ts instead */
+/** @deprecated — use seamlessSearchByDomain from seamless-service.ts instead */
 export async function getCompanyEmployees(): Promise<LinkedInEmployee[]> {
   return [];
 }
 
-/** @deprecated — use apolloMatchPerson from apollo-service.ts instead */
+/** @deprecated — use seamlessMatchPerson from seamless-service.ts instead */
 export async function enrichLinkedInProfile(): Promise<LinkedInProfile | null> {
   return null;
 }

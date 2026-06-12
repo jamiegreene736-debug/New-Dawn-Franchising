@@ -288,7 +288,7 @@ function FilterPanel({ filters, onChange, onClose }: { filters: Filters; onChang
   const [local, setLocal] = useState<Filters>({ ...filters });
 
   const tiers = ["hot", "warm", "nurture", "watch", "cold"];
-  const sources = ["Zillow", "Facebook", "Craigslist", "Nextdoor", "Google Ads", "Referral", "Apollo", "Reddit"];
+  const sources = ["Zillow", "Facebook", "Craigslist", "Nextdoor", "Google Ads", "Referral", "Seamless", "Reddit"];
   const daysOptions = ["any", "0-7", "7-14", "14-30", "30+"];
 
   const toggle = (key: "tiers" | "stages" | "sources", val: string) => {

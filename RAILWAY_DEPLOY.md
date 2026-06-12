@@ -77,4 +77,5 @@ The app listens on `process.env.PORT` which Railway sets automatically.
 - All SMS goes through **Quo (OpenPhone)** — not Twilio
 - All WhatsApp goes through **Meta Cloud API** — not Twilio
 - The AI agents require `ANTHROPIC_API_KEY`
-- Prospect enrichment requires: `APOLLO_API_KEY`, `HUNTER_API_KEY`, `PROXYCURL_API_KEY`, `ZEROBOUNCE_API_KEY`, `SERPAPI_KEY`
+- Prospect enrichment requires: `SEAMLESS_API_KEY`, `HUNTER_API_KEY`, `PROXYCURL_API_KEY`, `ZEROBOUNCE_API_KEY`, `SERPAPI_KEY`
+  - `SEAMLESS_API_KEY` is the primary contact-search + enrichment provider (it replaced Apollo). Create it in the Seamless app under **Settings → Public API → Create New Connection**.

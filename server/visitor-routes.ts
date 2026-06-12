@@ -2,7 +2,7 @@ import { db } from "./db";
 import { visitorSessions, visitorPageViews, crmClients } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
 import { upsertSession, recordPageView, updateDuration, getVisitorSessions } from "./visitor-service";
-import { apolloSearchByCompanyName } from "./apollo-service";
+import { seamlessSearchByCompanyName } from "./seamless-service";
 
 // ─── Private pages to never track ────────────────────────────────────────────
 const SKIP_PATHS = ["/crm", "/login", "/seo", "/marketing", "/api"];
@@ -123,7 +123,7 @@ export function registerVisitorRoutes(app: any) {
     }
   });
 
-  // ── Admin: find people at visitor's company via Apollo ──────────────────────
+  // ── Admin: find people at visitor's company via Seamless ────────────────────
   app.post("/api/seo/visitors/:id/find-people", async (req: any, res: any) => {
     if (!req.session?.adminId) return res.status(401).json({ message: "Admin required" });
     try {
@@ -137,7 +137,7 @@ export function registerVisitorRoutes(app: any) {
       const companyName = visitor.identifiedCompany || visitor.org || visitor.isp;
       if (!companyName) return res.status(400).json({ message: "No company identified for this visitor" });
 
-      const results = await apolloSearchByCompanyName(companyName, null, 10);
+      const results = await seamlessSearchByCompanyName(companyName, null, 10);
       res.json({
         companyName,
         location: [visitor.city, visitor.region, visitor.country].filter(Boolean).join(", "),

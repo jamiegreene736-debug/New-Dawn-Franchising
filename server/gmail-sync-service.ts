@@ -15,7 +15,10 @@ import { storage } from "./storage";
 const FRANCHISING_EMAIL = "franchising@newdawnfranchising.com";
 
 function getAppPassword(): string | undefined {
-  return process.env.GMAIL_APP_PASSWORD_FRANCHISING;
+  // Strip whitespace (Gmail app passwords are 16 contiguous chars; pasted env
+  // values often carry a trailing newline/space that would break IMAP auth).
+  const clean = process.env.GMAIL_APP_PASSWORD_FRANCHISING?.replace(/\s+/g, "");
+  return clean || undefined;
 }
 
 export function getGmailSyncStatus() {

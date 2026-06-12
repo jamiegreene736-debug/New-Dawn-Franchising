@@ -2208,6 +2208,36 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
     }
   });
 
+  // Duplicate a campaign + all its steps (created paused so it never sends until activated).
+  app.post("/api/crm/campaigns/:id/duplicate", requireAdminAuth, async (req, res) => {
+    try {
+      const src = await storage.getDripCampaign(String(req.params.id));
+      if (!src) return res.status(404).json({ message: "Campaign not found" });
+      const steps = await storage.getDripSteps(src.id);
+      const copy = await storage.createDripCampaign({
+        name: `Copy of ${src.name}`,
+        description: src.description,
+        isActive: false,
+      });
+      for (const s of steps) {
+        await storage.createDripStep({
+          campaignId: copy.id,
+          stepOrder: s.stepOrder,
+          delayDays: s.delayDays,
+          stepType: s.stepType,
+          stepName: s.stepName,
+          priority: s.priority,
+          subject: s.subject,
+          bodyHtml: s.bodyHtml,
+        } as any);
+      }
+      const savedSteps = await storage.getDripSteps(copy.id);
+      res.status(201).json({ ...copy, steps: savedSteps });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to duplicate campaign" });
+    }
+  });
+
   // --- Campaign Steps ---
   app.post("/api/crm/campaigns/:id/steps", requireAdminAuth, async (req, res) => {
     try {

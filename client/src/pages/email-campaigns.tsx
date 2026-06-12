@@ -7,6 +7,7 @@ import {
   CheckSquare,
   ChevronDown,
   Clock,
+  Copy,
   Edit2,
   ExternalLink,
   Linkedin,
@@ -385,6 +386,20 @@ function EmailCampaignTab() {
     onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
+  const duplicateCampaignMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("POST", `/api/crm/campaigns/${id}/duplicate`);
+      return res.json();
+    },
+    onSuccess: (c: Campaign) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/campaigns"] });
+      setSelectedCampaign(c.id);
+      setBuilderView("overview");
+      toast({ title: "Campaign duplicated", description: "Created as a paused copy — edit its steps, then activate." });
+    },
+    onError: (err: Error) => toast({ title: "Duplicate failed", description: err.message, variant: "destructive" }),
+  });
+
   const pauseEnrollmentMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
       const res = await apiRequest("PATCH", `/api/crm/enrollments/${id}`, { status });
@@ -608,7 +623,21 @@ function EmailCampaignTab() {
                             {campaign.isActive ? "Active" : "Paused"}
                           </span>
                         </div>
-                        <ChevronDown className="size-4 -rotate-90 text-muted-foreground" />
+                        <div className="flex items-center gap-1">
+                          <Button
+                            data-testid={`button-duplicate-campaign-${campaign.id}`}
+                            size="sm"
+                            variant="ghost"
+                            className="gap-1 text-muted-foreground"
+                            title="Duplicate this campaign and its steps"
+                            disabled={duplicateCampaignMutation.isPending}
+                            onClick={(e) => { e.stopPropagation(); duplicateCampaignMutation.mutate(campaign.id); }}
+                          >
+                            {duplicateCampaignMutation.isPending ? <Loader2 className="size-3.5 animate-spin" /> : <Copy className="size-3.5" />}
+                            Duplicate
+                          </Button>
+                          <ChevronDown className="size-4 -rotate-90 text-muted-foreground" />
+                        </div>
                       </div>
                       {campaign.description && <p className="mt-1 text-xs text-muted-foreground">{campaign.description}</p>}
                     </Card>
@@ -633,6 +662,9 @@ function EmailCampaignTab() {
                 <div className="flex items-center gap-2">
                   <Button data-testid="button-process-drip" size="sm" variant="outline" className="gap-2" onClick={() => processMutation.mutate()} disabled={processMutation.isPending}>
                     {processMutation.isPending ? <><Loader2 className="size-4 animate-spin" /> Processing…</> : <><Send className="size-4" /> Send Due Now</>}
+                  </Button>
+                  <Button data-testid="button-duplicate-campaign" size="sm" variant="outline" className="gap-1" title="Duplicate this campaign and its steps" disabled={duplicateCampaignMutation.isPending} onClick={() => duplicateCampaignMutation.mutate(campaignDetail.id)}>
+                    {duplicateCampaignMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : <Copy className="size-4" />} Duplicate
                   </Button>
                   <Button data-testid="button-toggle-campaign" size="sm" variant="outline" className="gap-1" onClick={() => toggleCampaignMutation.mutate({ id: campaignDetail.id, isActive: !campaignDetail.isActive })}>
                     {campaignDetail.isActive ? <><Pause className="size-4" /> Pause Campaign</> : <><Play className="size-4" /> Activate</>}

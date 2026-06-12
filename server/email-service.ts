@@ -20,10 +20,14 @@ export const ALL_SENDER_PROFILES: SenderProfile[] = [
 // Resolve the actual password for a sender.
 // Dylan's account accepts either GMAIL_APP_PASSWORD_DYLAN or the base GMAIL_APP_PASSWORD.
 export function getSenderPassword(profile: SenderProfile): string | undefined {
-  if (profile.email === "dylan@newdawnfranchising.com") {
-    return process.env.GMAIL_APP_PASSWORD_DYLAN || process.env.GMAIL_APP_PASSWORD;
-  }
-  return process.env[profile.envVar];
+  const raw = profile.email === "dylan@newdawnfranchising.com"
+    ? (process.env.GMAIL_APP_PASSWORD_DYLAN || process.env.GMAIL_APP_PASSWORD)
+    : process.env[profile.envVar];
+  // Gmail app passwords are 16 contiguous chars. Strip any whitespace (the display
+  // format shows 4 spaced groups, and pasted env values often carry a trailing
+  // newline/space) so SMTP auth uses the exact credential Gmail expects.
+  const clean = raw?.replace(/\s+/g, "");
+  return clean || undefined;
 }
 
 export function getAvailableSenders(): SenderProfile[] {

@@ -37,7 +37,7 @@ app.use(express.urlencoded({ extended: false }));
 const PgSession = connectPgSimple(session);
 app.use(
   session({
-    store: new PgSession({ pool }),
+    store: new PgSession({ pool, createTableIfMissing: true }),
     secret: process.env.SESSION_SECRET || "nhf-session-secret-2026",
     resave: false,
     saveUninitialized: false,

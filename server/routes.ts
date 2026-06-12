@@ -12,6 +12,7 @@ import { generateBrochurePDF } from "./brochure";
 import { generateBrokerAgreementPDF } from "./broker-agreement-pdf";
 import { searchProspects, SEARCH_CATEGORIES } from "./prospect-search";
 import { scheduleDripProcessing, processDripEmails } from "./drip-processor";
+import { scheduleGmailSync, syncFranchisingInbox, getGmailSyncStatus, getGmailSyncLastResult } from "./gmail-sync-service";
 import { seedDefaultCampaign } from "./default-campaign";
 import { sendEmail, sendEmailFromSender, getTrackingPixelUrl, getAvailableSenders, CRM_EMAIL_TEMPLATES, cacheDylanCalendlyUrl } from "./email-service";
 import { generateFacebookPost } from "./facebook-generator";
@@ -2113,6 +2114,59 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
     }
   });
 
+  // Per-step + overview analytics for the Seamless-style builder.
+  app.get("/api/crm/campaigns/:id/stats", requireAdminAuth, async (req, res) => {
+    try {
+      const campaignId = String(req.params.id);
+      const [steps, enrollments, sends, replyAddrs] = await Promise.all([
+        storage.getDripSteps(campaignId),
+        storage.getDripEnrollments(campaignId),
+        storage.getDripSendsByCampaign(campaignId),
+        storage.getInboundReplyAddresses(),
+      ]);
+
+      const totalEnrollments = enrollments.length;
+      const replySet = new Set(replyAddrs);
+      const repliedCount = enrollments.filter(
+        (e) => e.prospectEmail && replySet.has(e.prospectEmail.toLowerCase())
+      ).length;
+
+      // Per-step breakdown keyed by stepId.
+      const perStep: Record<string, { sent: number; opened: number; bounced: number; tasks: number; notSent: number }> = {};
+      for (const step of steps) {
+        const rows = sends.filter((s) => s.stepId === step.id);
+        const sent = rows.filter((s) => s.status === "sent").length;
+        const opened = rows.filter((s) => s.status === "sent" && s.openedAt).length;
+        const bounced = rows.filter((s) => s.status === "failed").length;
+        const tasks = rows.filter((s) => s.status === "task").length;
+        const handled = sent + bounced + tasks;
+        perStep[step.id] = {
+          sent,
+          opened,
+          bounced,
+          tasks,
+          notSent: Math.max(0, totalEnrollments - handled),
+        };
+      }
+
+      const emailSends = sends.filter((s) => s.status === "sent" || s.status === "failed");
+      const overview = {
+        total: totalEnrollments,
+        active: enrollments.filter((e) => e.status === "active").length,
+        completed: enrollments.filter((e) => e.status === "completed").length,
+        paused: enrollments.filter((e) => e.status === "paused").length,
+        emails: sends.filter((s) => s.status === "sent").length,
+        opens: sends.filter((s) => s.status === "sent" && s.openedAt).length,
+        replies: repliedCount,
+        bounced: emailSends.filter((s) => s.status === "failed").length,
+      };
+
+      res.json({ overview, perStep });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to fetch campaign stats" });
+    }
+  });
+
   app.post("/api/crm/campaigns", requireAdminAuth, async (req, res) => {
     try {
       const { name, description, isActive, steps } = req.body;
@@ -2480,6 +2534,20 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
       res.json(numbers);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── Gmail inbox sync (franchising@) ────────────────────────────────────────
+  app.get("/api/crm/gmail-sync/status", requireAdminAuth, (_req, res) => {
+    res.json({ ...getGmailSyncStatus(), last: getGmailSyncLastResult() });
+  });
+
+  app.post("/api/crm/gmail-sync/run", requireAdminAuth, async (_req, res) => {
+    try {
+      const result = await syncFranchisingInbox();
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Gmail sync failed" });
     }
   });
 
@@ -3530,6 +3598,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
 
   scheduleWeeklyBlogGeneration();
   scheduleDripProcessing();
+  scheduleGmailSync();
   seedDefaultCampaign();
   scheduleDailyFacebookPosting();
   scheduleAgentCrons();

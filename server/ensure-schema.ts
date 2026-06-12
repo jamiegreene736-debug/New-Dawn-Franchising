@@ -92,6 +92,22 @@ const STATEMENTS: string[] = [
     created_at           timestamp  NOT NULL DEFAULT now(),
     updated_at           timestamp  NOT NULL DEFAULT now()
   )`,
+  // ─── Multi-channel sequence builder ──────────────────────────────────────
+  // drip_steps gains a channel/type, a display name, and a priority so the
+  // Seamless-style builder can render day-grouped email / SMS / call / LinkedIn steps.
+  `ALTER TABLE drip_steps ADD COLUMN IF NOT EXISTS step_type text NOT NULL DEFAULT 'email'`,
+  `ALTER TABLE drip_steps ADD COLUMN IF NOT EXISTS step_name text`,
+  `ALTER TABLE drip_steps ADD COLUMN IF NOT EXISTS priority text`,
+  // ─── Two-way Gmail (franchising@) sync ───────────────────────────────────
+  // crm_direct_emails stores inbound replies alongside outbound sends in one thread.
+  `ALTER TABLE crm_direct_emails ADD COLUMN IF NOT EXISTS direction text NOT NULL DEFAULT 'outbound'`,
+  `ALTER TABLE crm_direct_emails ADD COLUMN IF NOT EXISTS message_id text`,
+  // ─── Tasks from manual drip steps ────────────────────────────────────────
+  // Drip call/LinkedIn steps create tasks against a prospect (not an attorney contact),
+  // so contact_id must allow NULL and we add prospect_id + subtitle.
+  `ALTER TABLE contact_tasks ALTER COLUMN contact_id DROP NOT NULL`,
+  `ALTER TABLE contact_tasks ADD COLUMN IF NOT EXISTS prospect_id varchar`,
+  `ALTER TABLE contact_tasks ADD COLUMN IF NOT EXISTS subtitle text`,
 ];
 
 export async function ensureSchema(): Promise<void> {

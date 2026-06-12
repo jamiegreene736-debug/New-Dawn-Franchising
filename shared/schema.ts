@@ -183,6 +183,10 @@ export const crmDirectEmails = pgTable("crm_direct_emails", {
   openedAt: timestamp("opened_at"),
   openCount: integer("open_count").default(0).notNull(),
   trackingId: varchar("tracking_id", { length: 128 }).unique(),
+  // "outbound" (sent from the CRM) or "inbound" (synced from the franchising@ Gmail inbox).
+  direction: text("direction").notNull().default("outbound"),
+  // Gmail Message-ID header — used to dedupe inbound replies across poll cycles.
+  messageId: text("message_id"),
   sentAt: timestamp("sent_at").defaultNow().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -280,6 +284,15 @@ export const dripSteps = pgTable("drip_steps", {
   campaignId: varchar("campaign_id").notNull().references(() => dripCampaigns.id),
   stepOrder: integer("step_order").notNull(),
   delayDays: integer("delay_days").notNull(),
+  // Channel for this step. "email"/"manual_email" send mail; "sms" texts via Quo;
+  // "call"/"linkedin"/"linkedin_connect"/"linkedin_message"/"task" create to-dos.
+  stepType: text("step_type").notNull().default("email"),
+  // Display label shown in the sequence builder (e.g. "Automatic Email", "LinkedIn Connect Request").
+  stepName: text("step_name"),
+  // Optional priority surfaced in the editor: None | Low | Medium | High.
+  priority: text("priority"),
+  // `subject` is used for email/sms steps ("" for task steps); `bodyHtml` holds the
+  // content for every step type (email HTML, SMS text, or task instructions).
   subject: text("subject").notNull(),
   bodyHtml: text("body_html").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -449,7 +462,12 @@ export type InsertContactActivity = z.infer<typeof insertContactActivitySchema>;
 
 export const contactTasks = pgTable("contact_tasks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  contactId: varchar("contact_id").notNull().references(() => contacts.id),
+  // Nullable: tasks can belong to an attorney `contact` OR a `prospect` (drip-generated
+  // call/LinkedIn steps), or neither for ad-hoc to-dos.
+  contactId: varchar("contact_id").references(() => contacts.id),
+  prospectId: varchar("prospect_id").references(() => prospects.id),
+  // Secondary line shown under the title (e.g. the prospect/contact name a call is for).
+  subtitle: text("subtitle"),
   title: text("title").notNull(),
   dueDate: timestamp("due_date"),
   completed: boolean("completed").default(false).notNull(),

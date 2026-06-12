@@ -1,6 +1,7 @@
 import cron from "node-cron";
 import { storage } from "./storage";
 import { sendEmail, getTrackingPixelUrl } from "./email-service";
+import { sendSmsViaQuo } from "./quo-service";
 import {
   isOptimalEmailWindow,
   smartEmailDelay,
@@ -19,6 +20,16 @@ function getBaseUrl(): string {
     return `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`;
   }
   return `http://localhost:${process.env.PORT || 5000}`;
+}
+
+function defaultTaskTitle(stepType: string, firstName: string): string {
+  switch (stepType) {
+    case "call": return `Call ${firstName}`;
+    case "linkedin":
+    case "linkedin_connect": return `LinkedIn connect: ${firstName}`;
+    case "linkedin_message": return `LinkedIn message: ${firstName}`;
+    default: return `Follow up with ${firstName}`;
+  }
 }
 
 export async function processDripEmails() {
@@ -76,55 +87,109 @@ export async function processDripEmails() {
           continue;
         }
 
-        const send = await storage.createDripSend({
-          enrollmentId: enrollment.id,
-          stepId: step.id,
-          recipientEmail: enrollment.prospectEmail,
-          recipientName: enrollment.prospectName,
-          subject: step.subject,
-          status: "pending",
-        });
+        // Shared personalization — supports Seamless-style [Contact First Name]
+        // as well as the legacy {{name}} / {{email}} tokens.
+        const firstName = (enrollment.prospectName || "").trim().split(/\s+/)[0] || enrollment.prospectName || "there";
+        const personalize = (s: string | null | undefined): string =>
+          (s || "")
+            .replace(/\[Contact First Name\]/gi, firstName)
+            .replace(/\{\{\s*firstName\s*\}\}/gi, firstName)
+            .replace(/\{\{\s*name\s*\}\}/gi, enrollment.prospectName)
+            .replace(/\{\{\s*email\s*\}\}/gi, enrollment.prospectEmail);
 
-        const baseUrl = getBaseUrl();
-        const trackingUrl = getTrackingPixelUrl(baseUrl, send.id);
+        const stepType = (step.stepType || "email").toLowerCase();
 
-        const personalizedHtml = step.bodyHtml
-          .replace(/\{\{name\}\}/g, enrollment.prospectName)
-          .replace(/\{\{email\}\}/g, enrollment.prospectEmail);
+        if (stepType === "email" || stepType === "manual_email") {
+          const send = await storage.createDripSend({
+            enrollmentId: enrollment.id,
+            stepId: step.id,
+            recipientEmail: enrollment.prospectEmail,
+            recipientName: enrollment.prospectName,
+            subject: step.subject || step.stepName || "Email",
+            status: "pending",
+          });
 
-        const result = await sendEmail(
-          enrollment.prospectEmail,
-          step.subject.replace(/\{\{name\}\}/g, enrollment.prospectName),
-          personalizedHtml,
-          trackingUrl
-        );
+          const baseUrl = getBaseUrl();
+          const trackingUrl = getTrackingPixelUrl(baseUrl, send.id);
 
-        if (result.success) {
-          incrementDailyEmailCount();
-          sentThisRun++;
-          await storage.updateDripSend(send.id, {
-            status: "sent",
-            sentAt: new Date(),
-          } as any);
-          console.log(`[Drip] Sent step ${currentStepIndex + 1} to ${enrollment.prospectEmail} (daily total: ${getDailyEmailCount()})`);
+          const result = await sendEmail(
+            enrollment.prospectEmail,
+            personalize(step.subject),
+            personalize(step.bodyHtml),
+            trackingUrl
+          );
+
+          if (result.success) {
+            incrementDailyEmailCount();
+            sentThisRun++;
+            await storage.updateDripSend(send.id, { status: "sent", sentAt: new Date() } as any);
+            console.log(`[Drip] Sent email step ${currentStepIndex + 1} to ${enrollment.prospectEmail} (daily total: ${getDailyEmailCount()})`);
+          } else {
+            await storage.updateDripSend(send.id, { status: "failed", errorMessage: result.error } as any);
+            console.error(`[Drip] Failed to email ${enrollment.prospectEmail}: ${result.error}`);
+          }
+
+          // Organic jitter between emails — avoids burst-send spam signals
+          if (sentThisRun > 0 && !isEmailDailyCapReached()) {
+            const jitter = smartEmailDelay(sentThisRun);
+            console.log(`[Drip] Waiting ${Math.round(jitter / 1000)}s before next send...`);
+            await new Promise(r => setTimeout(r, jitter));
+          }
+        } else if (stepType === "sms") {
+          const prospect = await storage.getProspect(enrollment.prospectId);
+          const phone = prospect?.phone || "";
+          const send = await storage.createDripSend({
+            enrollmentId: enrollment.id,
+            stepId: step.id,
+            recipientEmail: phone || enrollment.prospectEmail,
+            recipientName: enrollment.prospectName,
+            subject: step.stepName || "Text message",
+            status: "pending",
+          });
+
+          if (!phone) {
+            await storage.updateDripSend(send.id, { status: "failed", errorMessage: "Prospect has no phone number" } as any);
+            console.error(`[Drip] SMS step skipped for ${enrollment.prospectName}: no phone`);
+          } else {
+            const result = await sendSmsViaQuo(phone, personalize(step.bodyHtml));
+            if (result.success) {
+              await storage.updateDripSend(send.id, { status: "sent", sentAt: new Date() } as any);
+              console.log(`[Drip] Sent SMS step ${currentStepIndex + 1} to ${phone}`);
+            } else {
+              await storage.updateDripSend(send.id, { status: "failed", errorMessage: result.error } as any);
+              console.error(`[Drip] Failed to text ${phone}: ${result.error}`);
+            }
+          }
         } else {
-          await storage.updateDripSend(send.id, {
-            status: "failed",
-            errorMessage: result.error,
-          } as any);
-          console.error(`[Drip] Failed to send to ${enrollment.prospectEmail}: ${result.error}`);
+          // call / linkedin / linkedin_connect / linkedin_message / task → manual to-do.
+          // Record the dedup marker (drip_sends row) FIRST so a task-creation hiccup
+          // can't make this step fire again on the next run; then create the task.
+          await storage.createDripSend({
+            enrollmentId: enrollment.id,
+            stepId: step.id,
+            recipientEmail: enrollment.prospectEmail,
+            recipientName: enrollment.prospectName,
+            subject: step.stepName || stepType,
+            status: "task",
+          });
+          const title = personalize(step.stepName) || defaultTaskTitle(stepType, firstName);
+          try {
+            await storage.createContactTask({
+              prospectId: enrollment.prospectId,
+              title,
+              subtitle: enrollment.prospectName,
+              dueDate: new Date(),
+            } as any);
+            console.log(`[Drip] Created ${stepType} task for ${enrollment.prospectName}: "${title}"`);
+          } catch (taskErr) {
+            // Don't let a single task failure abort the whole run or stall the enrollment.
+            console.error(`[Drip] Failed to create ${stepType} task for ${enrollment.prospectName}:`, taskErr);
+          }
         }
 
         await storage.updateDripEnrollment(enrollment.id, {
           currentStep: currentStepIndex + 1,
         } as any);
-
-        // Organic jitter between emails — avoids burst-send spam signals
-        if (sentThisRun > 0 && !isEmailDailyCapReached()) {
-          const jitter = smartEmailDelay(sentThisRun);
-          console.log(`[Drip] Waiting ${Math.round(jitter / 1000)}s before next send...`);
-          await new Promise(r => setTimeout(r, jitter));
-        }
       }
     }
 

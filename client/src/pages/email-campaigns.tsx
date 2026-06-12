@@ -1,21 +1,27 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
+  ArrowLeft,
   ArrowUpDown,
   Check,
+  CheckSquare,
   ChevronDown,
   Clock,
   Edit2,
   ExternalLink,
+  Linkedin,
   Loader2,
   Mail,
   MailOpen,
   MailX,
   MessageSquare,
+  Pause,
+  Phone,
   Play,
   Plus,
   Send,
   Smartphone,
+  Sparkles,
   Trash2,
   Users,
   Eye,
@@ -45,6 +51,23 @@ interface Step {
   delayDays: number;
   subject: string;
   bodyHtml: string;
+  stepType?: string;
+  stepName?: string | null;
+  priority?: string | null;
+}
+
+interface CampaignStats {
+  overview: {
+    total: number;
+    active: number;
+    completed: number;
+    paused: number;
+    emails: number;
+    opens: number;
+    replies: number;
+    bounced: number;
+  };
+  perStep: Record<string, { sent: number; opened: number; bounced: number; tasks: number; notSent: number }>;
 }
 
 interface Enrollment {
@@ -129,6 +152,13 @@ function SendStatusBadge({ send }: { send: EmailSend }) {
       </span>
     );
   }
+  if (send.status === "task") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-700">
+        <CheckSquare className="size-3" /> Task created
+      </span>
+    );
+  }
   switch (send.status) {
     case "sent":
       return (
@@ -151,6 +181,41 @@ function SendStatusBadge({ send }: { send: EmailSend }) {
   }
 }
 
+// ─── Step type catalog (Seamless-style "Add a Step" picker) ──────────────────
+
+const STEP_TYPES = [
+  { type: "email", label: "Automatic Email", desc: "Auto-sent email from franchising@", icon: Mail },
+  { type: "manual_email", label: "Manual Email", desc: "A reminder to send an email yourself", icon: MailOpen },
+  { type: "sms", label: "SMS (Quo)", desc: "Auto-sent text message via Quo", icon: MessageSquare },
+  { type: "call", label: "Call", desc: "A task to call the contact", icon: Phone },
+  { type: "linkedin_connect", label: "LinkedIn Connect Request", desc: "Task: send a LinkedIn connection", icon: Linkedin },
+  { type: "linkedin_message", label: "LinkedIn Message", desc: "Task: send a LinkedIn message", icon: Linkedin },
+  { type: "task", label: "Custom Task", desc: "A generic to-do for this contact", icon: CheckSquare },
+] as const;
+
+type StepMeta = { type: string; label: string; desc: string; icon: typeof Mail };
+
+function stepMeta(type: string | undefined | null): StepMeta {
+  return STEP_TYPES.find((s) => s.type === type) ?? { type: type || "email", label: "Automatic Email", desc: "", icon: Mail };
+}
+
+// email | sms steps carry content; everything else is a manual task.
+const CHANNEL_OF: Record<string, "email" | "sms" | "task"> = {
+  email: "email", manual_email: "email", sms: "sms",
+  call: "task", linkedin_connect: "task", linkedin_message: "task", task: "task",
+};
+
+const PRIORITIES = ["None", "Low", "Medium", "High"];
+
+// Swap merge fields for sample values in the live preview pane.
+function previewMerge(text: string): string {
+  return (text || "")
+    .replace(/\[Contact First Name\]/gi, "John")
+    .replace(/\{\{\s*firstName\s*\}\}/gi, "John")
+    .replace(/\{\{\s*name\s*\}\}/gi, "John Carter")
+    .replace(/\{\{\s*email\s*\}\}/gi, "john.carter@example.com");
+}
+
 function EmailCampaignTab() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -162,6 +227,11 @@ function EmailCampaignTab() {
   const [showStepEditor, setShowStepEditor] = useState(false);
   const [editingStep, setEditingStep] = useState<Step | null>(null);
   const [viewingStep, setViewingStep] = useState<Step | null>(null);
+  const [builderView, setBuilderView] = useState<"overview" | "contacts">("overview");
+  const [showAddStep, setShowAddStep] = useState(false);
+  const [addStepType, setAddStepType] = useState<string>("email");
+  const [showNewCampaign, setShowNewCampaign] = useState(false);
+  const [newCampaignName, setNewCampaignName] = useState("");
 
   const [filterText, setFilterText] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -188,6 +258,15 @@ function EmailCampaignTab() {
         ? `/api/crm/enrollments?campaignId=${selectedCampaign}`
         : "/api/crm/enrollments";
       const res = await fetch(url);
+      return res.json();
+    },
+    enabled: !!selectedCampaign,
+  });
+
+  const { data: stats } = useQuery<CampaignStats>({
+    queryKey: ["/api/crm/campaigns", selectedCampaign, "stats"],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/campaigns/${selectedCampaign}/stats`);
       return res.json();
     },
     enabled: !!selectedCampaign,
@@ -227,6 +306,7 @@ function EmailCampaignTab() {
     },
     onSuccess: (data: Enrollment[]) => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/enrollments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/campaigns", selectedCampaign] });
       setShowEnrollListModal(false);
       setEnrollListId("");
       toast({ title: `${data.length} prospects enrolled from list`, description: "They will start receiving campaign emails." });
@@ -253,6 +333,7 @@ function EmailCampaignTab() {
     },
     onSuccess: (data: Enrollment[]) => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/enrollments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/campaigns", selectedCampaign] });
       setShowEnrollModal(false);
       setSelectedProspects(new Set());
       toast({ title: `${data.length} prospects enrolled`, description: "They will start receiving campaign emails." });
@@ -270,7 +351,8 @@ function EmailCampaignTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/sends"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/enrollments"] });
-      toast({ title: "Drip emails processed", description: "Any due emails have been sent." });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/campaigns", selectedCampaign] });
+      toast({ title: "Sequence processed", description: "Any due emails, texts and tasks have been actioned." });
     },
     onError: (err: Error) => {
       toast({ title: "Processing failed", description: err.message, variant: "destructive" });
@@ -285,6 +367,22 @@ function EmailCampaignTab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/campaigns"] });
     },
+  });
+
+  const createCampaignMutation = useMutation({
+    mutationFn: async (name: string) => {
+      const res = await apiRequest("POST", "/api/crm/campaigns", { name, isActive: true });
+      return res.json();
+    },
+    onSuccess: (c: Campaign) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/campaigns"] });
+      setShowNewCampaign(false);
+      setNewCampaignName("");
+      setSelectedCampaign(c.id);
+      setBuilderView("overview");
+      toast({ title: "Campaign created", description: "Add your first step to start the sequence." });
+    },
+    onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   const pauseEnrollmentMutation = useMutation({
@@ -412,6 +510,19 @@ function EmailCampaignTab() {
     pending: sends.filter((s) => s.status === "pending").length,
   }), [sends]);
 
+  // Steps grouped by their "Day Step is Due" (delayDays) for the Seamless-style builder.
+  const dayGroups = useMemo(() => {
+    const steps = campaignDetail?.steps ?? [];
+    const sorted = [...steps].sort((a, b) => a.delayDays - b.delayDays || a.stepOrder - b.stepOrder);
+    const groups: { day: number; steps: Step[] }[] = [];
+    for (const s of sorted) {
+      let g = groups.find((x) => x.day === s.delayDays);
+      if (!g) { g = { day: s.delayDays, steps: [] }; groups.push(g); }
+      g.steps.push(s);
+    }
+    return groups;
+  }, [campaignDetail]);
+
   const SortHeader = ({ label, sortKeyVal }: { label: string; sortKeyVal: SortKey }) => (
     <button
       className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
@@ -443,227 +554,264 @@ function EmailCampaignTab() {
 
       {activeTab === "campaigns" && (
         <>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold">Email Campaigns</h3>
-            <Button
-              data-testid="button-process-drip"
-              size="sm"
-              variant="outline"
-              className="gap-2"
-              onClick={() => processMutation.mutate()}
-              disabled={processMutation.isPending}
-            >
-              {processMutation.isPending ? (
-                <><Loader2 className="size-4 animate-spin" /> Processing...</>
-              ) : (
-                <><Send className="size-4" /> Send Due Emails</>
-              )}
-            </Button>
-          </div>
+          {!selectedCampaign ? (
+            /* ── Campaign list ── */
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold">Email Sequences</h3>
+                  <p className="text-xs text-muted-foreground">Multi-step email, text &amp; task cadences. Open a campaign to edit its steps.</p>
+                </div>
+                <Button data-testid="button-new-campaign" size="sm" className="gap-1" onClick={() => { setShowNewCampaign(true); setNewCampaignName(""); }}>
+                  <Plus className="size-3" /> New Campaign
+                </Button>
+              </div>
 
-          {campaigns.length === 0 ? (
-            <Card className="p-8 text-center">
-              <Mail className="mx-auto size-10 text-muted-foreground/30" />
-              <p className="mt-3 text-sm text-muted-foreground">No campaigns yet. A default campaign will be created automatically.</p>
-            </Card>
-          ) : (
-            <div className="space-y-3">
-              {campaigns.map((campaign) => (
-                <Card
-                  key={campaign.id}
-                  data-testid={`campaign-${campaign.id}`}
-                  className={`p-4 cursor-pointer transition-colors ${selectedCampaign === campaign.id ? "border-[hsl(var(--primary))] ring-1 ring-[hsl(var(--primary))]" : "hover:border-gray-300"}`}
-                  onClick={() => setSelectedCampaign(selectedCampaign === campaign.id ? null : campaign.id)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold">{campaign.name}</span>
-                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${campaign.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
-                          {campaign.isActive ? "Active" : "Paused"}
-                        </span>
-                      </div>
-                      {campaign.description && (
-                        <p className="mt-1 text-xs text-muted-foreground">{campaign.description}</p>
-                      )}
-                    </div>
-                    <Button
-                      data-testid={`toggle-campaign-${campaign.id}`}
-                      size="sm"
-                      variant="outline"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleCampaignMutation.mutate({ id: campaign.id, isActive: !campaign.isActive });
-                      }}
-                    >
-                      {campaign.isActive ? "Pause" : "Activate"}
+              {showNewCampaign && (
+                <Card className="p-4 mb-4 border-[hsl(var(--primary))] ring-1 ring-[hsl(var(--primary))]/30">
+                  <Label>Campaign name</Label>
+                  <div className="flex gap-2 mt-1">
+                    <Input
+                      data-testid="input-new-campaign-name"
+                      autoFocus
+                      value={newCampaignName}
+                      onChange={(e) => setNewCampaignName(e.target.value)}
+                      placeholder="e.g. E-2 Attorney Outreach"
+                      onKeyDown={(e) => { if (e.key === "Enter" && newCampaignName.trim()) createCampaignMutation.mutate(newCampaignName.trim()); }}
+                    />
+                    <Button onClick={() => createCampaignMutation.mutate(newCampaignName.trim())} disabled={!newCampaignName.trim() || createCampaignMutation.isPending}>
+                      {createCampaignMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : "Create"}
                     </Button>
+                    <Button variant="outline" onClick={() => setShowNewCampaign(false)}>Cancel</Button>
                   </div>
                 </Card>
-              ))}
-            </div>
-          )}
+              )}
 
-          {selectedCampaign && campaignDetail && (
-            <div className="mt-6 space-y-6">
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-semibold">Email Steps ({campaignDetail.steps?.length || 0})</h4>
-                  <Button
-                    data-testid="button-add-step"
-                    size="sm"
-                    variant="outline"
-                    className="gap-1"
-                    onClick={() => { setShowStepEditor(true); setEditingStep(null); }}
-                  >
-                    <Plus className="size-3" /> Add Step
-                  </Button>
-                </div>
-
-                {showStepEditor && (
-                  <StepEditor
-                    step={editingStep}
-                    nextOrder={(campaignDetail.steps?.length || 0) + 1}
-                    onSave={(data) => saveStepMutation.mutate(data)}
-                    onCancel={() => { setShowStepEditor(false); setEditingStep(null); }}
-                    isPending={saveStepMutation.isPending}
-                  />
-                )}
-
-                <div className="space-y-2">
-                  {campaignDetail.steps?.map((step) => (
-                    <Card key={step.id} data-testid={`step-${step.id}`} className="p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="inline-flex items-center justify-center size-6 rounded-full bg-[hsl(var(--primary))] text-white text-xs font-bold">
-                              {step.stepOrder}
-                            </span>
-                            <span className="font-medium text-sm">{step.subject}</span>
-                          </div>
-                          <div className="mt-1 text-xs text-muted-foreground">
-                            Day {step.delayDays} after enrollment
-                          </div>
+              {campaigns.length === 0 && !showNewCampaign ? (
+                <Card className="p-8 text-center">
+                  <Mail className="mx-auto size-10 text-muted-foreground/30" />
+                  <p className="mt-3 text-sm text-muted-foreground">No campaigns yet. Click <span className="font-medium">New Campaign</span> to build your first sequence.</p>
+                </Card>
+              ) : (
+                <div className="space-y-3">
+                  {campaigns.map((campaign) => (
+                    <Card
+                      key={campaign.id}
+                      data-testid={`campaign-${campaign.id}`}
+                      className="p-4 cursor-pointer transition-colors hover:border-[hsl(var(--primary))]"
+                      onClick={() => { setSelectedCampaign(campaign.id); setBuilderView("overview"); }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold">{campaign.name}</span>
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${campaign.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
+                            {campaign.isActive ? "Active" : "Paused"}
+                          </span>
                         </div>
-                        <div className="flex gap-1">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setViewingStep(viewingStep?.id === step.id ? null : step)}
-                          >
-                            <Eye className="size-3" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => { setEditingStep(step); setShowStepEditor(true); }}
-                          >
-                            <Edit2 className="size-3" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="text-red-600 hover:text-red-700"
-                            onClick={() => {
-                              if (confirm("Delete this email step?")) {
-                                deleteStepMutation.mutate(step.id);
-                              }
-                            }}
-                          >
-                            <Trash2 className="size-3" />
-                          </Button>
-                        </div>
+                        <ChevronDown className="size-4 -rotate-90 text-muted-foreground" />
                       </div>
-                      {viewingStep?.id === step.id && (
-                        <div className="mt-3 p-3 bg-gray-50 rounded-lg border text-sm">
-                          <div dangerouslySetInnerHTML={{ __html: step.bodyHtml }} />
-                        </div>
-                      )}
+                      {campaign.description && <p className="mt-1 text-xs text-muted-foreground">{campaign.description}</p>}
                     </Card>
                   ))}
                 </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-semibold">Enrolled Prospects ({enrollments.length})</h4>
-                  <div className="flex gap-2">
-                    <Button
-                      data-testid="button-enroll-from-list"
-                      size="sm"
-                      variant="outline"
-                      className="gap-1"
-                      onClick={() => { setShowEnrollListModal(true); setEnrollListId(""); }}
-                      disabled={prospectLists.length === 0}
-                    >
-                      <Users className="size-3" /> From List
-                    </Button>
-                    <Button
-                      data-testid="button-enroll-prospects"
-                      size="sm"
-                      className="gap-1"
-                      onClick={() => { setShowEnrollModal(true); setSelectedProspects(new Set()); }}
-                      disabled={enrollableProspects.length === 0}
-                    >
-                      <UserPlus className="size-3" /> Enroll Individuals
-                    </Button>
-                  </div>
-                </div>
-
-                {enrollments.length === 0 ? (
-                  <Card className="p-6 text-center">
-                    <Users className="mx-auto size-8 text-muted-foreground/30" />
-                    <p className="mt-2 text-sm text-muted-foreground">No prospects enrolled yet.</p>
-                    {prospectLists.length > 0 && (
-                      <Button
-                        size="sm"
-                        className="mt-3 gap-1"
-                        onClick={() => { setShowEnrollListModal(true); setEnrollListId(""); }}
-                      >
-                        <Users className="size-3" /> Enroll from a List
-                      </Button>
-                    )}
-                    {prospectLists.length === 0 && <p className="text-xs text-muted-foreground mt-1">Save prospects into a list in the People Finder first.</p>}
-                  </Card>
-                ) : (
-                  <div className="space-y-2">
-                    {enrollments.map((e) => (
-                      <Card key={e.id} data-testid={`enrollment-${e.id}`} className="p-3">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="text-sm font-medium">{e.prospectName}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {e.prospectEmail} &middot; Step {e.currentStep}/{campaignDetail.steps?.length || 0} &middot;{" "}
-                              <span className={e.status === "active" ? "text-green-600" : e.status === "completed" ? "text-blue-600" : "text-gray-500"}>
-                                {e.status}
-                              </span>
-                            </div>
-                          </div>
-                          {e.status === "active" && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => pauseEnrollmentMutation.mutate({ id: e.id, status: "paused" })}
-                            >
-                              Pause
-                            </Button>
-                          )}
-                          {e.status === "paused" && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => pauseEnrollmentMutation.mutate({ id: e.id, status: "active" })}
-                            >
-                              Resume
-                            </Button>
-                          )}
-                        </div>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-              </div>
+              )}
             </div>
+          ) : campaignDetail ? (
+            /* ── Seamless-style sequence builder ── */
+            <div>
+              {/* Header */}
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+                <div className="flex items-center gap-3 min-w-0">
+                  <Button data-testid="button-back-campaigns" size="sm" variant="ghost" className="gap-1" onClick={() => setSelectedCampaign(null)}>
+                    <ArrowLeft className="size-4" /> All
+                  </Button>
+                  <h3 className="text-xl font-semibold truncate">{campaignDetail.name}</h3>
+                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${campaignDetail.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
+                    {campaignDetail.isActive ? "Active" : "Paused"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button data-testid="button-process-drip" size="sm" variant="outline" className="gap-2" onClick={() => processMutation.mutate()} disabled={processMutation.isPending}>
+                    {processMutation.isPending ? <><Loader2 className="size-4 animate-spin" /> Processing…</> : <><Send className="size-4" /> Send Due Now</>}
+                  </Button>
+                  <Button data-testid="button-toggle-campaign" size="sm" variant="outline" className="gap-1" onClick={() => toggleCampaignMutation.mutate({ id: campaignDetail.id, isActive: !campaignDetail.isActive })}>
+                    {campaignDetail.isActive ? <><Pause className="size-4" /> Pause Campaign</> : <><Play className="size-4" /> Activate</>}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Overview stat row */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 mb-6">
+                {[
+                  { label: "Total", value: stats?.overview.total ?? enrollments.length, color: "text-[hsl(var(--primary))]" },
+                  { label: "Active", value: stats?.overview.active ?? 0, color: "text-green-600" },
+                  { label: "Completed", value: stats?.overview.completed ?? 0, color: "text-blue-600" },
+                  { label: "Paused", value: stats?.overview.paused ?? 0, color: "text-gray-500" },
+                  { label: "Emails", value: stats?.overview.emails ?? 0, color: "text-blue-600" },
+                  { label: "Opens", value: stats?.overview.opens ?? 0, color: "text-green-600" },
+                  { label: "Replies", value: stats?.overview.replies ?? 0, color: "text-purple-600" },
+                  { label: "Bounced", value: stats?.overview.bounced ?? 0, color: "text-red-600" },
+                ].map((s) => (
+                  <Card key={s.label} data-testid={`overview-stat-${s.label.toLowerCase()}`} className="p-3 text-center">
+                    <div className={`text-xl font-bold ${s.color}`}>{s.value}</div>
+                    <div className="text-[11px] text-muted-foreground">{s.label}</div>
+                  </Card>
+                ))}
+              </div>
+
+              {/* Sub-tabs */}
+              <div className="flex gap-1 mb-4 border-b">
+                {([["overview", "Steps"], ["contacts", `Contacts (${enrollments.length})`]] as const).map(([key, lbl]) => (
+                  <button
+                    key={key}
+                    data-testid={`builder-tab-${key}`}
+                    onClick={() => setBuilderView(key)}
+                    className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${builderView === key ? "border-[hsl(var(--primary))] text-[hsl(var(--primary))]" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+                  >
+                    {lbl}
+                  </button>
+                ))}
+              </div>
+
+              {builderView === "overview" && (
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-semibold">Steps ({campaignDetail.steps?.length || 0})</h4>
+                    <Button data-testid="button-add-step" size="sm" className="gap-1" onClick={() => setShowAddStep(true)}>
+                      <Plus className="size-3" /> Add Step
+                    </Button>
+                  </div>
+
+                  {(!campaignDetail.steps || campaignDetail.steps.length === 0) ? (
+                    <Card className="p-8 text-center">
+                      <Zap className="mx-auto size-8 text-muted-foreground/30" />
+                      <p className="mt-2 text-sm text-muted-foreground">No steps yet. Add an email, text or task to start the sequence.</p>
+                    </Card>
+                  ) : (
+                    <div className="space-y-5">
+                      {dayGroups.map((group) => (
+                        <div key={group.day}>
+                          <div className="mb-2 inline-flex items-center rounded-md bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700">
+                            Day {group.day}
+                          </div>
+                          <div className="space-y-2">
+                            {group.steps.map((step) => {
+                              const meta = stepMeta(step.stepType);
+                              const Icon = meta.icon;
+                              const st = stats?.perStep?.[step.id];
+                              const channel = CHANNEL_OF[step.stepType || "email"] || "email";
+                              return (
+                                <Card key={step.id} data-testid={`step-${step.id}`} className="p-4">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="flex items-start gap-3 min-w-0">
+                                      <span className="mt-0.5 inline-flex size-8 items-center justify-center rounded-md bg-[hsl(var(--primary))]/10 text-[hsl(var(--primary))]"><Icon className="size-4" /></span>
+                                      <div className="min-w-0">
+                                        <div className="flex items-center gap-2">
+                                          <span className="font-medium text-sm">{step.stepName || meta.label}</span>
+                                          {step.priority && step.priority !== "None" && <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">{step.priority}</span>}
+                                        </div>
+                                        {channel !== "task" && step.subject && <div className="text-xs text-muted-foreground truncate">{step.subject}</div>}
+                                        <div className="mt-0.5 text-xs text-muted-foreground line-clamp-1">
+                                          {(step.bodyHtml || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 120) || meta.desc}
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div className="flex gap-1 shrink-0">
+                                      <Button size="sm" variant="ghost" onClick={() => setViewingStep(viewingStep?.id === step.id ? null : step)}><Eye className="size-3" /></Button>
+                                      <Button size="sm" variant="ghost" onClick={() => { setEditingStep(step); setAddStepType(step.stepType || "email"); setShowStepEditor(true); }}><Edit2 className="size-3" /></Button>
+                                      <Button size="sm" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => { if (confirm("Delete this step?")) deleteStepMutation.mutate(step.id); }}><Trash2 className="size-3" /></Button>
+                                    </div>
+                                  </div>
+                                  <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 border-t pt-2 text-[11px] text-muted-foreground">
+                                    {channel === "task" ? (
+                                      <span><span className="font-semibold text-foreground">{st?.tasks ?? 0}</span> Created</span>
+                                    ) : (
+                                      <>
+                                        <span><span className="font-semibold text-foreground">{st?.sent ?? 0}</span> Sent</span>
+                                        {channel === "email" && <span><span className="font-semibold text-foreground">{st?.opened ?? 0}</span> Opened</span>}
+                                        <span><span className="font-semibold text-foreground">{st?.bounced ?? 0}</span> {channel === "sms" ? "Failed" : "Bounced"}</span>
+                                      </>
+                                    )}
+                                    <span><span className="font-semibold text-foreground">{st?.notSent ?? 0}</span> Not Sent</span>
+                                  </div>
+                                  {viewingStep?.id === step.id && (
+                                    <div className="mt-3 rounded-lg border bg-gray-50 p-3 text-sm">
+                                      {step.subject && <div className="mb-1 font-medium">Subject: {previewMerge(step.subject)}</div>}
+                                      <div dangerouslySetInnerHTML={{ __html: previewMerge(step.bodyHtml) }} />
+                                    </div>
+                                  )}
+                                </Card>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {builderView === "contacts" && (
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-semibold">Enrolled Contacts ({enrollments.length})</h4>
+                    <div className="flex gap-2">
+                      <Button data-testid="button-enroll-from-list" size="sm" variant="outline" className="gap-1" onClick={() => { setShowEnrollListModal(true); setEnrollListId(""); }} disabled={prospectLists.length === 0}>
+                        <Users className="size-3" /> From List
+                      </Button>
+                      <Button data-testid="button-enroll-prospects" size="sm" className="gap-1" onClick={() => { setShowEnrollModal(true); setSelectedProspects(new Set()); }} disabled={enrollableProspects.length === 0}>
+                        <UserPlus className="size-3" /> Add Contacts
+                      </Button>
+                    </div>
+                  </div>
+                  {enrollments.length === 0 ? (
+                    <Card className="p-6 text-center">
+                      <Users className="mx-auto size-8 text-muted-foreground/30" />
+                      <p className="mt-2 text-sm text-muted-foreground">No contacts enrolled yet.</p>
+                      {prospectLists.length === 0 && <p className="text-xs text-muted-foreground mt-1">Save prospects into a list in the People Finder first.</p>}
+                    </Card>
+                  ) : (
+                    <div className="space-y-2">
+                      {enrollments.map((e) => (
+                        <Card key={e.id} data-testid={`enrollment-${e.id}`} className="p-3">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="text-sm font-medium">{e.prospectName}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {e.prospectEmail} &middot; Step {e.currentStep}/{campaignDetail.steps?.length || 0} &middot;{" "}
+                                <span className={e.status === "active" ? "text-green-600" : e.status === "completed" ? "text-blue-600" : "text-gray-500"}>{e.status}</span>
+                              </div>
+                            </div>
+                            {e.status === "active" && <Button size="sm" variant="outline" onClick={() => pauseEnrollmentMutation.mutate({ id: e.id, status: "paused" })}>Pause</Button>}
+                            {e.status === "paused" && <Button size="sm" variant="outline" onClick={() => pauseEnrollmentMutation.mutate({ id: e.id, status: "active" })}>Resume</Button>}
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {showAddStep && (
+                <AddStepModal
+                  onPick={(type) => { setShowAddStep(false); setAddStepType(type); setEditingStep(null); setShowStepEditor(true); }}
+                  onClose={() => setShowAddStep(false)}
+                />
+              )}
+
+              {showStepEditor && (
+                <StepEditorModal
+                  step={editingStep}
+                  defaultType={addStepType}
+                  nextOrder={(campaignDetail.steps?.length || 0) + 1}
+                  onSave={(data) => saveStepMutation.mutate(data)}
+                  onCancel={() => { setShowStepEditor(false); setEditingStep(null); }}
+                  isPending={saveStepMutation.isPending}
+                />
+              )}
+            </div>
+          ) : (
+            <Card className="p-8 text-center"><Loader2 className="mx-auto size-6 animate-spin text-muted-foreground" /></Card>
           )}
 
           {showEnrollModal && (
@@ -884,72 +1032,193 @@ function UserPlus(props: any) {
   );
 }
 
-function StepEditor({
+// ─── "Add a Step" type picker (Seamless-style) ───────────────────────────────
+
+function AddStepModal({ onPick, onClose }: { onPick: (type: string) => void; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <Card className="w-full max-w-2xl p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold">Add a Step</h3>
+          <Button size="sm" variant="ghost" onClick={onClose}><X className="size-4" /></Button>
+        </div>
+        <p className="text-sm text-muted-foreground mb-4">Choose the type of step to add to the sequence.</p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {STEP_TYPES.map((t) => {
+            const Icon = t.icon;
+            return (
+              <button
+                key={t.type}
+                data-testid={`add-step-${t.type}`}
+                onClick={() => onPick(t.type)}
+                className="flex items-start gap-3 rounded-lg border p-4 text-left transition-colors hover:border-[hsl(var(--primary))] hover:bg-[hsl(var(--primary))]/5"
+              >
+                <span className="inline-flex size-9 items-center justify-center rounded-md bg-[hsl(var(--primary))]/10 text-[hsl(var(--primary))]"><Icon className="size-4" /></span>
+                <div>
+                  <div className="text-sm font-medium">{t.label}</div>
+                  <div className="text-xs text-muted-foreground">{t.desc}</div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// ─── Step editor modal (Step Name · Day Due · Priority · body + live preview) ─
+
+function StepEditorModal({
   step,
+  defaultType,
   nextOrder,
   onSave,
   onCancel,
   isPending,
 }: {
   step: Step | null;
+  defaultType: string;
   nextOrder: number;
   onSave: (data: any) => void;
   onCancel: () => void;
   isPending: boolean;
 }) {
+  const initialType = step?.stepType || defaultType || "email";
   const [form, setForm] = useState({
     stepOrder: step?.stepOrder || nextOrder,
-    delayDays: step?.delayDays || 0,
+    delayDays: step?.delayDays ?? 0,
+    stepType: initialType,
+    stepName: step?.stepName || stepMeta(initialType).label,
+    priority: step?.priority || "None",
     subject: step?.subject || "",
     bodyHtml: step?.bodyHtml || "",
   });
+  const [mode, setMode] = useState<"template" | "ai">("template");
+
+  const channel = CHANNEL_OF[form.stepType] || "task";
+  const isEmail = channel === "email";
+  const isSms = channel === "sms";
+  const isTask = channel === "task";
+  const HeaderIcon = stepMeta(form.stepType).icon;
+
+  const canSave = isTask
+    ? !!form.stepName.trim()
+    : !!form.bodyHtml.trim() && (!isEmail || !!form.subject.trim());
+
+  const bodyLabel = isEmail ? "Email body" : isSms ? "Text message" : "Task details";
 
   return (
-    <Card className="p-4 mb-4">
-      <h4 className="font-semibold mb-3">{step ? "Edit Step" : "Add New Step"}</h4>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <Label>Step order</Label>
-          <Input
-            type="number"
-            value={form.stepOrder}
-            onChange={(e) => setForm({ ...form, stepOrder: parseInt(e.target.value) || 1 })}
-          />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onCancel}>
+      <Card className="w-full max-w-3xl max-h-[88vh] overflow-auto p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex size-8 items-center justify-center rounded-md bg-[hsl(var(--primary))]/10 text-[hsl(var(--primary))]"><HeaderIcon className="size-4" /></span>
+            <h3 className="text-lg font-semibold">{step ? "Edit Step" : stepMeta(form.stepType).label}</h3>
+          </div>
+          <Button size="sm" variant="ghost" onClick={onCancel}><X className="size-4" /></Button>
         </div>
-        <div>
-          <Label>Delay (days after enrollment)</Label>
-          <Input
-            type="number"
-            value={form.delayDays}
-            onChange={(e) => setForm({ ...form, delayDays: parseInt(e.target.value) || 0 })}
-          />
+
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div className="sm:col-span-1">
+            <Label>Step name</Label>
+            <Input data-testid="step-name" value={form.stepName} onChange={(e) => setForm({ ...form, stepName: e.target.value })} placeholder={stepMeta(form.stepType).label} />
+          </div>
+          <div>
+            <Label>Day step is due</Label>
+            <Input data-testid="step-day" type="number" min={0} value={form.delayDays} onChange={(e) => setForm({ ...form, delayDays: parseInt(e.target.value) || 0 })} />
+          </div>
+          <div>
+            <Label>Priority</Label>
+            <select
+              data-testid="step-priority"
+              value={form.priority}
+              onChange={(e) => setForm({ ...form, priority: e.target.value })}
+              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              {PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </div>
         </div>
-      </div>
-      <div className="mt-3">
-        <Label>Subject line</Label>
-        <Input
-          value={form.subject}
-          onChange={(e) => setForm({ ...form, subject: e.target.value })}
-          placeholder="Email subject..."
-        />
-      </div>
-      <div className="mt-3">
-        <Label>Email body (HTML)</Label>
-        <p className="text-xs text-muted-foreground mb-1">Use {"{{name}}"} and {"{{email}}"} as placeholders for the recipient's name and email.</p>
-        <textarea
-          value={form.bodyHtml}
-          onChange={(e) => setForm({ ...form, bodyHtml: e.target.value })}
-          rows={8}
-          className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y font-mono"
-        />
-      </div>
-      <div className="mt-3 flex gap-2 justify-end">
-        <Button variant="outline" onClick={onCancel}>Cancel</Button>
-        <Button onClick={() => onSave(form)} disabled={isPending || !form.subject || !form.bodyHtml}>
-          {isPending ? "Saving..." : step ? "Update" : "Add Step"}
-        </Button>
-      </div>
-    </Card>
+
+        {(isEmail || isSms) && (
+          <>
+            <div className="mt-4 inline-flex rounded-md border p-0.5">
+              <button type="button" onClick={() => setMode("template")} className={`px-3 py-1 text-xs font-medium rounded transition-colors ${mode === "template" ? "bg-[hsl(var(--primary))] text-white" : "text-muted-foreground"}`}>Template</button>
+              <button type="button" onClick={() => setMode("ai")} className={`inline-flex items-center gap-1 px-3 py-1 text-xs font-medium rounded transition-colors ${mode === "ai" ? "bg-[hsl(var(--primary))] text-white" : "text-muted-foreground"}`}><Sparkles className="size-3" /> AI Prompt</button>
+            </div>
+
+            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+              <div>
+                {isEmail && (
+                  <div className="mb-3">
+                    <Label>Subject</Label>
+                    <Input data-testid="step-subject" value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} placeholder="e.g. The U.S. business piece for your clients" />
+                  </div>
+                )}
+                <Label>{mode === "ai" ? "AI prompt" : bodyLabel}</Label>
+                <p className="text-xs text-muted-foreground mb-1">Use <code className="bg-gray-100 px-1 rounded">[Contact First Name]</code> to personalize.</p>
+                <textarea
+                  data-testid="step-body"
+                  value={form.bodyHtml}
+                  onChange={(e) => setForm({ ...form, bodyHtml: e.target.value })}
+                  rows={isSms ? 5 : 12}
+                  className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y"
+                  placeholder={mode === "ai" ? "Describe the message you want the AI to draft…" : isSms ? "Hi [Contact First Name], …" : "Hi [Contact First Name],\n\n…"}
+                />
+                {isSms && <p className={`mt-0.5 text-xs text-right ${form.bodyHtml.length > 160 ? "text-amber-600 font-medium" : "text-muted-foreground"}`}>{form.bodyHtml.length}/160</p>}
+              </div>
+
+              <div>
+                <Label>Preview</Label>
+                <div className="mt-1 rounded-md border bg-gray-50 p-3 text-sm min-h-[120px]">
+                  {isEmail && form.subject && <div className="mb-2 font-medium">Subject: {previewMerge(form.subject)}</div>}
+                  {isEmail ? (
+                    <div dangerouslySetInnerHTML={{ __html: previewMerge(form.bodyHtml) || '<span style="color:#9ca3af">Nothing to preview yet.</span>' }} />
+                  ) : (
+                    <div className="whitespace-pre-wrap">{previewMerge(form.bodyHtml) || <span className="text-muted-foreground">Nothing to preview yet.</span>}</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
+        {isTask && (
+          <div className="mt-4">
+            <Label>Task details</Label>
+            <p className="text-xs text-muted-foreground mb-1">This becomes a to-do in the Tasks tab on its due day. The step name is the task title — use <code className="bg-gray-100 px-1 rounded">[Contact First Name]</code> to personalize.</p>
+            <textarea
+              data-testid="step-body"
+              value={form.bodyHtml}
+              onChange={(e) => setForm({ ...form, bodyHtml: e.target.value })}
+              rows={4}
+              className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y"
+              placeholder="e.g. Call [Contact First Name] to discuss the FDD and answer questions"
+            />
+          </div>
+        )}
+
+        <div className="mt-5 flex justify-end gap-2">
+          <Button variant="outline" onClick={onCancel}>Cancel</Button>
+          <Button
+            data-testid="step-save"
+            onClick={() => onSave({
+              stepOrder: form.stepOrder,
+              delayDays: form.delayDays,
+              stepType: form.stepType,
+              stepName: form.stepName.trim() || stepMeta(form.stepType).label,
+              priority: form.priority,
+              subject: form.subject,
+              bodyHtml: form.bodyHtml,
+            })}
+            disabled={isPending || !canSave}
+          >
+            {isPending ? "Saving…" : step ? "Update Step" : "Save Step"}
+          </Button>
+        </div>
+      </Card>
+    </div>
   );
 }
 

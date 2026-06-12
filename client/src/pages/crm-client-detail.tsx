@@ -87,7 +87,9 @@ interface DirectEmail {
   toEmail: string;
   subject: string;
   bodyHtml: string;
+  bodyText?: string | null;
   status: string;
+  direction?: "inbound" | "outbound";
   openedAt: string | null;
   openCount: number;
   sentAt: string;
@@ -1750,17 +1752,23 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
                     {directEmails.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-8 text-center">
                         <Mail className="size-10 text-muted-foreground/30 mb-2" />
-                        <p className="text-sm text-muted-foreground">No emails sent yet</p>
+                        <p className="text-sm text-muted-foreground">No email activity yet</p>
                       </div>
                     ) : (
                       <div className="space-y-2">
-                        {directEmails.map(em => (
-                          <Card key={em.id} className="p-3">
+                        {directEmails.map(em => {
+                          const isInbound = em.direction === "inbound";
+                          return (
+                          <Card key={em.id} className={`p-3 ${isInbound ? "border-l-4 border-l-[hsl(var(--primary))] bg-[hsl(var(--primary))]/5" : ""}`}>
                             <div className="flex items-start justify-between gap-2">
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <span className="text-sm font-medium truncate">{em.subject}</span>
-                                  {em.status === "opened" ? (
+                                  {isInbound ? (
+                                    <span className="inline-flex items-center gap-1 text-xs text-[hsl(var(--primary))] bg-[hsl(var(--primary))]/10 px-2 py-0.5 rounded-full font-medium">
+                                      <Mail className="size-3" /> Reply received
+                                    </span>
+                                  ) : em.status === "opened" ? (
                                     <span className="inline-flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
                                       <CheckCircle2 className="size-3" /> Opened{em.openCount > 1 ? ` ×${em.openCount}` : ""}
                                     </span>
@@ -1769,15 +1777,21 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
                                   )}
                                 </div>
                                 <div className="text-xs text-muted-foreground mt-0.5">
-                                  From: {em.fromEmail}
+                                  {isInbound ? "From" : "Sent from"}: {em.fromEmail}
                                   {" · "}
                                   {new Date(em.sentAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}
-                                  {em.openedAt && ` · Opened ${new Date(em.openedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}
+                                  {!isInbound && em.openedAt && ` · Opened ${new Date(em.openedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}
                                 </div>
+                                {isInbound && (em.bodyText || em.bodyHtml) && (
+                                  <p className="mt-1.5 text-xs text-foreground/80 line-clamp-3 whitespace-pre-wrap">
+                                    {(em.bodyText || em.bodyHtml.replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim().slice(0, 280)}
+                                  </p>
+                                )}
                               </div>
                             </div>
                           </Card>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -1790,7 +1804,7 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
                       <li>🔲 <strong>DKIM</strong> — Enable in Google Workspace Admin → Apps → Google Workspace → Gmail → Authenticate email → Generate key → Add DNS TXT record</li>
                       <li>✅ <strong>DMARC</strong> — DNS TXT record active: <code className="bg-blue-100 px-1 rounded font-mono">v=DMARC1; p=none; rua=mailto:postmaster@newdawnfranchising.com</code></li>
                       <li>✅ <strong>Open tracking</strong> — Enabled via invisible pixel in every email</li>
-                      <li>🔲 <strong>Additional senders</strong> — Add <code className="bg-blue-100 px-1 rounded font-mono">GMAIL_APP_PASSWORD_DYLAN</code> etc. to enable dylan@ and other team senders</li>
+                      <li>🔲 <strong>Primary sender + inbox sync</strong> — Add <code className="bg-blue-100 px-1 rounded font-mono">GMAIL_APP_PASSWORD_FRANCHISING</code> to send from and two-way sync franchising@ (replies appear in this thread)</li>
                     </ul>
                   </Card>
                 </div>

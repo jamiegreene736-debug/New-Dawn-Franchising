@@ -11,8 +11,9 @@ export interface SenderProfile {
 }
 
 export const ALL_SENDER_PROFILES: SenderProfile[] = [
+  { email: "franchising@newdawnfranchising.com", name: "New Dawn Franchising", envVar: "GMAIL_APP_PASSWORD_FRANCHISING" },
   { email: "dylan@newdawnfranchising.com", name: "Dylan – New Dawn Franchising", envVar: "GMAIL_APP_PASSWORD_DYLAN" },
-  { email: "info@newdawnfranchising.com", name: "New Dawn Franchising", envVar: "GMAIL_APP_PASSWORD_INFO" },
+  { email: "info@newdawnfranchising.com", name: "New Dawn Franchising — Info", envVar: "GMAIL_APP_PASSWORD_INFO" },
   { email: "support@newdawnfranchising.com", name: "New Dawn Franchising Support", envVar: "GMAIL_APP_PASSWORD_SUPPORT" },
 ];
 
@@ -26,8 +27,8 @@ export function getSenderPassword(profile: SenderProfile): string | undefined {
 }
 
 export function getAvailableSenders(): SenderProfile[] {
-  // Dylan is always the primary sender — include even if password isn't confirmed yet
-  // so the UI always has at least one option. The actual send will surface the error.
+  // franchising@ is the primary sender — always included (even before its app password
+  // is confirmed) so the UI has at least one option; the actual send surfaces any error.
   const others = ALL_SENDER_PROFILES.slice(1).filter((p) => !!getSenderPassword(p));
   return [ALL_SENDER_PROFILES[0], ...others];
 }
@@ -60,7 +61,7 @@ function getTransporter(senderEmail: string): nodemailer.Transporter {
 }
 
 // Default sender for system emails (signatures, drip campaigns, etc.)
-const DEFAULT_SENDER = "dylan@newdawnfranchising.com";
+const DEFAULT_SENDER = "franchising@newdawnfranchising.com";
 
 // ─── Email Attachment ─────────────────────────────────────────────────────────
 interface EmailAttachment {
@@ -194,6 +195,16 @@ export async function cacheDylanCalendlyUrl(): Promise<void> {
 }
 
 const SIGNER_MAP: Record<string, SignerInfo> = {
+  // Company-branded signature (logo, no personal headshot) for the shared franchising@ inbox.
+  "franchising@newdawnfranchising.com": {
+    name: "New Dawn Franchising",
+    title: "Franchise Development",
+    email: "franchising@newdawnfranchising.com",
+    phone: "(346) 597-9994",
+    linkedin: "https://www.linkedin.com/company/new-dawn-franchising",
+    whatsappUrl: "https://wa.me/13465979994",
+    usePhoto: false,
+  },
   "dylan@newdawnfranchising.com": {
     name: "Dylan Delaney",
     title: "Director of Franchise Development",

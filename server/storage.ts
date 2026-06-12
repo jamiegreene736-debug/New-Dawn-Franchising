@@ -27,6 +27,7 @@ export interface IStorage {
   updateCrmClient(id: string, data: Partial<InsertCrmClient>): Promise<CrmClient>;
   deleteCrmClient(id: string): Promise<void>;
   getProspects(): Promise<Prospect[]>;
+  getProspect(id: string): Promise<Prospect | undefined>;
   getProspectsByLocation(category: string, location: string): Promise<Prospect[]>;
   createProspect(prospect: InsertProspect): Promise<Prospect>;
   createProspects(prospectList: InsertProspect[]): Promise<Prospect[]>;
@@ -54,6 +55,8 @@ export interface IStorage {
   getActiveEnrollments(): Promise<DripEnrollment[]>;
   getDripSends(enrollmentId?: string): Promise<DripSend[]>;
   getAllDripSends(): Promise<DripSend[]>;
+  getDripSendsByCampaign(campaignId: string): Promise<DripSend[]>;
+  getInboundReplyAddresses(): Promise<string[]>;
   getDripSend(id: string): Promise<DripSend | undefined>;
   createDripSend(send: InsertDripSend): Promise<DripSend>;
   updateDripSend(id: string, data: Partial<DripSend>): Promise<DripSend>;
@@ -80,8 +83,10 @@ export interface IStorage {
   createCrmClientDocument(data: { clientId: string; fileName: string; fileType: string; fileSize: number; fileData: string }): Promise<Omit<CrmClientDocument, "fileData">>;
   deleteCrmClientDocument(id: string): Promise<void>;
   // Direct CRM emails
+  getCrmClientByEmail(email: string): Promise<CrmClient | undefined>;
   getCrmDirectEmails(clientId: string): Promise<CrmDirectEmail[]>;
-  createCrmDirectEmail(data: { clientId: string; fromEmail: string; fromName: string; toEmail: string; subject: string; bodyHtml: string; bodyText?: string; trackingId?: string }): Promise<CrmDirectEmail>;
+  getCrmDirectEmailByMessageId(messageId: string): Promise<CrmDirectEmail | undefined>;
+  createCrmDirectEmail(data: { clientId: string; fromEmail: string; fromName: string; toEmail: string; subject: string; bodyHtml: string; bodyText?: string; trackingId?: string; direction?: "inbound" | "outbound"; messageId?: string; status?: string }): Promise<CrmDirectEmail>;
   recordDirectEmailOpen(trackingId: string): Promise<void>;
   // Signature requests
   getSignatureRequests(clientId: string): Promise<SignatureRequest[]>;
@@ -223,6 +228,11 @@ export class DatabaseStorage implements IStorage {
 
   async getProspects(): Promise<Prospect[]> {
     return db.select().from(prospects).orderBy(desc(prospects.createdAt));
+  }
+
+  async getProspect(id: string): Promise<Prospect | undefined> {
+    const [p] = await db.select().from(prospects).where(eq(prospects.id, id)).limit(1);
+    return p;
   }
 
   async getProspectsByLocation(category: string, location: string): Promise<Prospect[]> {
@@ -374,6 +384,26 @@ export class DatabaseStorage implements IStorage {
 
   async getAllDripSends(): Promise<DripSend[]> {
     return db.select().from(dripSends).orderBy(desc(dripSends.createdAt));
+  }
+
+  async getDripSendsByCampaign(campaignId: string): Promise<DripSend[]> {
+    // Resolve the campaign's enrollment ids, then fetch their sends. Avoids any
+    // ambiguity about Drizzle's joined-result key shape.
+    const enr = await db.select({ id: dripEnrollments.id }).from(dripEnrollments)
+      .where(eq(dripEnrollments.campaignId, campaignId));
+    const ids = enr.map((e) => e.id);
+    if (ids.length === 0) return [];
+    return db.select().from(dripSends)
+      .where(inArray(dripSends.enrollmentId, ids))
+      .orderBy(desc(dripSends.createdAt));
+  }
+
+  // Lowercased sender addresses of every inbound (synced) reply — used to count
+  // campaign replies by intersecting with enrolled prospect emails.
+  async getInboundReplyAddresses(): Promise<string[]> {
+    const rows = await db.select({ from: crmDirectEmails.fromEmail }).from(crmDirectEmails)
+      .where(eq(crmDirectEmails.direction, "inbound"));
+    return rows.map((r) => (r.from || "").toLowerCase());
   }
 
   async getDripSend(id: string): Promise<DripSend | undefined> {
@@ -720,13 +750,28 @@ export class DatabaseStorage implements IStorage {
     await db.delete(crmClientDocuments).where(eq(crmClientDocuments.id, id));
   }
 
+  async getCrmClientByEmail(email: string): Promise<CrmClient | undefined> {
+    const [client] = await db.select().from(crmClients)
+      .where(sql`lower(${crmClients.email}) = ${email.toLowerCase()}`)
+      .limit(1);
+    return client;
+  }
+
   async getCrmDirectEmails(clientId: string): Promise<CrmDirectEmail[]> {
     return db.select().from(crmDirectEmails)
       .where(eq(crmDirectEmails.clientId, clientId))
       .orderBy(desc(crmDirectEmails.sentAt));
   }
 
-  async createCrmDirectEmail(data: { clientId: string; fromEmail: string; fromName: string; toEmail: string; subject: string; bodyHtml: string; bodyText?: string; trackingId?: string }): Promise<CrmDirectEmail> {
+  async getCrmDirectEmailByMessageId(messageId: string): Promise<CrmDirectEmail | undefined> {
+    const [email] = await db.select().from(crmDirectEmails)
+      .where(eq(crmDirectEmails.messageId, messageId))
+      .limit(1);
+    return email;
+  }
+
+  async createCrmDirectEmail(data: { clientId: string; fromEmail: string; fromName: string; toEmail: string; subject: string; bodyHtml: string; bodyText?: string; trackingId?: string; direction?: "inbound" | "outbound"; messageId?: string; status?: string }): Promise<CrmDirectEmail> {
+    const direction = data.direction ?? "outbound";
     const [email] = await db.insert(crmDirectEmails).values({
       clientId: data.clientId,
       fromEmail: data.fromEmail,
@@ -736,9 +781,11 @@ export class DatabaseStorage implements IStorage {
       bodyHtml: data.bodyHtml,
       bodyText: data.bodyText,
       trackingId: data.trackingId,
-      status: "sent",
+      direction,
+      messageId: data.messageId,
+      status: data.status ?? (direction === "inbound" ? "received" : "sent"),
     }).returning();
-    // Auto-update lastContactedAt on the client
+    // Touch lastContactedAt on the client for either direction.
     await db.update(crmClients)
       .set({ lastContactedAt: new Date(), lastContactMethod: "email", updatedAt: new Date() })
       .where(eq(crmClients.id, data.clientId));

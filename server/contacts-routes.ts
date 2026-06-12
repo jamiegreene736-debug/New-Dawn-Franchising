@@ -341,7 +341,9 @@ export function registerContactRoutes(app: Express) {
   app.patch("/api/tasks/:id", requireAdminAuth, async (req, res) => {
     try {
       const task = await storage.updateContactTask(String(req.params.id), req.body);
-      if (req.body.completed) {
+      // Drip-generated tasks belong to a prospect (contactId null) — only log a
+      // contact activity when the task is tied to an attorney contact.
+      if (req.body.completed && task.contactId) {
         await storage.createContactActivity({
           contactId: task.contactId,
           activityType: "note_added",

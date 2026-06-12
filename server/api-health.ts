@@ -223,6 +223,15 @@ async function checkGmailDylan(): Promise<ApiHealthResult> {
   return result("gmail_dylan", "Gmail (dylan@)", "ok", "Credentials present — IMAP polling active", Date.now() - start, "email");
 }
 
+async function checkGmailFranchising(): Promise<ApiHealthResult> {
+  const pass = process.env.GMAIL_APP_PASSWORD_FRANCHISING;
+  const start = Date.now();
+  if (!pass) return result("gmail_franchising", "Gmail (franchising@)", "unconfigured", "App password not set — outbound sends + inbox sync disabled", undefined, "email");
+  const clean = pass.replace(/\s/g, "");
+  if (clean.length !== 16) return result("gmail_franchising", "Gmail (franchising@)", "error", "App password appears malformed (should be 16 chars)", Date.now() - start, "email");
+  return result("gmail_franchising", "Gmail (franchising@)", "ok", "Credentials present — sending + inbox sync active", Date.now() - start, "email");
+}
+
 async function checkZeroBounce(): Promise<ApiHealthResult> {
   const key = process.env.ZEROBOUNCE_API_KEY;
   const start = Date.now();
@@ -265,6 +274,7 @@ export async function runAllHealthChecks(): Promise<ApiHealthResult[]> {
     checkMetaWhatsApp(),
     checkSerpAPI(),
     checkSlack(),
+    checkGmailFranchising(),
     checkGmailDylan(),
     checkZeroBounce(),
   ]);

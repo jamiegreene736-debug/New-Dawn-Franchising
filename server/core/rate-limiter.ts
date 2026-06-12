@@ -5,7 +5,7 @@ import { eq, and, sql } from "drizzle-orm";
 export type Service =
   | "serp_api"
   | "pagespeed_api"
-  | "apollo_api"
+  | "seamless_api"
   | "twilio_sms"
   | "twilio_whatsapp"
   | "lob_mail"
@@ -15,7 +15,7 @@ export type Service =
 const DAILY_LIMITS: Record<Service, number> = {
   serp_api: 100,
   pagespeed_api: 25000,
-  apollo_api: 50,
+  seamless_api: 50,
   twilio_sms: 20,
   twilio_whatsapp: 20,
   lob_mail: 10,

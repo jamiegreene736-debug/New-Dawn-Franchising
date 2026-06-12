@@ -1,5 +1,5 @@
 import { scrapeTeamPage, type ScrapedPerson } from "./website-scraper";
-import { apolloSearchByDomain, apolloSearchByCompanyName, apolloMatchPerson } from "./apollo-service";
+import { seamlessSearchByDomain, seamlessSearchByCompanyName, seamlessMatchPerson } from "./seamless-service";
 import { hunterFindEmail, hunterDomainPattern, buildEmailFromPattern } from "./hunter-service";
 import { calculateDecisionMakerScore } from "./decision-maker-scorer";
 import { searchProspects, searchByFreeQuery } from "./prospect-search";
@@ -147,7 +147,7 @@ function isLikelyRealPersonName(firstName: string, lastName: string): boolean {
 
 function mergePeople(
   scraped: ScrapedPerson[],
-  apolloResults: Awaited<ReturnType<typeof apolloSearchByDomain>>
+  seamlessResults: Awaited<ReturnType<typeof seamlessSearchByDomain>>
 ): Array<{
   fullName: string; firstName: string; lastName: string;
   jobTitle: string | null; seniority: string;
@@ -171,8 +171,8 @@ function mergePeople(
     });
   }
 
-  for (const a of apolloResults) {
-    // Skip Apollo contacts with fake/generic/pattern-derived names
+  for (const a of seamlessResults) {
+    // Skip Seamless contacts with fake/generic/pattern-derived names
     if (!isLikelyRealPersonName(a.firstName, a.lastName)) continue;
 
     const fullName = `${a.firstName} ${a.lastName}`.trim();
@@ -183,7 +183,7 @@ function mergePeople(
       if (!existing.phone && a.phone) existing.phone = a.phone;
       if (!existing.linkedinUrl && a.linkedinUrl) existing.linkedinUrl = a.linkedinUrl;
       if (!existing.jobTitle && a.jobTitle) existing.jobTitle = a.jobTitle;
-      if (!existing.sources.includes("apollo")) existing.sources.push("apollo");
+      if (!existing.sources.includes("seamless")) existing.sources.push("seamless");
     } else {
       people.set(key, {
         fullName, firstName: a.firstName, lastName: a.lastName,
@@ -191,7 +191,7 @@ function mergePeople(
         email: a.email, emailConfidence: a.emailConfidence,
         phone: a.phone, linkedinUrl: a.linkedinUrl,
         bio: null, e2ViaBio: false, internationalBio: false,
-        sources: ["apollo"],
+        sources: ["seamless"],
       });
     }
   }
@@ -204,47 +204,47 @@ async function enrichCompany(
   category: string,
   location: string,
   hunterPatterns: Map<string, string | null>,
-  apolloFirst = false
+  seamlessFirst = false
 ): Promise<EnrichedCompany> {
   const companyId = makeId();
   const domain = extractDomain(serpResult.website);
 
   let people: ReturnType<typeof mergePeople> = [];
 
-  if (apolloFirst) {
-    // ── Apollo-first strategy (used for "By Company URL") ──────────────────
-    // Try Apollo domain search first — it finds real verified people by domain
-    const apolloResults = domain ? await apolloSearchByDomain(domain, 10) : [];
+  if (seamlessFirst) {
+    // ── Seamless-first strategy (used for "By Company URL") ────────────────
+    // Try Seamless domain search first — it finds real people by domain
+    const seamlessResults = domain ? await seamlessSearchByDomain(domain, 10) : [];
 
-    if (apolloResults.length >= 2) {
-      // Apollo found enough people — skip website scraping entirely
-      people = mergePeople([], apolloResults);
+    if (seamlessResults.length >= 2) {
+      // Seamless found enough people — skip website scraping entirely
+      people = mergePeople([], seamlessResults);
     } else {
-      // Apollo came up thin — run website scraping AND company-name fallback in parallel
-      const [scraped, apolloByName] = await Promise.all([
+      // Seamless came up thin — run website scraping AND company-name fallback in parallel
+      const [scraped, seamlessByName] = await Promise.all([
         serpResult.website ? scrapeTeamPage(serpResult.website) : Promise.resolve([]),
-        apolloSearchByCompanyName(serpResult.name, domain, 8),
+        seamlessSearchByCompanyName(serpResult.name, domain, 8),
       ]);
-      people = mergePeople(scraped, [...apolloResults, ...apolloByName]);
+      people = mergePeople(scraped, [...seamlessResults, ...seamlessByName]);
     }
 
-    // If still empty, try Apollo company-name alone
+    // If still empty, try Seamless company-name alone
     if (people.length === 0 && domain) {
-      const byName = await apolloSearchByCompanyName(serpResult.name, domain, 8);
+      const byName = await seamlessSearchByCompanyName(serpResult.name, domain, 8);
       people = mergePeople([], byName);
     }
   } else {
     // ── Standard strategy (used for "By Category & Location") ─────────────
-    // Run website scraping and Apollo in parallel for speed
-    const [scraped, apolloResults] = await Promise.all([
+    // Run website scraping and Seamless in parallel for speed
+    const [scraped, seamlessResults] = await Promise.all([
       serpResult.website ? scrapeTeamPage(serpResult.website) : Promise.resolve([]),
-      domain ? apolloSearchByDomain(domain, 8) : Promise.resolve([]),
+      domain ? seamlessSearchByDomain(domain, 8) : Promise.resolve([]),
     ]);
-    people = mergePeople(scraped, apolloResults);
+    people = mergePeople(scraped, seamlessResults);
 
-    // Fallback: Apollo company-name search
+    // Fallback: Seamless company-name search
     if (people.length === 0) {
-      const fallbackResults = await apolloSearchByCompanyName(serpResult.name, domain, 6);
+      const fallbackResults = await seamlessSearchByCompanyName(serpResult.name, domain, 6);
       if (fallbackResults.length > 0) {
         people = mergePeople([], fallbackResults);
       }
@@ -748,7 +748,7 @@ Example output: ["franchise consultant E-2 visa investors USA", "international f
 
 export function getEnrichmentApiStatus() {
   return {
-    apollo: !!process.env.APOLLO_API_KEY,
+    seamless: !!process.env.SEAMLESS_API_KEY,
     hunter: !!process.env.HUNTER_API_KEY,
     zerobounce: !!process.env.ZEROBOUNCE_API_KEY,
     proxycurl: !!process.env.PROXYCURL_API_KEY,

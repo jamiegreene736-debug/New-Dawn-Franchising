@@ -14,6 +14,7 @@ import {
   runOutreachCampaignLoop, draftFirstTouch, handleReply, approveAndSendTouch, getCampaignStats,
 } from "./outreach-agent-service";
 import { sendSingleAgentMessage } from "./agent-service";
+import { seamlessFindPeople } from "./seamless-service";
 
 function requireAdmin(req: any, res: any, next: any) {
   if (req.session?.adminId || req.session?.isAdmin) return next();
@@ -135,7 +136,6 @@ export function registerOutreachRoutes(app: Express) {
     if (!segment) return res.status(400).json({ message: "segment is required" });
 
     const serpKey = process.env.SERPAPI_KEY;
-    const apolloKey = process.env.APOLLO_API_KEY;
     const leads: any[] = [];
 
     // Step 1: SerpAPI search
@@ -176,28 +176,23 @@ export function registerOutreachRoutes(app: Express) {
       }
     }
 
-    // Step 2: Apollo enrichment if available
-    if (apolloKey && leads.length > 0) {
+    // Step 2: Seamless enrichment if available
+    if (process.env.SEAMLESS_API_KEY && leads.length > 0) {
       for (const lead of leads.slice(0, 5)) {
         try {
-          const r = await fetch("https://api.apollo.io/api/v1/mixed_people/api_search", {
-            method: "POST",
-            headers: { "x-api-key": apolloKey, "Content-Type": "application/json" },
-            body: JSON.stringify({ q_organization_domains: [lead.company], per_page: 1 }),
-            signal: AbortSignal.timeout(8000),
-          });
-          if (!r.ok) continue;
-          const data = await r.json() as any;
-          const person = data?.people?.[0];
+          const found = await seamlessFindPeople(
+            { companyDomains: [lead.company], limit: 1 },
+            { enrich: true },
+          );
+          const person = found[0];
           if (person) {
-            lead.fullName = `${person.first_name || ""} ${person.last_name || ""}`.trim() || lead.fullName;
-            lead.title = person.title || lead.title;
+            lead.fullName = `${person.firstName} ${person.lastName}`.trim() || lead.fullName;
+            lead.title = person.jobTitle || lead.title;
             lead.email = person.email || lead.email;
-            lead.phone = person.phone_numbers?.[0]?.sanitized_number || lead.phone;
-            lead.linkedinUrl = person.linkedin_url || lead.linkedinUrl;
+            lead.phone = person.phone || lead.phone;
+            lead.linkedinUrl = person.linkedinUrl || lead.linkedinUrl;
             lead.score = Math.min(10, lead.score + 2);
           }
-          await new Promise(r => setTimeout(r, 500));
         } catch { /* skip */ }
       }
     }
@@ -512,7 +507,6 @@ Return JSON array of suggestion objects with fields: id (short string), title (s
     const { description, category, location, scoreThreshold } = req.body;
     if (!description) return res.status(400).json({ message: "description required" });
     const serpKey = process.env.SERPAPI_KEY;
-    const apolloKey = process.env.APOLLO_API_KEY;
     const hunterKey = process.env.HUNTER_API_KEY;
     const discovered: any[] = [];
 
@@ -538,28 +532,23 @@ Return JSON array of suggestion objects with fields: id (short string), title (s
       } catch { /* skip */ }
     }
 
-    // Apollo enrichment on top results
-    if (apolloKey && discovered.length > 0) {
+    // Seamless enrichment on top results
+    if (process.env.SEAMLESS_API_KEY && discovered.length > 0) {
       for (const lead of discovered.slice(0, 5)) {
         try {
-          const r = await fetch("https://api.apollo.io/api/v1/mixed_people/api_search", {
-            method: "POST",
-            headers: { "x-api-key": apolloKey, "Content-Type": "application/json" },
-            body: JSON.stringify({ q_organization_domains: [lead.company], per_page: 1 }),
-            signal: AbortSignal.timeout(8000),
-          });
-          if (!r.ok) continue;
-          const data = await r.json() as any;
-          const person = data?.people?.[0];
+          const found = await seamlessFindPeople(
+            { companyDomains: [lead.company], limit: 1 },
+            { enrich: true },
+          );
+          const person = found[0];
           if (person) {
-            lead.fullName = `${person.first_name || ""} ${person.last_name || ""}`.trim() || lead.fullName;
-            lead.title = person.title;
+            lead.fullName = `${person.firstName} ${person.lastName}`.trim() || lead.fullName;
+            lead.title = person.jobTitle;
             lead.email = person.email;
-            lead.phone = person.phone_numbers?.[0]?.sanitized_number;
-            lead.linkedinUrl = person.linkedin_url;
+            lead.phone = person.phone;
+            lead.linkedinUrl = person.linkedinUrl;
             lead.score = Math.min(10, lead.score + 2);
           }
-          await new Promise(r => setTimeout(r, 400));
         } catch { /* skip */ }
       }
     }

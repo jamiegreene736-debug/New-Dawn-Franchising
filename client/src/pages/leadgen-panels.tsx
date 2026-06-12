@@ -1442,7 +1442,7 @@ export function DiscoverSection() {
       {isSearching && (
         <div className="flex flex-col items-center justify-center py-12 gap-3 text-gray-400">
           <Loader2 className="w-6 h-6 animate-spin" />
-          <p className="text-sm">Searching web directories, enriching with Apollo...</p>
+          <p className="text-sm">Searching web directories, enriching with Seamless.AI...</p>
         </div>
       )}
 

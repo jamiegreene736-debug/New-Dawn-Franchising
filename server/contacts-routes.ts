@@ -4,7 +4,7 @@ import { insertContactSchema, insertContactActivitySchema, insertContactTaskSche
 import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { calculateLeadScore, rescoreContact } from "./lead-scoring";
-import { apolloSearch, getApolloStatus } from "./apollo-service";
+import { seamlessSearch, getSeamlessStatus } from "./seamless-service";
 import { sendEmail } from "./email-service";
 
 function requireAdminAuth(req: Request, res: Response, next: () => void) {
@@ -448,13 +448,13 @@ export function registerContactRoutes(app: Express) {
     }
   });
 
-  // ─── Apollo ───────────────────────────────────────────────────────────────
+  // ─── Seamless.AI ──────────────────────────────────────────────────────────
 
-  app.get("/api/apollo/status", requireAdminAuth, (_req, res) => {
-    res.json(getApolloStatus());
+  app.get("/api/seamless/status", requireAdminAuth, (_req, res) => {
+    res.json(getSeamlessStatus());
   });
 
-  app.post("/api/apollo/search", requireAdminAuth, async (req, res) => {
+  app.post("/api/seamless/search", requireAdminAuth, async (req, res) => {
     try {
       const { titles, locations, keywords, page } = req.body as {
         titles?: string[];
@@ -462,10 +462,10 @@ export function registerContactRoutes(app: Express) {
         keywords?: string;
         page?: number;
       };
-      const result = await apolloSearch({ titles, locations, keywords, page });
+      const result = await seamlessSearch({ titles, locations, keywords, page });
       res.json(result);
     } catch (err) {
-      res.status(500).json({ message: "Apollo search failed" });
+      res.status(500).json({ message: "Seamless search failed" });
     }
   });
 
@@ -521,14 +521,14 @@ export function registerContactRoutes(app: Express) {
       if (score > 100) throw new Error(`Score ${score} exceeds 100`);
     });
 
-    // Apollo tests
-    await run("Apollo status endpoint responds", async () => {
-      const status = getApolloStatus();
+    // Seamless tests
+    await run("Seamless status endpoint responds", async () => {
+      const status = getSeamlessStatus();
       if (typeof status.configured !== "boolean") throw new Error("No configured field");
     });
-    await run("Apollo API key configured", async () => {
-      const status = getApolloStatus();
-      if (!status.configured) throw new Error("APOLLO_API_KEY not set");
+    await run("Seamless API key configured", async () => {
+      const status = getSeamlessStatus();
+      if (!status.configured) throw new Error("SEAMLESS_API_KEY not set");
     });
 
     // Contact CRUD tests

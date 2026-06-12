@@ -4,18 +4,18 @@
  *
  * Daily schedule (via cron in routes.ts):
  *   6:00 AM ET — planDailyIntelligence() → Claude plans the day, saves to DB, sends SMS approval link
- *   On approval  — executeApprovedPlan(planId) → SerpAPI + Apollo searches → populates outreach_leads
+ *   On approval  — executeApprovedPlan(planId) → SerpAPI + Seamless searches → populates outreach_leads
  */
 
 import { db } from "./db";
 import { outreachDailyPlans, outreachLeads } from "@shared/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { notifyBlocker, sendAgentSms } from "./agent-sms-service";
+import { seamlessFindPeople } from "./seamless-service";
 import { randomUUID } from "crypto";
 
 const APP_BASE = () => process.env.APP_BASE_URL ?? "https://newdawnfranchising.replit.app";
 const SERPAPI_KEY = process.env.SERPAPI_KEY ?? "";
-const APOLLO_API_KEY = process.env.APOLLO_API_KEY ?? "";
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY ?? "";
 
 // ─── Claude helper ────────────────────────────────────────────────────────────
@@ -104,7 +104,7 @@ Think about timing and strategy: What country or category has the most active de
 
 AVAILABLE TOOLS:
 - SerpAPI: Google Search (use for finding specific people, firms, associations, contact info)
-- Apollo: B2B lead database with email enrichment (use for finding specific job titles at companies)
+- Seamless: B2B lead database with email enrichment (use for finding specific job titles at companies)
 - Hunter.io: Email finder for domains
 - Note: LinkedIn scraping NOT available. If needed, flag as a blocker request.
 
@@ -179,41 +179,35 @@ async function serpSearch(query: string): Promise<{ title: string; link: string;
   }
 }
 
-// ─── Apollo People Search ─────────────────────────────────────────────────────
+// ─── Seamless.AI People Search ──────────────────────────────────────────────
 
-async function apolloSearch(opts: {
+async function seamlessSearch(opts: {
   titles?: string[];
   locations?: string[];
   keywords?: string;
   limit?: number;
 }): Promise<{ name: string; title: string; company: string; email?: string; linkedinUrl?: string; location?: string }[]> {
-  if (!APOLLO_API_KEY) return [];
-  try {
-    const res = await fetch("https://api.apollo.io/api/v1/mixed_people/api_search", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-api-key": APOLLO_API_KEY },
-      body: JSON.stringify({
-        page: 1,
-        per_page: Math.min(opts.limit ?? 20, 25),
-        person_titles: opts.titles ?? [],
-        person_locations: opts.locations ?? [],
-        q_keywords: opts.keywords ?? "",
-        contact_email_status: ["verified", "likely to engage"],
-      }),
-    });
-    if (!res.ok) return [];
-    const data = await res.json() as { people?: Record<string, unknown>[] };
-    return (data.people ?? []).map((p: Record<string, unknown>) => ({
-      name: `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim(),
-      title: (p.title as string) ?? "",
-      company: ((p.organization as Record<string, unknown>)?.name as string) ?? "",
-      email: (p.email as string) ?? undefined,
-      linkedinUrl: (p.linkedin_url as string) ?? undefined,
-      location: `${p.city ?? ""} ${p.country ?? ""}`.trim(),
-    })).filter(p => p.name);
-  } catch {
-    return [];
-  }
+  if (!process.env.SEAMLESS_API_KEY) return [];
+  // enrich=true runs the research+poll step so emails come back.
+  const people = await seamlessFindPeople(
+    {
+      titles: opts.titles ?? [],
+      countries: opts.locations ?? [],
+      keywords: opts.keywords,
+      limit: Math.min(opts.limit ?? 20, 25),
+    },
+    { enrich: true },
+  );
+  return people
+    .map((p) => ({
+      name: p.fullName || `${p.firstName} ${p.lastName}`.trim(),
+      title: p.jobTitle ?? "",
+      company: p.company ?? "",
+      email: p.email ?? undefined,
+      linkedinUrl: p.linkedinUrl ?? undefined,
+      location: [p.city, p.country].filter(Boolean).join(" "),
+    }))
+    .filter((p) => p.name);
 }
 
 // ─── Extract leads from SerpAPI results ──────────────────────────────────────
@@ -298,7 +292,7 @@ Based on this context, generate today's outreach intelligence plan. Be strategic
     planSummary: string;
     strategicReasoning: string;
     leadCategories: { category: string; country: string; geoFocus: string; reasoning: string; estimatedLeads: number; priority: "high"|"medium"|"low" }[];
-    searchQueries: { query: string; source: "serpapi"|"apollo"|"hunter"; purpose: string }[];
+    searchQueries: { query: string; source: "serpapi"|"seamless"|"hunter"; purpose: string }[];
     blockerRequests?: { tool: string; reason: string; priority: "high"|"medium"|"low"; url?: string }[];
     estimatedLeads: number;
   };
@@ -380,7 +374,7 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
   for (const query of (plan.searchQueries ?? [])) {
     try {
       let discovered: { fullName: string; company: string; website?: string; category: string; notes: string }[] = [];
-      let apolloLeads: { name: string; title: string; company: string; email?: string; linkedinUrl?: string; location?: string }[] = [];
+      let seamlessLeads: { name: string; title: string; company: string; email?: string; linkedinUrl?: string; location?: string }[] = [];
 
       if (query.source === "serpapi") {
         const results = await serpSearch(query.query);
@@ -391,20 +385,20 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
           query.query.toLowerCase().includes(c.country.toLowerCase())
         ) ?? matchedCategory;
         discovered = await extractLeadsFromSerp(results, cat?.category ?? "other", cat?.country ?? "");
-      } else if (query.source === "apollo") {
-        // Parse Apollo query into titles + locations
+      } else if (query.source === "seamless") {
+        // Parse Seamless query into titles + locations
         const cat = plan.leadCategories.find(c =>
           query.purpose.toLowerCase().includes(c.country.toLowerCase())
         ) ?? plan.leadCategories[0];
         const titles = cat ? [cat.category.replace(/_/g, " ")] : ["immigration attorney"];
         const locations = cat ? [cat.geoFocus] : [];
-        apolloLeads = await apolloSearch({ titles, locations, keywords: "E-2 visa", limit: 20 });
-        discovered = apolloLeads.map(p => ({
+        seamlessLeads = await seamlessSearch({ titles, locations, keywords: "E-2 visa", limit: 20 });
+        discovered = seamlessLeads.map(p => ({
           fullName: p.name,
           company: p.company,
           website: undefined,
           category: cat?.category ?? "other",
-          notes: `${p.title} — found via Apollo | ${p.location}`,
+          notes: `${p.title} — found via Seamless | ${p.location}`,
         }));
       }
 
@@ -424,14 +418,14 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
 
           if (existing.length > 0) continue;
 
-          const apolloMatch = apolloLeads.find(a => a.name === lead.fullName);
+          const seamlessMatch = seamlessLeads.find(a => a.name === lead.fullName);
           await db.insert(outreachLeads).values({
             fullName: lead.fullName,
             company: lead.company ?? "",
             website: lead.website,
             category: lead.category,
-            email: apolloMatch?.email,
-            linkedinUrl: apolloMatch?.linkedinUrl,
+            email: seamlessMatch?.email,
+            linkedinUrl: seamlessMatch?.linkedinUrl,
             notes: `[${query.source.toUpperCase()}] ${lead.notes}`,
             score: 60,
             status: "new",

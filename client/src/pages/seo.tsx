@@ -1670,7 +1670,7 @@ function VisitorsSection() {
                             }
                           }}
                           disabled={findPeopleMutation.isPending && findPeopleMutation.variables === v.id}
-                          title="Find decision-makers at this company via Apollo"
+                          title="Find decision-makers at this company via Seamless.AI"
                         >
                           {findPeopleMutation.isPending && findPeopleMutation.variables === v.id
                             ? <><RefreshCw className="w-3.5 h-3.5 mr-1 animate-spin" /> Searching…</>
@@ -1772,10 +1772,10 @@ function VisitorsSection() {
                           Decision-makers at <span className="text-purple-700">{findPeopleData.companyName}</span>
                           {findPeopleData.location && <span className="font-normal text-purple-500">· {findPeopleData.location}</span>}
                         </p>
-                        <span className="text-xs text-purple-500">{findPeopleData.results.length} found via Apollo</span>
+                        <span className="text-xs text-purple-500">{findPeopleData.results.length} found via Seamless.AI</span>
                       </div>
                       {findPeopleData.results.length === 0 ? (
-                        <p className="text-sm text-purple-600">No Apollo results found. Try adding a website URL in the Prospect Finder for a deeper search.</p>
+                        <p className="text-sm text-purple-600">No Seamless.AI results found. Try adding a website URL in the Prospect Finder for a deeper search.</p>
                       ) : (
                         <div className="space-y-2">
                           {findPeopleData.results.map((p, i) => (

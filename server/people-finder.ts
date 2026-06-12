@@ -1,7 +1,7 @@
 /**
  * people-finder.ts
  * Multi-source people discovery engine for "By Company URL" enrichment.
- * Aggregates Apollo, Hunter domain search, SerpAPI (LinkedIn/ZoomInfo/Crunchbase/BBB),
+ * Aggregates Seamless.AI, Hunter domain search, SerpAPI (LinkedIn/ZoomInfo/Crunchbase/BBB),
  * People Data Labs, OpenCorporates, website scraping, and email permutation.
  */
 
@@ -11,8 +11,8 @@ import { verifyEmailBatch } from "./zerobounce-service";
 import { lookupPhoneBatch, type PhoneType } from "./twilio-lookup";
 import { fetchPeopleFromPdl, enrichGapsViaPdl, pdlLevelToSeniority, type PdlPerson } from "./pdl-service";
 import { enrichPeopleFromWhitepages } from "./whitepages-service";
+import { seamlessFindPeople, seamlessEnrichByIdentity, type SeamlessPerson } from "./seamless-service";
 
-const APOLLO_BASE = "https://api.apollo.io/api/v1";
 const HUNTER_BASE = "https://api.hunter.io/v2";
 const SERPAPI_BASE = "https://serpapi.com/search.json";
 
@@ -136,7 +136,7 @@ function mergeKey(firstName: string, lastName: string): string {
   return `${firstName}${lastName}`.toLowerCase().replace(/[^a-z]/g, "");
 }
 
-/** Map Apollo/other seniority strings to our levels */
+/** Map Seamless/other seniority strings to our levels */
 function normalizeSeniority(raw: string | null): string {
   if (!raw) return "associate";
   const r = raw.toLowerCase();
@@ -150,7 +150,7 @@ function normalizeSeniority(raw: string | null): string {
 
 /** Assign overall confidence tier */
 function scoreConfidence(p: { sources: string[]; emailVerified: boolean; email: string | null }): FoundPerson["confidence"] {
-  const directSources = p.sources.filter(s => ["apollo", "hunter_domain"].includes(s)).length;
+  const directSources = p.sources.filter(s => ["seamless", "hunter_domain"].includes(s)).length;
   if (p.emailVerified && p.sources.length >= 3) return "confirmed";
   if (directSources >= 2) return "confirmed";
   if (directSources >= 1 && p.email) return "high";
@@ -348,90 +348,46 @@ const NAME_TITLE_RE_WITH_TITLE = new RegExp(
   `^([A-Z][a-zÀ-ÖØ-öø-ÿ'-]+(?:\\s+(?:${NAME_PARTICLE}|[A-Z][a-zÀ-ÖØ-öø-ÿ'-]+))*\\s+[A-Z][a-zÀ-ÖØ-öø-ÿ'-]+)\\s*[-–]\\s*([^|]+?)(?:\\s*[-–]\\s*[^|]+)?\\s*\\|`
 );
 
-// ─── Source 1: Apollo (paginated, no seniority filter) ─────────────────────
+// ─── Source 1: Seamless.AI (domain + company search, with enrichment) ───────
 
-interface ApolloRaw {
-  first_name?: string;
-  last_name?: string;
-  email?: string;
-  email_status?: string;
-  phone_numbers?: Array<{ sanitized_number?: string; raw_number?: string }>;
-  linkedin_url?: string;
-  title?: string;
-  seniority?: string;
-  departments?: string[];
-  organization_name?: string;
-  country?: string;
-  city?: string;
-  state?: string;
-}
-
-async function apolloFetchPage(
-  domain: string,
-  page: number,
-  perPage: number,
-  seniorityFilter?: string[]
-): Promise<ApolloRaw[]> {
-  const apiKey = process.env.APOLLO_API_KEY;
-  if (!apiKey) return [];
-  try {
-    const body: Record<string, unknown> = {
-      organization_domains: [domain],
-      per_page: perPage,
-      page,
-    };
-    if (seniorityFilter?.length) body.person_seniorities = seniorityFilter;
-
-    const res = await fetch(`${APOLLO_BASE}/mixed_people/api_search`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Api-Key": apiKey },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) return [];
-    const json = await res.json() as { people?: ApolloRaw[] };
-    return json.people || [];
-  } catch { return []; }
-}
-
-async function fetchFromApollo(domain: string, companyName: string): Promise<FoundPerson[]> {
+async function fetchFromSeamless(domain: string, companyName: string): Promise<FoundPerson[]> {
+  if (!process.env.SEAMLESS_API_KEY) return [];
   const results: FoundPerson[] = [];
   const seen = new Set<string>();
 
-  const addApolloResult = (p: ApolloRaw, source = "apollo") => {
-    const firstName = String(p.first_name || "").trim();
-    const lastName = String(p.last_name || "").trim();
+  const addSeamlessResult = (p: SeamlessPerson, source = "seamless") => {
+    const firstName = (p.firstName || "").trim();
+    const lastName = (p.lastName || "").trim();
     if (!isValidPerson(firstName, lastName)) return;
-    const emailRaw = String(p.email || "").trim();
+    const emailRaw = (p.email || "").trim();
     if (emailRaw && isRoleAliasEmail(emailRaw)) return;
 
-    // Quality gate: Apollo sometimes returns company/place names as "people".
-    // If there's no email AND no LinkedIn URL, require at least one known
-    // decision-maker title word — otherwise skip this record as likely bad data.
+    // Quality gate: require an email, a LinkedIn URL, or a known decision-maker
+    // title word — otherwise skip the record as likely bad data.
     const hasEmail = !!emailRaw;
-    const hasLinkedIn = !!(p.linkedin_url || "").trim();
-    const titleStr = String(p.title || "").toLowerCase();
+    const hasLinkedIn = !!(p.linkedinUrl || "").trim();
+    const titleStr = (p.jobTitle || "").toLowerCase();
     const titleHasKeyword = [...TITLE_KEYWORDS].some(k => titleStr.includes(k));
     if (!hasEmail && !hasLinkedIn && !titleHasKeyword) return;
 
     const key = mergeKey(firstName, lastName);
     if (seen.has(key)) return;
     seen.add(key);
-    const phone = p.phone_numbers?.[0]?.sanitized_number || p.phone_numbers?.[0]?.raw_number || null;
-    const country = String(p.country || "").trim() || null;
+    const country = (p.country || "").trim() || null;
     results.push({
       firstName,
       lastName,
       fullName: `${firstName} ${lastName}`,
-      jobTitle: String(p.title || "") || null,
-      seniority: normalizeSeniority(p.seniority || null),
-      email: String(p.email || "") || null,
-      emailConfidence: p.email_status === "verified" ? 95 : p.email ? 70 : 0,
-      emailVerified: p.email_status === "verified",
-      emailStatus: p.email_status || (p.email ? "unverified" : "not_found"),
-      phone: phone ? String(phone) : null,
+      jobTitle: p.jobTitle,
+      seniority: normalizeSeniority(p.seniority),
+      email: p.email,
+      emailConfidence: p.emailConfidence,
+      emailVerified: p.emailVerified,
+      emailStatus: p.emailStatus,
+      phone: p.phone,
       ...DEFAULT_PHONE_META,
       whatsappProbability: whatsappProbForCountry(country),
-      linkedinUrl: String(p.linkedin_url || "") || null,
+      linkedinUrl: p.linkedinUrl,
       bio: null,
       country,
       sources: [source],
@@ -442,149 +398,23 @@ async function fetchFromApollo(domain: string, companyName: string): Promise<Fou
     });
   };
 
-  // Page 1 & 2: decision makers (owners, founders, C-suite, VP, director)
-  const seniorFilter = ["owner", "founder", "c_suite", "partner", "vp", "director"];
-  const [page1Senior, page2Senior] = await Promise.all([
-    apolloFetchPage(domain, 1, 25, seniorFilter),
-    apolloFetchPage(domain, 2, 25, seniorFilter),
+  // Two passes:
+  //  • Domain search for decision-makers, ENRICHED (research+poll) so emails and
+  //    phones come back — this is the high-value pass.
+  //  • Company-name search, search-only (no credits) — Hunter / email-permutation
+  //    fill in emails downstream. Keeps credit usage to one research batch/company.
+  const decisionMakers = ["C-Level", "VP", "Director", "Owner", "Partner", "Manager"];
+  const [byDomain, byName] = await Promise.all([
+    seamlessFindPeople(
+      { companyDomains: [domain], seniorities: decisionMakers, limit: 25 },
+      { enrich: true },
+    ),
+    companyName
+      ? seamlessFindPeople({ companyName, companyDomains: [domain], limit: 25 })
+      : Promise.resolve([] as SeamlessPerson[]),
   ]);
-  [...page1Senior, ...page2Senior].forEach(p => addApolloResult(p));
-
-  // Page 1 & 2: all seniority levels (gets managers, individual contributors too)
-  const [page1All, page2All] = await Promise.all([
-    apolloFetchPage(domain, 1, 25),
-    apolloFetchPage(domain, 2, 25),
-  ]);
-  [...page1All, ...page2All].forEach(p => addApolloResult(p));
-
-  // Company name search — two passes:
-  // Pass A: owner/founder/principal title filter (highest-value — catches the people
-  //         whose LinkedIn title is "Founder" rather than a seniority-tagged role)
-  // Pass B: broader C-suite/director sweep without title filter (catches everyone else)
-  if (companyName) {
-    const apiKey = process.env.APOLLO_API_KEY;
-    if (apiKey) {
-      const ownerTitles = [
-        "Owner", "Founder", "Co-Founder", "Co Founder",
-        "CEO", "President", "Principal", "Managing Partner",
-        "Managing Director", "Partner",
-      ];
-      await Promise.all([
-        // Pass A — owner/founder titles specifically
-        fetch(`${APOLLO_BASE}/mixed_people/api_search`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "X-Api-Key": apiKey },
-          body: JSON.stringify({
-            q_organization_name: companyName,
-            organization_domains: [domain],
-            person_titles: ownerTitles,
-            per_page: 25,
-            page: 1,
-          }),
-        }).then(r => r.ok ? r.json() as Promise<{ people?: ApolloRaw[] }> : { people: [] })
-          .then(json => (json.people || []).forEach(p => addApolloResult(p, "apollo_name_owner")))
-          .catch(() => {}),
-
-        // Pass B — all seniority (catches other execs whose title doesn't use these exact words)
-        fetch(`${APOLLO_BASE}/mixed_people/api_search`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "X-Api-Key": apiKey },
-          body: JSON.stringify({
-            q_organization_name: companyName,
-            organization_domains: [domain],
-            per_page: 25,
-            page: 1,
-          }),
-        }).then(r => r.ok ? r.json() as Promise<{ people?: ApolloRaw[] }> : { people: [] })
-          .then(json => (json.people || []).forEach(p => addApolloResult(p, "apollo_name")))
-          .catch(() => {}),
-      ]);
-    }
-  }
-
-  return results;
-}
-
-// ─── Source 1b: Apollo Organization Enrichment (org_id-based people search) ──
-// Resolves a domain to Apollo's internal org ID, then searches people by that ID.
-// This finds executives even if their LinkedIn profile doesn't list the company website.
-
-async function fetchFromApolloOrgId(domain: string): Promise<FoundPerson[]> {
-  const apiKey = process.env.APOLLO_API_KEY;
-  if (!apiKey) return [];
-  const results: FoundPerson[] = [];
-  const seen = new Set<string>();
-
-  try {
-    // Step 1: Resolve domain → Apollo org ID
-    const enrichRes = await fetch(
-      `${APOLLO_BASE}/organizations/enrich?domain=${encodeURIComponent(domain)}`,
-      {
-        headers: { "X-Api-Key": apiKey, "Content-Type": "application/json" },
-        signal: AbortSignal.timeout(10000),
-      }
-    );
-    if (!enrichRes.ok) return [];
-    const enrichData = await enrichRes.json() as { organization?: { id?: string; name?: string } };
-    const orgId = enrichData.organization?.id;
-    if (!orgId) return [];
-
-    // Step 2: Search people by org_id (more reliable than domain string match)
-    const peopleRes = await fetch(`${APOLLO_BASE}/mixed_people/api_search`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Api-Key": apiKey },
-      body: JSON.stringify({
-        organization_ids: [orgId],
-        person_seniorities: ["owner", "founder", "c_suite", "partner", "vp", "director", "manager"],
-        per_page: 25,
-        page: 1,
-      }),
-      signal: AbortSignal.timeout(12000),
-    });
-    if (!peopleRes.ok) return [];
-    const peopleData = await peopleRes.json() as { people?: ApolloRaw[] };
-
-    for (const p of peopleData.people || []) {
-      const firstName = String(p.first_name || "").trim();
-      const lastName = String(p.last_name || "").trim();
-      if (!isValidPerson(firstName, lastName)) continue;
-      const emailRaw = String(p.email || "").trim();
-      if (emailRaw && isRoleAliasEmail(emailRaw)) continue;
-      // Same quality gate as fetchFromApollo: no email + no LinkedIn requires a real title
-      const hasEmail = !!emailRaw;
-      const hasLinkedIn = !!(p.linkedin_url || "").trim();
-      const titleStr = String(p.title || "").toLowerCase();
-      const titleHasKeyword = [...TITLE_KEYWORDS].some(k => titleStr.includes(k));
-      if (!hasEmail && !hasLinkedIn && !titleHasKeyword) continue;
-      const key = mergeKey(firstName, lastName);
-      if (seen.has(key)) continue;
-      seen.add(key);
-      const phone = p.phone_numbers?.[0]?.sanitized_number || p.phone_numbers?.[0]?.raw_number || null;
-      const country = String(p.country || "").trim() || null;
-      results.push({
-        firstName,
-        lastName,
-        fullName: `${firstName} ${lastName}`,
-        jobTitle: String(p.title || "") || null,
-        seniority: normalizeSeniority(p.seniority || null),
-        email: String(p.email || "") || null,
-        emailConfidence: p.email_status === "verified" ? 95 : p.email ? 70 : 0,
-        emailVerified: p.email_status === "verified",
-        emailStatus: p.email_status || (p.email ? "unverified" : "not_found"),
-        phone: phone ? String(phone) : null,
-        ...DEFAULT_PHONE_META,
-        whatsappProbability: whatsappProbForCountry(country),
-        linkedinUrl: String(p.linkedin_url || "") || null,
-        bio: null,
-        country,
-        sources: ["apollo_org"],
-        sourceCount: 1,
-        confidence: "medium",
-        e2ViaBio: false,
-        internationalBio: false,
-      });
-    }
-  } catch { /* ignore */ }
+  byDomain.forEach(p => addSeamlessResult(p));
+  byName.forEach(p => addSeamlessResult(p, "seamless_name"));
 
   return results;
 }
@@ -1705,16 +1535,15 @@ export async function findAllPeopleAtCompany(
   if (!domain) return [];
 
   // Phase 1: Fetch from all sources in parallel
-  // apollo_org:  resolves domain → Apollo org_id → searches by org_id
+  // seamless:    domain + company search (enriched) — decision-makers with emails/phones
   // proxycurl:   LinkedIn company employee list — best for finding founders/owners with unusual titles
   // rdap:        free WHOIS successor — domain registrant is often the founder/owner
   // pdl:         People Data Labs — strong international coverage + direct work emails
   const [
-    apolloResults, apolloOrgResults, proxycurlResults, rdapResults,
+    seamlessResults, proxycurlResults, rdapResults,
     hunterResults, serpResults, ocResults, websiteResults, pdlResults,
   ] = await Promise.all([
-    fetchFromApollo(domain, companyName),
-    fetchFromApolloOrgId(domain),
+    fetchFromSeamless(domain, companyName),
     fetchFromProxycurl(domain),
     fetchFromRdap(domain),
     fetchFromHunterDomain(domain),
@@ -1726,7 +1555,7 @@ export async function findAllPeopleAtCompany(
 
   // Phase 2: Merge and deduplicate
   const merged = mergePeople([
-    apolloResults, apolloOrgResults, proxycurlResults, rdapResults,
+    seamlessResults, proxycurlResults, rdapResults,
     hunterResults, serpResults, ocResults, websiteResults, pdlResults,
   ]);
 
@@ -1758,7 +1587,7 @@ export async function findAllPeopleAtCompany(
   // Phase 2.5: Remove false aliases — a person found ONLY from the website (no
   // independent external source) whose email pattern collides with a better-sourced
   // person with the same last name is almost certainly a scraping artefact.
-  const externalSources = new Set(["apollo", "apollo_name", "apollo_name_owner", "apollo_org", "proxycurl", "hunter_domain", "hunter", "serp_linkedin", "serp_zoominfo", "serp_team", "rdap", "pdl"]);
+  const externalSources = new Set(["seamless", "seamless_name", "proxycurl", "hunter_domain", "hunter", "serp_linkedin", "serp_zoominfo", "serp_team", "rdap", "pdl"]);
   const hasExternalSource = (p: FoundPerson) => p.sources.some(s => externalSources.has(s));
 
   // Build a map of (last name → best-sourced person) for collision detection
@@ -1852,7 +1681,7 @@ export async function findAllPeopleAtCompany(
 
 // ─── Manual Contact Seeding ───────────────────────────────────────────────────
 // Targeted enrichment when you already know who you're looking for.
-// Runs Apollo person search, Apollo people/match, Hunter email-finder,
+// Runs Seamless search + identity research, Hunter email-finder,
 // SerpAPI LinkedIn/phone sweep, Whitepages, and ZeroBounce against a
 // specific name + company — and returns a single enriched FoundPerson.
 
@@ -1878,92 +1707,54 @@ export async function seedContactEnrichment(
 
   const addSource = (s: string) => { if (!result.sources.includes(s)) result.sources.push(s); };
 
-  // ── Step 1: Apollo mixed_people/api_search (name + company keyword) ──────────
-  const apolloKey = process.env.APOLLO_API_KEY;
-  if (apolloKey) {
+  // ── Step 1: Seamless — identity research + name/company search ───────────────
+  if (process.env.SEAMLESS_API_KEY) {
     try {
-      const body: Record<string, unknown> = {
-        q_keywords: fullName,
-        per_page: 5,
-        page: 1,
-      };
-      if (company) body.q_organization_name = company;
-      if (domain) body.organization_domains = [domain];
+      // First, identity research (name + domain/company/LinkedIn) to unlock a
+      // verified email + phone directly.
+      const enriched = await seamlessEnrichByIdentity([
+        {
+          contactName: fullName,
+          companyName: company || undefined,
+          domain: domain || undefined,
+          liProfileUrl: result.linkedinUrl || undefined,
+        },
+      ]);
+      let match: SeamlessPerson | undefined = enriched.find(p =>
+        isSameName(p.firstName.toLowerCase(), firstName.toLowerCase()) &&
+        isSameName(p.lastName.toLowerCase(), lastName.toLowerCase())
+      ) || enriched[0];
 
-      const apolloRes = await fetch(`${APOLLO_BASE}/mixed_people/api_search`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Api-Key": apolloKey },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(10_000),
-      });
-      if (apolloRes.ok) {
-        const json = await apolloRes.json() as { people?: ApolloRaw[] };
-        const people = json.people || [];
-        // Find the best match by name similarity
-        const match = people.find(p => {
-          const fn = String(p.first_name || "").toLowerCase();
-          const ln = String(p.last_name || "").toLowerCase();
-          return isSameName(fn, firstName.toLowerCase()) && isSameName(ln, lastName.toLowerCase());
-        }) || people[0];
-        if (match) {
-          if (!result.jobTitle) result.jobTitle = String(match.title || "") || null;
-          if (!result.seniority) result.seniority = normalizeSeniority(match.seniority || null);
-          if (!result.email && match.email) {
-            result.email = String(match.email);
-            result.emailConfidence = match.email_status === "verified" ? 95 : 70;
-            result.emailVerified = match.email_status === "verified";
-            result.emailStatus = match.email_status || "unverified";
-          }
-          if (!result.phone) {
-            const phone = match.phone_numbers?.[0]?.sanitized_number || match.phone_numbers?.[0]?.raw_number || null;
-            if (phone) result.phone = String(phone);
-          }
-          if (!result.linkedinUrl && match.linkedin_url) result.linkedinUrl = String(match.linkedin_url);
-          if (!result.country && match.country) result.country = String(match.country);
-          addSource("apollo");
-        }
+      // Fallback: search by name + company (enriched) if identity research is empty.
+      if (!match) {
+        const found = await seamlessFindPeople(
+          {
+            fullName,
+            companyName: company || undefined,
+            companyDomains: domain ? [domain] : undefined,
+            limit: 5,
+          },
+          { enrich: true },
+        );
+        match = found.find(p =>
+          isSameName(p.firstName.toLowerCase(), firstName.toLowerCase()) &&
+          isSameName(p.lastName.toLowerCase(), lastName.toLowerCase())
+        ) || found[0];
       }
-    } catch { /* ignore */ }
 
-    // ── Step 2: Apollo people/match — unlocks email with credits ────────────────
-    try {
-      const matchBody: Record<string, unknown> = {
-        first_name: firstName,
-        last_name: lastName,
-        reveal_personal_emails: true,
-      };
-      if (company) matchBody.organization_name = company;
-      if (domain) matchBody.domain = domain;
-      if (result.linkedinUrl) matchBody.linkedin_url = result.linkedinUrl;
-
-      const matchRes = await fetch(`${APOLLO_BASE}/people/match`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Api-Key": apolloKey },
-        body: JSON.stringify(matchBody),
-        signal: AbortSignal.timeout(10_000),
-      });
-      if (matchRes.ok) {
-        const json = await matchRes.json() as { person?: ApolloRaw & { personal_emails?: string[] } };
-        const p = json.person;
-        if (p) {
-          if (!result.jobTitle && p.title) result.jobTitle = String(p.title);
-          if (!result.seniority && p.seniority) result.seniority = normalizeSeniority(p.seniority);
-          if (!result.linkedinUrl && p.linkedin_url) result.linkedinUrl = String(p.linkedin_url);
-          if (!result.country && p.country) result.country = String(p.country);
-          // Prefer personal_emails if exposed
-          const bestEmail = (p as any).personal_emails?.[0] || p.email;
-          if (bestEmail && (!result.email || result.emailConfidence < 85)) {
-            result.email = String(bestEmail);
-            result.emailConfidence = p.email_status === "verified" ? 95 : 80;
-            result.emailVerified = p.email_status === "verified";
-            result.emailStatus = p.email_status || "unverified";
-          }
-          if (!result.phone) {
-            const phone = p.phone_numbers?.[0]?.sanitized_number || p.phone_numbers?.[0]?.raw_number || null;
-            if (phone) result.phone = String(phone);
-          }
-          addSource("apollo_match");
+      if (match) {
+        if (!result.jobTitle) result.jobTitle = match.jobTitle;
+        if (!result.seniority) result.seniority = normalizeSeniority(match.seniority);
+        if (!result.email && match.email) {
+          result.email = match.email;
+          result.emailConfidence = match.emailConfidence || 75;
+          result.emailVerified = match.emailVerified;
+          result.emailStatus = match.emailStatus;
         }
+        if (!result.phone && match.phone) result.phone = match.phone;
+        if (!result.linkedinUrl && match.linkedinUrl) result.linkedinUrl = match.linkedinUrl;
+        if (!result.country && match.country) result.country = match.country;
+        addSource("seamless");
       }
     } catch { /* ignore */ }
   }

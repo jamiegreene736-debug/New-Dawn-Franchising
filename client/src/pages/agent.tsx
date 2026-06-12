@@ -374,7 +374,7 @@ function DashboardSection({ onNavigate }: { onNavigate: (s: SectionId) => void }
   });
   const discoverMut = useMutation({
     mutationFn: () => api("/api/agent/run/discover", { method: "POST", body: JSON.stringify({ max: 25 }) }),
-    onSuccess: () => toast({ title: "Discovery started", description: "Pulling new leads from Apollo…" }),
+    onSuccess: () => toast({ title: "Discovery started", description: "Pulling new leads from Seamless…" }),
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
@@ -438,7 +438,7 @@ function DashboardSection({ onNavigate }: { onNavigate: (s: SectionId) => void }
             <Mail className="w-3.5 h-3.5 mr-1.5" />{briefMut.isPending ? "Sending…" : "Send Daily Brief"}
           </Button>
           <Button size="sm" variant="outline" onClick={() => discoverMut.mutate()} disabled={discoverMut.isPending}>
-            <Search className="w-3.5 h-3.5 mr-1.5" />{discoverMut.isPending ? "Discovering…" : "Discover Leads (Apollo)"}
+            <Search className="w-3.5 h-3.5 mr-1.5" />{discoverMut.isPending ? "Discovering…" : "Discover Leads (Seamless)"}
           </Button>
           <Button size="sm" variant="outline" onClick={() => { qc.invalidateQueries(); toast({ title: "Refreshed" }); }}>
             <RefreshCw className="w-3.5 h-3.5 mr-1.5" />Refresh
@@ -575,7 +575,7 @@ function IntegrationsStatus() {
 
   const items = [
     { key: "openai", label: "OpenAI (AI drafting)", required: true },
-    { key: "apollo", label: "Apollo.io (lead discovery)" },
+    { key: "seamless", label: "Seamless.AI (lead discovery)" },
     { key: "apify", label: "Apify (Reddit/Quora)" },
     { key: "calendly", label: "Calendly (bookings)" },
     { key: "slack", label: "Slack (notifications)" },
@@ -816,7 +816,7 @@ function AddLeadModal({ onClose }: { onClose: () => void }) {
               <label className="text-xs text-gray-500 mb-1 block">Source</label>
               <select value={form.source} onChange={e => setForm(f => ({ ...f, source: e.target.value }))}
                 className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm">
-                {["manual", "referral", "event", "linkedin", "apollo", "inbound", "other"].map(s => <option key={s} value={s}>{s}</option>)}
+                {["manual", "referral", "event", "linkedin", "seamless", "inbound", "other"].map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
           </div>

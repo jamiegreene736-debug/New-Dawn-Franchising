@@ -5,6 +5,8 @@ import { sendEmailFromSender } from "./email-service";
 import { verifyEmail } from "./zerobounce-service";
 import { lookupPhone } from "./twilio-lookup";
 import { extractPhoneFromText } from "./people-finder";
+import { seamlessFindPeople } from "./seamless-service";
+import { hunterFindEmail } from "./hunter-service";
 import { ImapFlow } from "imapflow";
 import { monitorReddit, monitorQuora } from "./apify-service";
 import { scanForumsForOpportunities } from "./forum-scanner";
@@ -210,17 +212,16 @@ async function draftWhatsAppMessage(lead: any, settings: any): Promise<string> {
   return res.choices[0].message.content || `Hey ${lead.firstName}, this is Dylan from New Dawn Franchising. Just following up on my email about franchise investment opportunities in the US. Would love to grab 20 min on Zoom if you're open: ${calendly} - Reply STOP to opt out.`;
 }
 
-// ─── Apollo Lead Discovery ───────────────────────────────────────────────────
+// ─── Seamless.AI Lead Discovery ──────────────────────────────────────────────
 
-export async function discoverLeadsFromApollo(maxLeads = 20): Promise<number> {
-  const key = process.env.APOLLO_API_KEY;
-  if (!key) {
-    console.warn("[Apollo] APOLLO_API_KEY not set — skipping discovery");
+export async function discoverLeadsFromSeamless(maxLeads = 20): Promise<number> {
+  if (!process.env.SEAMLESS_API_KEY) {
+    console.warn("[Seamless] SEAMLESS_API_KEY not set — skipping discovery");
     return 0;
   }
 
   const settings = await getSettings();
-  // Apollo requires full country names, not abbreviations
+  // Seamless expects full country names, not abbreviations
   const countryMap: Record<string, string> = {
     "UAE": "United Arab Emirates",
     "UK": "United Kingdom",
@@ -244,80 +245,44 @@ export async function discoverLeadsFromApollo(maxLeads = 20): Promise<number> {
       ];
   const countries = rawCountries.map((c: string) => countryMap[c] || c);
 
+  const titles = [
+    // Immigration & visa professionals
+    "Immigration Attorney", "Immigration Lawyer", "Visa Consultant", "Immigration Consultant",
+    "E-2 Visa Attorney", "EB-5 Attorney", "Immigration Law Partner",
+    // Business & franchise brokers
+    "Business Broker", "Franchise Broker", "Franchise Consultant", "Franchise Advisor",
+    "M&A Advisor", "Mergers and Acquisitions Advisor",
+    // Wealth & financial advisors to HNW clients
+    "Wealth Manager", "Private Banker", "Financial Advisor", "Investment Advisor",
+    "International Financial Advisor", "Private Wealth Advisor",
+    // Relocation & international mobility
+    "Relocation Consultant", "Global Mobility Consultant", "International Relocation Specialist",
+    // Chamber & trade association leaders
+    "Chamber of Commerce Director", "Executive Director", "President",
+  ];
+
   let discovered = 0;
   try {
-    const body = {
-      page: 1,
-      per_page: Math.min(maxLeads, 25),
-      person_titles: [
-        // Immigration & visa professionals
-        "Immigration Attorney", "Immigration Lawyer", "Visa Consultant", "Immigration Consultant",
-        "E-2 Visa Attorney", "EB-5 Attorney", "Immigration Law Partner",
-        // Business & franchise brokers
-        "Business Broker", "Franchise Broker", "Franchise Consultant", "Franchise Advisor",
-        "M&A Advisor", "Mergers and Acquisitions Advisor",
-        // Wealth & financial advisors to HNW clients
-        "Wealth Manager", "Private Banker", "Financial Advisor", "Investment Advisor",
-        "International Financial Advisor", "Private Wealth Advisor",
-        // Relocation & international mobility
-        "Relocation Consultant", "Global Mobility Consultant", "International Relocation Specialist",
-        // Chamber & trade association leaders
-        "Chamber of Commerce Director", "Executive Director", "President",
-      ],
-      person_locations: countries,
-      contact_email_status_v2: ["verified", "likely_to_engage"],
-    };
+    console.log(`[Seamless] Searching for leads in: ${countries.slice(0, 3).join(", ")}...`);
 
-    console.log(`[Apollo] Searching for leads in: ${countries.slice(0, 3).join(", ")}...`);
-
-    const res = await fetch("https://api.apollo.io/api/v1/mixed_people/api_search", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "no-cache",
-        "X-Api-Key": key,
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (!res.ok) {
-      const errText = await res.text().catch(() => "");
-      console.error(`[Apollo] API error ${res.status}: ${errText.slice(0, 200)}`);
-      return 0;
-    }
-
-    const data = await res.json() as any;
-    const people = data.people || [];
-    console.log(`[Apollo] Got ${people.length} people from API (page 1)`);
+    // enrich=true runs the research+poll step so emails/phones come back.
+    const people = await seamlessFindPeople(
+      { titles, countries, limit: Math.min(maxLeads, 25) },
+      { enrich: true },
+    );
+    console.log(`[Seamless] Got ${people.length} people from API`);
 
     let skippedNoEmail = 0, skippedDnc = 0, skippedExisting = 0;
     for (const p of people) {
-      let email = p.email || null;
-      let firstName = p.first_name || "";
-      let lastName = p.last_name || "";
-      let linkedinUrl = p.linkedin_url || null;
-
-      // If no email, use people/match to reveal it (uses Apollo email credits)
-      if (!email && p.id) {
+      let email = p.email;
+      // Seamless search frequently returns no email; recover it via Hunter from
+      // the person's company domain before giving up (mirrors people-finder).
+      if (!email && p.domain && p.firstName && p.lastName) {
         try {
-          const matchRes = await fetch("https://api.apollo.io/api/v1/people/match", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "X-Api-Key": key },
-            body: JSON.stringify({ id: p.id, reveal_personal_emails: true }),
-          });
-          if (matchRes.ok) {
-            const matchData = await matchRes.json() as any;
-            const mp = matchData.person;
-            if (mp?.email) {
-              email = mp.email;
-              firstName = mp.first_name || firstName;
-              lastName = mp.last_name || lastName;
-              linkedinUrl = mp.linkedin_url || linkedinUrl;
-            }
-          }
-        } catch { /* ignore reveal errors */ }
+          const hunter = await hunterFindEmail(p.firstName, p.lastName, p.domain);
+          if (hunter?.email) email = hunter.email;
+        } catch { /* ignore — fall through to skip */ }
       }
-
       if (!email) { skippedNoEmail++; continue; }
       if (await isOnDnc(email, null, null)) { skippedDnc++; continue; }
 
@@ -325,23 +290,23 @@ export async function discoverLeadsFromApollo(maxLeads = 20): Promise<number> {
       if (existing.length > 0) { skippedExisting++; continue; }
 
       await db.insert(agentLeads).values({
-        firstName,
-        lastName,
+        firstName: p.firstName,
+        lastName: p.lastName,
         email,
-        phone: p.phone_numbers?.[0]?.raw_number || null,
-        linkedinUrl,
-        company: p.organization?.name || p.employer || null,
-        title: p.title || null,
-        country: p.country || null,
-        source: "apollo",
-        sourceUrl: linkedinUrl || null,
+        phone: p.phone,
+        linkedinUrl: p.linkedinUrl,
+        company: p.company,
+        title: p.jobTitle,
+        country: p.country,
+        source: "seamless",
+        sourceUrl: p.linkedinUrl,
         aiScore: 0,
       });
       discovered++;
     }
-    console.log(`[Apollo] Saved ${discovered} new leads. Skipped: ${skippedNoEmail} no-email, ${skippedDnc} DNC, ${skippedExisting} existing.`);
+    console.log(`[Seamless] Saved ${discovered} new leads. Skipped: ${skippedNoEmail} no-email, ${skippedDnc} DNC, ${skippedExisting} existing.`);
   } catch (e) {
-    console.error("[Apollo] Discovery error:", e);
+    console.error("[Seamless] Discovery error:", e);
   }
   return discovered;
 }
@@ -958,8 +923,8 @@ export async function runDailyPreparation(): Promise<void> {
   try {
     runLog.push(`[${new Date().toISOString()}] Starting daily preparation for ${today}`);
 
-    const discovered = await discoverLeadsFromApollo(settings?.maxLeadsPerDay || 50);
-    runLog.push(`[${new Date().toISOString()}] Discovered ${discovered} new leads from Apollo`);
+    const discovered = await discoverLeadsFromSeamless(settings?.maxLeadsPerDay || 50);
+    runLog.push(`[${new Date().toISOString()}] Discovered ${discovered} new leads from Seamless`);
 
     const scored = await enrichAndScoreNewLeads();
     runLog.push(`[${new Date().toISOString()}] Scored ${scored} leads`);
@@ -1030,7 +995,7 @@ export async function runDailyPreparation(): Promise<void> {
     const dateLabel = new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
     const prepSms = staged > 0
       ? `🤖 Outreach Agent prep done — ${dateLabel}\n✅ ${staged} message${staged !== 1 ? "s" : ""} staged for approval (${discovered} leads found, ${forumPosts} forum posts).\nFull brief sent to email. Approve at:\nnewdawnfranchising.replit.app/agent`
-      : `🤖 Outreach Agent prep done — ${dateLabel}\n⚠️ 0 messages staged today (${discovered} leads found, ${forumPosts} forum posts).\nApollo may need upgrading for new lead discovery. Existing leads checked.\nnewdawnfranchising.replit.app/agent`;
+      : `🤖 Outreach Agent prep done — ${dateLabel}\n⚠️ 0 messages staged today (${discovered} leads found, ${forumPosts} forum posts).\nSeamless may need more credits for new lead discovery. Existing leads checked.\nnewdawnfranchising.replit.app/agent`;
     sendAgentSms("outreach", prepSms, { triggerType: "prep_complete" }).catch(() => {});
   } catch (e: any) {
     runLog.push(`[${new Date().toISOString()}] ERROR: ${e.message}`);

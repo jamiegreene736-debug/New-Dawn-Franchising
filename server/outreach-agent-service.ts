@@ -12,12 +12,12 @@ import {
 import { eq, desc, and, gte, lt, sql, count, not, inArray } from "drizzle-orm";
 import { notifyDraftPending, notifyBlocker } from "./agent-sms-service";
 import { buildLanguageInstructions, getLanguageLabel } from "./language-detection";
+import { seamlessFindPeople, type SeamlessPerson } from "./seamless-service";
 import { randomUUID } from "crypto";
 
 const APP_BASE = () => process.env.APP_BASE_URL ?? "https://newdawnfranchising.replit.app";
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-const APOLLO_API_KEY = process.env.APOLLO_API_KEY;
 const CLAUDE_MODEL = "claude-sonnet-4-5";
 
 // ─── Claude Helper ────────────────────────────────────────────────────────────
@@ -73,7 +73,7 @@ STRATEGY PRINCIPLES:
 - Positive replies ALWAYS surface to the human before sending the booking message — never auto-book.
 - When a channel is underperforming (low reply rate over the last 14 days), shift budget away from it and propose testing a new angle.
 - When reply volume is high, prioritize handle_reply actions over sourcing new first touches.
-- If you lack a resource (Apollo credits, approved WhatsApp template, compliance clearance for a new geo), emit request_blocker instead of guessing.
+- If you lack a resource (Seamless credits, approved WhatsApp template, compliance clearance for a new geo), emit request_blocker instead of guessing.
 
 Given campaign state, recent performance, and today's top-scored leads, return a JSON array of 1–25 actions for today. Respond with ONLY valid JSON — no prose, no markdown fences.
 
@@ -91,7 +91,7 @@ Schema per action:
 Payload examples:
 - draft_first_touch: { "personalization_hook": "her recent LinkedIn post about E-2 processing times", "angle": "offer to share our franchise vetting checklist" }
 - handle_reply: { "reply_id": "...", "sentiment": "interested", "suggested_response_summary": "thank, offer Calendly link, ask one qualifying question" }
-- request_blocker: { "type": "credentials_needed", "service": "Apollo", "reason": "Monthly credits exhausted", "instructions_for_user": "Top up at apollo.io/billing" }`;
+- request_blocker: { "type": "credentials_needed", "service": "Seamless", "reason": "Monthly credits exhausted", "instructions_for_user": "Top up at seamless.ai" }`;
 
 // ─── Planner Context Builder ───────────────────────────────────────────────────
 
@@ -507,36 +507,23 @@ Return the score JSON now.`;
   return JSON.parse(stripFences(raw));
 }
 
-// ─── Apollo Lead Sourcing ──────────────────────────────────────────────────────
+// ─── Seamless.AI Lead Sourcing ──────────────────────────────────────────────
 
-async function sourceFromApollo(
+async function sourceFromSeamless(
   persona: { titles?: string[]; industries?: string[]; geos?: string[]; company_size?: string },
   limit = 50,
-): Promise<Record<string, unknown>[]> {
-  if (!APOLLO_API_KEY) return [];
-  try {
-    const res = await fetch("https://api.apollo.io/api/v1/mixed_people/api_search", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": APOLLO_API_KEY,
-      },
-      body: JSON.stringify({
-        page: 1,
-        per_page: Math.min(limit, 25),
-        person_titles: persona.titles ?? ["immigration attorney", "immigration lawyer"],
-        organization_industry_tag_ids: [],
-        person_locations: persona.geos ?? [],
-        q_keywords: "E-2 visa",
-        contact_email_status: ["verified", "likely to engage"],
-      }),
-    });
-    if (!res.ok) return [];
-    const data = await res.json() as { people?: Record<string, unknown>[] };
-    return data.people ?? [];
-  } catch {
-    return [];
-  }
+): Promise<SeamlessPerson[]> {
+  if (!process.env.SEAMLESS_API_KEY) return [];
+  // enrich=true runs the research+poll step so emails come back for outreach.
+  return seamlessFindPeople(
+    {
+      titles: persona.titles ?? ["immigration attorney", "immigration lawyer"],
+      countries: persona.geos ?? [],
+      keywords: "E-2 visa",
+      limit: Math.min(limit, 25),
+    },
+    { enrich: true },
+  );
 }
 
 // ─── Classify & Handle Reply ──────────────────────────────────────────────────
@@ -629,16 +616,16 @@ export async function runOutreachCampaignLoop(campaignId: string): Promise<{
   const persona = (campaign.personaTarget ?? {}) as Record<string, unknown>;
 
   // ── Step 1: Source new leads ──────────────────────────────────────────────
-  steps.push({ step: "source", result: "Sourcing leads from Apollo..." });
+  steps.push({ step: "source", result: "Sourcing leads from Seamless..." });
   try {
-    const apolloLeads = await sourceFromApollo(
+    const seamlessLeads = await sourceFromSeamless(
       persona as { titles?: string[]; industries?: string[]; geos?: string[]; company_size?: string },
       50,
     );
 
     let newCount = 0;
-    for (const p of apolloLeads) {
-      const email = (p.email as string) ?? (p.primary_email as string);
+    for (const p of seamlessLeads) {
+      const email = p.email;
       if (!email) continue;
 
       const existing = await db.select({ id: outreachLeads.id }).from(outreachLeads)
@@ -646,11 +633,11 @@ export async function runOutreachCampaignLoop(campaignId: string): Promise<{
       if (existing.length > 0) continue;
 
       await db.insert(outreachLeads).values({
-        fullName: `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || "Unknown",
-        title: (p.title as string) ?? null,
-        company: (p.organization_name as string) ?? null,
+        fullName: p.fullName || `${p.firstName} ${p.lastName}`.trim() || "Unknown",
+        title: p.jobTitle,
+        company: p.company,
         email,
-        linkedinUrl: (p.linkedin_url as string) ?? null,
+        linkedinUrl: p.linkedinUrl,
         category: "immigration_attorney",
         status: "new",
       });
@@ -659,13 +646,13 @@ export async function runOutreachCampaignLoop(campaignId: string): Promise<{
 
     await db.insert(leadSources).values({
       campaignId,
-      sourceType: "apollo",
+      sourceType: "seamless",
       queryPayload: persona as Record<string, unknown>,
       lastRunAt: new Date(),
       contactsFound: newCount,
     });
 
-    steps[steps.length - 1].result = `Sourced ${newCount} new leads from Apollo (${apolloLeads.length} total found)`;
+    steps[steps.length - 1].result = `Sourced ${newCount} new leads from Seamless (${seamlessLeads.length} total found)`;
   } catch (err) {
     steps[steps.length - 1].result = `Sourcing failed: ${(err as Error).message}`;
   }

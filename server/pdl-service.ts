@@ -7,7 +7,7 @@
  *   2. Company Enrichment — find employees at a domain (PDL "identify" + bulk person search)
  *
  * PDL is especially strong for international contacts (EU, APAC, LATAM) where
- * Apollo's coverage tends to drop off.
+ * Seamless.AI's coverage tends to drop off.
  */
 
 const PDL_BASE = "https://api.peopledatalabs.com/v5";

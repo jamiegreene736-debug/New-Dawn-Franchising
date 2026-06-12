@@ -93,7 +93,7 @@ interface SavedProspect {
   sourceUrl: string | null; notes: string | null; createdAt: string;
 }
 interface EnrichmentStatus {
-  apollo: boolean;
+  seamless: boolean;
   hunter: boolean;
   zerobounce: boolean;
   proxycurl?: boolean;
@@ -839,7 +839,7 @@ export default function ProspectFinder() {
 
   const URL_STAGES = [
     { label: "Scraping website",       pct: 18 },
-    { label: "Searching Apollo.io",    pct: 42 },
+    { label: "Searching Seamless.AI",  pct: 42 },
     { label: "Finding people",         pct: 72 },
     { label: "Scoring contacts",       pct: 90 },
   ];
@@ -1486,7 +1486,7 @@ export default function ProspectFinder() {
   };
 
   const activeApis = enrichmentStatus ? Object.values(enrichmentStatus).filter(Boolean).length : 0;
-  const totalApis = 6; // apollo, hunter, zerobounce, proxycurl, whitepages, pdl
+  const totalApis = 6; // seamless, hunter, zerobounce, proxycurl, whitepages, pdl
 
   return (
     <div className="space-y-4 p-1">
@@ -1501,13 +1501,13 @@ export default function ProspectFinder() {
             <p className="text-xs text-amber-700 mt-0.5">
               Active: Website Scraping
               {enrichmentStatus.pdl && " · People Data Labs (emails + international)"}
-              {enrichmentStatus.apollo && " · Apollo.io (emails + LinkedIn)"}
+              {enrichmentStatus.seamless && " · Seamless.AI (emails + LinkedIn)"}
               {enrichmentStatus.hunter && " · Hunter.io (email patterns)"}
               {enrichmentStatus.proxycurl && " · Proxycurl (LinkedIn employees)"}
               {enrichmentStatus.zerobounce && " · ZeroBounce (email verification)"}
               {enrichmentStatus.whitepages && " · Whitepages (US addresses + phones)"}
-              {!enrichmentStatus.apollo && !enrichmentStatus.pdl && " — Add Apollo.io or People Data Labs for broader coverage"}
-              {enrichmentStatus.apollo && !enrichmentStatus.zerobounce && " — Add ZeroBounce key to verify emails before outreach"}
+              {!enrichmentStatus.seamless && !enrichmentStatus.pdl && " — Add Seamless.AI or People Data Labs for broader coverage"}
+              {enrichmentStatus.seamless && !enrichmentStatus.zerobounce && " — Add ZeroBounce key to verify emails before outreach"}
             </p>
           </div>
         </div>
@@ -1611,7 +1611,7 @@ export default function ProspectFinder() {
               <>
                 <div className="space-y-1">
                   <p className="text-xs text-muted-foreground">
-                    Enter any company website directly — the system will scrape their team page, search Apollo.io, and surface individual decision-makers with contact info.
+                    Enter any company website directly — the system will scrape their team page, search Seamless.AI, and surface individual decision-makers with contact info.
                   </p>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-3">
@@ -1729,7 +1729,7 @@ export default function ProspectFinder() {
               <>
                 <div>
                   <p className="text-xs text-muted-foreground">
-                    Already know who you're looking for? Type their name and company — the system will search Apollo, Hunter, Whitepages, and LinkedIn specifically for that one person and return everything it finds.
+                    Already know who you're looking for? Type their name and company — the system will search Seamless.AI, Hunter, Whitepages, and LinkedIn specifically for that one person and return everything it finds.
                   </p>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -1791,7 +1791,7 @@ export default function ProspectFinder() {
                   {seedLoading && (
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <Loader2 className="size-3.5 animate-spin" />
-                      Checking Apollo · Hunter · SerpAPI · Whitepages — usually 15–30 seconds
+                      Checking Seamless.AI · Hunter · SerpAPI · Whitepages — usually 15–30 seconds
                     </div>
                   )}
                 </div>

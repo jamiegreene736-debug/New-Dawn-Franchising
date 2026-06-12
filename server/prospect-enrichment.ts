@@ -43,6 +43,10 @@ export interface EnrichedContact {
   internationalBio: boolean;
   ailaNumber: boolean;
   address: string | null;        // home/office address from Whitepages enrichment
+  searchResultId?: string | null; // Seamless searchResultId (for reveal-on-demand)
+  revealed?: boolean;             // true once email/phone have been revealed (credits spent)
+  industries?: string[] | null;  // company industries from Seamless search
+  employeeSizeRange?: string | null; // company headcount band from Seamless search
 }
 
 export interface EnrichedCompany {

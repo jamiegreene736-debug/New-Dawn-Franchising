@@ -1369,7 +1369,11 @@ export default function ProspectFinder() {
           {/* Seamless.AI search */}
           <SeamlessSearchPanel
             searchTab={searchTab}
-            setSearchTab={(t) => { setSearchTab(t); setHasSearched(false); setCompanies([]); }}
+            setSearchTab={(t) => {
+              setSearchTab(t); setHasSearched(false); setCompanies([]);
+              // Contact-only filters can't be edited on the Companies tab — drop them so they don't silently constrain a company search.
+              if (t === "companies") setFilters((f) => ({ ...f, jobTitle: [], seniority: [], department: [], fullName: [] }));
+            }}
             filters={filters}
             setFilters={setFilters}
             aiQuery={aiQuery}
@@ -1377,6 +1381,8 @@ export default function ProspectFinder() {
             onSearch={() => searchMutation.mutate()}
             onAiSearch={() => aiSearchMutation.mutate()}
             isSearching={isSearchPending}
+            connected={seamlessConnected}
+            userName="Dylan"
           />
 
           {/* Results */}

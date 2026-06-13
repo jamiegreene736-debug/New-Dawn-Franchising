@@ -32,6 +32,17 @@ function defaultTaskTitle(stepType: string, firstName: string): string {
   }
 }
 
+// Normalize a step type into the activity channel stored on each drip_send so the
+// unified Activity feed can group/filter touches (email | sms | linkedin | call | task).
+function channelOf(stepType: string): string {
+  const t = (stepType || "email").toLowerCase();
+  if (t === "email" || t === "manual_email") return "email";
+  if (t === "sms") return "sms";
+  if (t.startsWith("linkedin")) return "linkedin";
+  if (t === "call") return "call";
+  return "task";
+}
+
 export async function processDripEmails() {
   console.log("[Drip] Processing scheduled emails...");
 
@@ -103,6 +114,7 @@ export async function processDripEmails() {
           const send = await storage.createDripSend({
             enrollmentId: enrollment.id,
             stepId: step.id,
+            channel: "email",
             recipientEmail: enrollment.prospectEmail,
             recipientName: enrollment.prospectName,
             subject: step.subject || step.stepName || "Email",
@@ -141,6 +153,7 @@ export async function processDripEmails() {
           const send = await storage.createDripSend({
             enrollmentId: enrollment.id,
             stepId: step.id,
+            channel: "sms",
             recipientEmail: phone || enrollment.prospectEmail,
             recipientName: enrollment.prospectName,
             subject: step.stepName || "Text message",
@@ -167,6 +180,7 @@ export async function processDripEmails() {
           await storage.createDripSend({
             enrollmentId: enrollment.id,
             stepId: step.id,
+            channel: channelOf(stepType),
             recipientEmail: enrollment.prospectEmail,
             recipientName: enrollment.prospectName,
             subject: step.stepName || stepType,

@@ -13,7 +13,6 @@ import {
   Loader2,
   Mail,
   MailOpen,
-  MailX,
   MessageSquare,
   Pause,
   Phone,
@@ -31,6 +30,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -158,6 +158,14 @@ function channelMeta(channel: string) {
   return CHANNEL_META[(channel as ActivityItem["channel"])] ?? CHANNEL_META.other;
 }
 
+// Chips shown above the Activity table — "All channels" plus one per channel.
+const CHANNEL_FILTERS: { key: string; label: string; icon: typeof Mail }[] = [
+  { key: "all", label: "All channels", icon: Zap },
+  ...(["email", "sms", "whatsapp", "call", "linkedin", "note", "status", "document"] as const).map(
+    (c) => ({ key: c, label: CHANNEL_META[c].label, icon: CHANNEL_META[c].icon })
+  ),
+];
+
 function ActivityStatusBadge({ item }: { item: ActivityItem }) {
   const map: Record<string, { label: string; cls: string }> = {
     opened:   { label: "Opened",   cls: "bg-green-100 text-green-700" },
@@ -215,6 +223,7 @@ function EmailCampaignTab() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<"campaigns" | "sends">("campaigns");
   const [selectedCampaign, setSelectedCampaign] = useState<string | null>(null);
+  const [editCampaign, setEditCampaign] = useState<{ id: string; name: string; description: string } | null>(null);
   const [showEnrollModal, setShowEnrollModal] = useState(false);
   const [showEnrollListModal, setShowEnrollListModal] = useState(false);
   const [enrollListId, setEnrollListId] = useState<string>("");
@@ -428,6 +437,25 @@ function EmailCampaignTab() {
     onError: (err: Error) => toast({ title: "Duplicate failed", description: err.message, variant: "destructive" }),
   });
 
+  // Rename / edit a campaign's name + description.
+  const updateCampaignMetaMutation = useMutation({
+    mutationFn: async ({ id, name, description }: { id: string; name: string; description: string }) => {
+      const res = await apiRequest("PATCH", `/api/crm/campaigns/${id}`, {
+        name: name.trim(),
+        description: description.trim() || null,
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.message || "Failed to save");
+      return res.json();
+    },
+    onSuccess: (_c, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/campaigns"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/campaigns", vars.id] });
+      setEditCampaign(null);
+      toast({ title: "Campaign updated" });
+    },
+    onError: (err: Error) => toast({ title: "Save failed", description: err.message, variant: "destructive" }),
+  });
+
   const pauseEnrollmentMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
       const res = await apiRequest("PATCH", `/api/crm/enrollments/${id}`, { status });
@@ -602,6 +630,17 @@ function EmailCampaignTab() {
                         </div>
                         <div className="flex items-center gap-1">
                           <Button
+                            data-testid={`button-edit-campaign-${campaign.id}`}
+                            size="sm"
+                            variant="ghost"
+                            className="gap-1 text-muted-foreground"
+                            title="Rename or edit this campaign"
+                            onClick={(e) => { e.stopPropagation(); setEditCampaign({ id: campaign.id, name: campaign.name, description: campaign.description || "" }); }}
+                          >
+                            <Edit2 className="size-3.5" />
+                            Edit
+                          </Button>
+                          <Button
                             data-testid={`button-duplicate-campaign-${campaign.id}`}
                             size="sm"
                             variant="ghost"
@@ -639,6 +678,9 @@ function EmailCampaignTab() {
                 <div className="flex items-center gap-2">
                   <Button data-testid="button-process-drip" size="sm" variant="outline" className="gap-2" onClick={() => processMutation.mutate()} disabled={processMutation.isPending}>
                     {processMutation.isPending ? <><Loader2 className="size-4 animate-spin" /> Processing…</> : <><Send className="size-4" /> Send Due Now</>}
+                  </Button>
+                  <Button data-testid="button-edit-campaign" size="sm" variant="outline" className="gap-1" title="Rename or edit this campaign" onClick={() => setEditCampaign({ id: campaignDetail.id, name: campaignDetail.name, description: campaignDetail.description || "" })}>
+                    <Edit2 className="size-4" /> Edit
                   </Button>
                   <Button data-testid="button-duplicate-campaign" size="sm" variant="outline" className="gap-1" title="Duplicate this campaign and its steps" disabled={duplicateCampaignMutation.isPending} onClick={() => duplicateCampaignMutation.mutate(campaignDetail.id)}>
                     {duplicateCampaignMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : <Copy className="size-4" />} Duplicate
@@ -826,6 +868,56 @@ function EmailCampaignTab() {
             </div>
           ) : (
             <Card className="p-8 text-center"><Loader2 className="mx-auto size-6 animate-spin text-muted-foreground" /></Card>
+          )}
+
+          {editCampaign && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setEditCampaign(null)}>
+              <Card className="w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+                <div className="mb-4 flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Edit campaign</h3>
+                  <Button size="sm" variant="ghost" onClick={() => setEditCampaign(null)}><X className="size-4" /></Button>
+                </div>
+                <form
+                  className="space-y-4"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!editCampaign.name.trim()) return;
+                    updateCampaignMetaMutation.mutate(editCampaign);
+                  }}
+                >
+                  <div className="space-y-1.5">
+                    <Label htmlFor="edit-campaign-name">Campaign name</Label>
+                    <Input
+                      id="edit-campaign-name"
+                      data-testid="input-edit-campaign-name"
+                      value={editCampaign.name}
+                      onChange={(e) => setEditCampaign({ ...editCampaign, name: e.target.value })}
+                      placeholder="e.g. Broker Introduction Sequence"
+                      autoFocus
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="edit-campaign-desc">Description</Label>
+                    <Textarea
+                      id="edit-campaign-desc"
+                      data-testid="input-edit-campaign-desc"
+                      value={editCampaign.description}
+                      onChange={(e) => setEditCampaign({ ...editCampaign, description: e.target.value })}
+                      placeholder="What this sequence is for (optional)"
+                      rows={3}
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2 pt-1">
+                    <Button type="button" variant="outline" size="sm" onClick={() => setEditCampaign(null)}>Cancel</Button>
+                    <Button type="submit" size="sm" data-testid="button-save-campaign" disabled={!editCampaign.name.trim() || updateCampaignMetaMutation.isPending}>
+                      {updateCampaignMetaMutation.isPending ? <Loader2 className="mr-1 size-4 animate-spin" /> : null}
+                      Save
+                    </Button>
+                  </div>
+                </form>
+              </Card>
+            </div>
           )}
 
           {showEnrollContacts && (
@@ -1043,11 +1135,7 @@ function EmailCampaignTab() {
 
           {/* Channel filter chips */}
           <div className="flex flex-wrap gap-1.5 mb-3">
-            {([["all", "All channels", Zap]] as const).concat(
-              (["email", "sms", "whatsapp", "call", "linkedin", "note", "status", "document"] as const).map(
-                (c) => [c, CHANNEL_META[c].label, CHANNEL_META[c].icon] as const
-              )
-            ).map(([key, label, Icon]) => {
+            {CHANNEL_FILTERS.map(({ key, label, icon: Icon }) => {
               const active = filterChannel === key;
               return (
                 <button

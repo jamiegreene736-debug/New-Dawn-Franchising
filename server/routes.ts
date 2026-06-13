@@ -2093,6 +2093,28 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
     res.send(pixel);
   });
 
+  // Link-click tracking — outgoing email links are rewritten to this redirect so
+  // every send is tracked for clicks as well as opens. `:id` is a drip send id or
+  // a "de_"-prefixed direct-email tracking id; `u` is the original destination.
+  app.get("/api/track/click/:id", async (req, res) => {
+    const id = String(req.params.id);
+    const target = String(req.query.u || "");
+    try {
+      if (id.startsWith("de_")) {
+        await storage.recordDirectEmailClick(id);
+      } else {
+        await storage.recordEmailClick(id);
+      }
+    } catch {
+      // non-fatal — always still redirect the recipient
+    }
+    // Only follow http(s) targets — blocks javascript:/data: open-redirect abuse.
+    if (/^https?:\/\//i.test(target)) {
+      return res.redirect(302, target);
+    }
+    res.status(204).end();
+  });
+
   // --- Drip Campaign routes ---
   app.get("/api/crm/campaigns", requireAdminAuth, async (_req, res) => {
     try {
@@ -2132,17 +2154,19 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
       ).length;
 
       // Per-step breakdown keyed by stepId.
-      const perStep: Record<string, { sent: number; opened: number; bounced: number; tasks: number; notSent: number }> = {};
+      const perStep: Record<string, { sent: number; opened: number; clicked: number; bounced: number; tasks: number; notSent: number }> = {};
       for (const step of steps) {
         const rows = sends.filter((s) => s.stepId === step.id);
         const sent = rows.filter((s) => s.status === "sent").length;
         const opened = rows.filter((s) => s.status === "sent" && s.openedAt).length;
+        const clicked = rows.filter((s) => s.status === "sent" && (s as any).clickedAt).length;
         const bounced = rows.filter((s) => s.status === "failed").length;
         const tasks = rows.filter((s) => s.status === "task").length;
         const handled = sent + bounced + tasks;
         perStep[step.id] = {
           sent,
           opened,
+          clicked,
           bounced,
           tasks,
           notSent: Math.max(0, totalEnrollments - handled),
@@ -2157,6 +2181,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
         paused: enrollments.filter((e) => e.status === "paused").length,
         emails: sends.filter((s) => s.status === "sent").length,
         opens: sends.filter((s) => s.status === "sent" && s.openedAt).length,
+        clicks: sends.filter((s) => s.status === "sent" && (s as any).clickedAt).length,
         replies: repliedCount,
         bounced: emailSends.filter((s) => s.status === "failed").length,
       };
@@ -2362,6 +2387,126 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
       res.json(sends);
     } catch (err) {
       res.status(500).json({ message: "Failed to fetch sends" });
+    }
+  });
+
+  // --- Unified Activity feed (all channels: email / text / LinkedIn / call / note …) ---
+  // Merges three sources into one time-ordered timeline:
+  //   • drip_sends            → every campaign touch (channel stamped per step)
+  //   • contact_activities    → manual & inbound touches against attorney contacts
+  //   • crm_client_activities → touches against investor-CRM clients
+  app.get("/api/crm/activity", requireAdminAuth, async (_req, res) => {
+    try {
+      // activity_type → channel/direction. Anything unmapped falls back to "other".
+      const ACT_MAP: Record<string, { channel: string; direction: "outbound" | "inbound" }> = {
+        email_sent: { channel: "email", direction: "outbound" },
+        email_opened: { channel: "email", direction: "outbound" },
+        email_received: { channel: "email", direction: "inbound" },
+        email_reply: { channel: "email", direction: "inbound" },
+        sms_sent: { channel: "sms", direction: "outbound" },
+        sms_failed: { channel: "sms", direction: "outbound" },
+        sms_received: { channel: "sms", direction: "inbound" },
+        whatsapp_sent: { channel: "whatsapp", direction: "outbound" },
+        whatsapp_failed: { channel: "whatsapp", direction: "outbound" },
+        whatsapp_received: { channel: "whatsapp", direction: "inbound" },
+        phone_call: { channel: "call", direction: "outbound" },
+        call_logged: { channel: "call", direction: "outbound" },
+        voicemail_dropped: { channel: "call", direction: "outbound" },
+        voicemail_failed: { channel: "call", direction: "outbound" },
+        linkedin: { channel: "linkedin", direction: "outbound" },
+        linkedin_sent: { channel: "linkedin", direction: "outbound" },
+        linkedin_connect: { channel: "linkedin", direction: "outbound" },
+        linkedin_message: { channel: "linkedin", direction: "outbound" },
+        note: { channel: "note", direction: "outbound" },
+        note_added: { channel: "note", direction: "outbound" },
+        status_changed: { channel: "status", direction: "outbound" },
+        signature_sent: { channel: "document", direction: "outbound" },
+        document_signed: { channel: "document", direction: "inbound" },
+        document_uploaded: { channel: "document", direction: "outbound" },
+      };
+
+      const pick = (m: any, ...keys: string[]): string => {
+        if (!m || typeof m !== "object") return "";
+        for (const k of keys) if (m[k]) return String(m[k]);
+        return "";
+      };
+      const humanize = (t: string) => t.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+      const [sends, contactActs, clientActs] = await Promise.all([
+        storage.getAllDripSends(),
+        storage.getRecentContactActivities(400),
+        storage.getRecentCrmClientActivities(400),
+      ]);
+
+      const items: Array<{
+        id: string; source: string; channel: string; direction: string;
+        name: string; target: string; detail: string; status: string;
+        timestamp: string | null;
+      }> = [];
+
+      // 1) Campaign touches
+      for (const s of sends as any[]) {
+        const channel = s.channel || (s.status === "task" ? "task" : "email");
+        const status = s.openedAt ? "opened" : s.status;
+        items.push({
+          id: `send-${s.id}`,
+          source: "campaign",
+          channel,
+          direction: "outbound",
+          name: s.recipientName || "",
+          target: s.recipientEmail || "",
+          detail: s.subject || s.errorMessage || "",
+          status,
+          timestamp: (s.sentAt || s.createdAt) ? new Date(s.sentAt || s.createdAt).toISOString() : null,
+        });
+      }
+
+      // 2) Contact-level touches
+      for (const a of contactActs) {
+        const map = ACT_MAP[a.activityType] || { channel: "other", direction: "outbound" as const };
+        const detail = pick(a.metadata, "subject", "message", "note", "text", "summary", "body", "title")
+          || humanize(a.activityType);
+        items.push({
+          id: `contact-${a.id}`,
+          source: "contact",
+          channel: map.channel,
+          direction: map.direction,
+          name: a.name || "",
+          target: a.email || "",
+          detail,
+          status: a.activityType.endsWith("_failed") ? "failed" : (map.direction === "inbound" ? "received" : "sent"),
+          timestamp: a.createdAt ? new Date(a.createdAt).toISOString() : null,
+        });
+      }
+
+      // 3) Investor-CRM client touches
+      for (const a of clientActs) {
+        const map = ACT_MAP[a.activityType] || { channel: "other", direction: "outbound" as const };
+        const detail = pick(a.metadata, "subject", "message", "note", "text", "summary", "body", "title")
+          || humanize(a.activityType);
+        items.push({
+          id: `client-${a.id}`,
+          source: "client",
+          channel: map.channel,
+          direction: map.direction,
+          name: a.name || "",
+          target: a.email || "",
+          detail,
+          status: a.activityType.endsWith("_failed") ? "failed" : (map.direction === "inbound" ? "received" : "sent"),
+          timestamp: a.createdAt ? new Date(a.createdAt).toISOString() : null,
+        });
+      }
+
+      items.sort((x, y) => {
+        const tx = x.timestamp ? Date.parse(x.timestamp) : 0;
+        const ty = y.timestamp ? Date.parse(y.timestamp) : 0;
+        return ty - tx;
+      });
+
+      res.json(items.slice(0, 500));
+    } catch (err) {
+      console.error("[Activity] Failed to build feed:", err);
+      res.status(500).json({ message: "Failed to fetch activity" });
     }
   });
 

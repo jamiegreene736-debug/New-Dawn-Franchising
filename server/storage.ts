@@ -62,6 +62,7 @@ export interface IStorage {
   createDripSend(send: InsertDripSend): Promise<DripSend>;
   updateDripSend(id: string, data: Partial<DripSend>): Promise<DripSend>;
   recordEmailOpen(sendId: string): Promise<DripSend | undefined>;
+  recordEmailClick(sendId: string): Promise<void>;
   getSmsCampaigns(): Promise<SmsCampaign[]>;
   createSmsCampaign(data: InsertSmsCampaign): Promise<SmsCampaign>;
   updateSmsCampaign(id: string, data: Partial<SmsCampaign>): Promise<SmsCampaign>;
@@ -89,6 +90,7 @@ export interface IStorage {
   getCrmDirectEmailByMessageId(messageId: string): Promise<CrmDirectEmail | undefined>;
   createCrmDirectEmail(data: { clientId: string; fromEmail: string; fromName: string; toEmail: string; subject: string; bodyHtml: string; bodyText?: string; trackingId?: string; direction?: "inbound" | "outbound"; messageId?: string; status?: string }): Promise<CrmDirectEmail>;
   recordDirectEmailOpen(trackingId: string): Promise<void>;
+  recordDirectEmailClick(trackingId: string): Promise<void>;
   // Signature requests
   getSignatureRequests(clientId: string): Promise<SignatureRequest[]>;
   getSignatureRequestByToken(token: string): Promise<SignatureRequest | undefined>;
@@ -462,6 +464,17 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
+  async recordEmailClick(sendId: string): Promise<void> {
+    // A click implies an open — set both so opens are never undercounted.
+    await db.update(dripSends)
+      .set({
+        clickedAt: sql`COALESCE(${dripSends.clickedAt}, NOW())`,
+        clickCount: sql`${dripSends.clickCount} + 1`,
+        openedAt: sql`COALESCE(${dripSends.openedAt}, NOW())`,
+      })
+      .where(eq(dripSends.id, sendId));
+  }
+
   async getSmsCampaigns(): Promise<SmsCampaign[]> {
     return db.select().from(smsCampaigns).orderBy(desc(smsCampaigns.createdAt));
   }
@@ -641,6 +654,60 @@ export class DatabaseStorage implements IStorage {
   async createContactActivity(data: InsertContactActivity): Promise<ContactActivity> {
     const [a] = await db.insert(contactActivities).values(data).returning();
     return a;
+  }
+
+  // Recent contact-level touches (manual email/SMS/WhatsApp/call/note, inbound email,
+  // LinkedIn, status changes …) joined to the contact's name — feeds the Activity tab.
+  async getRecentContactActivities(limit = 400): Promise<Array<{
+    id: string; contactId: string; activityType: string; metadata: any;
+    createdAt: Date; name: string | null; email: string | null;
+  }>> {
+    const rows = await db
+      .select({
+        id: contactActivities.id,
+        contactId: contactActivities.contactId,
+        activityType: contactActivities.activityType,
+        metadata: contactActivities.metadata,
+        createdAt: contactActivities.createdAt,
+        firstName: contacts.firstName,
+        lastName: contacts.lastName,
+        email: contacts.email,
+      })
+      .from(contactActivities)
+      .leftJoin(contacts, eq(contactActivities.contactId, contacts.id))
+      .orderBy(desc(contactActivities.createdAt))
+      .limit(limit);
+    return rows.map((r) => ({
+      id: r.id,
+      contactId: r.contactId,
+      activityType: r.activityType,
+      metadata: r.metadata,
+      createdAt: r.createdAt,
+      name: [r.firstName, r.lastName].filter(Boolean).join(" ") || null,
+      email: r.email,
+    }));
+  }
+
+  // Recent investor-CRM client touches (email/SMS/WhatsApp/voicemail/notes/signatures …)
+  // joined to the client's name — also feeds the Activity tab.
+  async getRecentCrmClientActivities(limit = 400): Promise<Array<{
+    id: string; clientId: string; activityType: string; metadata: any;
+    createdAt: Date; name: string | null; email: string | null;
+  }>> {
+    return db
+      .select({
+        id: crmClientActivities.id,
+        clientId: crmClientActivities.clientId,
+        activityType: crmClientActivities.activityType,
+        metadata: crmClientActivities.metadata,
+        createdAt: crmClientActivities.createdAt,
+        name: crmClients.fullName,
+        email: crmClients.email,
+      })
+      .from(crmClientActivities)
+      .leftJoin(crmClients, eq(crmClientActivities.clientId, crmClients.id))
+      .orderBy(desc(crmClientActivities.createdAt))
+      .limit(limit);
   }
 
   // ─── Contact Tasks ────────────────────────────────────────────────────────
@@ -830,6 +897,20 @@ export class DatabaseStorage implements IStorage {
       .set({
         openedAt: existing.openedAt || new Date(),
         openCount: (existing.openCount || 0) + 1,
+        status: "opened",
+      })
+      .where(eq(crmDirectEmails.trackingId, trackingId));
+  }
+
+  async recordDirectEmailClick(trackingId: string): Promise<void> {
+    const [existing] = await db.select().from(crmDirectEmails)
+      .where(eq(crmDirectEmails.trackingId, trackingId));
+    if (!existing) return;
+    await db.update(crmDirectEmails)
+      .set({
+        clickedAt: existing.clickedAt || new Date(),
+        clickCount: (existing.clickCount || 0) + 1,
+        openedAt: existing.openedAt || new Date(),
         status: "opened",
       })
       .where(eq(crmDirectEmails.trackingId, trackingId));

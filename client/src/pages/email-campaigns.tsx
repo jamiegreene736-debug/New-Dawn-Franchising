@@ -2,7 +2,6 @@ import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
-  ArrowUpDown,
   Check,
   CheckSquare,
   ChevronDown,
@@ -65,10 +64,11 @@ interface CampaignStats {
     paused: number;
     emails: number;
     opens: number;
+    clicks: number;
     replies: number;
     bounced: number;
   };
-  perStep: Record<string, { sent: number; opened: number; bounced: number; tasks: number; notSent: number }>;
+  perStep: Record<string, { sent: number; opened: number; clicked: number; bounced: number; tasks: number; notSent: number }>;
 }
 
 interface Enrollment {
@@ -83,19 +83,18 @@ interface Enrollment {
   completedAt: string | null;
 }
 
-interface EmailSend {
+// One row in the unified Activity feed (/api/crm/activity) — a single touch on any
+// channel: campaign sends, manual emails/texts/calls/LinkedIn, inbound replies, notes…
+interface ActivityItem {
   id: string;
-  enrollmentId: string;
-  stepId: string;
-  recipientEmail: string;
-  recipientName: string;
-  subject: string;
+  source: "campaign" | "contact" | "client";
+  channel: "email" | "sms" | "whatsapp" | "call" | "linkedin" | "note" | "status" | "document" | "task" | "other";
+  direction: "outbound" | "inbound";
+  name: string;
+  target: string;
+  detail: string;
   status: string;
-  sentAt: string | null;
-  openedAt: string | null;
-  openCount: number;
-  errorMessage: string | null;
-  createdAt: string;
+  timestamp: string | null;
 }
 
 interface Prospect {
@@ -136,59 +135,44 @@ interface SmsCampaignData {
 }
 type WaCampaignData = SmsCampaignData;
 
-type SortKey = "recipientName" | "recipientEmail" | "subject" | "status" | "sentAt" | "openedAt" | "openCount";
-type SortDir = "asc" | "desc";
+// ─── Activity feed channel catalog ───────────────────────────────────────────
+// Drives the channel filter chips, the per-channel icon/colour in each row, and the
+// stat tiles at the top of the Activity tab.
+const CHANNEL_META: Record<
+  ActivityItem["channel"],
+  { label: string; icon: typeof Mail; color: string; bg: string }
+> = {
+  email:    { label: "Email",    icon: Mail,          color: "text-blue-600",    bg: "bg-blue-100 text-blue-700" },
+  sms:      { label: "Text",     icon: MessageSquare, color: "text-emerald-600", bg: "bg-emerald-100 text-emerald-700" },
+  whatsapp: { label: "WhatsApp", icon: Smartphone,    color: "text-green-600",   bg: "bg-green-100 text-green-700" },
+  call:     { label: "Call",     icon: Phone,         color: "text-amber-600",   bg: "bg-amber-100 text-amber-700" },
+  linkedin: { label: "LinkedIn", icon: Linkedin,      color: "text-sky-600",     bg: "bg-sky-100 text-sky-700" },
+  note:     { label: "Note",     icon: Edit2,         color: "text-gray-500",    bg: "bg-gray-100 text-gray-600" },
+  status:   { label: "Status",   icon: Zap,           color: "text-violet-600",  bg: "bg-violet-100 text-violet-700" },
+  document: { label: "Document", icon: CheckSquare,   color: "text-indigo-600",  bg: "bg-indigo-100 text-indigo-700" },
+  task:     { label: "Task",     icon: CheckSquare,   color: "text-purple-600",  bg: "bg-purple-100 text-purple-700" },
+  other:    { label: "Other",    icon: Clock,         color: "text-gray-400",    bg: "bg-gray-100 text-gray-600" },
+};
 
-function StatusIcon({ status }: { status: string }) {
-  switch (status) {
-    case "sent":
-      return <Mail className="size-4 text-blue-500" />;
-    case "opened":
-      return <MailOpen className="size-4 text-green-500" />;
-    case "failed":
-      return <MailX className="size-4 text-red-500" />;
-    case "pending":
-      return <Mail className="size-4 text-gray-400" />;
-    default:
-      return <Mail className="size-4 text-gray-400" />;
-  }
+function channelMeta(channel: string) {
+  return CHANNEL_META[(channel as ActivityItem["channel"])] ?? CHANNEL_META.other;
 }
 
-function SendStatusBadge({ send }: { send: EmailSend }) {
-  if (send.openedAt) {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700">
-        <MailOpen className="size-3" /> Opened ({send.openCount}x)
-      </span>
-    );
-  }
-  if (send.status === "task") {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-700">
-        <CheckSquare className="size-3" /> Task created
-      </span>
-    );
-  }
-  switch (send.status) {
-    case "sent":
-      return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700">
-          <Mail className="size-3" /> Sent
-        </span>
-      );
-    case "failed":
-      return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-700">
-          <MailX className="size-3" /> Failed
-        </span>
-      );
-    default:
-      return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">
-          <Mail className="size-3" /> Pending
-        </span>
-      );
-  }
+function ActivityStatusBadge({ item }: { item: ActivityItem }) {
+  const map: Record<string, { label: string; cls: string }> = {
+    opened:   { label: "Opened",   cls: "bg-green-100 text-green-700" },
+    sent:     { label: item.direction === "inbound" ? "Received" : "Sent", cls: "bg-blue-100 text-blue-700" },
+    received: { label: "Received", cls: "bg-cyan-100 text-cyan-700" },
+    failed:   { label: "Failed",   cls: "bg-red-100 text-red-700" },
+    pending:  { label: "Pending",  cls: "bg-gray-100 text-gray-600" },
+    task:     { label: "Task",     cls: "bg-purple-100 text-purple-700" },
+  };
+  const s = map[item.status] ?? { label: item.status || "—", cls: "bg-gray-100 text-gray-600" };
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${s.cls}`}>
+      {s.label}
+    </span>
+  );
 }
 
 // ─── Step type catalog (Seamless-style "Add a Step" picker) ──────────────────
@@ -248,8 +232,7 @@ function EmailCampaignTab() {
 
   const [filterText, setFilterText] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
-  const [sortKey, setSortKey] = useState<SortKey>("sentAt");
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [filterChannel, setFilterChannel] = useState("all");
 
   const { data: campaigns = [] } = useQuery<Campaign[]>({
     queryKey: ["/api/crm/campaigns"],
@@ -285,8 +268,8 @@ function EmailCampaignTab() {
     enabled: !!selectedCampaign,
   });
 
-  const { data: sends = [] } = useQuery<EmailSend[]>({
-    queryKey: ["/api/crm/sends"],
+  const { data: activity = [] } = useQuery<ActivityItem[]>({
+    queryKey: ["/api/crm/activity"],
   });
 
   const { data: prospects = [] } = useQuery<Prospect[]>({
@@ -395,7 +378,7 @@ function EmailCampaignTab() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/sends"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/activity"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/enrollments"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/campaigns", selectedCampaign] });
       toast({ title: "Sequence processed", description: "Any due emails, texts and tasks have been actioned." });
@@ -494,81 +477,40 @@ function EmailCampaignTab() {
     setSelectedProspects(next);
   };
 
-  const handleSort = (key: SortKey) => {
-    if (sortKey === key) {
-      setSortDir(sortDir === "asc" ? "desc" : "asc");
-    } else {
-      setSortKey(key);
-      setSortDir("desc");
+  // Activity feed is already time-ordered (newest first) by the API — we only filter.
+  const filteredActivity = useMemo(() => {
+    let result = activity;
+    if (filterChannel !== "all") {
+      result = result.filter((a) => a.channel === filterChannel);
     }
-  };
-
-  const filteredSends = useMemo(() => {
-    let result = sends;
+    if (filterStatus !== "all") {
+      result = result.filter((a) => (filterStatus === "opened" ? a.status === "opened" : a.status === filterStatus));
+    }
     if (filterText) {
       const q = filterText.toLowerCase();
       result = result.filter(
-        (s) =>
-          s.recipientName.toLowerCase().includes(q) ||
-          s.recipientEmail.toLowerCase().includes(q) ||
-          s.subject.toLowerCase().includes(q)
+        (a) =>
+          a.name.toLowerCase().includes(q) ||
+          a.target.toLowerCase().includes(q) ||
+          a.detail.toLowerCase().includes(q)
       );
     }
-    if (filterStatus !== "all") {
-      if (filterStatus === "opened") {
-        result = result.filter((s) => s.openedAt);
-      } else if (filterStatus === "not_opened") {
-        result = result.filter((s) => s.status === "sent" && !s.openedAt);
-      } else {
-        result = result.filter((s) => s.status === filterStatus);
-      }
-    }
-    result = [...result].sort((a, b) => {
-      let aVal: any, bVal: any;
-      switch (sortKey) {
-        case "recipientName":
-          aVal = a.recipientName.toLowerCase();
-          bVal = b.recipientName.toLowerCase();
-          break;
-        case "recipientEmail":
-          aVal = a.recipientEmail.toLowerCase();
-          bVal = b.recipientEmail.toLowerCase();
-          break;
-        case "subject":
-          aVal = a.subject.toLowerCase();
-          bVal = b.subject.toLowerCase();
-          break;
-        case "status":
-          aVal = a.openedAt ? "opened" : a.status;
-          bVal = b.openedAt ? "opened" : b.status;
-          break;
-        case "sentAt":
-          aVal = a.sentAt || "";
-          bVal = b.sentAt || "";
-          break;
-        case "openedAt":
-          aVal = a.openedAt || "";
-          bVal = b.openedAt || "";
-          break;
-        case "openCount":
-          aVal = a.openCount;
-          bVal = b.openCount;
-          break;
-      }
-      if (aVal < bVal) return sortDir === "asc" ? -1 : 1;
-      if (aVal > bVal) return sortDir === "asc" ? 1 : -1;
-      return 0;
-    });
     return result;
-  }, [sends, filterText, filterStatus, sortKey, sortDir]);
+  }, [activity, filterText, filterStatus, filterChannel]);
 
-  const sendStats = useMemo(() => ({
-    total: sends.length,
-    sent: sends.filter((s) => s.status === "sent" || s.openedAt).length,
-    opened: sends.filter((s) => s.openedAt).length,
-    failed: sends.filter((s) => s.status === "failed").length,
-    pending: sends.filter((s) => s.status === "pending").length,
-  }), [sends]);
+  // Per-channel tallies for the stat tiles at the top of the Activity tab.
+  const activityStats = useMemo(() => {
+    const byChannel: Record<string, number> = {};
+    for (const a of activity) byChannel[a.channel] = (byChannel[a.channel] || 0) + 1;
+    return {
+      total: activity.length,
+      email: byChannel.email || 0,
+      sms: byChannel.sms || 0,
+      linkedin: byChannel.linkedin || 0,
+      call: byChannel.call || 0,
+      opened: activity.filter((a) => a.status === "opened").length,
+    };
+  }, [activity]);
 
   // Steps grouped by their "Day Step is Due" (delayDays) for the Seamless-style builder.
   const dayGroups = useMemo(() => {
@@ -582,16 +524,6 @@ function EmailCampaignTab() {
     }
     return groups;
   }, [campaignDetail]);
-
-  const SortHeader = ({ label, sortKeyVal }: { label: string; sortKeyVal: SortKey }) => (
-    <button
-      className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
-      onClick={() => handleSort(sortKeyVal)}
-    >
-      {label}
-      <ArrowUpDown className={`size-3 ${sortKey === sortKeyVal ? "text-foreground" : ""}`} />
-    </button>
-  );
 
   return (
     <div data-testid="email-campaigns">
@@ -608,7 +540,7 @@ function EmailCampaignTab() {
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === "sends" ? "border-[hsl(var(--primary))] text-[hsl(var(--primary))]" : "border-transparent text-muted-foreground hover:text-foreground"}`}
           onClick={() => setActiveTab("sends")}
         >
-          Email Activity ({sends.length})
+          Activity ({activity.length})
         </button>
       </div>
 
@@ -718,7 +650,7 @@ function EmailCampaignTab() {
               </div>
 
               {/* Overview stat row */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 mb-6">
+              <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2 mb-6">
                 {[
                   { label: "Total", value: stats?.overview.total ?? enrollments.length, color: "text-[hsl(var(--primary))]" },
                   { label: "Active", value: stats?.overview.active ?? 0, color: "text-green-600" },
@@ -726,6 +658,7 @@ function EmailCampaignTab() {
                   { label: "Paused", value: stats?.overview.paused ?? 0, color: "text-gray-500" },
                   { label: "Emails", value: stats?.overview.emails ?? 0, color: "text-blue-600" },
                   { label: "Opens", value: stats?.overview.opens ?? 0, color: "text-green-600" },
+                  { label: "Clicks", value: stats?.overview.clicks ?? 0, color: "text-amber-600" },
                   { label: "Replies", value: stats?.overview.replies ?? 0, color: "text-purple-600" },
                   { label: "Bounced", value: stats?.overview.bounced ?? 0, color: "text-red-600" },
                 ].map((s) => (
@@ -806,6 +739,7 @@ function EmailCampaignTab() {
                                       <>
                                         <span><span className="font-semibold text-foreground">{st?.sent ?? 0}</span> Sent</span>
                                         {channel === "email" && <span><span className="font-semibold text-foreground">{st?.opened ?? 0}</span> Opened</span>}
+                                        {channel === "email" && <span><span className="font-semibold text-foreground">{st?.clicked ?? 0}</span> Clicked</span>}
                                         <span><span className="font-semibold text-foreground">{st?.bounced ?? 0}</span> {channel === "sms" ? "Failed" : "Bounced"}</span>
                                       </>
                                     )}
@@ -1086,23 +1020,46 @@ function EmailCampaignTab() {
 
       {activeTab === "sends" && (
         <>
-          <div className="grid gap-4 sm:grid-cols-4 mb-6">
-            <Card className="p-3 text-center">
-              <div className="text-xl font-bold text-[hsl(var(--primary))]">{sendStats.total}</div>
-              <div className="text-xs text-muted-foreground">Total Emails</div>
-            </Card>
-            <Card className="p-3 text-center">
-              <div className="text-xl font-bold text-blue-600">{sendStats.sent}</div>
-              <div className="text-xs text-muted-foreground">Sent</div>
-            </Card>
-            <Card className="p-3 text-center">
-              <div className="text-xl font-bold text-green-600">{sendStats.opened}</div>
-              <div className="text-xs text-muted-foreground">Opened</div>
-            </Card>
-            <Card className="p-3 text-center">
-              <div className="text-xl font-bold text-red-600">{sendStats.failed}</div>
-              <div className="text-xs text-muted-foreground">Failed</div>
-            </Card>
+          <div className="mb-1">
+            <h3 className="text-lg font-semibold">Activity</h3>
+            <p className="text-xs text-muted-foreground">Every outreach touch across all channels — campaign sends, manual emails &amp; texts, calls, LinkedIn and inbound replies.</p>
+          </div>
+
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 my-4">
+            {[
+              { label: "All Activity", value: activityStats.total, color: "text-[hsl(var(--primary))]" },
+              { label: "Email", value: activityStats.email, color: "text-blue-600" },
+              { label: "Text", value: activityStats.sms, color: "text-emerald-600" },
+              { label: "LinkedIn", value: activityStats.linkedin, color: "text-sky-600" },
+              { label: "Calls", value: activityStats.call, color: "text-amber-600" },
+              { label: "Opened", value: activityStats.opened, color: "text-green-600" },
+            ].map((s) => (
+              <Card key={s.label} className="p-3 text-center">
+                <div className={`text-xl font-bold ${s.color}`}>{s.value}</div>
+                <div className="text-[11px] text-muted-foreground">{s.label}</div>
+              </Card>
+            ))}
+          </div>
+
+          {/* Channel filter chips */}
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {([["all", "All channels", Zap]] as const).concat(
+              (["email", "sms", "whatsapp", "call", "linkedin", "note", "status", "document"] as const).map(
+                (c) => [c, CHANNEL_META[c].label, CHANNEL_META[c].icon] as const
+              )
+            ).map(([key, label, Icon]) => {
+              const active = filterChannel === key;
+              return (
+                <button
+                  key={key}
+                  data-testid={`activity-channel-${key}`}
+                  onClick={() => setFilterChannel(key)}
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${active ? "border-[hsl(var(--primary))] bg-[hsl(var(--primary))] text-white" : "border-input text-muted-foreground hover:text-foreground"}`}
+                >
+                  <Icon className="size-3" /> {label}
+                </button>
+              );
+            })}
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center mb-4">
@@ -1110,7 +1067,7 @@ function EmailCampaignTab() {
               <Mail className="absolute left-3 top-2.5 size-4 text-muted-foreground" />
               <Input
                 data-testid="input-filter-sends"
-                placeholder="Filter by name, email, subject..."
+                placeholder="Filter by name, email, detail..."
                 value={filterText}
                 onChange={(e) => setFilterText(e.target.value)}
                 className="pl-9"
@@ -1126,51 +1083,56 @@ function EmailCampaignTab() {
                 <option value="all">All statuses</option>
                 <option value="sent">Sent</option>
                 <option value="opened">Opened</option>
-                <option value="not_opened">Not opened</option>
+                <option value="received">Received</option>
                 <option value="failed">Failed</option>
-                <option value="pending">Pending</option>
+                <option value="task">Task</option>
               </select>
               <ChevronDown className="pointer-events-none absolute right-2 top-2.5 size-4 text-muted-foreground" />
             </div>
           </div>
 
-          {filteredSends.length === 0 ? (
+          {filteredActivity.length === 0 ? (
             <Card className="p-8 text-center">
-              <Mail className="mx-auto size-10 text-muted-foreground/30" />
+              <Clock className="mx-auto size-10 text-muted-foreground/30" />
               <p className="mt-3 text-sm text-muted-foreground">
-                {sends.length === 0 ? "No emails sent yet. Enroll prospects in a campaign and process the drip." : "No emails match your filter."}
+                {activity.length === 0 ? "No activity logged yet. Enroll prospects in a campaign or send a message to start the timeline." : "No activity matches your filter."}
               </p>
             </Card>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2 px-3"><SortHeader label="Recipient" sortKeyVal="recipientName" /></th>
-                    <th className="text-left py-2 px-3"><SortHeader label="Email" sortKeyVal="recipientEmail" /></th>
-                    <th className="text-left py-2 px-3"><SortHeader label="Subject" sortKeyVal="subject" /></th>
-                    <th className="text-left py-2 px-3"><SortHeader label="Status" sortKeyVal="status" /></th>
-                    <th className="text-left py-2 px-3"><SortHeader label="Sent" sortKeyVal="sentAt" /></th>
-                    <th className="text-left py-2 px-3"><SortHeader label="Opened" sortKeyVal="openedAt" /></th>
-                    <th className="text-left py-2 px-3"><SortHeader label="Opens" sortKeyVal="openCount" /></th>
+                  <tr className="border-b text-xs text-muted-foreground">
+                    <th className="text-left py-2 px-3 font-medium">Channel</th>
+                    <th className="text-left py-2 px-3 font-medium">Contact</th>
+                    <th className="text-left py-2 px-3 font-medium">To / From</th>
+                    <th className="text-left py-2 px-3 font-medium">Detail</th>
+                    <th className="text-left py-2 px-3 font-medium">Status</th>
+                    <th className="text-left py-2 px-3 font-medium">When</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredSends.map((send) => (
-                    <tr key={send.id} data-testid={`send-row-${send.id}`} className="border-b hover:bg-gray-50">
-                      <td className="py-2 px-3 font-medium">{send.recipientName}</td>
-                      <td className="py-2 px-3 text-muted-foreground">{send.recipientEmail}</td>
-                      <td className="py-2 px-3 max-w-48 truncate">{send.subject}</td>
-                      <td className="py-2 px-3"><SendStatusBadge send={send} /></td>
-                      <td className="py-2 px-3 text-xs text-muted-foreground">
-                        {send.sentAt ? new Date(send.sentAt).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—"}
-                      </td>
-                      <td className="py-2 px-3 text-xs text-muted-foreground">
-                        {send.openedAt ? new Date(send.openedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—"}
-                      </td>
-                      <td className="py-2 px-3 text-center">{send.openCount}</td>
-                    </tr>
-                  ))}
+                  {filteredActivity.map((item) => {
+                    const meta = channelMeta(item.channel);
+                    const Icon = meta.icon;
+                    return (
+                      <tr key={item.id} data-testid={`activity-row-${item.id}`} className="border-b hover:bg-gray-50">
+                        <td className="py-2 px-3">
+                          <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ${meta.bg}`}>
+                            <Icon className="size-3" /> {meta.label}
+                            {item.direction === "inbound" && <ArrowLeft className="size-3" />}
+                          </span>
+                        </td>
+                        <td className="py-2 px-3 font-medium">{item.name || "—"}</td>
+                        <td className="py-2 px-3 text-muted-foreground max-w-44 truncate">{item.target || "—"}</td>
+                        <td className="py-2 px-3 max-w-72 truncate" title={item.detail}>{item.detail || "—"}</td>
+                        <td className="py-2 px-3"><ActivityStatusBadge item={item} /></td>
+                        <td className="py-2 px-3 text-xs text-muted-foreground whitespace-nowrap">
+                          {item.timestamp ? new Date(item.timestamp).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

@@ -182,6 +182,8 @@ export const crmDirectEmails = pgTable("crm_direct_emails", {
   status: text("status").notNull().default("sent"),
   openedAt: timestamp("opened_at"),
   openCount: integer("open_count").default(0).notNull(),
+  clickedAt: timestamp("clicked_at"),
+  clickCount: integer("click_count").default(0).notNull(),
   trackingId: varchar("tracking_id", { length: 128 }).unique(),
   // "outbound" (sent from the CRM) or "inbound" (synced from the franchising@ Gmail inbox).
   direction: text("direction").notNull().default("outbound"),
@@ -331,6 +333,9 @@ export const dripSends = pgTable("drip_sends", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   enrollmentId: varchar("enrollment_id").notNull().references(() => dripEnrollments.id),
   stepId: varchar("step_id").notNull().references(() => dripSteps.id),
+  // Outreach channel this send/touch belongs to: email | sms | linkedin | call | task.
+  // Lets the unified Activity feed render & filter by channel without a step join.
+  channel: text("channel").notNull().default("email"),
   recipientEmail: text("recipient_email").notNull(),
   recipientName: text("recipient_name").notNull(),
   subject: text("subject").notNull(),
@@ -338,6 +343,8 @@ export const dripSends = pgTable("drip_sends", {
   sentAt: timestamp("sent_at"),
   openedAt: timestamp("opened_at"),
   openCount: integer("open_count").default(0).notNull(),
+  clickedAt: timestamp("clicked_at"),
+  clickCount: integer("click_count").default(0).notNull(),
   errorMessage: text("error_message"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

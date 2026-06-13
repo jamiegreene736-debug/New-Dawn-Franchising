@@ -108,6 +108,16 @@ const STATEMENTS: string[] = [
   `ALTER TABLE contact_tasks ALTER COLUMN contact_id DROP NOT NULL`,
   `ALTER TABLE contact_tasks ADD COLUMN IF NOT EXISTS prospect_id varchar`,
   `ALTER TABLE contact_tasks ADD COLUMN IF NOT EXISTS subtitle text`,
+  // ─── Email link-click tracking ───────────────────────────────────────────
+  // Every email is tracked for opens (pixel) and now link clicks (redirect).
+  `ALTER TABLE drip_sends ADD COLUMN IF NOT EXISTS clicked_at timestamp`,
+  `ALTER TABLE drip_sends ADD COLUMN IF NOT EXISTS click_count integer NOT NULL DEFAULT 0`,
+  // ─── Unified Activity feed ───────────────────────────────────────────────
+  // Every drip touch records its channel so the Activity tab can show & filter
+  // email / SMS / LinkedIn / call / task touches side-by-side.
+  `ALTER TABLE drip_sends ADD COLUMN IF NOT EXISTS channel text NOT NULL DEFAULT 'email'`,
+  `ALTER TABLE crm_direct_emails ADD COLUMN IF NOT EXISTS clicked_at timestamp`,
+  `ALTER TABLE crm_direct_emails ADD COLUMN IF NOT EXISTS click_count integer NOT NULL DEFAULT 0`,
 ];
 
 export async function ensureSchema(): Promise<void> {

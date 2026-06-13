@@ -134,13 +134,24 @@ export async function sendEmailFromSender(
       const pixelHtml = trackingPixelUrl
         ? `\n<img src="${trackingPixelUrl}" width="1" height="1" style="display:none;border:0;" alt="" />`
         : "";
+
+      // Link-click tracking: rewrite every outgoing http(s) link to the click
+      // redirect derived from the open-pixel URL (…/track/open/<id> → …/track/click/<id>).
+      // Together with the pixel this means every tracked send records opens AND clicks.
+      let innerHtml = `${bodyContent}\n${sigHtml}`;
+      if (trackingPixelUrl && trackingPixelUrl.includes("/api/track/open/")) {
+        const clickBase = trackingPixelUrl.replace("/api/track/open/", "/api/track/click/");
+        innerHtml = innerHtml.replace(/href="(https?:\/\/[^"]+)"/gi, (_m, url) =>
+          `href="${clickBase}?u=${encodeURIComponent(url)}"`
+        );
+      }
+
       finalHtml = `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#ffffff;">
 <div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.7;color:#222222;max-width:600px;margin:0 auto;padding:24px 20px;">
-${bodyContent}
-${sigHtml}
+${innerHtml}
 </div>${pixelHtml}
 </body>
 </html>`;

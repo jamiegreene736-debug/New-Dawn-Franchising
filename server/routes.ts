@@ -2375,16 +2375,36 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
       const enrolled = new Set(existing.map((e) => e.prospectId));
       const results = [];
       let skippedNoEmail = 0;
-      for (const contactId of contactIds) {
-        const contact = await storage.getContact(String(contactId));
-        if (!contact) continue;
-        if (!contact.email) { skippedNoEmail++; continue; }
-        const prospect = await storage.findOrCreateProspectForContact(contact);
+      for (const rawId of contactIds) {
+        // IDs may be prefixed to indicate which CRM store they come from:
+        //   "client:<id>"  → crm_clients (the main CRM tab)
+        //   "contact:<id>" → contacts (attorney/lead contacts)
+        // Bare ids default to a contact for backward compatibility.
+        const id = String(rawId);
+        const isClient = id.startsWith("client:");
+        const bareId = id.includes(":") ? id.slice(id.indexOf(":") + 1) : id;
+
+        let prospect;
+        let email: string | null;
+        if (isClient) {
+          const client = await storage.getCrmClient(bareId);
+          if (!client) continue;
+          if (!client.email) { skippedNoEmail++; continue; }
+          email = client.email;
+          prospect = await storage.findOrCreateProspectForClient(client);
+        } else {
+          const contact = await storage.getContact(bareId);
+          if (!contact) continue;
+          if (!contact.email) { skippedNoEmail++; continue; }
+          email = contact.email;
+          prospect = await storage.findOrCreateProspectForContact(contact);
+        }
+
         if (enrolled.has(prospect.id)) continue;
         const enrollment = await storage.createDripEnrollment({
           campaignId,
           prospectId: prospect.id,
-          prospectEmail: prospect.email || contact.email,
+          prospectEmail: prospect.email || email,
           prospectName: prospect.name,
           currentStep: 0,
           status: "active",
@@ -2395,6 +2415,63 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
       res.status(201).json({ enrolled: results, count: results.length, skippedNoEmail });
     } catch (err) {
       res.status(500).json({ message: "Failed to enroll contacts" });
+    }
+  });
+
+  // Unified list of people available to enroll in a campaign, merged from BOTH
+  // CRM stores — crm_clients (the main CRM tab) and contacts (lead/attorney
+  // contacts) — de-duplicated by email. IDs are prefixed with their source
+  // ("client:" / "contact:") so enrollment resolves them against the right table.
+  app.get("/api/crm/enroll-candidates", requireAdminAuth, async (_req, res) => {
+    try {
+      const [clients, contactsResult] = await Promise.all([
+        storage.getCrmClients(),
+        storage.getContacts({ limit: 5000, offset: 0 }),
+      ]);
+
+      const seenEmails = new Set<string>();
+      const candidates: Array<{
+        id: string; firstName: string; lastName: string;
+        email: string | null; firmName: string | null; jobTitle: string | null; source: string;
+      }> = [];
+
+      // Clients first (this is what the main CRM tab writes to).
+      for (const c of clients) {
+        const key = (c.email || "").toLowerCase();
+        if (key) seenEmails.add(key);
+        const parts = (c.fullName || "").trim().split(/\s+/);
+        candidates.push({
+          id: `client:${c.id}`,
+          firstName: parts[0] || c.fullName || "",
+          lastName: parts.slice(1).join(" "),
+          email: c.email || null,
+          firmName: c.companyName || null,
+          jobTitle: c.profession || null,
+          source: "CRM",
+        });
+      }
+
+      // Then attorney/lead contacts, skipping any already covered by email.
+      const contactList = (contactsResult as { contacts?: any[] }).contacts || [];
+      for (const c of contactList) {
+        const key = (c.email || "").toLowerCase();
+        if (key && seenEmails.has(key)) continue;
+        if (key) seenEmails.add(key);
+        candidates.push({
+          id: `contact:${c.id}`,
+          firstName: c.firstName || "",
+          lastName: c.lastName || "",
+          email: c.email || null,
+          firmName: c.firmName || null,
+          jobTitle: c.jobTitle || null,
+          source: "Contacts",
+        });
+      }
+
+      res.json({ contacts: candidates, total: candidates.length });
+    } catch (err) {
+      console.error("GET /api/crm/enroll-candidates error:", err);
+      res.status(500).json({ message: "Failed to load enrollment candidates" });
     }
   });
 

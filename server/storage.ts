@@ -31,6 +31,7 @@ export interface IStorage {
   getProspectsByLocation(category: string, location: string): Promise<Prospect[]>;
   createProspect(prospect: InsertProspect): Promise<Prospect>;
   findOrCreateProspectForContact(contact: Contact): Promise<Prospect>;
+  findOrCreateProspectForClient(client: CrmClient): Promise<Prospect>;
   createProspects(prospectList: InsertProspect[]): Promise<Prospect[]>;
   deleteProspect(id: string): Promise<void>;
   deleteProspectsByLocation(category: string, location: string): Promise<void>;
@@ -595,6 +596,25 @@ export class DatabaseStorage implements IStorage {
       category: contact.personaType || "Referral Partner",
       location: contact.city || contact.country || "International",
       source: contact.source || "contact",
+    } as InsertProspect);
+  }
+
+  async findOrCreateProspectForClient(client: CrmClient): Promise<Prospect> {
+    const name = (client.fullName || "").trim() || "Unknown";
+    if (client.email) {
+      const [byEmail] = await db.select().from(prospects)
+        .where(sql`lower(${prospects.email}) = ${client.email.toLowerCase()}`).limit(1);
+      if (byEmail) return byEmail;
+    }
+    return this.createProspect({
+      name,
+      company: client.companyName ?? null,
+      email: client.email ?? null,
+      phone: client.phone ?? null,
+      website: null,
+      category: client.profession || "CRM Client",
+      location: client.country || "International",
+      source: client.leadSource || "crm_client",
     } as InsertProspect);
   }
 

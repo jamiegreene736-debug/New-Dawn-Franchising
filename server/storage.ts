@@ -57,6 +57,7 @@ export interface IStorage {
   getActiveEnrollments(): Promise<DripEnrollment[]>;
   getDripSends(enrollmentId?: string): Promise<DripSend[]>;
   getAllDripSends(): Promise<DripSend[]>;
+  countSentEmailsSince(since: Date): Promise<number>;
   getDripSendsByCampaign(campaignId: string): Promise<DripSend[]>;
   getInboundReplyAddresses(): Promise<string[]>;
   getDripSend(id: string): Promise<DripSend | undefined>;
@@ -388,6 +389,22 @@ export class DatabaseStorage implements IStorage {
 
   async getAllDripSends(): Promise<DripSend[]> {
     return db.select().from(dripSends).orderBy(desc(dripSends.createdAt));
+  }
+
+  /**
+   * Count campaign emails actually SENT since `since`. Backs the drip
+   * processor's daily + hourly throttles so they survive process restarts
+   * (Railway redeploys) rather than resetting an in-memory counter.
+   */
+  async countSentEmailsSince(since: Date): Promise<number> {
+    const [row] = await db.select({ n: sql<number>`count(*)` })
+      .from(dripSends)
+      .where(and(
+        eq(dripSends.channel, "email"),
+        eq(dripSends.status, "sent"),
+        gte(dripSends.sentAt, since),
+      ));
+    return Number(row?.n ?? 0);
   }
 
   async getDripSendsByCampaign(campaignId: string): Promise<DripSend[]> {

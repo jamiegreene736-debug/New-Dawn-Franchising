@@ -5,12 +5,14 @@ import { sendSmsViaQuo } from "./quo-service";
 import {
   isOptimalEmailWindow,
   smartEmailDelay,
-  isEmailDailyCapReached,
-  incrementDailyEmailCount,
-  getDailyEmailCount,
   EMAIL_DAILY_CAP,
+  EMAIL_HOURLY_CAP,
+  EMAIL_DOMAIN_GAP_MS,
+  emailDomain,
   nextWindowDescription,
 } from "./smart-scheduler";
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 function getBaseUrl(): string {
   if (process.env.REPLIT_DEPLOYMENT_URL) {
@@ -52,22 +54,39 @@ export async function processDripEmails() {
     return;
   }
 
-  // Respect daily email cap
-  if (isEmailDailyCapReached()) {
-    console.log(`[Drip] Daily email cap reached (${EMAIL_DAILY_CAP}/day). Deferring to tomorrow.`);
-    return;
-  }
-
   try {
+    // DB-backed rolling-window counters so throttles survive process restarts
+    // (Railway redeploys) instead of resetting an in-memory counter mid-day.
+    const now = Date.now();
+    let sentLast24h = await storage.countSentEmailsSince(new Date(now - 24 * 60 * 60 * 1000));
+    let sentLastHour = await storage.countSentEmailsSince(new Date(now - 60 * 60 * 1000));
+
+    // Respect daily volume cap
+    if (sentLast24h >= EMAIL_DAILY_CAP) {
+      console.log(`[Drip] Daily email cap reached (${sentLast24h}/${EMAIL_DAILY_CAP} in last 24h). Deferring.`);
+      return;
+    }
+    // Respect hourly cap — spreads the day's volume across business hours so we
+    // never burst the whole quota in one run (a classic bulk-sender spam signal).
+    if (sentLastHour >= EMAIL_HOURLY_CAP) {
+      console.log(`[Drip] Hourly email cap reached (${sentLastHour}/${EMAIL_HOURLY_CAP} in last hour). Resuming next hour.`);
+      return;
+    }
+
     const activeEnrollments = await storage.getActiveEnrollments();
     let sentThisRun = 0;
-    const dailyRemaining = EMAIL_DAILY_CAP - getDailyEmailCount();
-    console.log(`[Drip] ${activeEnrollments.length} active enrollments, ${dailyRemaining} sends remaining today`);
+    // Last send time per recipient domain, to pace bursts to one ISP/domain.
+    const lastSendByDomain = new Map<string, number>();
+    console.log(`[Drip] ${activeEnrollments.length} active enrollments · ${EMAIL_DAILY_CAP - sentLast24h} left today · ${EMAIL_HOURLY_CAP - sentLastHour} left this hour`);
 
     for (const enrollment of activeEnrollments) {
-      // Stop if daily cap hit mid-run
-      if (isEmailDailyCapReached()) {
+      // Stop if either throttle is hit mid-run
+      if (sentLast24h >= EMAIL_DAILY_CAP) {
         console.log("[Drip] Daily cap hit mid-run. Stopping early.");
+        break;
+      }
+      if (sentLastHour >= EMAIL_HOURLY_CAP) {
+        console.log("[Drip] Hourly cap hit mid-run. Stopping — will resume next hour.");
         break;
       }
 
@@ -111,6 +130,21 @@ export async function processDripEmails() {
         const stepType = (step.stepType || "email").toLowerCase();
 
         if (stepType === "email" || stepType === "manual_email") {
+          // Per-domain pacing: if we sent to this recipient's domain very
+          // recently in this run, wait out the remainder of the domain gap
+          // before sending again (avoids rapid bursts to one ISP).
+          const domain = emailDomain(enrollment.prospectEmail);
+          if (domain) {
+            const last = lastSendByDomain.get(domain);
+            if (last !== undefined) {
+              const wait = EMAIL_DOMAIN_GAP_MS - (Date.now() - last);
+              if (wait > 0) {
+                console.log(`[Drip] Pacing ${domain}: waiting ${Math.round(wait / 1000)}s before next send to same domain...`);
+                await sleep(wait);
+              }
+            }
+          }
+
           const send = await storage.createDripSend({
             enrollmentId: enrollment.id,
             stepId: step.id,
@@ -132,20 +166,23 @@ export async function processDripEmails() {
           );
 
           if (result.success) {
-            incrementDailyEmailCount();
             sentThisRun++;
+            sentLast24h++;
+            sentLastHour++;
+            if (domain) lastSendByDomain.set(domain, Date.now());
             await storage.updateDripSend(send.id, { status: "sent", sentAt: new Date() } as any);
-            console.log(`[Drip] Sent email step ${currentStepIndex + 1} to ${enrollment.prospectEmail} (daily total: ${getDailyEmailCount()})`);
+            console.log(`[Drip] Sent email step ${currentStepIndex + 1} to ${enrollment.prospectEmail} (today: ${sentLast24h}/${EMAIL_DAILY_CAP}, hour: ${sentLastHour}/${EMAIL_HOURLY_CAP})`);
           } else {
             await storage.updateDripSend(send.id, { status: "failed", errorMessage: result.error } as any);
             console.error(`[Drip] Failed to email ${enrollment.prospectEmail}: ${result.error}`);
           }
 
-          // Organic jitter between emails — avoids burst-send spam signals
-          if (sentThisRun > 0 && !isEmailDailyCapReached()) {
+          // Organic jitter between emails — avoids burst-send spam signals.
+          // Skip the wait once a cap is hit (the loop is about to stop anyway).
+          if (sentThisRun > 0 && sentLast24h < EMAIL_DAILY_CAP && sentLastHour < EMAIL_HOURLY_CAP) {
             const jitter = smartEmailDelay(sentThisRun);
             console.log(`[Drip] Waiting ${Math.round(jitter / 1000)}s before next send...`);
-            await new Promise(r => setTimeout(r, jitter));
+            await sleep(jitter);
           }
         } else if (stepType === "sms") {
           const prospect = await storage.getProspect(enrollment.prospectId);
@@ -207,7 +244,7 @@ export async function processDripEmails() {
       }
     }
 
-    console.log(`[Drip] Run complete. Sent ${sentThisRun} emails this run (daily total: ${getDailyEmailCount()}/${EMAIL_DAILY_CAP}).`);
+    console.log(`[Drip] Run complete. Sent ${sentThisRun} emails this run (today: ${sentLast24h}/${EMAIL_DAILY_CAP}, hour: ${sentLastHour}/${EMAIL_HOURLY_CAP}).`);
   } catch (err) {
     console.error("[Drip] Processing error:", err);
   }

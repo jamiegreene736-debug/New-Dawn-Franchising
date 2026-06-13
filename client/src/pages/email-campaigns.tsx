@@ -83,6 +83,44 @@ interface Enrollment {
   completedAt: string | null;
 }
 
+// Projected send-schedule for a campaign (GET /api/crm/campaigns/:id/schedule).
+interface ScheduledStep {
+  stepOrder: number;
+  stepNumber: number;
+  name: string;
+  stepType: string;
+  delayDays: number;
+  sendAt: string | null; // ISO; null when enrollment is paused/completed
+}
+interface EnrollmentSchedule {
+  enrollmentId: string;
+  prospectName: string;
+  prospectEmail: string;
+  status: string;
+  currentStep: number;
+  totalSteps: number;
+  nextSendAt: string | null;
+  nextStepName: string | null;
+  nextStepType: string | null;
+  upcoming: ScheduledStep[];
+}
+interface CampaignSchedule {
+  windowSummary: string;
+  enrollments: EnrollmentSchedule[];
+}
+
+/** Format an ISO send time in Central time, e.g. "Tue, Jun 17, 8:00 AM CT". */
+function formatSendTime(iso: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "—";
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago",
+    weekday: "short", month: "short", day: "numeric",
+    hour: "numeric", minute: "2-digit",
+  }).format(d) + " CT";
+}
+
 // One row in the unified Activity feed (/api/crm/activity) — a single touch on any
 // channel: campaign sends, manual emails/texts/calls/LinkedIn, inbound replies, notes…
 interface ActivityItem {
@@ -239,6 +277,7 @@ function EmailCampaignTab() {
   const [showEnrollContacts, setShowEnrollContacts] = useState(false);
   const [selectedContacts, setSelectedContacts] = useState<Set<string>>(new Set());
   const [contactSearch, setContactSearch] = useState("");
+  const [openSchedule, setOpenSchedule] = useState<Set<string>>(new Set());
 
   const [filterText, setFilterText] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -277,6 +316,19 @@ function EmailCampaignTab() {
     },
     enabled: !!selectedCampaign,
   });
+
+  // Projected send schedule — when each enrollment's upcoming emails go out.
+  const { data: schedule } = useQuery<CampaignSchedule>({
+    queryKey: ["/api/crm/campaigns", selectedCampaign, "schedule"],
+    queryFn: async () => {
+      const res = await fetch(`/api/crm/campaigns/${selectedCampaign}/schedule`);
+      return res.json();
+    },
+    enabled: !!selectedCampaign,
+  });
+  const scheduleByEnrollment = new Map(
+    (schedule?.enrollments ?? []).map((s) => [s.enrollmentId, s]),
+  );
 
   const { data: activity = [] } = useQuery<ActivityItem[]>({
     queryKey: ["/api/crm/activity"],
@@ -466,6 +518,7 @@ function EmailCampaignTab() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/enrollments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/campaigns", selectedCampaign, "schedule"] });
       toast({ title: "Enrollment updated" });
     },
   });
@@ -831,21 +884,85 @@ function EmailCampaignTab() {
                     </Card>
                   ) : (
                     <div className="space-y-2">
-                      {enrollments.map((e) => (
+                      {/* Send-window explainer so the projected times make sense */}
+                      {schedule?.windowSummary && (
+                        <div className="flex items-start gap-2 rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                          <Clock className="size-3.5 shrink-0 mt-0.5 text-primary" />
+                          <span>{schedule.windowSummary}</span>
+                        </div>
+                      )}
+                      {enrollments.map((e) => {
+                        const sched = scheduleByEnrollment.get(e.id);
+                        const expanded = openSchedule.has(e.id);
+                        const upcoming = sched?.upcoming ?? [];
+                        return (
                         <Card key={e.id} data-testid={`enrollment-${e.id}`} className="p-3">
-                          <div className="flex items-center justify-between">
-                            <div>
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
                               <div className="text-sm font-medium">{e.prospectName}</div>
                               <div className="text-xs text-muted-foreground">
                                 {e.prospectEmail} &middot; Step {e.currentStep}/{campaignDetail.steps?.length || 0} &middot;{" "}
                                 <span className={e.status === "active" ? "text-green-600" : e.status === "completed" ? "text-blue-600" : "text-gray-500"}>{e.status}</span>
                               </div>
+                              {/* Next scheduled send */}
+                              {e.status === "active" && (
+                                <div className="mt-1 flex items-center gap-1.5 text-xs font-medium text-foreground" data-testid={`next-send-${e.id}`}>
+                                  <Clock className="size-3.5 text-primary" />
+                                  {sched?.nextSendAt ? (
+                                    <span>
+                                      Next: <span className="text-primary">{formatSendTime(sched.nextSendAt)}</span>
+                                      {sched.nextStepName ? <span className="text-muted-foreground font-normal"> · {sched.nextStepName}</span> : null}
+                                    </span>
+                                  ) : (
+                                    <span className="text-muted-foreground font-normal">No further steps scheduled</span>
+                                  )}
+                                </div>
+                              )}
+                              {e.status === "completed" && (
+                                <div className="mt-1 text-xs text-blue-600">All steps sent — sequence complete</div>
+                              )}
+                              {e.status === "paused" && (
+                                <div className="mt-1 text-xs text-amber-600">Paused — sending stopped. Resume to reschedule.</div>
+                              )}
+                              {/* Full upcoming schedule (collapsible) */}
+                              {upcoming.length > 0 && (
+                                <button
+                                  type="button"
+                                  data-testid={`toggle-schedule-${e.id}`}
+                                  onClick={() => setOpenSchedule((prev) => {
+                                    const next = new Set(prev);
+                                    next.has(e.id) ? next.delete(e.id) : next.add(e.id);
+                                    return next;
+                                  })}
+                                  className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
+                                >
+                                  <ChevronDown className={`size-3 transition-transform ${expanded ? "rotate-180" : ""}`} />
+                                  {expanded ? "Hide" : "View"} full schedule ({upcoming.length} step{upcoming.length === 1 ? "" : "s"})
+                                </button>
+                              )}
+                              {expanded && upcoming.length > 0 && (
+                                <ol className="mt-1.5 space-y-1 border-l border-border/70 pl-3">
+                                  {upcoming.map((s) => (
+                                    <li key={s.stepOrder} className="text-[11px] text-muted-foreground">
+                                      <span className="font-medium text-foreground">Step {s.stepNumber}</span>
+                                      <span className="ml-1 capitalize">({s.stepType})</span>
+                                      {s.name ? <span> · {s.name}</span> : null}
+                                      <span className="ml-1">
+                                        → {e.status === "active" ? formatSendTime(s.sendAt) : `day ${s.delayDays} after enrollment`}
+                                      </span>
+                                    </li>
+                                  ))}
+                                </ol>
+                              )}
                             </div>
-                            {e.status === "active" && <Button size="sm" variant="outline" onClick={() => pauseEnrollmentMutation.mutate({ id: e.id, status: "paused" })}>Pause</Button>}
-                            {e.status === "paused" && <Button size="sm" variant="outline" onClick={() => pauseEnrollmentMutation.mutate({ id: e.id, status: "active" })}>Resume</Button>}
+                            <div className="shrink-0">
+                              {e.status === "active" && <Button size="sm" variant="outline" onClick={() => pauseEnrollmentMutation.mutate({ id: e.id, status: "paused" })}>Pause</Button>}
+                              {e.status === "paused" && <Button size="sm" variant="outline" onClick={() => pauseEnrollmentMutation.mutate({ id: e.id, status: "active" })}>Resume</Button>}
+                            </div>
                           </div>
                         </Card>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>

@@ -105,11 +105,68 @@ interface SavedProspect {
 }
 interface EnrichmentStatus {
   seamless: boolean;
+  apollo?: boolean;
+  origami?: boolean;
   hunter: boolean;
   zerobounce: boolean;
   proxycurl?: boolean;
   whitepages?: boolean;
   pdl?: boolean;
+}
+
+type ProviderId = "seamless" | "apollo" | "origami";
+
+interface ProviderStatus {
+  id: ProviderId;
+  label: string;
+  configured: boolean;
+  credits: number | null;
+}
+
+// Live per-provider state during a multi-provider search run.
+type ProviderRunStatus = "queued" | "searching" | "done" | "error";
+interface ProviderRunState {
+  id: ProviderId;
+  label: string;
+  status: ProviderRunStatus;
+  count: number;
+  message?: string;
+}
+
+const PROVIDER_ORDER: ProviderId[] = ["seamless", "apollo", "origami"];
+const PROVIDER_LABELS: Record<ProviderId, string> = {
+  seamless: "Seamless.AI",
+  apollo: "Apollo.io",
+  origami: "Origami",
+};
+// Distinct accent colors so each provider's results are visually distinguishable.
+const PROVIDER_STYLES: Record<ProviderId, { dot: string; chip: string; badge: string }> = {
+  seamless: { dot: "bg-blue-500",   chip: "border-blue-300 bg-blue-50 text-blue-700",     badge: "bg-blue-100 text-blue-700 border-blue-200" },
+  apollo:   { dot: "bg-purple-500", chip: "border-purple-300 bg-purple-50 text-purple-700", badge: "bg-purple-100 text-purple-700 border-purple-200" },
+  origami:  { dot: "bg-teal-500",   chip: "border-teal-300 bg-teal-50 text-teal-700",     badge: "bg-teal-100 text-teal-700 border-teal-200" },
+};
+const LABEL_TO_PROVIDER: Record<string, ProviderId> = {
+  "Seamless.AI": "seamless",
+  "Apollo.io": "apollo",
+  "Origami": "origami",
+};
+
+/** Small colored badges showing which provider(s) surfaced a contact. */
+function SourceBadges({ sources }: { sources?: string[] }) {
+  if (!sources || sources.length === 0) return null;
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1">
+      {sources.map((s) => {
+        const id = LABEL_TO_PROVIDER[s];
+        const style = id ? PROVIDER_STYLES[id].badge : "bg-gray-100 text-gray-600 border-gray-200";
+        return (
+          <span key={s} className={`inline-flex items-center rounded-sm border px-1 py-0 text-[9px] font-semibold leading-4 ${style}`} title={`Found via ${s}`}>
+            {s.replace(".AI", "").replace(".io", "")}
+          </span>
+        );
+      })}
+    </span>
+  );
 }
 
 function ScoreBadge({ score, tier, tierEmoji, tierLabel }: {
@@ -291,6 +348,7 @@ function ContactCard({
             <ScoreBadge score={score.total} tier={score.tier} tierEmoji={score.tierEmoji} tierLabel={score.tierLabel} />
             <span className="font-semibold text-sm">{contact.fullName}</span>
             {contact.jobTitle && <span className="text-xs text-muted-foreground">{contact.jobTitle}</span>}
+            <SourceBadges sources={contact.sources} />
           </div>
 
           {/* Company context line */}
@@ -848,6 +906,10 @@ export default function ProspectFinder() {
   const [searchTab, setSearchTab] = useState<"contacts" | "companies">("contacts");
   const [filters, setFilters] = useState<LeadFilters>({ ...EMPTY_FILTERS });
   const [aiQuery, setAiQuery] = useState("");
+  // Multi-provider search: which providers the user wants to run + live run state.
+  const [selectedProviders, setSelectedProviders] = useState<Set<ProviderId>>(new Set<ProviderId>());
+  const [providerRun, setProviderRun] = useState<ProviderRunState[]>([]);
+  const [isSearchPending, setIsSearchPending] = useState(false);
   const [revealingIds, setRevealingIds] = useState<Set<string>>(new Set());
   const [findingCompanyIds, setFindingCompanyIds] = useState<Set<string>>(new Set());
   const [showAll, setShowAll] = useState(false);
@@ -912,6 +974,34 @@ export default function ProspectFinder() {
     queryKey: ["/api/crm/enrichment-status"],
   });
 
+  // Per-provider connection + remaining-credit status (Seamless / Apollo / Origami).
+  const { data: providerStatusData } = useQuery<{ providers: ProviderStatus[] }>({
+    queryKey: ["/api/crm/prospects/provider-status"],
+    refetchOnWindowFocus: false,
+    staleTime: 60_000,
+  });
+  const providerStatuses: ProviderStatus[] = providerStatusData?.providers
+    ?? PROVIDER_ORDER.map((id) => ({ id, label: PROVIDER_LABELS[id], configured: false, credits: null }));
+  const providerStatusById = new Map(providerStatuses.map((p) => [p.id, p]));
+
+  // Default the selection to every connected provider once status loads (run once).
+  const didInitProviders = useRef(false);
+  useEffect(() => {
+    if (didInitProviders.current || !providerStatusData) return;
+    const connected = providerStatuses.filter((p) => p.configured).map((p) => p.id);
+    setSelectedProviders(new Set(connected.length ? connected : (["seamless"] as ProviderId[])));
+    didInitProviders.current = true;
+  }, [providerStatusData]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const toggleProvider = (id: ProviderId) => {
+    setSelectedProviders((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   // ── Seamless.AI search helpers ──────────────────────────────────────────────
   const toSearchFilters = (f: LeadFilters) => ({
     jobTitle: f.jobTitle,
@@ -950,47 +1040,184 @@ export default function ProspectFinder() {
       enrichedCount: number;
       nextToken: string | null;
       appliedFilters?: LeadFilters;
+      provider?: ProviderId;
     }>;
   };
 
-  const applyResults = (
-    data: { companies: EnrichedCompany[]; totalContacts: number },
-    label: string,
-  ) => {
-    setCompanies(data.companies);
+  // ── Cross-provider de-dup + merge ───────────────────────────────────────────
+  const domainOf = (u?: string | null) =>
+    u ? u.replace(/^https?:\/\//, "").replace(/\/.*$/, "").replace(/^www\./, "").toLowerCase() : "";
+
+  // Stable identity for a person across providers: email → LinkedIn → name+company.
+  const contactKey = (c: EnrichedContact): string => {
+    if (c.email) return `e:${c.email.toLowerCase()}`;
+    if (c.linkedinUrl) return `l:${c.linkedinUrl.toLowerCase().replace(/\/+$/, "")}`;
+    return `n:${(c.fullName || "").toLowerCase()}|${(c.companyName || "").toLowerCase()}`;
+  };
+  const companyKeyOf = (domain: string | null, name: string | null, fallback: number) =>
+    domainOf(domain) || (name || "").toLowerCase() || `co-${fallback}`;
+
+  /** Merge one provider's companies into the running accumulators. Returns # of NEW unique items. */
+  const mergeInto = (
+    contactMap: Map<string, EnrichedContact>,
+    companyMeta: Map<string, EnrichedCompany>,
+    incoming: EnrichedCompany[],
+    mode: "contacts" | "companies",
+  ): number => {
+    let added = 0;
+    for (const co of incoming) {
+      const cKey = companyKeyOf(co.domain, co.name, companyMeta.size);
+      if (!companyMeta.has(cKey)) {
+        companyMeta.set(cKey, { ...co, id: cKey, contacts: [] });
+        if (mode === "companies") added++;
+      } else {
+        const ex = companyMeta.get(cKey)!;
+        ex.website ||= co.website;
+        ex.address ||= co.address;
+        ex.description ||= co.description;
+        ex.domain ||= co.domain;
+      }
+      const companyName = companyMeta.get(cKey)!.name;
+      for (const ct of co.contacts) {
+        const tagged: EnrichedContact = { ...ct, companyId: cKey, companyName };
+        const key = contactKey(tagged);
+        const ex = contactMap.get(key);
+        if (!ex) {
+          contactMap.set(key, tagged);
+          added++;
+        } else {
+          const sources = Array.from(new Set([...(ex.sources || []), ...(ct.sources || [])]));
+          contactMap.set(key, {
+            ...ex,
+            sources,
+            email: ex.email || ct.email,
+            emailConfidence: ex.email ? ex.emailConfidence : ct.emailConfidence,
+            emailStatus: ex.email ? ex.emailStatus : ct.emailStatus,
+            emailVerified: ex.emailVerified || ct.emailVerified,
+            phone: ex.phone || ct.phone,
+            phoneType: ex.phoneType || ct.phoneType,
+            whatsappEligible: ex.whatsappEligible || ct.whatsappEligible,
+            linkedinUrl: ex.linkedinUrl || ct.linkedinUrl,
+            jobTitle: ex.jobTitle || ct.jobTitle,
+            seniority: ex.seniority || ct.seniority,
+            department: ex.department || ct.department,
+            industries: ex.industries?.length ? ex.industries : ct.industries,
+            employeeSizeRange: ex.employeeSizeRange || ct.employeeSizeRange,
+            companyRevenue: ex.companyRevenue || ct.companyRevenue,
+            companyType: ex.companyType || ct.companyType,
+            companyLocation: ex.companyLocation || ct.companyLocation,
+            website: ex.website || ct.website,
+            address: ex.address || ct.address,
+            // Keep a Seamless reveal id if either side has one (enables on-demand reveal).
+            searchResultId: ex.searchResultId || ct.searchResultId,
+            timeAtCompany: ex.timeAtCompany || ct.timeAtCompany,
+            startedAtCurrentCompany: ex.startedAtCurrentCompany || ct.startedAtCurrentCompany,
+          });
+        }
+      }
+    }
+    return added;
+  };
+
+  const rebuildCompanies = (
+    contactMap: Map<string, EnrichedContact>,
+    companyMeta: Map<string, EnrichedCompany>,
+  ): EnrichedCompany[] => {
+    const byCompany = new Map<string, EnrichedContact[]>();
+    for (const ct of Array.from(contactMap.values())) {
+      const arr = byCompany.get(ct.companyId) || [];
+      arr.push(ct);
+      byCompany.set(ct.companyId, arr);
+    }
+    return Array.from(companyMeta.entries()).map(([key, meta]) => {
+      const contacts = byCompany.get(key) || [];
+      return {
+        ...meta,
+        contacts,
+        enrichmentStatus: (contacts.length ? "complete" : "no_contacts") as EnrichedCompany["enrichmentStatus"],
+      };
+    });
+  };
+
+  // ── Sequential multi-provider search orchestrator ───────────────────────────
+  const runMultiSearch = async (opts: { aiQuery?: string } = {}) => {
+    if (isSearchPending) return;
+    const useAi = !!opts.aiQuery?.trim();
+    if (!useAi && countActiveFilters(filters) === 0) {
+      toast({ title: "Add a filter", description: "Add at least one filter, or use AI Search above.", variant: "destructive" });
+      return;
+    }
+    // Run the selected providers that are actually connected, in canonical order.
+    const order = PROVIDER_ORDER.filter(
+      (p) => selectedProviders.has(p) && providerStatusById.get(p)?.configured,
+    );
+    if (order.length === 0) {
+      toast({
+        title: "No search source selected",
+        description: "Pick at least one connected provider (Seamless, Apollo or Origami) above.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSearchPending(true);
     setHasSearched(true);
     setSelected(new Set());
     setShowAll(true);
+    setCompanies([]);
+    setProviderRun(order.map((id) => ({ id, label: PROVIDER_LABELS[id], status: "queued", count: 0 })));
+
+    const contactMap = new Map<string, EnrichedContact>();
+    const companyMeta = new Map<string, EnrichedCompany>();
+    let appliedFilters: LeadFilters | null = null;
+    let firstError: string | null = null;
+
+    for (const id of order) {
+      setProviderRun((prev) => prev.map((p) => (p.id === id ? { ...p, status: "searching" } : p)));
+      try {
+        const body: Record<string, unknown> = {
+          provider: id,
+          mode: searchTab,
+          filters: toSearchFilters(appliedFilters ?? filters),
+        };
+        // Parse the natural-language query once (on the first provider), then
+        // reuse the resolved filters for the rest so all sources stay aligned.
+        if (useAi && !appliedFilters) body.aiQuery = opts.aiQuery!.trim();
+
+        const data = await runSeamlessSearch(body);
+
+        if (data.appliedFilters && !appliedFilters) {
+          appliedFilters = { ...EMPTY_FILTERS, ...data.appliedFilters };
+          if (useAi) setFilters(appliedFilters);
+        }
+
+        const added = mergeInto(contactMap, companyMeta, data.companies || [], searchTab);
+        setCompanies(rebuildCompanies(contactMap, companyMeta));
+        setProviderRun((prev) => prev.map((p) => (p.id === id ? { ...p, status: "done", count: added } : p)));
+      } catch (err: any) {
+        if (!firstError) firstError = err?.message || "Search failed";
+        setProviderRun((prev) =>
+          prev.map((p) => (p.id === id ? { ...p, status: "error", message: err?.message } : p)),
+        );
+      }
+    }
+
+    setIsSearchPending(false);
+
+    const finalCompanies = rebuildCompanies(contactMap, companyMeta);
+    const totalContacts = finalCompanies.reduce((s, c) => s + c.contacts.length, 0);
+    const ranLabels = order.map((id) => PROVIDER_LABELS[id]).join(" + ");
     const msg = searchTab === "companies"
-      ? `Found ${data.companies.length} companies — open one to find its decision-makers`
-      : data.totalContacts > 0
-        ? `Found ${data.totalContacts} contacts across ${data.companies.length} companies`
-        : "No matching contacts — try adjusting your filters";
-    toast({ title: label, description: msg });
+      ? `Found ${finalCompanies.length} companies across ${ranLabels}`
+      : totalContacts > 0
+        ? `Found ${totalContacts} unique contacts across ${finalCompanies.length} companies (${ranLabels})`
+        : "No matching contacts — try adjusting your filters or sources";
+    toast({
+      title: firstError && totalContacts === 0 ? "Search finished with errors" : "Search complete",
+      description: firstError && totalContacts === 0 ? firstError : msg,
+      variant: firstError && totalContacts === 0 ? "destructive" : undefined,
+    });
   };
-
-  const searchMutation = useMutation({
-    mutationFn: async () => {
-      if (countActiveFilters(filters) === 0) throw new Error("Add at least one filter, or use AI Search above.");
-      return runSeamlessSearch({ mode: searchTab, filters: toSearchFilters(filters) });
-    },
-    onSuccess: (data) => applyResults(data, "Search complete"),
-    onError: (err: Error) => toast({ title: "Search failed", description: err.message, variant: "destructive" }),
-  });
-
-  const aiSearchMutation = useMutation({
-    mutationFn: async () => {
-      if (!aiQuery.trim()) throw new Error("Type what you're looking for first.");
-      return runSeamlessSearch({ mode: searchTab, filters: toSearchFilters(filters), aiQuery: aiQuery.trim() });
-    },
-    onSuccess: (data) => {
-      if (data.appliedFilters) setFilters({ ...EMPTY_FILTERS, ...data.appliedFilters });
-      applyResults(data, "AI search complete");
-    },
-    onError: (err: Error) => toast({ title: "AI search failed", description: err.message, variant: "destructive" }),
-  });
-
-  const isSearchPending = searchMutation.isPending || aiSearchMutation.isPending;
 
   // Reveal email + phone for one or more contacts (spends Seamless credits).
   const revealContacts = async (contactIds: string[]) => {
@@ -1484,17 +1711,20 @@ export default function ProspectFinder() {
   };
 
   const seamlessConnected = !!enrichmentStatus?.seamless;
+  const anyProviderConnected = providerStatuses.some((p) => p.configured);
 
   return (
     <div className="space-y-4 p-1">
-      {/* Seamless.AI connection banner */}
-      {enrichmentStatus && !seamlessConnected && (
+      {/* Provider connection banner — shown only when no search source is connected */}
+      {providerStatusData && !anyProviderConnected && (
         <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm">
           <Info className="size-4 text-amber-600 shrink-0 mt-0.5" />
           <div>
-            <p className="font-medium text-amber-800">Seamless.AI is not connected</p>
+            <p className="font-medium text-amber-800">No lead-data source is connected</p>
             <p className="text-xs text-amber-700 mt-0.5">
-              Lead Research is powered entirely by Seamless.AI. Add your <code className="font-mono">SEAMLESS_API_KEY</code> in Railway → Variables to enable contact &amp; company search.
+              Lead Research can layer results from Seamless.AI, Apollo.io and Origami. Add any of{" "}
+              <code className="font-mono">SEAMLESS_API_KEY</code>, <code className="font-mono">APOLLO_API_KEY</code> or{" "}
+              <code className="font-mono">ORIGAMI_API_KEY</code> in Railway → Variables to enable contact &amp; company search.
             </p>
           </div>
         </div>
@@ -1527,12 +1757,52 @@ export default function ProspectFinder() {
             setFilters={setFilters}
             aiQuery={aiQuery}
             setAiQuery={setAiQuery}
-            onSearch={() => searchMutation.mutate()}
-            onAiSearch={() => aiSearchMutation.mutate()}
+            onSearch={() => runMultiSearch()}
+            onAiSearch={() => runMultiSearch({ aiQuery })}
             isSearching={isSearchPending}
             connected={seamlessConnected}
             userName="Dylan"
+            providers={providerStatuses}
+            selectedProviders={Array.from(selectedProviders)}
+            onToggleProvider={(id) => toggleProvider(id as ProviderId)}
+            providerRun={providerRun}
           />
+
+          {/* Live multi-provider search pipeline — shows each source being searched in turn */}
+          {providerRun.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card p-3" data-testid="provider-pipeline">
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mr-1">
+                Search layers
+              </span>
+              {providerRun.map((p, i) => {
+                const style = PROVIDER_STYLES[p.id];
+                return (
+                  <div key={p.id} className="flex items-center gap-2">
+                    {i > 0 && <ChevronRight className="size-3.5 text-muted-foreground/50" />}
+                    <span
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${
+                        p.status === "searching" ? style.chip + " animate-pulse"
+                          : p.status === "done" ? style.chip
+                          : p.status === "error" ? "border-red-300 bg-red-50 text-red-700"
+                          : "border-muted bg-muted/40 text-muted-foreground"
+                      }`}
+                      data-testid={`pipeline-${p.id}`}
+                    >
+                      <span className={`size-1.5 rounded-full ${style.dot}`} />
+                      {p.label}
+                      {p.status === "searching" && <><Loader2 className="size-3 animate-spin" /> searching…</>}
+                      {p.status === "done" && <><Check className="size-3" /> +{p.count}</>}
+                      {p.status === "error" && <><AlertCircle className="size-3" /> failed</>}
+                      {p.status === "queued" && <span className="text-muted-foreground/70">queued</span>}
+                    </span>
+                  </div>
+                );
+              })}
+              {isSearchPending && (
+                <span className="ml-auto text-[11px] text-muted-foreground">Layering &amp; de-duplicating results…</span>
+              )}
+            </div>
+          )}
 
           {/* Results */}
           {hasSearched && (
@@ -1822,6 +2092,7 @@ export default function ProspectFinder() {
                                       <Linkedin className="size-3.5" />
                                     </a>
                                   )}
+                                  <SourceBadges sources={c.sources} />
                                 </div>
                               </td>
                               <td className="max-w-[200px] truncate" title={c.jobTitle || ""}>{c.jobTitle || "—"}</td>

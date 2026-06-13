@@ -70,6 +70,11 @@ interface EnrichedContact {
   revealed?: boolean;
   industries?: string[] | null;
   employeeSizeRange?: string | null;
+  department?: string | null;
+  companyRevenue?: string | null;
+  companyType?: string | null;
+  companyLocation?: string | null;
+  website?: string | null;
 }
 
 interface EnrichedCompany {
@@ -755,6 +760,7 @@ export default function ProspectFinder() {
   const [findingCompanyIds, setFindingCompanyIds] = useState<Set<string>>(new Set());
   const [showAll, setShowAll] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [resultsView, setResultsView] = useState<"table" | "cards">("table");
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
   const [companies, setCompanies] = useState<EnrichedCompany[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
@@ -1260,6 +1266,28 @@ export default function ProspectFinder() {
 
   const activeSearchFilterCount = [filterHasPhone, filterHasEmail, !!filterCategory, !!filterLocation].filter(Boolean).length;
 
+  // Flat list of the contacts the table view shows — same visibility rules as the cards.
+  const tableContacts = displayCompanies
+    .flatMap((co) => co.contacts)
+    .filter((ct) => {
+      if (filterEnrichedOnly && !ct.revealed) return false;
+      if (filterHasPhone && !ct.phone) return false;
+      if (filterHasEmail && !ct.email) return false;
+      if (!(showAll || filterEnrichedOnly) && !(ct.scoreBreakdown.tier === "hot" || ct.scoreBreakdown.tier === "warm")) return false;
+      return true;
+    })
+    .sort((a, b) => b.decisionMakerScore - a.decisionMakerScore);
+
+  const allTableSelected = tableContacts.length > 0 && tableContacts.every((c) => selected.has(c.id));
+  const toggleSelectAllTable = () => {
+    setSelected((s) => {
+      const next = new Set(s);
+      if (allTableSelected) tableContacts.forEach((c) => next.delete(c.id));
+      else tableContacts.forEach((c) => next.add(c.id));
+      return next;
+    });
+  };
+
   // Saved tab: derive unique values for filters
   const currentViewSource = selectedListId ? listMembers : savedProspects;
   const savedCategories = Array.from(new Set(currentViewSource.map((p) => p.category).filter(Boolean))).sort();
@@ -1415,6 +1443,26 @@ export default function ProspectFinder() {
                         <option value="location_asc">By country / location</option>
                       </select>
                       <ChevronDown className="pointer-events-none absolute right-1.5 top-1.5 size-3 text-muted-foreground" />
+                    </div>
+
+                    {/* Table / Cards view toggle */}
+                    <div className="inline-flex rounded-md border p-0.5">
+                      <button
+                        data-testid="view-table"
+                        onClick={() => setResultsView("table")}
+                        className={`px-2 py-0.5 text-xs rounded transition-colors ${resultsView === "table" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                        title="Table view"
+                      >
+                        Table
+                      </button>
+                      <button
+                        data-testid="view-cards"
+                        onClick={() => setResultsView("cards")}
+                        className={`px-2 py-0.5 text-xs rounded transition-colors ${resultsView === "cards" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                        title="Grouped by company"
+                      >
+                        Cards
+                      </button>
                     </div>
 
                     {/* Filter button with badge */}
@@ -1590,6 +1638,145 @@ export default function ProspectFinder() {
                   <p className="text-muted-foreground">
                     {filterEnrichedOnly ? "No enriched companies found — clear the filter to see all results." : "No companies found. Try a different category or location."}
                   </p>
+                </Card>
+              ) : resultsView === "table" ? (
+                /* ── Seamless-style dense data table ── */
+                <Card className="overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs whitespace-nowrap">
+                      <thead className="bg-muted/50 border-b">
+                        <tr className="[&>th]:px-3 [&>th]:py-2 [&>th]:text-left [&>th]:font-medium [&>th]:text-muted-foreground">
+                          <th className="w-8">
+                            <button
+                              onClick={toggleSelectAllTable}
+                              data-testid="select-all-table"
+                              className={`flex size-4 items-center justify-center rounded border ${allTableSelected ? "border-primary bg-primary text-primary-foreground" : "border-gray-300"}`}
+                              title="Select all"
+                            >
+                              {allTableSelected && <Check className="size-3" />}
+                            </button>
+                          </th>
+                          <th>Name</th>
+                          <th>Title</th>
+                          <th>Company</th>
+                          <th>Email</th>
+                          <th>Phone</th>
+                          <th>Seniority</th>
+                          <th>Department</th>
+                          <th>Industries</th>
+                          <th>Company Location</th>
+                          <th>Contact Location</th>
+                          <th>Employees</th>
+                          <th>Revenue</th>
+                          <th>Type</th>
+                          <th>Website</th>
+                          <th>Score</th>
+                          <th className="sticky right-0 bg-muted/50">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {tableContacts.map((c) => {
+                          const isSel = selected.has(c.id);
+                          const added = addedToCrmIds.has(c.id);
+                          const saving = savingIds.has(c.id);
+                          const revealing = revealingIds.has(c.id);
+                          const canReveal = !!c.searchResultId && !c.revealed && !c.email && !c.phone;
+                          return (
+                            <tr key={c.id} data-testid={`row-${c.id}`} className={`border-b last:border-0 hover:bg-muted/30 [&>td]:px-3 [&>td]:py-1.5 ${isSel ? "bg-primary/5" : ""}`}>
+                              <td>
+                                <button
+                                  onClick={() => toggleContact(c.id)}
+                                  className={`flex size-4 items-center justify-center rounded border ${isSel ? "border-primary bg-primary text-primary-foreground" : "border-gray-300"}`}
+                                >
+                                  {isSel && <Check className="size-3" />}
+                                </button>
+                              </td>
+                              <td>
+                                <div className="flex items-center gap-1.5 font-medium text-foreground">
+                                  <span title={c.scoreBreakdown.tierLabel}>{c.scoreBreakdown.tierEmoji}</span>
+                                  <span>{c.fullName}</span>
+                                  {c.linkedinUrl && (
+                                    <a href={c.linkedinUrl} target="_blank" rel="noreferrer" className="text-[#0077b5]" title="LinkedIn">
+                                      <Linkedin className="size-3.5" />
+                                    </a>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="max-w-[200px] truncate" title={c.jobTitle || ""}>{c.jobTitle || "—"}</td>
+                              <td className="font-medium text-foreground">{c.companyName || "—"}</td>
+                              <td>
+                                {c.email ? (
+                                  <span className="text-foreground">
+                                    {c.email}
+                                    {c.emailConfidence ? <span className="ml-1 text-[10px] text-muted-foreground">{c.emailConfidence}%</span> : null}
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground">•••• hidden</span>
+                                )}
+                              </td>
+                              <td>
+                                {c.phone ? (
+                                  <span className="text-foreground">{c.phone}{c.phoneType ? <span className="ml-1 text-[10px] text-muted-foreground">{c.phoneType}</span> : null}</span>
+                                ) : (
+                                  <span className="text-muted-foreground">—</span>
+                                )}
+                              </td>
+                              <td className="capitalize">{c.seniority || "—"}</td>
+                              <td>{c.department || "—"}</td>
+                              <td className="max-w-[180px] truncate" title={(c.industries || []).join(", ")}>
+                                {c.industries && c.industries.length ? c.industries.slice(0, 2).join(", ") : "—"}
+                              </td>
+                              <td>{c.companyLocation || "—"}</td>
+                              <td>{c.address || "—"}</td>
+                              <td>{c.employeeSizeRange || "—"}</td>
+                              <td>{c.companyRevenue || "—"}</td>
+                              <td>{c.companyType || "—"}</td>
+                              <td className="max-w-[160px] truncate">
+                                {c.website ? (
+                                  <a href={c.website} target="_blank" rel="noreferrer" className="text-primary hover:underline inline-flex items-center gap-0.5">
+                                    {c.website.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+                                    <ExternalLink className="size-3" />
+                                  </a>
+                                ) : "—"}
+                              </td>
+                              <td><span className="font-semibold text-foreground">{c.decisionMakerScore}</span></td>
+                              <td className="sticky right-0 bg-background">
+                                <div className="flex items-center gap-1">
+                                  {canReveal && (
+                                    <Button
+                                      size="sm" variant="outline"
+                                      className="h-6 gap-1 px-2 text-[11px] border-primary/40 text-primary"
+                                      onClick={() => revealContacts([c.id])}
+                                      disabled={revealing}
+                                      data-testid={`find-${c.id}`}
+                                      title="Reveal email & phone (uses ~1 Seamless credit)"
+                                    >
+                                      {revealing ? <Loader2 className="size-3 animate-spin" /> : <Search className="size-3" />} Find
+                                    </Button>
+                                  )}
+                                  {added ? (
+                                    <span className="inline-flex items-center gap-1 text-[11px] text-green-700"><CheckCircle2 className="size-3.5" /> Added</span>
+                                  ) : (
+                                    <Button
+                                      size="sm" className="h-6 gap-1 px-2 text-[11px]"
+                                      onClick={() => addToCRM(c)}
+                                      disabled={saving}
+                                      data-testid={`add-${c.id}`}
+                                    >
+                                      {saving ? <Loader2 className="size-3 animate-spin" /> : <UserPlus className="size-3" />} Add
+                                    </Button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  {tableContacts.length === 0 && (
+                    <p className="p-6 text-center text-sm text-muted-foreground">No contacts match the current filters — switch to “Show all” or clear filters.</p>
+                  )}
                 </Card>
               ) : (
                 <div className="space-y-3">

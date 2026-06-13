@@ -47,6 +47,11 @@ export interface EnrichedContact {
   revealed?: boolean;             // true once email/phone have been revealed (credits spent)
   industries?: string[] | null;  // company industries from Seamless search
   employeeSizeRange?: string | null; // company headcount band from Seamless search
+  department?: string | null;    // contact department from Seamless search
+  companyRevenue?: string | null; // company revenue band from Seamless search
+  companyType?: string | null;   // Public / Private from Seamless search
+  companyLocation?: string | null; // company HQ city/state/country from Seamless search
+  website?: string | null;       // company website (derived from domain)
 }
 
 export interface EnrichedCompany {

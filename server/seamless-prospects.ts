@@ -139,6 +139,11 @@ function contactAddress(p: SeamlessPerson): string | null {
   return parts.length ? parts.join(", ") : null;
 }
 
+function companyLocation(p: SeamlessPerson): string | null {
+  const parts = [p.companyCity, p.companyState, p.companyCountry].map((s) => (s || "").trim()).filter(Boolean);
+  return parts.length ? parts.join(", ") : null;
+}
+
 function companyBlurb(industries?: string[] | null, sizeRange?: string | null): string | null {
   const bits: string[] = [];
   if (industries && industries.length) bits.push(industries[0]);
@@ -192,6 +197,11 @@ function personToContact(p: SeamlessPerson, companyId: string, companyName: stri
     revealed,
     industries: p.industries ?? null,
     employeeSizeRange: p.employeeSizeRange ?? null,
+    department: p.department ?? null,
+    companyRevenue: p.companyRevenue ?? null,
+    companyType: p.companyType ?? null,
+    companyLocation: companyLocation(p),
+    website: p.domain ? `https://${p.domain.replace(/^https?:\/\//, "")}` : null,
   };
 }
 

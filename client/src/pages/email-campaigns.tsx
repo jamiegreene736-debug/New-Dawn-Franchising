@@ -120,6 +120,7 @@ interface ContactLite {
   email: string | null;
   firmName: string | null;
   jobTitle: string | null;
+  source?: string;
 }
 
 interface SmsCampaignData {
@@ -289,10 +290,12 @@ function EmailCampaignTab() {
     queryKey: ["/api/crm/prospect-lists"],
   });
 
+  // Pull from BOTH CRM stores (crm_clients + contacts), merged + de-duped by the
+  // server, so a person added in either CRM surface is enrollable here.
   const { data: contactsForEnroll = [] } = useQuery<ContactLite[]>({
-    queryKey: ["/api/contacts", "enroll-picker"],
+    queryKey: ["/api/crm/enroll-candidates", "enroll-picker"],
     queryFn: async () => {
-      const res = await apiRequest("GET", "/api/contacts?limit=1000");
+      const res = await apiRequest("GET", "/api/crm/enroll-candidates");
       const json = await res.json();
       return (Array.isArray(json) ? json : json?.contacts ?? []) as ContactLite[];
     },
@@ -977,7 +980,15 @@ function EmailCampaignTab() {
                                 {checked && <Check className="size-3" />}
                               </div>
                               <div className="min-w-0">
-                                <div className="text-sm font-medium truncate">{c.firstName} {c.lastName}{c.firmName ? <span className="text-muted-foreground font-normal"> · {c.firmName}</span> : null}</div>
+                                <div className="flex items-center gap-1.5 text-sm font-medium truncate">
+                                  <span className="truncate">{c.firstName} {c.lastName}</span>
+                                  {c.firmName ? <span className="text-muted-foreground font-normal truncate"> · {c.firmName}</span> : null}
+                                  {c.source && (
+                                    <span className="shrink-0 rounded-sm border px-1 text-[9px] font-semibold leading-4 text-muted-foreground">
+                                      {c.source}
+                                    </span>
+                                  )}
+                                </div>
                                 <div className="text-xs text-muted-foreground truncate">{c.email || "no email"}{already ? " · already enrolled" : ""}</div>
                               </div>
                             </div>

@@ -31,6 +31,7 @@ export interface IStorage {
   getProspectsByLocation(category: string, location: string): Promise<Prospect[]>;
   createProspect(prospect: InsertProspect): Promise<Prospect>;
   findOrCreateProspectForContact(contact: Contact): Promise<Prospect>;
+  findOrCreateProspectForClient(client: CrmClient): Promise<Prospect>;
   createProspects(prospectList: InsertProspect[]): Promise<Prospect[]>;
   deleteProspect(id: string): Promise<void>;
   deleteProspectsByLocation(category: string, location: string): Promise<void>;
@@ -56,6 +57,7 @@ export interface IStorage {
   getActiveEnrollments(): Promise<DripEnrollment[]>;
   getDripSends(enrollmentId?: string): Promise<DripSend[]>;
   getAllDripSends(): Promise<DripSend[]>;
+  countSentEmailsSince(since: Date): Promise<number>;
   getDripSendsByCampaign(campaignId: string): Promise<DripSend[]>;
   getInboundReplyAddresses(): Promise<string[]>;
   getDripSend(id: string): Promise<DripSend | undefined>;
@@ -389,6 +391,22 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(dripSends).orderBy(desc(dripSends.createdAt));
   }
 
+  /**
+   * Count campaign emails actually SENT since `since`. Backs the drip
+   * processor's daily + hourly throttles so they survive process restarts
+   * (Railway redeploys) rather than resetting an in-memory counter.
+   */
+  async countSentEmailsSince(since: Date): Promise<number> {
+    const [row] = await db.select({ n: sql<number>`count(*)` })
+      .from(dripSends)
+      .where(and(
+        eq(dripSends.channel, "email"),
+        eq(dripSends.status, "sent"),
+        gte(dripSends.sentAt, since),
+      ));
+    return Number(row?.n ?? 0);
+  }
+
   async getDripSendsByCampaign(campaignId: string): Promise<DripSend[]> {
     // Resolve the campaign's enrollment ids, then fetch their sends. Avoids any
     // ambiguity about Drizzle's joined-result key shape.
@@ -595,6 +613,25 @@ export class DatabaseStorage implements IStorage {
       category: contact.personaType || "Referral Partner",
       location: contact.city || contact.country || "International",
       source: contact.source || "contact",
+    } as InsertProspect);
+  }
+
+  async findOrCreateProspectForClient(client: CrmClient): Promise<Prospect> {
+    const name = (client.fullName || "").trim() || "Unknown";
+    if (client.email) {
+      const [byEmail] = await db.select().from(prospects)
+        .where(sql`lower(${prospects.email}) = ${client.email.toLowerCase()}`).limit(1);
+      if (byEmail) return byEmail;
+    }
+    return this.createProspect({
+      name,
+      company: client.companyName ?? null,
+      email: client.email ?? null,
+      phone: client.phone ?? null,
+      website: null,
+      category: client.profession || "CRM Client",
+      location: client.country || "International",
+      source: client.leadSource || "crm_client",
     } as InsertProspect);
   }
 

@@ -79,4 +79,5 @@ The app listens on `process.env.PORT` which Railway sets automatically.
 - The AI agents require `ANTHROPIC_API_KEY`
 - Prospect enrichment requires: `SEAMLESS_API_KEY`, `HUNTER_API_KEY`, `PROXYCURL_API_KEY`, `ZEROBOUNCE_API_KEY`, `SERPAPI_KEY`
 - Layered contact search (Lead Research) uses, in order: `SEAMLESS_API_KEY` (primary), then `APOLLO_API_KEY` and `ORIGAMI_API_KEY` as supplemental layers. Each is optional and independently selectable in the UI; results are merged and de-duplicated. Optional Origami overrides: `ORIGAMI_API_BASE`, `ORIGAMI_SEARCH_PATH`, `ORIGAMI_CREDITS_PATH`.
+- Campaign email throttle (deliverability): drip emails are sent only in business-hours windows, with organic jitter, per-domain pacing, and hourly + daily caps. Tune with the optional `EMAIL_DAILY_CAP` (default 100), `EMAIL_HOURLY_CAP` (default 20) and `EMAIL_DOMAIN_GAP_SECONDS` (default 45) variables. Caps are DB-backed, so they hold across redeploys.
   - `SEAMLESS_API_KEY` is the primary contact-search + enrichment provider (it replaced Apollo). Create it in the Seamless app under **Settings → Public API → Create New Connection**.

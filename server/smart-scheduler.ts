@@ -200,9 +200,42 @@ export function smartEmailDelay(index: number): number {
   return randInt(5000, 18_000);
 }
 
-// ─── Daily email cap ──────────────────────────────────────────────────────────
+// ─── Daily / hourly email caps (spam-safety throttles) ────────────────────────
 
-export const EMAIL_DAILY_CAP = 100; // per day, conservative Gmail App Password limit
+/** Parse a positive integer env var, falling back to a default. */
+function envInt(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const n = parseInt(raw, 10);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+// Per-day volume ceiling per sending address (conservative Gmail App Password
+// limit). Override with EMAIL_DAILY_CAP in Railway → Variables.
+export const EMAIL_DAILY_CAP = envInt("EMAIL_DAILY_CAP", 100);
+
+// Per-hour ceiling so the daily volume is spread across the business-hours
+// window instead of bursting in a single cron run (a strong spam signal).
+// 100/day ÷ ~11 business hours ≈ 9/hr; default 20 leaves headroom. Override
+// with EMAIL_HOURLY_CAP in Railway → Variables.
+export const EMAIL_HOURLY_CAP = envInt("EMAIL_HOURLY_CAP", 20);
+
+// Minimum spacing between two emails sent to the SAME recipient domain within a
+// run. ISPs flag rapid bursts to one domain (e.g. many gmail.com in seconds),
+// so we pace per-domain on top of the global jitter. Override with
+// EMAIL_DOMAIN_GAP_SECONDS.
+export const EMAIL_DOMAIN_GAP_MS = envInt("EMAIL_DOMAIN_GAP_SECONDS", 45) * 1000;
+
+/** Lowercased domain of an email address, or "" if unparseable. */
+export function emailDomain(email: string | null | undefined): string {
+  const at = (email || "").lastIndexOf("@");
+  return at >= 0 ? (email as string).slice(at + 1).trim().toLowerCase() : "";
+}
+
+// ─── In-memory daily counter (legacy preview/estimate path) ──────────────────
+// NOTE: the drip processor itself uses DB-backed rolling-window counts
+// (storage.countSentEmailsSince) so caps survive restarts. This in-memory
+// counter only backs the synchronous estimateSend() UI preview.
 
 /** In-memory daily email counter keyed by YYYY-MM-DD */
 const dailyEmailCounts: Record<string, number> = {};

@@ -2662,7 +2662,10 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
   // --- Manual send / process trigger ---
   app.post("/api/crm/drip/process", requireAdminAuth, async (_req, res) => {
     try {
-      await processDripEmails();
+      // Manual "Send Due Now" — override the optimal-window + hourly-cap gating
+      // so due emails go out immediately (e.g. testing on a weekend). The daily
+      // cap and per-domain pacing still apply as safety rails.
+      await processDripEmails({ force: true });
       res.json({ message: "Drip emails processed" });
     } catch (err) {
       res.status(500).json({ message: "Failed to process drip emails" });

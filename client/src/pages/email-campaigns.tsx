@@ -329,6 +329,18 @@ function EmailCampaignTab() {
   const scheduleByEnrollment = new Map(
     (schedule?.enrollments ?? []).map((s) => [s.enrollmentId, s]),
   );
+  // Earliest projected send time per step (across active enrollments) — drives
+  // the timing shown on each step in the Steps tab.
+  const sendAtByStepOrder = new Map<number, string>();
+  for (const en of schedule?.enrollments ?? []) {
+    if (en.status !== "active") continue;
+    for (const u of en.upcoming) {
+      if (!u.sendAt) continue;
+      const prev = sendAtByStepOrder.get(u.stepOrder);
+      if (!prev || new Date(u.sendAt) < new Date(prev)) sendAtByStepOrder.set(u.stepOrder, u.sendAt);
+    }
+  }
+  const hasActiveEnrollment = (schedule?.enrollments ?? []).some((e) => e.status === "active");
 
   const { data: activity = [] } = useQuery<ActivityItem[]>({
     queryKey: ["/api/crm/activity"],
@@ -797,10 +809,35 @@ function EmailCampaignTab() {
                     </Card>
                   ) : (
                     <div className="space-y-5">
-                      {dayGroups.map((group) => (
+                      {/* Send-timing explainer + per-step projected times */}
+                      {schedule?.windowSummary && (
+                        <div className="flex items-start gap-2 rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                          <Clock className="size-3.5 shrink-0 mt-0.5 text-primary" />
+                          <span>
+                            {schedule.windowSummary}
+                            {hasActiveEnrollment
+                              ? " Projected send times for the current contact(s) are shown on each day below."
+                              : " Enroll a contact to see projected send times."}
+                          </span>
+                        </div>
+                      )}
+                      {dayGroups.map((group) => {
+                        // All steps in a day share the same delay, so the same projected time.
+                        const groupSendAt = group.steps
+                          .map((s) => sendAtByStepOrder.get(s.stepOrder))
+                          .filter((x): x is string => !!x)
+                          .sort()[0];
+                        return (
                         <div key={group.day}>
-                          <div className="mb-2 inline-flex items-center rounded-md bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700">
-                            Day {group.day}
+                          <div className="mb-2 flex flex-wrap items-center gap-2">
+                            <span className="inline-flex items-center rounded-md bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700">
+                              Day {group.day}
+                            </span>
+                            {groupSendAt && (
+                              <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-1 text-xs font-medium text-primary" data-testid={`step-sendat-day-${group.day}`}>
+                                <Clock className="size-3" /> Sends {formatSendTime(groupSendAt)}
+                              </span>
+                            )}
                           </div>
                           <div className="space-y-2">
                             {group.steps.map((step) => {
@@ -854,7 +891,8 @@ function EmailCampaignTab() {
                             })}
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>

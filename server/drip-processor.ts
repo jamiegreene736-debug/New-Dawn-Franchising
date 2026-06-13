@@ -45,11 +45,13 @@ function channelOf(stepType: string): string {
   return "task";
 }
 
-export async function processDripEmails() {
-  console.log("[Drip] Processing scheduled emails...");
+export async function processDripEmails(opts: { force?: boolean } = {}) {
+  const { force = false } = opts;
+  console.log(`[Drip] Processing scheduled emails...${force ? " (manual override — bypassing window + hourly cap)" : ""}`);
 
-  // Respect optimal send windows — skip if outside hours
-  if (!isOptimalEmailWindow()) {
+  // Respect optimal send windows — skip if outside hours. A manual "Send Due
+  // Now" passes force:true to send due emails immediately regardless of day/time.
+  if (!force && !isOptimalEmailWindow()) {
     console.log(`[Drip] Outside optimal email window — ${nextWindowDescription("email")}. Skipping.`);
     return;
   }
@@ -61,14 +63,15 @@ export async function processDripEmails() {
     let sentLast24h = await storage.countSentEmailsSince(new Date(now - 24 * 60 * 60 * 1000));
     let sentLastHour = await storage.countSentEmailsSince(new Date(now - 60 * 60 * 1000));
 
-    // Respect daily volume cap
+    // Respect daily volume cap (a hard safety even on a manual override)
     if (sentLast24h >= EMAIL_DAILY_CAP) {
       console.log(`[Drip] Daily email cap reached (${sentLast24h}/${EMAIL_DAILY_CAP} in last 24h). Deferring.`);
       return;
     }
     // Respect hourly cap — spreads the day's volume across business hours so we
     // never burst the whole quota in one run (a classic bulk-sender spam signal).
-    if (sentLastHour >= EMAIL_HOURLY_CAP) {
+    // Skipped on a manual override.
+    if (!force && sentLastHour >= EMAIL_HOURLY_CAP) {
       console.log(`[Drip] Hourly email cap reached (${sentLastHour}/${EMAIL_HOURLY_CAP} in last hour). Resuming next hour.`);
       return;
     }
@@ -85,7 +88,7 @@ export async function processDripEmails() {
         console.log("[Drip] Daily cap hit mid-run. Stopping early.");
         break;
       }
-      if (sentLastHour >= EMAIL_HOURLY_CAP) {
+      if (!force && sentLastHour >= EMAIL_HOURLY_CAP) {
         console.log("[Drip] Hourly cap hit mid-run. Stopping — will resume next hour.");
         break;
       }
@@ -178,8 +181,8 @@ export async function processDripEmails() {
           }
 
           // Organic jitter between emails — avoids burst-send spam signals.
-          // Skip the wait once a cap is hit (the loop is about to stop anyway).
-          if (sentThisRun > 0 && sentLast24h < EMAIL_DAILY_CAP && sentLastHour < EMAIL_HOURLY_CAP) {
+          // Skip the wait once the daily cap is hit (the loop is about to stop).
+          if (sentThisRun > 0 && sentLast24h < EMAIL_DAILY_CAP && (force || sentLastHour < EMAIL_HOURLY_CAP)) {
             const jitter = smartEmailDelay(sentThisRun);
             console.log(`[Drip] Waiting ${Math.round(jitter / 1000)}s before next send...`);
             await sleep(jitter);

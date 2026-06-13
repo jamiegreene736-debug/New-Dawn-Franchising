@@ -160,6 +160,77 @@ function formatHour(h: number): string {
   return `${display}:00 ${ampm}`;
 }
 
+// ─── Projected send-time helpers (drive the campaign schedule UI) ─────────────
+
+/** Build a Date whose wall-clock time in TZ equals the given components. */
+function makeZonedDate(year: number, month1to12: number, day: number, hour: number, minute: number): Date {
+  const utcGuess = Date.UTC(year, month1to12 - 1, day, hour, minute, 0);
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: TZ, hour12: false,
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+  }).formatToParts(new Date(utcGuess));
+  const get = (t: string) => parseInt(parts.find((p) => p.type === t)!.value, 10);
+  const asUTC = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
+  const offset = asUTC - utcGuess; // ms TZ is ahead of UTC at this instant
+  return new Date(utcGuess - offset);
+}
+
+/** TZ-local calendar/time parts for a given instant. */
+function zonedParts(date: Date): { year: number; month: number; day: number; hour: number; minute: number; dow: number } {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: TZ, hour12: false, weekday: "short",
+    year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
+  }).formatToParts(date);
+  const get = (t: string) => parts.find((p) => p.type === t)!.value;
+  const dayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  return {
+    year: +get("year"), month: +get("month"), day: +get("day"),
+    hour: +get("hour"), minute: +get("minute"), dow: dayMap[get("weekday")] ?? 1,
+  };
+}
+
+/**
+ * The next instant at or after `from` that falls inside an email send window.
+ * If `from` is already within a window, returns `from` unchanged. Used to project
+ * when a drip email is actually "meant to go out" given the optimal-window gating.
+ */
+export function nextEmailWindowFrom(from: Date): Date {
+  for (let dayOffset = 0; dayOffset < 14; dayOffset++) {
+    const candidate = new Date(from.getTime() + dayOffset * 86_400_000);
+    const zp = zonedParts(candidate);
+    const windows = (EMAIL_WINDOWS[zp.dow] ?? []).slice().sort((a, b) => a.start - b.start);
+    const currentDecimal = zp.hour + zp.minute / 60;
+    for (const w of windows) {
+      if (dayOffset === 0) {
+        if (currentDecimal >= w.start && currentDecimal < w.end) return from; // sendable now
+        if (currentDecimal < w.start) return makeZonedDate(zp.year, zp.month, zp.day, w.start, 0);
+        // else this window has passed today — fall through to the next one / next day
+      } else {
+        return makeZonedDate(zp.year, zp.month, zp.day, w.start, 0);
+      }
+    }
+  }
+  return from; // fallback — should not happen given weekday windows exist
+}
+
+/**
+ * Project when a drip step is "meant to be sent" for an enrollment: the step
+ * becomes eligible `delayDays` after enrollment, then sends in the next email
+ * window. Returns an ISO string. (Hourly/daily caps may push the real send a
+ * little later, but this is the scheduled intent.)
+ */
+export function projectStepSendTime(enrolledAt: Date, delayDays: number): string {
+  const eligible = enrolledAt.getTime() + delayDays * 86_400_000;
+  const from = new Date(Math.max(eligible, Date.now()));
+  return nextEmailWindowFrom(from).toISOString();
+}
+
+/** Human-readable summary of the email send windows, for UI captions. */
+export const EMAIL_WINDOW_SUMMARY =
+  "Emails send Mon–Fri during optimal windows (Tue–Thu 8–10 AM & 1–3 PM CT; Mon 9–11 AM & 1–3 PM; Fri 9–11 AM), spaced out to protect deliverability.";
+
+
 // ─── Delay / jitter calculations ─────────────────────────────────────────────
 
 /** Random integer in [min, max] */

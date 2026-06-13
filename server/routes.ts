@@ -45,7 +45,7 @@ import { planDailyIntelligence, getRecentPlans, getTodaysPlan } from "./outreach
 import { sendSmsViaQuo, getQuoStatus, listQuoPhoneNumbers, SMS_TEMPLATES } from "./quo-service";
 import { sendAgentSms, handleInboundAgentSms, notifyDraftPending, notifyBlocker, notifyError, getAgentSmsHistory, AGENT_NUMBERS, DYLAN_PHONE } from "./agent-sms-service";
 import { fetchOpenPhoneCalls, fetchCallTranscript, formatTranscript, getCallerNumber, getCallerName } from "./openphone-calls";
-import { smartSmsDelay, smartWhatsAppDelay, isOptimalSmsWindow, nextWindowDescription, estimateSend, type SendMode } from "./smart-scheduler";
+import { smartSmsDelay, smartWhatsAppDelay, isOptimalSmsWindow, nextWindowDescription, estimateSend, projectStepSendTime, EMAIL_WINDOW_SUMMARY, type SendMode } from "./smart-scheduler";
 import { sendWhatsAppMessage as sendWhatsApp, sendWhatsAppTemplate, WHATSAPP_TEMPLATES } from "./meta-whatsapp-service";
 import { sendRinglessVoicemail, getVoicemailStatus, VOICEMAIL_SCRIPTS } from "./voicemail-service";
 import { runEnrichmentSearch, enrichSingleCompany, findSimilarCompanies, getEnrichmentApiStatus } from "./prospect-enrichment";
@@ -2329,6 +2329,51 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
       res.json(enrollments);
     } catch (err) {
       res.status(500).json({ message: "Failed to fetch enrollments" });
+    }
+  });
+
+  // Projected send schedule for a campaign's enrollments — when each upcoming
+  // step is "meant to go out" (step delay + the optimal email send window).
+  // Powers the schedule display in the campaign builder's Contacts tab.
+  app.get("/api/crm/campaigns/:id/schedule", requireAdminAuth, async (req, res) => {
+    try {
+      const campaignId = String(req.params.id);
+      const [steps, enrollments] = await Promise.all([
+        storage.getDripSteps(campaignId),       // ordered by stepOrder asc (matches the processor)
+        storage.getDripEnrollments(campaignId),
+      ]);
+
+      const result = enrollments.map((e) => {
+        const enrolledAt = new Date(e.enrolledAt);
+        // Upcoming = steps the processor hasn't sent yet (index >= currentStep).
+        const upcoming = steps.slice(e.currentStep).map((s, i) => ({
+          stepOrder: s.stepOrder,
+          stepNumber: e.currentStep + i + 1,
+          name: s.subject || s.stepName || `Step ${s.stepOrder}`,
+          stepType: s.stepType || "email",
+          delayDays: s.delayDays,
+          sendAt: (e.status === "active")
+            ? projectStepSendTime(enrolledAt, s.delayDays)
+            : null, // paused/completed enrollments aren't actively scheduled
+        }));
+        return {
+          enrollmentId: e.id,
+          prospectName: e.prospectName,
+          prospectEmail: e.prospectEmail,
+          status: e.status,
+          currentStep: e.currentStep,
+          totalSteps: steps.length,
+          nextSendAt: e.status === "active" ? (upcoming[0]?.sendAt ?? null) : null,
+          nextStepName: upcoming[0]?.name ?? null,
+          nextStepType: upcoming[0]?.stepType ?? null,
+          upcoming,
+        };
+      });
+
+      res.json({ windowSummary: EMAIL_WINDOW_SUMMARY, enrollments: result });
+    } catch (err) {
+      console.error("GET /api/crm/campaigns/:id/schedule error:", err);
+      res.status(500).json({ message: "Failed to compute campaign schedule" });
     }
   });
 

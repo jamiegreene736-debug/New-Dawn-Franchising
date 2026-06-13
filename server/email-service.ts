@@ -59,6 +59,11 @@ function getTransporter(senderEmail: string): nodemailer.Transporter {
   const transporter = nodemailer.createTransport({
     service: "gmail",
     auth: { user: senderEmail, pass: password },
+    // Bounded timeouts so a slow/unreachable SMTP connection fails fast instead
+    // of hanging the caller (e.g. a manual "Send Due Now").
+    connectionTimeout: 15_000,
+    greetingTimeout: 15_000,
+    socketTimeout: 20_000,
   });
   transporterCache.set(senderEmail, transporter);
   return transporter;

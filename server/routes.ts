@@ -2661,15 +2661,16 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
 
   // --- Manual send / process trigger ---
   app.post("/api/crm/drip/process", requireAdminAuth, async (_req, res) => {
-    try {
-      // Manual "Send Due Now" — override the optimal-window + hourly-cap gating
-      // so due emails go out immediately (e.g. testing on a weekend). The daily
-      // cap and per-domain pacing still apply as safety rails.
-      await processDripEmails({ force: true });
-      res.json({ message: "Drip emails processed" });
-    } catch (err) {
-      res.status(500).json({ message: "Failed to process drip emails" });
-    }
+    // Manual "Send Due Now" — override the optimal-window + hourly-cap gating so
+    // due emails go out immediately (e.g. testing on a weekend). Run in the
+    // BACKGROUND and respond right away so the UI never hangs on a slow SMTP
+    // connection or a large batch; results show up as the stats/schedule refresh.
+    // The daily cap stays as a safety rail and an in-progress guard prevents
+    // overlapping runs.
+    processDripEmails({ force: true }).catch((err) =>
+      console.error("[Drip] Manual process error:", err),
+    );
+    res.status(202).json({ message: "Processing started", started: true });
   });
 
   // --- Test email ---

@@ -1,6 +1,6 @@
 import { type User, type InsertUser, type Lead, type InsertLead, type BlogPost, type InsertBlogPost, type Broker, type BrokerClient, type InsertBrokerClient, type CrmClient, type InsertCrmClient, type CrmClientActivity, type InsertCrmClientActivity, type CrmClientDocument, type CrmDirectEmail, type Prospect, type InsertProspect, type ProspectList, type DripCampaign, type InsertDripCampaign, type DripStep, type InsertDripStep, type DripEnrollment, type InsertDripEnrollment, type DripSend, type InsertDripSend, type FacebookPost, type InsertFacebookPost, type SignatureRequest, type SmsCampaign, type InsertSmsCampaign, type WhatsappCampaign, type InsertWhatsappCampaign, users, leads, blogPosts, brokers, brokerClients, crmClients, crmClientActivities, crmClientDocuments, crmDirectEmails, signatureRequests, prospects, prospectLists, prospectListMembers, dripCampaigns, dripSteps, dripEnrollments, dripSends, facebookPosts, smsCampaigns, whatsappCampaigns, type Contact, type InsertContact, type ContactActivity, type InsertContactActivity, type ContactTask, type InsertContactTask, type PipelineDeal, type InsertPipelineDeal, type SavedSegment, type InsertSavedSegment, type EmailTemplate, type InsertEmailTemplate, contacts, contactActivities, contactTasks, pipelineDeals, savedSegments, emailTemplates, type PhoneCall, phoneCalls } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, asc, sql, ilike, or, gte, lte, inArray } from "drizzle-orm";
+import { eq, desc, and, asc, sql, ilike, or, gte, lte, inArray, isNull } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -30,6 +30,7 @@ export interface IStorage {
   getProspect(id: string): Promise<Prospect | undefined>;
   getProspectsByLocation(category: string, location: string): Promise<Prospect[]>;
   createProspect(prospect: InsertProspect): Promise<Prospect>;
+  findOrCreateProspectForContact(contact: Contact): Promise<Prospect>;
   createProspects(prospectList: InsertProspect[]): Promise<Prospect[]>;
   deleteProspect(id: string): Promise<void>;
   deleteProspectsByLocation(category: string, location: string): Promise<void>;
@@ -553,6 +554,35 @@ export class DatabaseStorage implements IStorage {
   async getContact(id: string): Promise<Contact | undefined> {
     const [c] = await db.select().from(contacts).where(eq(contacts.id, id));
     return c;
+  }
+
+  // Mirror a CRM contact into a prospect (campaigns enroll prospects, not contacts).
+  // Matches an existing prospect by email (preferred), else by name + company.
+  async findOrCreateProspectForContact(contact: Contact): Promise<Prospect> {
+    const name = [contact.firstName, contact.lastName].filter(Boolean).join(" ").trim() || contact.firstName || "Unknown";
+    if (contact.email) {
+      const [byEmail] = await db.select().from(prospects)
+        .where(sql`lower(${prospects.email}) = ${contact.email.toLowerCase()}`).limit(1);
+      if (byEmail) return byEmail;
+    } else {
+      // Match on company correctly whether it's set or NULL (eq(col, "") never matches NULL).
+      const companyCond = contact.firmName
+        ? eq(prospects.company, contact.firmName)
+        : isNull(prospects.company);
+      const [byName] = await db.select().from(prospects)
+        .where(and(eq(prospects.name, name), companyCond)).limit(1);
+      if (byName) return byName;
+    }
+    return this.createProspect({
+      name,
+      company: contact.firmName ?? null,
+      email: contact.email ?? null,
+      phone: contact.phone ?? null,
+      website: contact.websiteUrl ?? null,
+      category: contact.personaType || "Referral Partner",
+      location: contact.city || contact.country || "International",
+      source: contact.source || "contact",
+    } as InsertProspect);
   }
 
   async getContactByEmail(email: string): Promise<Contact | undefined> {

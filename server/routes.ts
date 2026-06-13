@@ -2310,6 +2310,42 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
     }
   });
 
+  // Enroll straight from the CRM Contacts list. Each contact is transparently
+  // mirrored to a prospect (find-or-create by email), then enrolled — so the
+  // Contacts list and campaigns are unified without a separate prospect step.
+  app.post("/api/crm/enrollments/from-contacts", requireAdminAuth, async (req, res) => {
+    try {
+      const { campaignId, contactIds } = req.body as { campaignId?: string; contactIds?: string[] };
+      if (!campaignId || !Array.isArray(contactIds)) {
+        return res.status(400).json({ message: "campaignId and contactIds are required" });
+      }
+      const existing = await storage.getDripEnrollments(campaignId);
+      const enrolled = new Set(existing.map((e) => e.prospectId));
+      const results = [];
+      let skippedNoEmail = 0;
+      for (const contactId of contactIds) {
+        const contact = await storage.getContact(String(contactId));
+        if (!contact) continue;
+        if (!contact.email) { skippedNoEmail++; continue; }
+        const prospect = await storage.findOrCreateProspectForContact(contact);
+        if (enrolled.has(prospect.id)) continue;
+        const enrollment = await storage.createDripEnrollment({
+          campaignId,
+          prospectId: prospect.id,
+          prospectEmail: prospect.email || contact.email,
+          prospectName: prospect.name,
+          currentStep: 0,
+          status: "active",
+        });
+        enrolled.add(prospect.id);
+        results.push(enrollment);
+      }
+      res.status(201).json({ enrolled: results, count: results.length, skippedNoEmail });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to enroll contacts" });
+    }
+  });
+
   app.patch("/api/crm/enrollments/:id", requireAdminAuth, async (req, res) => {
     try {
       const updated = await storage.updateDripEnrollment(String(req.params.id) as string, req.body);

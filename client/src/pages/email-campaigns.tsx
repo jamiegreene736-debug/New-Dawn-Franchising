@@ -114,6 +114,15 @@ interface ProspectList {
   count: number;
 }
 
+interface ContactLite {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string | null;
+  firmName: string | null;
+  jobTitle: string | null;
+}
+
 interface SmsCampaignData {
   id: string;
   name: string;
@@ -233,6 +242,9 @@ function EmailCampaignTab() {
   const [addStepType, setAddStepType] = useState<string>("email");
   const [showNewCampaign, setShowNewCampaign] = useState(false);
   const [newCampaignName, setNewCampaignName] = useState("");
+  const [showEnrollContacts, setShowEnrollContacts] = useState(false);
+  const [selectedContacts, setSelectedContacts] = useState<Set<string>>(new Set());
+  const [contactSearch, setContactSearch] = useState("");
 
   const [filterText, setFilterText] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -283,6 +295,16 @@ function EmailCampaignTab() {
 
   const { data: prospectLists = [] } = useQuery<ProspectList[]>({
     queryKey: ["/api/crm/prospect-lists"],
+  });
+
+  const { data: contactsForEnroll = [] } = useQuery<ContactLite[]>({
+    queryKey: ["/api/contacts", "enroll-picker"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/contacts?limit=1000");
+      const json = await res.json();
+      return (Array.isArray(json) ? json : json?.contacts ?? []) as ContactLite[];
+    },
+    enabled: showEnrollContacts,
   });
 
   const { data: listMembers = [], isFetching: listMembersFetching } = useQuery<Prospect[]>({
@@ -338,6 +360,29 @@ function EmailCampaignTab() {
       setShowEnrollModal(false);
       setSelectedProspects(new Set());
       toast({ title: `${data.length} prospects enrolled`, description: "They will start receiving campaign emails." });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Enrollment failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const enrollContactsMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedCampaign) throw new Error("No campaign selected");
+      const res = await apiRequest("POST", "/api/crm/enrollments/from-contacts", {
+        campaignId: selectedCampaign,
+        contactIds: Array.from(selectedContacts),
+      });
+      return res.json();
+    },
+    onSuccess: (data: { count: number; skippedNoEmail: number }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/enrollments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/campaigns", selectedCampaign] });
+      setShowEnrollContacts(false);
+      setSelectedContacts(new Set());
+      setContactSearch("");
+      const skip = data.skippedNoEmail ? ` (${data.skippedNoEmail} skipped — no email)` : "";
+      toast({ title: `${data.count} contact${data.count === 1 ? "" : "s"} enrolled`, description: `They'll start receiving the sequence.${skip}` });
     },
     onError: (err: Error) => {
       toast({ title: "Enrollment failed", description: err.message, variant: "destructive" });
@@ -791,8 +836,11 @@ function EmailCampaignTab() {
                       <Button data-testid="button-enroll-from-list" size="sm" variant="outline" className="gap-1" onClick={() => { setShowEnrollListModal(true); setEnrollListId(""); }} disabled={prospectLists.length === 0}>
                         <Users className="size-3" /> From List
                       </Button>
-                      <Button data-testid="button-enroll-prospects" size="sm" className="gap-1" onClick={() => { setShowEnrollModal(true); setSelectedProspects(new Set()); }} disabled={enrollableProspects.length === 0}>
-                        <UserPlus className="size-3" /> Add Contacts
+                      <Button data-testid="button-enroll-prospects" size="sm" variant="outline" className="gap-1" onClick={() => { setShowEnrollModal(true); setSelectedProspects(new Set()); }} disabled={enrollableProspects.length === 0}>
+                        <UserPlus className="size-3" /> From Prospects
+                      </Button>
+                      <Button data-testid="button-enroll-from-contacts" size="sm" className="gap-1" onClick={() => { setShowEnrollContacts(true); setSelectedContacts(new Set()); setContactSearch(""); }}>
+                        <UserPlus className="size-3" /> Add from Contacts
                       </Button>
                     </div>
                   </div>
@@ -844,6 +892,86 @@ function EmailCampaignTab() {
             </div>
           ) : (
             <Card className="p-8 text-center"><Loader2 className="mx-auto size-6 animate-spin text-muted-foreground" /></Card>
+          )}
+
+          {showEnrollContacts && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowEnrollContacts(false)}>
+              <Card className="w-full max-w-lg max-h-[85vh] overflow-auto p-6" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-lg font-semibold">Add from Contacts</h3>
+                  <Button size="sm" variant="ghost" onClick={() => setShowEnrollContacts(false)}><X className="size-4" /></Button>
+                </div>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Pick contacts from your CRM to enroll in this campaign. They're added to the sequence directly — no separate prospect step needed. Contacts without an email are skipped.
+                </p>
+                <div className="relative mb-3">
+                  <Mail className="absolute left-3 top-2.5 size-4 text-muted-foreground" />
+                  <Input data-testid="input-contact-search" placeholder="Search by name, email, or firm…" value={contactSearch} onChange={(e) => setContactSearch(e.target.value)} className="pl-9" />
+                </div>
+                {(() => {
+                  const q = contactSearch.trim().toLowerCase();
+                  const enrolledEmails = new Set(enrollments.map((e) => (e.prospectEmail || "").toLowerCase()));
+                  const filtered = contactsForEnroll.filter((c) => {
+                    const full = `${c.firstName} ${c.lastName}`.toLowerCase();
+                    return !q || full.includes(q) || (c.email || "").toLowerCase().includes(q) || (c.firmName || "").toLowerCase().includes(q);
+                  });
+                  const selectableIds = filtered.filter((c) => c.email).map((c) => c.id);
+                  const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selectedContacts.has(id));
+                  return (
+                    <>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs text-muted-foreground">{filtered.length} contact{filtered.length === 1 ? "" : "s"}</span>
+                        <button
+                          className="text-xs text-[hsl(var(--primary))] hover:underline"
+                          onClick={() => {
+                            const next = new Set(selectedContacts);
+                            if (allSelected) selectableIds.forEach((id) => next.delete(id));
+                            else selectableIds.forEach((id) => next.add(id));
+                            setSelectedContacts(next);
+                          }}
+                        >
+                          {allSelected ? "Clear all" : "Select all"}
+                        </button>
+                      </div>
+                      <div className="space-y-1 max-h-72 overflow-y-auto">
+                        {filtered.length === 0 ? (
+                          <p className="text-sm text-muted-foreground py-4 text-center">No contacts match.</p>
+                        ) : filtered.map((c) => {
+                          const noEmail = !c.email;
+                          const already = c.email ? enrolledEmails.has(c.email.toLowerCase()) : false;
+                          const checked = selectedContacts.has(c.id);
+                          return (
+                            <div
+                              key={c.id}
+                              data-testid={`enroll-contact-${c.id}`}
+                              className={`flex items-center gap-3 p-2 rounded ${noEmail || already ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-gray-50"} ${checked ? "bg-[hsl(var(--primary))]/5" : ""}`}
+                              onClick={() => { if (noEmail || already) return; const next = new Set(selectedContacts); checked ? next.delete(c.id) : next.add(c.id); setSelectedContacts(next); }}
+                            >
+                              <div className={`flex size-5 items-center justify-center rounded border ${checked ? "border-[hsl(var(--primary))] bg-[hsl(var(--primary))] text-white" : "border-gray-300"}`}>
+                                {checked && <Check className="size-3" />}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="text-sm font-medium truncate">{c.firstName} {c.lastName}{c.firmName ? <span className="text-muted-foreground font-normal"> · {c.firmName}</span> : null}</div>
+                                <div className="text-xs text-muted-foreground truncate">{c.email || "no email"}{already ? " · already enrolled" : ""}</div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="mt-4 flex justify-end">
+                        <Button
+                          data-testid="button-confirm-enroll-contacts"
+                          onClick={() => enrollContactsMutation.mutate()}
+                          disabled={selectedContacts.size === 0 || enrollContactsMutation.isPending}
+                        >
+                          {enrollContactsMutation.isPending ? <><Loader2 className="size-4 mr-1 animate-spin" /> Enrolling…</> : `Enroll ${selectedContacts.size} contact${selectedContacts.size === 1 ? "" : "s"}`}
+                        </Button>
+                      </div>
+                    </>
+                  );
+                })()}
+              </Card>
+            </div>
           )}
 
           {showEnrollModal && (

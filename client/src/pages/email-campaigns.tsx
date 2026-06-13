@@ -450,17 +450,25 @@ function EmailCampaignTab() {
 
   const processMutation = useMutation({
     mutationFn: async () => {
+      // Returns 202 immediately; processing continues in the background.
       const res = await apiRequest("POST", "/api/crm/drip/process");
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/activity"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/enrollments"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/campaigns", selectedCampaign] });
-      toast({ title: "Sequence processed", description: "Any due emails, texts and tasks have been actioned." });
+      const refresh = () => {
+        queryClient.invalidateQueries({ queryKey: ["/api/crm/activity"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/crm/enrollments"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/crm/campaigns", selectedCampaign] });
+      };
+      // The send runs server-side after we respond — refresh a couple of times
+      // so the stats / step counts / schedule reflect it without a manual reload.
+      refresh();
+      setTimeout(refresh, 4000);
+      setTimeout(refresh, 12000);
+      toast({ title: "Sending started", description: "Due emails are going out now — counts will update in a few seconds." });
     },
     onError: (err: Error) => {
-      toast({ title: "Processing failed", description: err.message, variant: "destructive" });
+      toast({ title: "Couldn't start sending", description: err.message, variant: "destructive" });
     },
   });
 

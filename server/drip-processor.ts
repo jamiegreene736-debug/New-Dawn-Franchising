@@ -45,9 +45,18 @@ function channelOf(stepType: string): string {
   return "task";
 }
 
+// Guard against overlapping runs (a manual "Send Due Now" overlapping the cron,
+// or repeated clicks) so the same enrollments aren't processed twice in parallel.
+let dripRunInProgress = false;
+
 export async function processDripEmails(opts: { force?: boolean } = {}) {
   const { force = false } = opts;
   console.log(`[Drip] Processing scheduled emails...${force ? " (manual override — bypassing window + hourly cap)" : ""}`);
+
+  if (dripRunInProgress) {
+    console.log("[Drip] A run is already in progress — skipping this trigger.");
+    return;
+  }
 
   // Respect optimal send windows — skip if outside hours. A manual "Send Due
   // Now" passes force:true to send due emails immediately regardless of day/time.
@@ -56,6 +65,7 @@ export async function processDripEmails(opts: { force?: boolean } = {}) {
     return;
   }
 
+  dripRunInProgress = true;
   try {
     // DB-backed rolling-window counters so throttles survive process restarts
     // (Railway redeploys) instead of resetting an in-memory counter mid-day.
@@ -136,8 +146,9 @@ export async function processDripEmails(opts: { force?: boolean } = {}) {
           // Per-domain pacing: if we sent to this recipient's domain very
           // recently in this run, wait out the remainder of the domain gap
           // before sending again (avoids rapid bursts to one ISP).
+          // (Manual force runs skip the spacing waits so they finish promptly.)
           const domain = emailDomain(enrollment.prospectEmail);
-          if (domain) {
+          if (domain && !force) {
             const last = lastSendByDomain.get(domain);
             if (last !== undefined) {
               const wait = EMAIL_DOMAIN_GAP_MS - (Date.now() - last);
@@ -181,8 +192,8 @@ export async function processDripEmails(opts: { force?: boolean } = {}) {
           }
 
           // Organic jitter between emails — avoids burst-send spam signals.
-          // Skip the wait once the daily cap is hit (the loop is about to stop).
-          if (sentThisRun > 0 && sentLast24h < EMAIL_DAILY_CAP && (force || sentLastHour < EMAIL_HOURLY_CAP)) {
+          // Skipped on manual force runs (snappy) and once the daily cap is hit.
+          if (!force && sentThisRun > 0 && sentLast24h < EMAIL_DAILY_CAP && sentLastHour < EMAIL_HOURLY_CAP) {
             const jitter = smartEmailDelay(sentThisRun);
             console.log(`[Drip] Waiting ${Math.round(jitter / 1000)}s before next send...`);
             await sleep(jitter);
@@ -250,6 +261,8 @@ export async function processDripEmails(opts: { force?: boolean } = {}) {
     console.log(`[Drip] Run complete. Sent ${sentThisRun} emails this run (today: ${sentLast24h}/${EMAIL_DAILY_CAP}, hour: ${sentLastHour}/${EMAIL_HOURLY_CAP}).`);
   } catch (err) {
     console.error("[Drip] Processing error:", err);
+  } finally {
+    dripRunInProgress = false;
   }
 }
 

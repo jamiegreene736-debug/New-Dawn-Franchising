@@ -202,6 +202,8 @@ function personToContact(p: SeamlessPerson, companyId: string, companyName: stri
     companyType: p.companyType ?? null,
     companyLocation: companyLocation(p),
     website: p.domain ? `https://${p.domain.replace(/^https?:\/\//, "")}` : null,
+    timeAtCompany: p.timeAtCompany ?? null,
+    startedAtCurrentCompany: p.startedAtCurrentCompany ?? null,
   };
 }
 

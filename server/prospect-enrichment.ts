@@ -52,6 +52,8 @@ export interface EnrichedContact {
   companyType?: string | null;   // Public / Private from Seamless search
   companyLocation?: string | null; // company HQ city/state/country from Seamless search
   website?: string | null;       // company website (derived from domain)
+  timeAtCompany?: string | null;           // human-readable tenure at current company (Seamless)
+  startedAtCurrentCompany?: string | null; // ISO date the contact started at the company (Seamless)
 }
 
 export interface EnrichedCompany {

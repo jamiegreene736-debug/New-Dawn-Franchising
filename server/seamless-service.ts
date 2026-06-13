@@ -95,6 +95,9 @@ export interface SeamlessPerson {
   companyCity?: string | null;
   companyState?: string | null;
   companyCountry?: string | null;
+  // How long the person has been at their current company (from Seamless).
+  timeAtCompany?: string | null;            // human-readable, e.g. "3 yrs 2 mos"
+  startedAtCurrentCompany?: string | null;  // ISO date (YYYY-MM-DD)
 }
 
 /**
@@ -231,6 +234,9 @@ interface SeamlessSearchItem {
   companyCity?: string;
   companyState?: string;
   companyCountry?: string;
+  // Job-tenure fields from the Seamless contact-search response.
+  timeAtCompany?: string;            // human-readable, e.g. "3 yrs 2 mos"
+  startedAtCurrentCompany?: string;  // ISO date (YYYY-MM-DD)
 }
 
 interface SeamlessEnrichedContact {
@@ -315,6 +321,8 @@ function mapSearchItem(item: SeamlessSearchItem): SeamlessPerson {
     companyCity: item.companyCity || null,
     companyState: item.companyState || null,
     companyCountry: item.companyCountry || null,
+    timeAtCompany: item.timeAtCompany || null,
+    startedAtCurrentCompany: item.startedAtCurrentCompany || null,
   };
 }
 

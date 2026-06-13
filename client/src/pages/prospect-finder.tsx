@@ -6,7 +6,7 @@ import {
   MapPin, Phone, Search, Trash2, Mail, Linkedin, Star, Check, Info,
   Building2, Users, UserPlus, Bookmark, Eye, EyeOff, RefreshCw,
   PhoneCall, CheckCircle2, AlertCircle, Plus, ListPlus, FolderOpen, X, PhoneOff, Edit2, SlidersHorizontal, Tag, ShieldCheck,
-  MessageCircle, Send, Sparkles,
+  MessageCircle, Send, Sparkles, ArrowUp, ArrowDown, ChevronsUpDown,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -75,6 +75,8 @@ interface EnrichedContact {
   companyType?: string | null;
   companyLocation?: string | null;
   website?: string | null;
+  timeAtCompany?: string | null;           // human-readable tenure at current company (Seamless)
+  startedAtCurrentCompany?: string | null; // ISO date the contact started at the company (Seamless)
 }
 
 interface EnrichedCompany {
@@ -748,6 +750,96 @@ function CompanySection({
   );
 }
 
+// ─── Results-table sorting helpers ───────────────────────────────────────────
+type TableSortDir = "asc" | "desc";
+const NUMERIC_SORT_COLS = new Set(["tenure", "score", "employees", "revenue"]);
+
+/** Parse a band like "201 - 500" or "$20M - $50M" into a sortable number (its lower bound). */
+function bandMagnitude(s: string | null | undefined): number {
+  if (!s) return NaN;
+  const m = s.replace(/,/g, "").match(/([\d.]+)\s*([kmb])?/i);
+  if (!m) return NaN;
+  let n = parseFloat(m[1]);
+  const suffix = (m[2] || "").toLowerCase();
+  if (suffix === "k") n *= 1e3;
+  else if (suffix === "m") n *= 1e6;
+  else if (suffix === "b") n *= 1e9;
+  return n;
+}
+
+/** Parse a Seamless tenure string ("3 yrs 2 mos", "1 Yr 2 Mo", "5 yr", "11 mo") into months (NaN if none). */
+function parseTenureString(s: string | null | undefined): number {
+  if (!s) return NaN;
+  const yr = s.match(/(\d+)\s*(?:yrs?|years?|y)\b/i);
+  const mo = s.match(/(\d+)\s*(?:mos?|months?|m)\b/i);
+  if (!yr && !mo) return NaN;
+  return (yr ? parseInt(yr[1], 10) * 12 : 0) + (mo ? parseInt(mo[1], 10) : 0);
+}
+
+/** Months at the current company — from the Seamless start date, else parsed from its tenure string (NaN if unknown). */
+function tenureMonths(c: EnrichedContact): number {
+  if (c.startedAtCurrentCompany) {
+    const start = new Date(c.startedAtCurrentCompany);
+    if (!isNaN(start.getTime())) return (Date.now() - start.getTime()) / (1000 * 60 * 60 * 24 * 30.44);
+  }
+  return parseTenureString(c.timeAtCompany); // keeps sort working when only the human string is present
+}
+
+/** Human-readable tenure — prefers Seamless's own string, else derives it from the start date. */
+function formatTenure(c: EnrichedContact): string {
+  if (c.timeAtCompany && c.timeAtCompany.trim()) return c.timeAtCompany.trim();
+  const months = tenureMonths(c);
+  if (!isFinite(months) || months < 0) return "—";
+  // Round to total months BEFORE splitting so the remainder can never round up to 12.
+  const total = Math.round(months);
+  const years = Math.floor(total / 12);
+  const rem = total % 12;
+  if (years <= 0) return `${Math.max(1, rem)} mo`;
+  return rem > 0 ? `${years} yr ${rem} mo` : `${years} yr`;
+}
+
+/** Comparable value for a column — strings lowercased; bands/score/tenure numeric. */
+function contactSortValue(c: EnrichedContact, col: string): string | number {
+  switch (col) {
+    case "name": return (c.fullName || "").toLowerCase();
+    case "title": return (c.jobTitle || "").toLowerCase();
+    case "company": return (c.companyName || "").toLowerCase();
+    case "tenure": return tenureMonths(c); // bigger = longer tenure
+    case "email": return (c.email || "").toLowerCase();
+    case "phone": return (c.phone || "").toLowerCase();
+    case "seniority": return (c.seniority || "").toLowerCase();
+    case "department": return (c.department || "").toLowerCase();
+    case "industries": return (c.industries?.[0] || "").toLowerCase();
+    case "companyLocation": return (c.companyLocation || "").toLowerCase();
+    case "contactLocation": return (c.address || "").toLowerCase();
+    case "employees": return bandMagnitude(c.employeeSizeRange);
+    case "revenue": return bandMagnitude(c.companyRevenue);
+    case "type": return (c.companyType || "").toLowerCase();
+    case "website": return (c.website || "").toLowerCase();
+    case "score": return c.decisionMakerScore || 0;
+    default: return "";
+  }
+}
+
+/** Sort a copy of the rows by column/direction, pushing empty/unknown values to the bottom. */
+function sortContacts(rows: EnrichedContact[], col: string | null, dir: TableSortDir): EnrichedContact[] {
+  if (!col) return rows;
+  const sign = dir === "asc" ? 1 : -1;
+  const isEmpty = (v: string | number) => v === "" || (typeof v === "number" && !isFinite(v));
+  return [...rows].sort((a, b) => {
+    const va = contactSortValue(a, col);
+    const vb = contactSortValue(b, col);
+    const ea = isEmpty(va), eb = isEmpty(vb);
+    if (ea && eb) return 0;
+    if (ea) return 1;   // empties always last, regardless of direction
+    if (eb) return -1;
+    const r = typeof va === "number" && typeof vb === "number"
+      ? va - vb
+      : String(va).localeCompare(String(vb));
+    return sign * r;
+  });
+}
+
 export default function ProspectFinder() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -761,6 +853,8 @@ export default function ProspectFinder() {
   const [showAll, setShowAll] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [resultsView, setResultsView] = useState<"table" | "cards">("table");
+  const [tableSortCol, setTableSortCol] = useState<string | null>(null);
+  const [tableSortDir, setTableSortDir] = useState<TableSortDir>("asc");
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
   const [companies, setCompanies] = useState<EnrichedCompany[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
@@ -1278,6 +1372,33 @@ export default function ProspectFinder() {
     })
     .sort((a, b) => b.decisionMakerScore - a.decisionMakerScore);
 
+  // Apply the user-chosen column sort on top of the default score-desc order.
+  const sortedTableContacts = sortContacts(tableContacts, tableSortCol, tableSortDir);
+  const onSortColumn = (col: string) => {
+    if (tableSortCol === col) {
+      setTableSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setTableSortCol(col);
+      setTableSortDir(NUMERIC_SORT_COLS.has(col) ? "desc" : "asc");
+    }
+  };
+  const sortableTh = (col: string, label: string, thClass = "") => (
+    <th className={thClass}>
+      <button
+        type="button"
+        onClick={() => onSortColumn(col)}
+        data-testid={`sort-${col}`}
+        className="inline-flex items-center gap-1 font-medium hover:text-foreground"
+        title={`Sort by ${label}`}
+      >
+        {label}
+        {tableSortCol === col
+          ? (tableSortDir === "asc" ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />)
+          : <ChevronsUpDown className="size-3 opacity-40" />}
+      </button>
+    </th>
+  );
+
   const allTableSelected = tableContacts.length > 0 && tableContacts.every((c) => selected.has(c.id));
   const toggleSelectAllTable = () => {
     setSelected((s) => {
@@ -1337,7 +1458,7 @@ export default function ProspectFinder() {
     const rows: (string | number | null | undefined)[][] = [
       [
         "Full Name","First Name","Last Name","Job Title","Seniority",
-        "Company","Company Website","Email","Email Verified","Email Confidence %","Email Status",
+        "Company","Company Website","Time at Company","Email","Email Verified","Email Confidence %","Email Status",
         "Phone","Phone Type","WhatsApp Eligible",
         "LinkedIn URL","Address","Score","Tier","Sources",
         "E-2 Signals","International Bio","Category","Location",
@@ -1347,7 +1468,7 @@ export default function ProspectFinder() {
       for (const c of company.contacts) {
         rows.push([
           c.fullName, c.firstName, c.lastName, c.jobTitle || "", c.seniority || "",
-          company.name, company.website || "",
+          company.name, company.website || "", formatTenure(c),
           c.email || "", c.emailVerified ? "Yes" : "No", c.emailConfidence || 0, c.emailStatus || "",
           c.phone || "", c.phoneType || "", c.whatsappEligible ? "Yes" : "No",
           c.linkedinUrl || "", (c as any).address || "",
@@ -1656,26 +1777,27 @@ export default function ProspectFinder() {
                               {allTableSelected && <Check className="size-3" />}
                             </button>
                           </th>
-                          <th>Name</th>
-                          <th>Title</th>
-                          <th>Company</th>
-                          <th>Email</th>
-                          <th>Phone</th>
-                          <th>Seniority</th>
-                          <th>Department</th>
-                          <th>Industries</th>
-                          <th>Company Location</th>
-                          <th>Contact Location</th>
-                          <th>Employees</th>
-                          <th>Revenue</th>
-                          <th>Type</th>
-                          <th>Website</th>
-                          <th>Score</th>
+                          {sortableTh("name", "Name")}
+                          {sortableTh("title", "Title")}
+                          {sortableTh("company", "Company")}
+                          {sortableTh("tenure", "Time at Company")}
+                          {sortableTh("email", "Email")}
+                          {sortableTh("phone", "Phone")}
+                          {sortableTh("seniority", "Seniority")}
+                          {sortableTh("department", "Department")}
+                          {sortableTh("industries", "Industries")}
+                          {sortableTh("companyLocation", "Company Location")}
+                          {sortableTh("contactLocation", "Contact Location")}
+                          {sortableTh("employees", "Employees")}
+                          {sortableTh("revenue", "Revenue")}
+                          {sortableTh("type", "Type")}
+                          {sortableTh("website", "Website")}
+                          {sortableTh("score", "Score")}
                           <th className="sticky right-0 bg-muted/50">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {tableContacts.map((c) => {
+                        {sortedTableContacts.map((c) => {
                           const isSel = selected.has(c.id);
                           const added = addedToCrmIds.has(c.id);
                           const saving = savingIds.has(c.id);
@@ -1704,6 +1826,10 @@ export default function ProspectFinder() {
                               </td>
                               <td className="max-w-[200px] truncate" title={c.jobTitle || ""}>{c.jobTitle || "—"}</td>
                               <td className="font-medium text-foreground">{c.companyName || "—"}</td>
+                              <td className={c.timeAtCompany || c.startedAtCurrentCompany ? "text-foreground" : "text-muted-foreground"}
+                                  title={c.startedAtCurrentCompany ? `Started ${c.startedAtCurrentCompany}` : undefined}>
+                                {formatTenure(c)}
+                              </td>
                               <td>
                                 {c.email ? (
                                   <span className="text-foreground">

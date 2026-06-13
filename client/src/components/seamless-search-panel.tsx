@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import {
   Search, Sparkles, ChevronDown, X, Users, Building2, Loader2, SlidersHorizontal, Plus,
-  Folder, Bookmark, Clock, Settings2, Info, ListChecks, LineChart, Send, Star,
+  Folder, Bookmark, Clock, Settings2, Info, Star,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -282,15 +282,6 @@ export default function SeamlessSearchPanel({
   const isCompanies = searchTab === "companies";
   const greetName = (userName || "").trim() || "there";
 
-  const railIcons = [
-    { icon: Search, label: "Search", active: true },
-    { icon: Users, label: "Contacts", active: false },
-    { icon: Building2, label: "Companies", active: false },
-    { icon: ListChecks, label: "Saved lists", active: false },
-    { icon: Send, label: "Outreach", active: false },
-    { icon: LineChart, label: "Analytics", active: false },
-  ];
-
   return (
     <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
       {/* ── Brand bar (navy) ───────────────────────────────────────────────── */}
@@ -346,23 +337,8 @@ export default function SeamlessSearchPanel({
         </span>
       </div>
 
-      {/* ── Body: icon rail + filters + AI hero ────────────────────────────── */}
+      {/* ── Body: filters + AI hero ────────────────────────────────────────── */}
       <div className="flex flex-col md:flex-row">
-        {/* Slim icon rail */}
-        <div className="hidden w-14 shrink-0 flex-col items-center gap-1 border-r bg-muted/30 py-3 md:flex">
-          {railIcons.map(({ icon: Icon, label, active: on }) => (
-            <span
-              key={label}
-              title={label}
-              className={`grid size-9 place-items-center rounded-lg ${
-                on ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground/70"
-              }`}
-            >
-              <Icon className="size-[18px]" />
-            </span>
-          ))}
-        </div>
-
         {/* Filters column */}
         {showFilters && (
           <div className="flex w-full flex-col border-b md:max-w-[320px] md:shrink-0 md:border-b-0 md:border-r">

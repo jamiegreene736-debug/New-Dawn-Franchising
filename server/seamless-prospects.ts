@@ -20,9 +20,12 @@ import {
   seamlessSearchCompanies,
   seamlessRevealBySearchIds,
   type SeamlessPerson,
+  type SeamlessCompany,
   type SeamlessContactFilters,
   type SeamlessCompanyFilters,
 } from "./seamless-service";
+import { apolloSearchContacts, apolloSearchCompanies } from "./apollo-service";
+import { origamiSearchContacts, origamiSearchCompanies } from "./origami-service";
 import { calculateDecisionMakerScore } from "./decision-maker-scorer";
 import { createLazyOpenAIClient } from "./openai-client";
 import type { EnrichedContact, EnrichedCompany } from "./prospect-enrichment";
@@ -165,7 +168,22 @@ function scoreFor(p: SeamlessPerson) {
   });
 }
 
-function personToContact(p: SeamlessPerson, companyId: string, companyName: string): EnrichedContact {
+// ─── Provider identity ───────────────────────────────────────────────────────
+
+export type ProviderId = "seamless" | "apollo" | "origami";
+
+export const PROVIDER_LABEL: Record<ProviderId, string> = {
+  seamless: "Seamless.AI",
+  apollo: "Apollo.io",
+  origami: "Origami",
+};
+
+function personToContact(
+  p: SeamlessPerson,
+  companyId: string,
+  companyName: string,
+  source: string = "Seamless.AI",
+): EnrichedContact {
   const score = scoreFor(p);
   const revealed = !!(p.email || p.phone);
   return {
@@ -186,7 +204,7 @@ function personToContact(p: SeamlessPerson, companyId: string, companyName: stri
     whatsappEligible: !!p.phone,
     linkedinUrl: p.linkedinUrl,
     bio: null,
-    sources: ["Seamless.AI"],
+    sources: [source],
     decisionMakerScore: score.total,
     scoreBreakdown: score,
     e2ViaBio: false,
@@ -207,15 +225,17 @@ function personToContact(p: SeamlessPerson, companyId: string, companyName: stri
   };
 }
 
-// ─── Contact search (free) ───────────────────────────────────────────────────
+// ─── Shared grouping (provider-agnostic) ─────────────────────────────────────
 
-export async function seamlessContactSearch(
+type SearchResult = { companies: EnrichedCompany[]; totalContacts: number; enrichedCount: number; nextToken: string | null };
+
+/** Group a normalised people list into EnrichedCompany[] tagged with the source provider. */
+function groupPeopleIntoCompanies(
+  people: SeamlessPerson[],
   filters: LeadSearchFilters,
-  opts: { limit?: number; nextToken?: string | null } = {},
-): Promise<{ companies: EnrichedCompany[]; totalContacts: number; enrichedCount: number; nextToken: string | null }> {
-  const limit = Math.min(opts.limit ?? 50, 100);
-  const { people, nextToken } = await seamlessSearchContacts(toContactFilters(filters, limit, opts.nextToken));
-
+  source: string,
+  nextToken: string | null,
+): SearchResult {
   const category = deriveCategory(filters);
   const location = deriveLocation(filters);
   const groups = new Map<string, EnrichedCompany>();
@@ -235,7 +255,7 @@ export async function seamlessContactSearch(
         phone: null,
         googleRating: null,
         googleReviews: null,
-        source: "Seamless.AI",
+        source,
         contacts: [],
         enrichmentStatus: "no_contacts",
         searchCategory: category,
@@ -244,7 +264,7 @@ export async function seamlessContactSearch(
       };
       groups.set(key, co);
     }
-    co.contacts.push(personToContact(p, co.id, co.name));
+    co.contacts.push(personToContact(p, co.id, co.name, source));
   }
 
   const companies = Array.from(groups.values()).map((c) => ({
@@ -257,17 +277,15 @@ export async function seamlessContactSearch(
   return { companies, totalContacts, enrichedCount, nextToken };
 }
 
-// ─── Company search (free) ──────────────────────────────────────────────────
-
-export async function seamlessCompanySearch(
+/** Map a provider's company list into EnrichedCompany[] tagged with the source provider. */
+function mapCompanies(
+  raw: SeamlessCompany[],
   filters: LeadSearchFilters,
-  opts: { limit?: number; nextToken?: string | null } = {},
-): Promise<{ companies: EnrichedCompany[]; totalContacts: number; enrichedCount: number; nextToken: string | null }> {
-  const limit = Math.min(opts.limit ?? 50, 100);
-  const { companies: raw, nextToken } = await seamlessSearchCompanies(toCompanyFilters(filters, limit, opts.nextToken));
+  source: string,
+  nextToken: string | null,
+): SearchResult {
   const category = deriveCategory(filters);
   const location = deriveLocation(filters);
-
   const companies: EnrichedCompany[] = raw.map((c) => ({
     id: makeId(),
     name: c.name,
@@ -278,15 +296,93 @@ export async function seamlessCompanySearch(
     phone: null,
     googleRating: null,
     googleReviews: null,
-    source: "Seamless.AI",
+    source,
     contacts: [],
     enrichmentStatus: "no_contacts",
     searchCategory: category,
     searchLocation: c.state || c.country || location,
     description: c.description || companyBlurb(c.industries, c.employeeSizeRange),
   }));
-
   return { companies, totalContacts: 0, enrichedCount: 0, nextToken };
+}
+
+// ─── Contact search (free) ───────────────────────────────────────────────────
+
+export async function seamlessContactSearch(
+  filters: LeadSearchFilters,
+  opts: { limit?: number; nextToken?: string | null } = {},
+): Promise<SearchResult> {
+  const limit = Math.min(opts.limit ?? 50, 100);
+  const { people, nextToken } = await seamlessSearchContacts(toContactFilters(filters, limit, opts.nextToken));
+  return groupPeopleIntoCompanies(people, filters, "Seamless.AI", nextToken);
+}
+
+// ─── Company search (free) ──────────────────────────────────────────────────
+
+export async function seamlessCompanySearch(
+  filters: LeadSearchFilters,
+  opts: { limit?: number; nextToken?: string | null } = {},
+): Promise<SearchResult> {
+  const limit = Math.min(opts.limit ?? 50, 100);
+  const { companies: raw, nextToken } = await seamlessSearchCompanies(toCompanyFilters(filters, limit, opts.nextToken));
+  return mapCompanies(raw, filters, "Seamless.AI", nextToken);
+}
+
+// ─── Apollo.io (supplemental) ────────────────────────────────────────────────
+
+export async function apolloContactSearch(
+  filters: LeadSearchFilters,
+  opts: { limit?: number; nextToken?: string | null } = {},
+): Promise<SearchResult> {
+  const limit = Math.min(opts.limit ?? 50, 100);
+  const { people, nextToken } = await apolloSearchContacts(toContactFilters(filters, limit, opts.nextToken));
+  return groupPeopleIntoCompanies(people, filters, "Apollo.io", nextToken);
+}
+
+export async function apolloCompanySearch(
+  filters: LeadSearchFilters,
+  opts: { limit?: number; nextToken?: string | null } = {},
+): Promise<SearchResult> {
+  const limit = Math.min(opts.limit ?? 50, 100);
+  const { companies: raw, nextToken } = await apolloSearchCompanies(toCompanyFilters(filters, limit, opts.nextToken));
+  return mapCompanies(raw, filters, "Apollo.io", nextToken);
+}
+
+// ─── Origami (supplemental) ──────────────────────────────────────────────────
+
+export async function origamiContactSearch(
+  filters: LeadSearchFilters,
+  opts: { limit?: number; nextToken?: string | null } = {},
+): Promise<SearchResult> {
+  const limit = Math.min(opts.limit ?? 50, 100);
+  const { people, nextToken } = await origamiSearchContacts(toContactFilters(filters, limit, opts.nextToken));
+  return groupPeopleIntoCompanies(people, filters, "Origami", nextToken);
+}
+
+export async function origamiCompanySearch(
+  filters: LeadSearchFilters,
+  opts: { limit?: number; nextToken?: string | null } = {},
+): Promise<SearchResult> {
+  const limit = Math.min(opts.limit ?? 50, 100);
+  const { companies: raw, nextToken } = await origamiSearchCompanies(toCompanyFilters(filters, limit, opts.nextToken));
+  return mapCompanies(raw, filters, "Origami", nextToken);
+}
+
+// ─── Provider dispatch ───────────────────────────────────────────────────────
+
+export async function providerSearch(
+  provider: ProviderId,
+  mode: "contacts" | "companies",
+  filters: LeadSearchFilters,
+  opts: { limit?: number; nextToken?: string | null } = {},
+): Promise<SearchResult> {
+  if (provider === "apollo") {
+    return mode === "companies" ? apolloCompanySearch(filters, opts) : apolloContactSearch(filters, opts);
+  }
+  if (provider === "origami") {
+    return mode === "companies" ? origamiCompanySearch(filters, opts) : origamiContactSearch(filters, opts);
+  }
+  return mode === "companies" ? seamlessCompanySearch(filters, opts) : seamlessContactSearch(filters, opts);
 }
 
 // ─── Reveal (spends Seamless credits) ───────────────────────────────────────

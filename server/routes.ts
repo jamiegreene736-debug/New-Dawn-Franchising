@@ -53,9 +53,12 @@ import {
   seamlessContactSearch,
   seamlessCompanySearch,
   seamlessRevealContacts,
+  providerSearch,
   parseNaturalLanguageToFilters,
   type LeadSearchFilters,
+  type ProviderId,
 } from "./seamless-prospects";
+import { getProviderStatuses } from "./provider-credits";
 import { seedContactEnrichment } from "./people-finder";
 import { calculateDecisionMakerScore } from "./decision-maker-scorer";
 import { whitePageslookup, whitepagesVerifyPhone } from "./whitepages-service";
@@ -1642,15 +1645,28 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
   // are NOT included here — they are revealed on demand via /seamless-reveal.
   app.post("/api/crm/prospects/seamless-search", requireAdminAuth, async (req, res) => {
     try {
-      if (!process.env.SEAMLESS_API_KEY) {
-        return res.status(503).json({ message: "Seamless.AI is not configured (SEAMLESS_API_KEY missing)." });
-      }
       const { mode, aiQuery, nextToken } = req.body as {
         mode?: "contacts" | "companies";
         filters?: LeadSearchFilters;
         aiQuery?: string;
         nextToken?: string | null;
+        provider?: ProviderId;
       };
+      // Which provider to run for this call (defaults to Seamless for back-compat).
+      const provider: ProviderId =
+        req.body?.provider === "apollo" || req.body?.provider === "origami"
+          ? req.body.provider
+          : "seamless";
+
+      const KEY_FOR: Record<ProviderId, string> = {
+        seamless: "SEAMLESS_API_KEY",
+        apollo: "APOLLO_API_KEY",
+        origami: "ORIGAMI_API_KEY",
+      };
+      if (!process.env[KEY_FOR[provider]]) {
+        return res.status(503).json({ message: `${provider} is not configured (${KEY_FOR[provider]} missing).` });
+      }
+
       let filters: LeadSearchFilters = (req.body?.filters as LeadSearchFilters) || {};
 
       // If a natural-language query is supplied, parse it and merge over the
@@ -1669,14 +1685,25 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
         return res.status(400).json({ message: "Add at least one filter or type what you're looking for." });
       }
 
-      const result = mode === "companies"
-        ? await seamlessCompanySearch(appliedFilters, { nextToken })
-        : await seamlessContactSearch(appliedFilters, { nextToken });
+      const result = await providerSearch(provider, mode === "companies" ? "companies" : "contacts", appliedFilters, { nextToken });
 
-      res.json({ ...result, appliedFilters });
+      res.json({ ...result, appliedFilters, provider });
     } catch (err: any) {
-      console.error("Seamless search error:", err);
-      res.status(500).json({ message: err.message || "Seamless search failed" });
+      console.error("Provider search error:", err);
+      res.status(500).json({ message: err.message || "Provider search failed" });
+    }
+  });
+
+  // Connection + remaining-credit status for each contact-search provider
+  // (Seamless.AI, Apollo.io, Origami). Drives the provider selector UI.
+  app.get("/api/crm/prospects/provider-status", requireAdminAuth, async (req, res) => {
+    try {
+      const force = req.query.refresh === "1" || req.query.force === "1";
+      const statuses = await getProviderStatuses(force);
+      res.json({ providers: statuses });
+    } catch (err: any) {
+      console.error("Provider status error:", err);
+      res.status(500).json({ message: err.message || "Failed to load provider status" });
     }
   });
 

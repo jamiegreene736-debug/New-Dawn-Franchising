@@ -760,6 +760,8 @@ Example output: ["franchise consultant E-2 visa investors USA", "international f
 export function getEnrichmentApiStatus() {
   return {
     seamless: !!process.env.SEAMLESS_API_KEY,
+    apollo: !!process.env.APOLLO_API_KEY,
+    origami: !!process.env.ORIGAMI_API_KEY,
     hunter: !!process.env.HUNTER_API_KEY,
     zerobounce: !!process.env.ZEROBOUNCE_API_KEY,
     proxycurl: !!process.env.PROXYCURL_API_KEY,

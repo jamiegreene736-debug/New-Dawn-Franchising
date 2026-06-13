@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import {
   Search, Sparkles, ChevronDown, X, Users, Building2, Loader2, SlidersHorizontal, Plus,
-  Folder, Bookmark, Clock, Settings2, Info, Star,
+  Folder, Bookmark, Clock, Settings2, Info, Star, Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -256,6 +256,39 @@ function FilterAccordion({
 
 // ─── Main panel ──────────────────────────────────────────────────────────────
 
+// ─── Multi-provider types (mirror prospect-finder) ──────────────────────────
+export type ProviderId = "seamless" | "apollo" | "origami";
+export interface ProviderStatus {
+  id: ProviderId;
+  label: string;
+  configured: boolean;
+  credits: number | null;
+}
+export interface ProviderRunState {
+  id: ProviderId;
+  label: string;
+  status: "queued" | "searching" | "done" | "error";
+  count: number;
+  message?: string;
+}
+
+const PROVIDER_DOT: Record<ProviderId, string> = {
+  seamless: "bg-blue-500",
+  apollo: "bg-purple-500",
+  origami: "bg-teal-500",
+};
+const PROVIDER_ON: Record<ProviderId, string> = {
+  seamless: "border-blue-300 bg-blue-50 text-blue-800",
+  apollo: "border-purple-300 bg-purple-50 text-purple-800",
+  origami: "border-teal-300 bg-teal-50 text-teal-800",
+};
+
+function formatCredits(n: number | null): string | null {
+  if (n == null) return null;
+  if (n >= 1000) return `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k`;
+  return String(n);
+}
+
 interface Props {
   searchTab: "contacts" | "companies";
   setSearchTab: (t: "contacts" | "companies") => void;
@@ -270,11 +303,20 @@ interface Props {
   connected?: boolean;
   /** Optional first name for the hero greeting. */
   userName?: string;
+  /** Per-provider connection + remaining-credit status. */
+  providers?: ProviderStatus[];
+  /** IDs of the providers the user has selected to search. */
+  selectedProviders?: string[];
+  /** Toggle a provider on/off. */
+  onToggleProvider?: (id: string) => void;
+  /** Live per-provider state during a search run. */
+  providerRun?: ProviderRunState[];
 }
 
 export default function SeamlessSearchPanel({
   searchTab, setSearchTab, filters, setFilters, aiQuery, setAiQuery,
   onSearch, onAiSearch, isSearching, connected, userName,
+  providers, selectedProviders, onToggleProvider, providerRun,
 }: Props) {
   const [showFilters, setShowFilters] = useState(true);
   const active = countActiveFilters(filters);
@@ -336,6 +378,66 @@ export default function SeamlessSearchPanel({
           {connected ? "Data source connected" : "Connect data source"}
         </span>
       </div>
+
+      {/* ── Search sources: pick which providers to layer + see credits ─────── */}
+      {providers && providers.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 border-b bg-muted/20 px-3 py-2 sm:px-4">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Search sources
+          </span>
+          {providers.map((p) => {
+            const selected = (selectedProviders || []).includes(p.id);
+            const run = (providerRun || []).find((r) => r.id === p.id);
+            const credits = formatCredits(p.credits);
+            const disabled = !p.configured;
+            return (
+              <button
+                key={p.id}
+                type="button"
+                disabled={disabled}
+                onClick={() => onToggleProvider?.(p.id)}
+                data-testid={`provider-toggle-${p.id}`}
+                title={
+                  disabled
+                    ? `${p.label} is not connected — add its API key in Railway`
+                    : selected ? `Searching ${p.label} — click to skip` : `Click to include ${p.label}`
+                }
+                className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+                  disabled
+                    ? "cursor-not-allowed border-dashed border-muted-foreground/30 bg-transparent text-muted-foreground/50"
+                    : selected
+                      ? PROVIDER_ON[p.id]
+                      : "border-input bg-background text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {/* selection check / connection dot */}
+                {disabled ? (
+                  <span className="size-1.5 rounded-full bg-muted-foreground/40" />
+                ) : selected ? (
+                  <Check className="size-3.5" strokeWidth={3} />
+                ) : (
+                  <span className={`size-1.5 rounded-full ${PROVIDER_DOT[p.id]}`} />
+                )}
+                {p.label}
+                {/* credits remaining */}
+                {!disabled && credits != null && (
+                  <span className="rounded bg-white/70 px-1 text-[10px] font-semibold tabular-nums">
+                    {credits} cr
+                  </span>
+                )}
+                {disabled && <span className="text-[10px]">not connected</span>}
+                {/* live run status */}
+                {run?.status === "searching" && <Loader2 className="size-3 animate-spin" />}
+                {run?.status === "done" && <span className="text-[10px] font-semibold">+{run.count}</span>}
+                {run?.status === "error" && <span className="text-[10px] text-red-600">failed</span>}
+              </button>
+            );
+          })}
+          <span className="ml-auto hidden text-[10px] text-muted-foreground sm:inline">
+            Results layer in order &amp; de-duplicate
+          </span>
+        </div>
+      )}
 
       {/* ── Body: filters + AI hero ────────────────────────────────────────── */}
       <div className="flex flex-col md:flex-row">
@@ -592,7 +694,7 @@ export default function SeamlessSearchPanel({
             )}
 
             <p className="mt-8 text-center text-[11px] text-muted-foreground/70">
-              Lead data powered by Seamless.AI
+              Lead data layered from Seamless.AI · Apollo.io · Origami
             </p>
           </div>
         </div>

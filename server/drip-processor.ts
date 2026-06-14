@@ -89,6 +89,13 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
     // Scope to a single campaign when requested (manual "Send Due Now"); the
     // scheduled cron passes no campaignId and processes all active enrollments.
     const activeEnrollments = await storage.getActiveEnrollments(campaignId);
+
+    // Only send for campaigns that are switched ON. This makes "Pause Campaign"
+    // a real kill switch — paused/inactive campaigns are skipped entirely even
+    // if their enrollments are still marked active.
+    const allCampaigns = await storage.getDripCampaigns();
+    const activeCampaignIds = new Set(allCampaigns.filter((c) => c.isActive).map((c) => c.id));
+
     let sentThisRun = 0;
     // Last send time per recipient domain, to pace bursts to one ISP/domain.
     const lastSendByDomain = new Map<string, number>();
@@ -104,6 +111,9 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
         console.log("[Drip] Hourly cap hit mid-run. Stopping — will resume next hour.");
         break;
       }
+
+      // Skip enrollments whose campaign is paused/off.
+      if (!activeCampaignIds.has(enrollment.campaignId)) continue;
 
       const steps = await storage.getDripSteps(enrollment.campaignId);
       if (steps.length === 0) continue;

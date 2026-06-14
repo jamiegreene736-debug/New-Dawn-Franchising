@@ -2187,7 +2187,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
         const sent = rows.filter((s) => s.status === "sent").length;
         const opened = rows.filter((s) => s.status === "sent" && s.openedAt).length;
         const clicked = rows.filter((s) => s.status === "sent" && (s as any).clickedAt).length;
-        const bounced = rows.filter((s) => s.status === "failed").length;
+        const bounced = rows.filter((s) => s.status === "failed" || s.status === "bounced").length;
         const tasks = rows.filter((s) => s.status === "task").length;
         const handled = sent + bounced + tasks;
         perStep[step.id] = {
@@ -2210,7 +2210,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
         opens: sends.filter((s) => s.status === "sent" && s.openedAt).length,
         clicks: sends.filter((s) => s.status === "sent" && (s as any).clickedAt).length,
         replies: repliedCount,
-        bounced: emailSends.filter((s) => s.status === "failed").length,
+        bounced: emailSends.filter((s) => s.status === "failed" || s.status === "bounced").length,
       };
 
       res.json({ overview, perStep });

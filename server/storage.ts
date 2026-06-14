@@ -65,6 +65,7 @@ export interface IStorage {
   updateDripSend(id: string, data: Partial<DripSend>): Promise<DripSend>;
   recordEmailOpen(sendId: string): Promise<DripSend | undefined>;
   recordEmailClick(sendId: string): Promise<void>;
+  markDripSendBounced(recipientEmail: string, reason: string): Promise<boolean>;
   getSmsCampaigns(): Promise<SmsCampaign[]>;
   createSmsCampaign(data: InsertSmsCampaign): Promise<SmsCampaign>;
   updateSmsCampaign(id: string, data: Partial<SmsCampaign>): Promise<SmsCampaign>;
@@ -494,6 +495,22 @@ export class DatabaseStorage implements IStorage {
         openedAt: sql`COALESCE(${dripSends.openedAt}, NOW())`,
       })
       .where(eq(dripSends.id, sendId));
+  }
+
+  async markDripSendBounced(recipientEmail: string, reason: string): Promise<boolean> {
+    // A bounce NDR arrives asynchronously (minutes after Gmail accepted the
+    // message), so flip the most recent delivered send to this address from
+    // "sent" → "bounced" and store the reason. Falls back to the newest send.
+    const rows = await db.select().from(dripSends)
+      .where(eq(dripSends.recipientEmail, recipientEmail))
+      .orderBy(desc(dripSends.sentAt));
+    if (rows.length === 0) return false;
+    const target = rows.find((r) => r.status === "sent" || r.status === "pending") || rows[0];
+    if (target.status === "bounced") return false; // already recorded
+    await db.update(dripSends)
+      .set({ status: "bounced", errorMessage: reason.slice(0, 500) })
+      .where(eq(dripSends.id, target.id));
+    return true;
   }
 
   async getSmsCampaigns(): Promise<SmsCampaign[]> {

@@ -218,6 +218,7 @@ function ActivityStatusBadge({ item }: { item: ActivityItem }) {
     opened:   { label: "Opened",   cls: "bg-green-100 text-green-700" },
     sent:     { label: item.direction === "inbound" ? "Received" : "Sent", cls: "bg-blue-100 text-blue-700" },
     received: { label: "Received", cls: "bg-cyan-100 text-cyan-700" },
+    bounced:  { label: "Bounced",  cls: "bg-red-100 text-red-700" },
     failed:   { label: "Failed",   cls: "bg-red-100 text-red-700" },
     pending:  { label: "Pending",  cls: "bg-gray-100 text-gray-600" },
     task:     { label: "Task",     cls: "bg-purple-100 text-purple-700" },
@@ -1406,6 +1407,7 @@ function EmailCampaignTab() {
                 <option value="opened">Opened</option>
                 <option value="clicked">Clicked</option>
                 <option value="received">Received</option>
+                <option value="bounced">Bounced</option>
                 <option value="failed">Failed</option>
                 <option value="task">Task</option>
               </select>

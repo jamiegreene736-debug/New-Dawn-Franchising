@@ -2671,6 +2671,44 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
     }
   });
 
+  // Reconstruct the exact email content sent for a campaign send. The body
+  // isn't stored per-send (only the subject is), so we re-render the step's
+  // bodyHtml with the same personalization the drip processor used at send time.
+  app.get("/api/crm/sends/:id/content", requireAdminAuth, async (req, res) => {
+    try {
+      const send = await storage.getDripSend(String(req.params.id));
+      if (!send) return res.status(404).json({ message: "Send not found" });
+
+      const firstName = (send.recipientName || "").trim().split(/\s+/)[0] || send.recipientName || "there";
+      const personalize = (s: string | null | undefined): string =>
+        (s || "")
+          .replace(/\[Contact First Name\]/gi, firstName)
+          .replace(/\{\{\s*firstName\s*\}\}/gi, firstName)
+          .replace(/\{\{\s*name\s*\}\}/gi, send.recipientName || "")
+          .replace(/\{\{\s*email\s*\}\}/gi, send.recipientEmail || "");
+
+      let bodyHtml = "";
+      const steps = await storage.getDripSteps((await storage.getDripEnrollment(send.enrollmentId))?.campaignId || "");
+      const step = steps.find((s) => s.id === send.stepId);
+      if (step) bodyHtml = personalize(step.bodyHtml);
+
+      res.json({
+        recipientName: send.recipientName,
+        recipientEmail: send.recipientEmail,
+        subject: personalize(send.subject),
+        bodyHtml,
+        channel: send.channel,
+        status: send.status,
+        sentAt: send.sentAt,
+        errorMessage: send.errorMessage || null,
+        available: !!step,
+      });
+    } catch (err: any) {
+      console.error("[SendContent] failed:", err?.message || err);
+      res.status(500).json({ message: err?.message || "Failed to load email content" });
+    }
+  });
+
   // Find a better email for a bounced/failed send via Hunter.io (email finder,
   // then domain-pattern fallback). Returns a candidate for the user to confirm —
   // it never changes anything on its own.

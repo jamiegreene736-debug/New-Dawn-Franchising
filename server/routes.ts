@@ -2775,8 +2775,27 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
       const enrollment = await storage.getDripEnrollment(send.enrollmentId);
       if (!enrollment) return res.status(404).json({ message: "Enrollment not found" });
 
-      // Point the enrollment (and prospect) at the corrected address.
-      await storage.updateProspect(enrollment.prospectId, { email }).catch(() => {});
+      // The address we're replacing — used to find the canonical records.
+      const oldEmail = (enrollment.prospectEmail || send.recipientEmail || "").trim().toLowerCase();
+
+      // Propagate the corrected address everywhere this person lives so the
+      // change sticks system-wide, not just on the campaign mirror:
+      //   1) the prospect record the enrollment points at
+      //   2) the originating CRM contact (matched by the old email)
+      //   3) the originating investor-CRM client (matched by the old email)
+      const updated: string[] = [];
+      await storage.updateProspect(enrollment.prospectId, { email })
+        .then(() => updated.push("prospect")).catch(() => {});
+      if (oldEmail && oldEmail !== email) {
+        try {
+          const contact = await storage.getContactByEmail(oldEmail);
+          if (contact) { await storage.updateContact(contact.id, { email }); updated.push("contact"); }
+        } catch {}
+        try {
+          const client = await storage.getCrmClientByEmail(oldEmail);
+          if (client) { await storage.updateCrmClient(client.id, { email }); updated.push("client"); }
+        } catch {}
+      }
 
       // Re-send the step that bounced: drop the dead send and rewind currentStep
       // to it so the processor re-attempts it to the new address next run.
@@ -2789,7 +2808,8 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
         ...(stepIndex >= 0 ? { currentStep: stepIndex } : {}),
       } as any);
 
-      res.json({ success: true, email });
+      console.log(`[ApplyEmail] ${oldEmail} → ${email} (updated: ${updated.join(", ") || "enrollment only"})`);
+      res.json({ success: true, email, updated });
     } catch (err: any) {
       console.error("[ApplyEmail] failed:", err?.message || err);
       res.status(500).json({ message: err?.message || "Failed to update email" });

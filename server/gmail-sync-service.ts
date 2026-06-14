@@ -97,6 +97,19 @@ function extractBouncedRecipients(raw: string): string[] {
   return [...out];
 }
 
+// True for newsletters, service/welcome emails, notifications and auto-replies —
+// i.e. machine-sent bulk mail that shouldn't be logged as a personal "reply".
+// Genuine 1:1 replies from prospects carry none of these signals. `rawHead` is
+// the top of the raw message (headers); `fromAddr` is the lowercased sender.
+function isAutomatedOrBulk(rawHead: string, fromAddr: string): boolean {
+  if (/^(list-unsubscribe|list-id|precedence:\s*(bulk|list|junk)|auto-submitted:\s*(?!no)|x-auto-response-suppress|feedback-id):/im.test(rawHead)) {
+    return true;
+  }
+  const local = fromAddr.split("@")[0] || "";
+  return /^(no.?reply|do.?not.?reply|donotreply|notifications?|mailer|newsletter|news|bounce|postmaster|noreply|updates?|alerts?)$/i.test(local)
+    || /(via|notifications?|mailer|newsletter)@/i.test(fromAddr);
+}
+
 /**
  * Poll the franchising@ inbox once and import any new client replies.
  * No-ops (with a clear reason) when the app password isn't configured.
@@ -171,6 +184,14 @@ export async function syncFranchisingInbox(): Promise<SyncResult> {
 
         // Skip our own messages / anything without a sender.
         if (!fromAddr || fromAddr === FRANCHISING_EMAIL) {
+          processedMessageIds.add(msgId);
+          continue;
+        }
+
+        // Skip newsletters / service welcome emails / notifications / auto-replies
+        // (e.g. "Welcome to PR Newswire!") — these aren't personal replies and
+        // shouldn't clutter the contact's timeline / Activity feed.
+        if (isAutomatedOrBulk(rawSource.slice(0, 8000), fromAddr)) {
           processedMessageIds.add(msgId);
           continue;
         }

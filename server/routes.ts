@@ -2582,6 +2582,12 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
       };
       const humanize = (t: string) => t.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
+      // Hide already-logged newsletter / service / notification mail (e.g.
+      // "Re: Welcome to PR Newswire!") from the inbound activity feed. The inbox
+      // sync filters these going forward; this also suppresses old rows.
+      const looksAutomatedSubject = (s: string): boolean =>
+        /\b(welcome to|newsletter|unsubscribe|verify your|confirm your|password reset|your (receipt|invoice|statement)|notification|daily digest|out of office|automatic reply|do-?not-?reply|no-?reply)\b/i.test(s || "");
+
       const [sends, contactActs, clientActs] = await Promise.all([
         storage.getAllDripSends(),
         storage.getRecentContactActivities(400),
@@ -2627,6 +2633,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
         const map = ACT_MAP[a.activityType] || { channel: "other", direction: "outbound" as const };
         const detail = pick(a.metadata, "subject", "message", "note", "text", "summary", "body", "title")
           || humanize(a.activityType);
+        if (a.activityType === "email_received" && looksAutomatedSubject(detail)) continue;
         items.push({
           id: `contact-${a.id}`,
           source: "contact",
@@ -2645,6 +2652,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
         const map = ACT_MAP[a.activityType] || { channel: "other", direction: "outbound" as const };
         const detail = pick(a.metadata, "subject", "message", "note", "text", "summary", "body", "title")
           || humanize(a.activityType);
+        if (a.activityType === "email_received" && looksAutomatedSubject(detail)) continue;
         items.push({
           id: `client-${a.id}`,
           source: "client",

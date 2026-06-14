@@ -11,6 +11,7 @@ import {
   ExternalLink,
   Linkedin,
   Loader2,
+  RefreshCw,
   Search,
   Mail,
   MailOpen,
@@ -524,6 +525,28 @@ function EmailCampaignTab() {
     },
     onError: (err: Error) => {
       toast({ title: "Couldn't update email", description: err.message, variant: "destructive" });
+    },
+  });
+
+  // Force an immediate inbox poll — pulls in replies AND reconciles bounce
+  // notifications (mailer-daemon NDRs) so bounced sends flip to "Bounced" now
+  // instead of waiting for the 2-minute scheduled sync.
+  const syncInboxMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/crm/gmail-sync/run", {});
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/activity"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/campaigns", selectedCampaign] });
+      if (data?.error) {
+        toast({ title: "Inbox sync error", description: String(data.error), variant: "destructive" });
+      } else {
+        toast({ title: "Inbox synced", description: `Scanned ${data?.scanned ?? 0} message(s), updated ${data?.stored ?? 0} (replies + bounces).` });
+      }
+    },
+    onError: (err: Error) => {
+      toast({ title: "Inbox sync failed", description: err.message, variant: "destructive" });
     },
   });
 
@@ -1456,6 +1479,18 @@ function EmailCampaignTab() {
               </select>
               <ChevronDown className="pointer-events-none absolute right-2 top-2.5 size-4 text-muted-foreground" />
             </div>
+            <Button
+              size="sm"
+              variant="outline"
+              data-testid="btn-sync-inbox"
+              onClick={() => syncInboxMutation.mutate()}
+              disabled={syncInboxMutation.isPending}
+              title="Pull replies and reconcile bounce notifications from the franchising@ inbox now"
+            >
+              {syncInboxMutation.isPending
+                ? <><Loader2 className="size-4 animate-spin" /> Checking…</>
+                : <><RefreshCw className="size-4" /> Check for bounces</>}
+            </Button>
           </div>
 
           {filteredActivity.length === 0 ? (

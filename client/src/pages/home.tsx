@@ -132,8 +132,12 @@ const OVERVIEW_SCENES = [
   {
     id: "unique",
     kicker: "Why New Dawn",
-    title: "Own a U.S. business without running the day-to-day operations",
-    copy: "The first franchise built from the ground up for the E-2 visa — keep full oversight, skip the day-to-day, let our proprietary AI drive the growth, and live anywhere in the USA.",
+    title: "Own a U.S. business. Skip the daily grind.",
+    copy: [
+      "Built from the ground up for E-2 visa investors who want full ownership without running the show.",
+      "You keep total oversight and direction. Our proprietary AI + ops team handles execution and growth.",
+      "Live anywhere in the USA while your business runs and scales.",
+    ],
     icon: Landmark,
   },
   {
@@ -352,7 +356,15 @@ function HomepageVideoCard({ hero = false }: { hero?: boolean }) {
                 <div className="mt-2 text-balance text-2xl font-semibold leading-tight md:text-3xl">
                   {scene.title}
                 </div>
-                <p className="mt-2 max-w-lg text-pretty text-sm leading-relaxed text-white/75 md:text-base">{scene.copy}</p>
+                {Array.isArray(scene.copy) ? (
+                  <div className="mt-3 max-w-lg space-y-2">
+                    {scene.copy.map((line, i) => (
+                      <p key={i} className="text-pretty text-sm leading-relaxed text-white/80 md:text-base">{line}</p>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-2 max-w-lg text-pretty text-sm leading-relaxed text-white/75 md:text-base">{scene.copy}</p>
+                )}
               </motion.div>
             </AnimatePresence>
 

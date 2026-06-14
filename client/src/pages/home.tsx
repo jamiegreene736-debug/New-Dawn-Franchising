@@ -132,8 +132,8 @@ const OVERVIEW_SCENES = [
   {
     id: "unique",
     kicker: "Why New Dawn",
-    title: "The first franchise built for the E-2 visa",
-    copy: "Designed from the ground up around treaty-investor requirements — not retrofitted.",
+    title: "Own a U.S. business without running it",
+    copy: "The first franchise built from the ground up for the E-2 visa — you keep full oversight, skip the day-to-day, and our proprietary AI drives the growth.",
     icon: Landmark,
   },
   {
@@ -361,7 +361,7 @@ function HomepageVideoCard({ hero = false }: { hero?: boolean }) {
             {!isPlaying && (
               <div className="pointer-events-none absolute inset-0 z-10 bg-[hsl(var(--primary))]/25">
                 <div className="absolute inset-x-0 top-0 flex justify-center pt-5 md:pt-6">
-                  <div className="grid size-16 place-items-center rounded-full bg-white shadow-2xl ring-1 ring-black/5 transition duration-300 group-hover:scale-110 md:size-20">
+                  <div className="grid size-16 -translate-x-4 place-items-center rounded-full bg-white shadow-2xl ring-1 ring-black/5 transition duration-300 group-hover:scale-110 md:size-20 md:-translate-x-6">
                     <span className="ml-1.5 block h-0 w-0 border-y-[14px] border-l-[22px] border-y-transparent border-l-red-600 md:border-y-[16px] md:border-l-[26px]" />
                   </div>
                 </div>
@@ -371,7 +371,7 @@ function HomepageVideoCard({ hero = false }: { hero?: boolean }) {
             {/* Playing: pause button fades in on hover, in the same top spot. */}
             {isPlaying && (
               <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center pt-5 opacity-0 transition-opacity duration-200 group-hover:opacity-100 md:pt-6">
-                <div className="grid size-16 place-items-center rounded-full bg-white shadow-2xl ring-1 ring-black/5 md:size-20">
+                <div className="grid size-16 -translate-x-4 place-items-center rounded-full bg-white shadow-2xl ring-1 ring-black/5 md:size-20 md:-translate-x-6">
                   <Pause className="size-7 text-red-600 md:size-8" />
                 </div>
               </div>

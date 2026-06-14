@@ -6,17 +6,17 @@ const DEFAULT_STEPS = [
   {
     stepOrder: 1,
     delayDays: 0,
-    subject: "Partnership Opportunity — Property Management Franchise for E-2 Visa Investors",
+    subject: "Partnership Opportunity — E-2 Visa Franchise Platform for Your Clients",
     bodyHtml: `<div style="font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1a1a2e;">
   <p>Dear {{name}},</p>
-  <p>My name is the Franchise Development Team at <strong>New Dawn Franchising</strong>, a property management franchise based in El Paso, Texas, specifically designed for <strong>E-2 visa investors</strong>.</p>
+  <p>My name is the Franchise Development Team at <strong>New Dawn Franchising</strong>, the first franchise platform built specifically for <strong>E-2 visa investors</strong>. We offer three recurring-revenue verticals: Property Management, Telecom, and Insurance.</p>
   <p>We're reaching out because we believe there's a strong opportunity for us to work together. Many of your clients are likely looking for:</p>
   <ul>
-    <li>A qualifying E-2 visa business investment ($225K packages available)</li>
-    <li>A hands-off business model they can operate while transitioning to the U.S.</li>
-    <li>A proven system with 300+ active rental contracts already in place</li>
+    <li>A qualifying E-2 visa business investment (packages from $225K, financing available)</li>
+    <li>Director-level oversight — they direct the business while local teams run daily operations</li>
+    <li>Choice of three verticals with proprietary tech for full reporting and control</li>
   </ul>
-  <p>Our franchise model is uniquely positioned for E-2 investors — franchisees maintain full financial control while our territory-approved managers handle day-to-day operations.</p>
+  <p>Investors choose their vertical, maintain full financial control and executive direction, while approved local teams handle day-to-day operations across the chosen industry.</p>
   <p>Would you be open to a brief call to discuss how we might create a referral partnership? We offer competitive referral commissions for professionals who introduce qualified investors.</p>
   <p>Best regards,<br/><strong>New Dawn Franchising</strong><br/>El Paso, Texas<br/>dylan@newdawnfranchising.com</p>
 </div>`,
@@ -24,7 +24,7 @@ const DEFAULT_STEPS = [
   {
     stepOrder: 2,
     delayDays: 3,
-    subject: "Quick follow-up — E-2 Visa franchise opportunity for your clients",
+    subject: "Quick follow-up — E-2 Visa franchise platform for your clients",
     bodyHtml: `<div style="font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1a1a2e;">
   <p>Hi {{name}},</p>
   <p>I wanted to follow up on my previous email about <strong>New Dawn Franchising</strong>. I know you're busy, so I'll keep this brief.</p>
@@ -33,9 +33,9 @@ const DEFAULT_STEPS = [
     <li><strong>Spouse visa strategy</strong> — Our model supports dual-visa household planning</li>
     <li><strong>Financing available</strong> — We work with lenders experienced in E-2 transactions</li>
     <li><strong>Buy-back program</strong> — We offer an in-house buy-back option, reducing investor risk</li>
-    <li><strong>Exclusive territories</strong> — Protected Texas territories with established rental demand</li>
+    <li><strong>Choice of verticals</strong> — Property Management, Telecom, or Insurance — recurring revenue models built for E-2</li>
   </ul>
-  <p>If you'd like, I can send you our investor brochure with complete details on the franchise model and investment structure.</p>
+  <p>If you'd like, I can send you our investor overview with complete details on the three verticals, investment structure, and E-2 fit.</p>
   <p>Just reply to this email or book a call at your convenience.</p>
   <p>Best,<br/><strong>New Dawn Franchising</strong></p>
 </div>`,
@@ -43,7 +43,7 @@ const DEFAULT_STEPS = [
   {
     stepOrder: 3,
     delayDays: 7,
-    subject: "How New Dawn works for E-2 investors — a quick overview",
+    subject: "How New Dawn's E-2 platform works — three verticals, one model",
     bodyHtml: `<div style="font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1a1a2e;">
   <p>Hi {{name}},</p>
   <p>I wanted to share a bit more about how our franchise model works, in case it's helpful for any of your E-2 visa clients who are evaluating business opportunities.</p>
@@ -54,13 +54,13 @@ const DEFAULT_STEPS = [
     <li>Maintains full financial oversight and control</li>
     <li>Receives ongoing reporting and performance updates</li>
   </ul>
-  <p><strong>What we handle:</strong></p>
+  <p><strong>What we handle for the chosen vertical:</strong></p>
   <ul>
-    <li>Territory-approved property manager handles daily operations</li>
-    <li>300+ active long-term rental contracts already in the system</li>
-    <li>Full training, compliance support, and operational playbook</li>
+    <li>Approved local teams manage daily operations in Property Management, Telecom, or Insurance</li>
+    <li>Proprietary dashboards and reporting for full owner oversight</li>
+    <li>Full training, E-2 compliance support, and operational systems</li>
   </ul>
-  <p>This is designed for investors who want a real, operating business — not a passive investment — but don't want to manage tenants and maintenance calls themselves.</p>
+  <p>This is designed for investors who want a real, operating U.S. business they direct — not passive — without handling day-to-day tenant calls or field work.</p>
   <p>Happy to jump on a 15-minute call anytime. Would that be helpful?</p>
   <p>Best,<br/><strong>New Dawn Franchising</strong></p>
 </div>`,
@@ -87,17 +87,17 @@ const DEFAULT_STEPS = [
   {
     stepOrder: 5,
     delayDays: 21,
-    subject: "Last note from New Dawn — here if you need us",
+    subject: "Last note from New Dawn — E-2 franchise referrals here if needed",
     bodyHtml: `<div style="font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1a1a2e;">
   <p>Hi {{name}},</p>
   <p>This will be my last email in this series — I don't want to clutter your inbox.</p>
-  <p>If any of your clients are ever looking for a <strong>property management franchise opportunity</strong> that qualifies for the E-2 investor visa, please keep New Dawn Franchising in mind.</p>
+  <p>If any of your clients are ever looking for an E-2 qualifying franchise — with choice of Property Management, Telecom, or Insurance — please keep New Dawn Franchising in mind.</p>
   <p><strong>Quick recap:</strong></p>
   <ul>
     <li>$225K investment packages with financing available</li>
-    <li>Hands-off model with territory-approved property managers</li>
-    <li>300+ active rental contracts in El Paso, Texas</li>
-    <li>Spouse visa strategy and in-house buy-back program</li>
+    <li>Director model: clients oversee while local teams execute daily ops in their chosen vertical</li>
+    <li>Proprietary tech, E-2 compliance support, and in-house buy-back program</li>
+    <li>Escrow protections and spouse work authorization eligibility</li>
     <li>Competitive referral commissions for introducing investors</li>
   </ul>
   <p>Feel free to reach out anytime at <a href="mailto:dylan@newdawnfranchising.com">dylan@newdawnfranchising.com</a>. We're always here.</p>
@@ -115,7 +115,7 @@ export async function seedDefaultCampaign() {
 
     const campaign = await storage.createDripCampaign({
       name: DEFAULT_CAMPAIGN_NAME,
-      description: "5-email outreach sequence for immigration attorneys, E-2 visa consultants, and related professionals. Introduces the franchise opportunity and referral partnership program.",
+      description: "5-email outreach sequence for immigration attorneys, E-2 visa consultants, and related professionals. Introduces the multi-vertical E-2 franchise platform and referral partnership program.",
       isActive: true,
     });
 

@@ -542,7 +542,11 @@ function EmailCampaignTab() {
       if (data?.error) {
         toast({ title: "Inbox sync error", description: String(data.error), variant: "destructive" });
       } else {
-        toast({ title: "Inbox synced", description: `Scanned ${data?.scanned ?? 0} message(s), updated ${data?.stored ?? 0} (replies + bounces).` });
+        const b = data?.bounced ?? 0;
+        toast({
+          title: b > 0 ? `${b} bounce${b === 1 ? "" : "s"} found` : "Inbox synced — no new bounces",
+          description: `Scanned ${data?.scanned ?? 0} message(s) · ${b} marked bounced · ${data?.matched ?? 0} reply match(es).`,
+        });
       }
     },
     onError: (err: Error) => {

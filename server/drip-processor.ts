@@ -15,13 +15,22 @@ import {
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 function getBaseUrl(): string {
+  // This URL is embedded into recipients' emails as the open-pixel and
+  // click-redirect host, so it MUST be publicly reachable from their inbox.
+  // Prefer an explicit env override, then known platform domains, and fall
+  // back to the production domain — never localhost (which records no opens).
+  const fromEnv = process.env.APP_BASE_URL || process.env.BASE_URL;
+  if (fromEnv) return fromEnv.replace(/\/+$/, "");
+  if (process.env.RAILWAY_PUBLIC_DOMAIN) {
+    return `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`;
+  }
   if (process.env.REPLIT_DEPLOYMENT_URL) {
     return `https://${process.env.REPLIT_DEPLOYMENT_URL}`;
   }
   if (process.env.REPL_SLUG && process.env.REPL_OWNER) {
     return `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`;
   }
-  return `http://localhost:${process.env.PORT || 5000}`;
+  return "https://www.newdawnfranchising.com";
 }
 
 function defaultTaskTitle(stepType: string, firstName: string): string {

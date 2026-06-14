@@ -278,6 +278,7 @@ function EmailCampaignTab() {
   const [selectedContacts, setSelectedContacts] = useState<Set<string>>(new Set());
   const [contactSearch, setContactSearch] = useState("");
   const [openSchedule, setOpenSchedule] = useState<Set<string>>(new Set());
+  const [showSendConfirm, setShowSendConfirm] = useState(false);
 
   const [filterText, setFilterText] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -754,7 +755,7 @@ function EmailCampaignTab() {
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button data-testid="button-process-drip" size="sm" variant="outline" className="gap-2" onClick={() => processMutation.mutate()} disabled={processMutation.isPending}>
+                  <Button data-testid="button-process-drip" size="sm" variant="outline" className="gap-2" onClick={() => setShowSendConfirm(true)} disabled={processMutation.isPending}>
                     {processMutation.isPending ? <><Loader2 className="size-4 animate-spin" /> Processing…</> : <><Send className="size-4" /> Send Due Now</>}
                   </Button>
                   <Button data-testid="button-edit-campaign" size="sm" variant="outline" className="gap-1" title="Rename or edit this campaign" onClick={() => setEditCampaign({ id: campaignDetail.id, name: campaignDetail.name, description: campaignDetail.description || "" })}>
@@ -1036,6 +1037,48 @@ function EmailCampaignTab() {
             </div>
           ) : (
             <Card className="p-8 text-center"><Loader2 className="mx-auto size-6 animate-spin text-muted-foreground" /></Card>
+          )}
+
+          {/* Confirm before sending — shows exactly which campaign + how many contacts */}
+          {showSendConfirm && campaignDetail && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowSendConfirm(false)}>
+              <Card className="w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+                <div className="mb-3 flex items-center gap-2">
+                  <Send className="size-5 text-[hsl(var(--primary))]" />
+                  <h3 className="text-lg font-semibold">Send due emails now?</h3>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  This sends real emails immediately for{" "}
+                  <span className="font-semibold text-foreground">{campaignDetail.name}</span> only —
+                  no other campaign is affected.
+                </p>
+                <div className="mt-3 rounded-md border bg-muted/40 p-3 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Active contacts in this campaign</span>
+                    <span className="font-semibold" data-testid="send-confirm-count">
+                      {enrollments.filter((e) => e.status === "active").length}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Only contacts with a step currently due will be emailed; the rest stay on schedule.
+                  </p>
+                </div>
+                <div className="mt-5 flex justify-end gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setShowSendConfirm(false)} data-testid="send-confirm-cancel">
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="gap-1"
+                    disabled={processMutation.isPending}
+                    onClick={() => { setShowSendConfirm(false); processMutation.mutate(); }}
+                    data-testid="send-confirm-go"
+                  >
+                    <Send className="size-4" /> Send now
+                  </Button>
+                </div>
+              </Card>
+            </div>
           )}
 
           {editCampaign && (

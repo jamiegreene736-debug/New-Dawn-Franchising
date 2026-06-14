@@ -6,7 +6,7 @@ import {
   Trash2, FileText, Loader2, CheckCircle2, Circle, ExternalLink,
   Linkedin, Globe, ChevronDown, RefreshCw, Clock, Paperclip,
   PhoneCall, MessageCircle, PenLine, Timer, AlertTriangle, Sparkles,
-  Printer, Zap, Check, Search,
+  Printer, Zap, Check, Search, Megaphone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -132,7 +132,29 @@ interface Template { id: string; label: string; body?: string; script?: string; 
 interface TwilioStatus { configured: boolean; smsReady: boolean; whatsappReady: boolean; }
 interface VoicemailStatus { configured: boolean; }
 
-type Tab = "override" | "email" | "sms" | "whatsapp" | "voicemail" | "documents" | "signing" | "linkedin" | "postcard";
+type Tab = "override" | "campaigns" | "email" | "sms" | "whatsapp" | "voicemail" | "documents" | "signing" | "linkedin" | "postcard";
+
+interface ClientCampaignStep {
+  stepOrder: number;
+  stepName: string;
+  stepType: string;
+  delayDays: number;
+  state: "done" | "current" | "upcoming";
+}
+interface ClientCampaign {
+  enrollmentId: string;
+  campaignId: string;
+  campaignName: string;
+  campaignActive: boolean;
+  status: string;
+  currentStep: number;
+  totalSteps: number;
+  currentStepName: string | null;
+  currentStepType: string | null;
+  enrolledAt: string;
+  completedAt: string | null;
+  steps: ClientCampaignStep[];
+}
 
 export function CrmClientDetail({ client, onClose, onRefresh }: {
   client: CrmClientFull;
@@ -183,6 +205,15 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
     queryKey: ["/api/crm/twilio-status"],
     queryFn: async () => (await apiRequest("GET", "/api/crm/twilio-status")).json(),
   });
+
+  // Drip campaigns this client is enrolled in (matched by email server-side).
+  // Loaded eagerly — the Campaigns tab dot and the Send Now banner both depend on it.
+  const { data: clientCampaigns = [] } = useQuery<ClientCampaign[]>({
+    queryKey: [`/api/crm/clients/${client.id}/campaigns`],
+    queryFn: async () => (await apiRequest("GET", `/api/crm/clients/${client.id}/campaigns`)).json(),
+  });
+  const activeCampaigns = clientCampaigns.filter((c) => c.status === "active");
+  const isActiveOnCampaign = activeCampaigns.length > 0;
 
   // Email
   const emailsKey = [`/api/crm/clients/${client.id}/emails`];
@@ -485,6 +516,7 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
 
   const TABS: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: "override", label: "Send Now", icon: <Zap className="size-3.5" /> },
+    { key: "campaigns", label: "Campaigns", icon: <Megaphone className="size-3.5" /> },
     { key: "email", label: "Email", icon: <Mail className="size-3.5" /> },
     { key: "signing", label: "Signing", icon: <PenLine className="size-3.5" /> },
     { key: "linkedin", label: "LinkedIn", icon: <Linkedin className="size-3.5" /> },
@@ -653,6 +685,12 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
                   }`}
                 >
                   {t.icon} {t.label}
+                  {t.key === "campaigns" && (
+                    <span
+                      title={isActiveOnCampaign ? `Active on ${activeCampaigns.length} campaign${activeCampaigns.length > 1 ? "s" : ""}` : "Not active on any campaign"}
+                      className={`ml-1 size-2 shrink-0 rounded-full ${isActiveOnCampaign ? "bg-green-500" : "bg-red-400"}`}
+                    />
+                  )}
                   {t.key === "email" && directEmails.length > 0 && (
                     <span className="ml-1 rounded-full bg-muted px-1.5 py-0.5 text-[10px]">{directEmails.length}</span>
                   )}
@@ -665,6 +703,95 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
 
             {/* Tab content */}
             <div className="flex-1 overflow-y-auto p-3 md:p-4">
+
+              {/* ── Active Campaigns ── */}
+              {tab === "campaigns" && (
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-sm font-semibold">Campaign Enrollments</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {clientCampaigns.length === 0
+                        ? "Not enrolled in any campaign yet."
+                        : `${activeCampaigns.length} active · ${clientCampaigns.length} total`}
+                    </p>
+                  </div>
+
+                  {clientCampaigns.length === 0 && (
+                    <div className="rounded-xl border border-dashed p-6 text-center">
+                      <Megaphone className="size-7 mx-auto text-muted-foreground/40" />
+                      <p className="text-sm font-medium mt-2">No campaign enrollments</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Enroll {firstName} into a drip campaign from the Contacts list to start automated outreach.
+                      </p>
+                    </div>
+                  )}
+
+                  {clientCampaigns.map((c) => {
+                    const STATUS_STYLES: Record<string, string> = {
+                      active: "bg-green-100 text-green-700 border-green-200",
+                      paused: "bg-amber-100 text-amber-700 border-amber-200",
+                      completed: "bg-gray-100 text-gray-600 border-gray-200",
+                    };
+                    const CHANNEL_LABEL: Record<string, string> = {
+                      email: "Email", manual_email: "Email",
+                      sms: "SMS", call: "Call", task: "Task",
+                      linkedin: "LinkedIn", linkedin_connect: "LinkedIn", linkedin_message: "LinkedIn",
+                    };
+                    const doneSteps = c.steps.filter((s) => s.state === "done").length;
+                    const pct = c.totalSteps > 0 ? (doneSteps / c.totalSteps) * 100 : 0;
+                    const isComplete = c.status === "completed" || c.currentStep >= c.totalSteps;
+                    return (
+                      <div key={c.enrollmentId} className="rounded-xl border bg-card overflow-hidden">
+                        {/* Campaign header */}
+                        <div className="flex items-start justify-between gap-2 border-b bg-muted/30 px-3 py-2.5">
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold leading-tight truncate">{c.campaignName}</p>
+                            <p className="text-[11px] text-muted-foreground mt-0.5">
+                              Enrolled {new Date(c.enrolledAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                              {!c.campaignActive && <span className="text-amber-600"> · campaign paused</span>}
+                            </p>
+                          </div>
+                          <span className={`shrink-0 text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full border ${STATUS_STYLES[c.status] || STATUS_STYLES.completed}`}>
+                            {c.status}
+                          </span>
+                        </div>
+
+                        {/* Progress + steps */}
+                        <div className="px-3 py-2.5 space-y-2">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-muted-foreground min-w-0 truncate">
+                              {isComplete
+                                ? "All steps complete"
+                                : <>Currently on <span className="font-semibold text-foreground">step {c.currentStep + 1}</span> of {c.totalSteps}{c.currentStepName ? <span className="text-foreground"> — {c.currentStepName}</span> : null}</>}
+                            </span>
+                            <span className="shrink-0 ml-2 font-medium text-muted-foreground tabular-nums">{doneSteps}/{c.totalSteps}</span>
+                          </div>
+                          <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                            <div className="h-full rounded-full bg-[hsl(var(--primary))] transition-all" style={{ width: `${pct}%` }} />
+                          </div>
+
+                          <div className="pt-1 space-y-1">
+                            {c.steps.map((s, idx) => (
+                              <div key={idx} className={`flex items-center gap-2 rounded-md px-2 py-1.5 ${s.state === "current" ? "bg-[hsl(var(--primary)/0.06)] border border-[hsl(var(--primary)/0.3)]" : ""}`}>
+                                {s.state === "done"
+                                  ? <CheckCircle2 className="size-4 shrink-0 text-green-600" />
+                                  : s.state === "current"
+                                    ? <span className="size-4 shrink-0 grid place-items-center"><span className="size-2.5 rounded-full bg-[hsl(var(--primary))] animate-pulse" /></span>
+                                    : <Circle className="size-4 shrink-0 text-muted-foreground/40" />}
+                                <span className={`text-xs flex-1 min-w-0 truncate ${s.state === "upcoming" ? "text-muted-foreground" : "font-medium"}`}>
+                                  {idx + 1}. {s.stepName}
+                                </span>
+                                <span className="shrink-0 text-[10px] text-muted-foreground">{CHANNEL_LABEL[s.stepType] || s.stepType}</span>
+                                <span className="shrink-0 text-[10px] text-muted-foreground tabular-nums w-12 text-right">Day {s.delayDays}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
 
               {/* ── Manual Override / Send Now ── */}
               {tab === "override" && (() => {
@@ -950,6 +1077,27 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
                         <div className="h-full rounded-full bg-[hsl(var(--primary))] transition-all" style={{ width: `${(doneCount / STEPS.length) * 100}%` }} />
                       </div>
                     </div>
+
+                    {/* Live-campaign status banner */}
+                    {isActiveOnCampaign ? (
+                      <button
+                        onClick={() => setTab("campaigns")}
+                        className="w-full flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-left text-xs hover:bg-green-100 transition-colors dark:border-green-900 dark:bg-green-950/30"
+                      >
+                        <span className="size-2 shrink-0 rounded-full bg-green-500 animate-pulse" />
+                        <span className="text-green-800 dark:text-green-300">
+                          <span className="font-semibold">{firstName}</span> is active on{" "}
+                          <span className="font-semibold">{activeCampaigns.length} campaign{activeCampaigns.length > 1 ? "s" : ""}</span>
+                          {" — "}{activeCampaigns.map((c) => c.campaignName).join(", ")}
+                        </span>
+                        <span className="ml-auto shrink-0 font-medium text-green-700 dark:text-green-400">View →</span>
+                      </button>
+                    ) : (
+                      <div className="w-full flex items-center gap-2 rounded-lg border border-muted bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                        <span className="size-2 shrink-0 rounded-full bg-red-400" />
+                        <span><span className="font-semibold text-foreground">{firstName}</span> is not active on any campaign.</span>
+                      </div>
+                    )}
 
                     {/* Note composer (add to timeline) */}
                     <div className="flex gap-2">

@@ -2378,6 +2378,55 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
     }
   });
 
+  // Live campaigns for a single CRM client: which drip campaigns this person is
+  // enrolled in, their status, and per-step progress. Bridged by email since
+  // crm_clients has no FK into the prospect/enrollment world.
+  app.get("/api/crm/clients/:id/campaigns", requireAdminAuth, async (req, res) => {
+    try {
+      const client = await storage.getCrmClient(String(req.params.id));
+      if (!client) return res.status(404).json({ message: "Client not found" });
+      if (!client.email) return res.json([]);
+
+      const enrollments = await storage.getDripEnrollmentsByEmail(client.email);
+      const result = await Promise.all(enrollments.map(async (e) => {
+        const [campaign, steps] = await Promise.all([
+          storage.getDripCampaign(e.campaignId),
+          storage.getDripSteps(e.campaignId),
+        ]);
+        const totalSteps = steps.length;
+        // currentStep is a 0-based index into the (stepOrder-sorted) steps: the
+        // next touch to fire. Anything before it has been sent; a completed
+        // enrollment (or one past the last step) has every step done.
+        const isComplete = e.status === "completed" || e.currentStep >= totalSteps;
+        const stepList = steps.map((s, idx) => ({
+          stepOrder: s.stepOrder,
+          stepName: s.stepName || s.subject || `Step ${idx + 1}`,
+          stepType: s.stepType,
+          delayDays: s.delayDays,
+          state: isComplete || idx < e.currentStep ? "done" : idx === e.currentStep ? "current" : "upcoming",
+        }));
+        const currentStepObj = !isComplete && e.currentStep < totalSteps ? steps[e.currentStep] : null;
+        return {
+          enrollmentId: e.id,
+          campaignId: e.campaignId,
+          campaignName: campaign?.name || "Unknown campaign",
+          campaignActive: campaign?.isActive ?? false,
+          status: e.status,
+          currentStep: e.currentStep,
+          totalSteps,
+          currentStepName: currentStepObj ? (currentStepObj.stepName || currentStepObj.subject) : null,
+          currentStepType: currentStepObj ? currentStepObj.stepType : null,
+          enrolledAt: e.enrolledAt,
+          completedAt: e.completedAt,
+          steps: stepList,
+        };
+      }));
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch client campaigns" });
+    }
+  });
+
   app.post("/api/crm/enrollments", requireAdminAuth, async (req, res) => {
     try {
       const { campaignId, prospectIds } = req.body;

@@ -52,6 +52,7 @@ export interface IStorage {
   updateDripStep(id: string, data: Partial<InsertDripStep>): Promise<DripStep>;
   deleteDripStep(id: string): Promise<void>;
   getDripEnrollments(campaignId?: string): Promise<DripEnrollment[]>;
+  getDripEnrollmentsByEmail(email: string): Promise<DripEnrollment[]>;
   getDripEnrollment(id: string): Promise<DripEnrollment | undefined>;
   createDripEnrollment(enrollment: InsertDripEnrollment): Promise<DripEnrollment>;
   updateDripEnrollment(id: string, data: Partial<DripEnrollment>): Promise<DripEnrollment>;
@@ -363,6 +364,15 @@ export class DatabaseStorage implements IStorage {
         .orderBy(desc(dripEnrollments.enrolledAt));
     }
     return db.select().from(dripEnrollments).orderBy(desc(dripEnrollments.enrolledAt));
+  }
+
+  // All enrollments for a person, matched by their (denormalized) email. Used to
+  // surface a CRM client's live campaigns — crm_clients has no FK to prospects,
+  // so email is the only bridge into the drip world.
+  async getDripEnrollmentsByEmail(email: string): Promise<DripEnrollment[]> {
+    return db.select().from(dripEnrollments)
+      .where(sql`lower(${dripEnrollments.prospectEmail}) = ${email.toLowerCase()}`)
+      .orderBy(desc(dripEnrollments.enrolledAt));
   }
 
   async getDripEnrollment(id: string): Promise<DripEnrollment | undefined> {

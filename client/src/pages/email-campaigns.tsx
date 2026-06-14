@@ -450,8 +450,10 @@ function EmailCampaignTab() {
 
   const processMutation = useMutation({
     mutationFn: async () => {
-      // Returns 202 immediately; processing continues in the background.
-      const res = await apiRequest("POST", "/api/crm/drip/process");
+      if (!selectedCampaign) throw new Error("Open a campaign first.");
+      // Scoped to THIS campaign only. Returns 202 immediately; processing
+      // continues in the background.
+      const res = await apiRequest("POST", "/api/crm/drip/process", { campaignId: selectedCampaign });
       return res.json();
     },
     onSuccess: () => {

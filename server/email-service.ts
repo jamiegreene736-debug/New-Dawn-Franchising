@@ -162,7 +162,7 @@ ${innerHtml}
 </html>`;
     }
 
-    await transport.sendMail({
+    const info = await transport.sendMail({
       from: `"${profile?.name || "New Dawn Franchising"}" <${fromEmail}>`,
       to,
       subject,
@@ -174,6 +174,18 @@ ${innerHtml}
       })),
     });
 
+    // nodemailer resolves even when the SMTP server ACCEPTS the connection but
+    // REJECTS the recipient — the address lands in `info.rejected` and the mail
+    // is never delivered. Treat that as a failure (otherwise it shows "Sent" but
+    // never arrives). Also log messageId + SMTP response so deliveries are traceable.
+    const rejected = (info?.rejected || []) as string[];
+    const accepted = (info?.accepted || []) as string[];
+    if (rejected.length > 0 || accepted.length === 0) {
+      const reason = `SMTP did not accept recipient${rejected.length ? ` (rejected: ${rejected.join(", ")})` : " (no accepted recipients)"}${info?.response ? ` — ${info.response}` : ""}`;
+      console.error(`[Email] ${fromEmail} → ${to} NOT delivered: ${reason}`);
+      return { success: false, error: reason };
+    }
+    console.log(`[Email] Sent ${fromEmail} → ${to} | messageId=${info?.messageId || "?"} | ${info?.response || "accepted"}`);
     return { success: true };
   } catch (err: any) {
     console.error(`Email send error from ${fromEmail}:`, err);

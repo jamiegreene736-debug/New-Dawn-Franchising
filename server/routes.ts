@@ -11,7 +11,7 @@ import { generateBlogPost, scheduleWeeklyBlogGeneration } from "./blog-generator
 import { generateBrochurePDF } from "./brochure";
 import { generateBrokerAgreementPDF } from "./broker-agreement-pdf";
 import { searchProspects, SEARCH_CATEGORIES } from "./prospect-search";
-import { scheduleDripProcessing, processDripEmails } from "./drip-processor";
+import { scheduleDripProcessing, processDripEmails, reprocessStep } from "./drip-processor";
 import { scheduleGmailSync, syncFranchisingInbox, getGmailSyncStatus, getGmailSyncLastResult } from "./gmail-sync-service";
 import { seedDefaultCampaign } from "./default-campaign";
 import { sendEmail, sendEmailFromSender, getTrackingPixelUrl, getAvailableSenders, CRM_EMAIL_TEMPLATES, cacheDylanCalendlyUrl } from "./email-service";
@@ -2831,6 +2831,29 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
       console.error("[Drip] Manual process error:", err),
     );
     res.status(202).json({ message: "Processing started", started: true, campaignId });
+  });
+
+  // Reprocess a single step: force-resend it to every enrolled contact in the
+  // campaign now (ignores delay timing + the already-sent guard). Runs in the
+  // background and responds immediately with the contact count.
+  app.post("/api/crm/campaigns/:campaignId/steps/:stepId/reprocess", requireAdminAuth, async (req, res) => {
+    try {
+      const campaignId = String(req.params.campaignId);
+      const stepId = String(req.params.stepId);
+      const steps = await storage.getDripSteps(campaignId);
+      const step = steps.find((s) => s.id === stepId);
+      if (!step) return res.status(404).json({ message: "Step not found" });
+      const stepType = (step.stepType || "email").toLowerCase();
+      if (!["email", "manual_email", "sms"].includes(stepType)) {
+        return res.status(400).json({ message: "Only email and text steps can be reprocessed." });
+      }
+      const enrollments = await storage.getDripEnrollments(campaignId);
+      reprocessStep(campaignId, stepId).catch((err) => console.error("[Reprocess] error:", err));
+      res.status(202).json({ message: "Reprocessing started", started: true, count: enrollments.length });
+    } catch (err: any) {
+      console.error("[Reprocess] route failed:", err?.message || err);
+      res.status(500).json({ message: err?.message || "Failed to reprocess step" });
+    }
   });
 
   // --- Test email ---

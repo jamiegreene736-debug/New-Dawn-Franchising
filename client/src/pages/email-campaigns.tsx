@@ -506,6 +506,28 @@ function EmailCampaignTab() {
     },
   });
 
+  // Force-resend a single step to all enrolled contacts in the campaign.
+  const reprocessStepMutation = useMutation({
+    mutationFn: async ({ stepId }: { stepId: string; count: number }) => {
+      const res = await apiRequest("POST", `/api/crm/campaigns/${selectedCampaign}/steps/${stepId}/reprocess`, {});
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      const refresh = () => {
+        queryClient.invalidateQueries({ queryKey: ["/api/crm/activity"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/crm/campaigns", selectedCampaign] });
+        queryClient.invalidateQueries({ queryKey: ["/api/crm/enrollments"] });
+      };
+      refresh();
+      setTimeout(refresh, 4000);
+      setTimeout(refresh, 12000);
+      toast({ title: "Reprocessing started", description: `Re-sending to ${data?.count ?? 0} contact(s) — counts update in a few seconds.` });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Reprocess failed", description: err.message, variant: "destructive" });
+    },
+  });
+
   // Look up a replacement email for a bounced send (Hunter.io), then let the
   // user apply it — which corrects the address and resumes the enrollment.
   const findEmailMutation = useMutation({
@@ -975,7 +997,29 @@ function EmailCampaignTab() {
                                         </div>
                                       </div>
                                     </div>
-                                    <div className="flex gap-1 shrink-0">
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      {(channel === "email" || channel === "sms") && (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          data-testid={`button-reprocess-${step.id}`}
+                                          className="h-7 gap-1 px-2 text-[11px]"
+                                          disabled={reprocessStepMutation.isPending}
+                                          onClick={() => {
+                                            const n = enrollments.length;
+                                            if (n === 0) {
+                                              toast({ title: "No enrolled contacts", description: "Add contacts to this campaign before reprocessing.", variant: "destructive" });
+                                              return;
+                                            }
+                                            const kind = channel === "sms" ? "text" : "email";
+                                            if (confirm(`Reprocess this ${kind} step now for ${n} enrolled contact${n === 1 ? "" : "s"}?\n\nThis re-sends it to them immediately.`)) {
+                                              reprocessStepMutation.mutate({ stepId: step.id, count: n });
+                                            }
+                                          }}
+                                        >
+                                          <RefreshCw className="size-3" /> Reprocess
+                                        </Button>
+                                      )}
                                       <Button size="sm" variant="ghost" onClick={() => setViewingStep(viewingStep?.id === step.id ? null : step)}><Eye className="size-3" /></Button>
                                       <Button size="sm" variant="ghost" onClick={() => { setEditingStep(step); setAddStepType(step.stepType || "email"); setShowStepEditor(true); }}><Edit2 className="size-3" /></Button>
                                       <Button size="sm" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => { if (confirm("Delete this step?")) deleteStepMutation.mutate(step.id); }}><Trash2 className="size-3" /></Button>

@@ -730,6 +730,7 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
                     const STATUS_STYLES: Record<string, string> = {
                       active: "bg-green-100 text-green-700 border-green-200",
                       paused: "bg-amber-100 text-amber-700 border-amber-200",
+                      bounced: "bg-red-100 text-red-700 border-red-200",
                       completed: "bg-gray-100 text-gray-600 border-gray-200",
                     };
                     const CHANNEL_LABEL: Record<string, string> = {
@@ -740,6 +741,10 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
                     const doneSteps = c.steps.filter((s) => s.state === "done").length;
                     const pct = c.totalSteps > 0 ? (doneSteps / c.totalSteps) * 100 : 0;
                     const isComplete = c.status === "completed" || c.currentStep >= c.totalSteps;
+                    // A stopped enrollment (bounced/paused) must not look like it's
+                    // actively progressing — that's what made it seem "active".
+                    const isStopped = c.status === "bounced" || c.status === "paused";
+                    const barColor = c.status === "bounced" ? "bg-red-400" : c.status === "paused" ? "bg-amber-400" : "bg-[hsl(var(--primary))]";
                     return (
                       <div key={c.enrollmentId} className="rounded-xl border bg-card overflow-hidden">
                         {/* Campaign header */}
@@ -760,23 +765,29 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
                         <div className="px-3 py-2.5 space-y-2">
                           <div className="flex items-center justify-between text-xs">
                             <span className="text-muted-foreground min-w-0 truncate">
-                              {isComplete
-                                ? "All steps complete"
-                                : <>Currently on <span className="font-semibold text-foreground">step {c.currentStep + 1}</span> of {c.totalSteps}{c.currentStepName ? <span className="text-foreground"> — {c.currentStepName}</span> : null}</>}
+                              {c.status === "bounced"
+                                ? <><span className="font-semibold text-red-600">Stopped — email bounced</span> at step {c.currentStep + 1} of {c.totalSteps}</>
+                                : c.status === "paused"
+                                  ? <><span className="font-semibold text-amber-600">Paused</span> at step {c.currentStep + 1} of {c.totalSteps}</>
+                                  : isComplete
+                                    ? "All steps complete"
+                                    : <>Currently on <span className="font-semibold text-foreground">step {c.currentStep + 1}</span> of {c.totalSteps}{c.currentStepName ? <span className="text-foreground"> — {c.currentStepName}</span> : null}</>}
                             </span>
                             <span className="shrink-0 ml-2 font-medium text-muted-foreground tabular-nums">{doneSteps}/{c.totalSteps}</span>
                           </div>
                           <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-                            <div className="h-full rounded-full bg-[hsl(var(--primary))] transition-all" style={{ width: `${pct}%` }} />
+                            <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
                           </div>
 
                           <div className="pt-1 space-y-1">
                             {c.steps.map((s, idx) => (
-                              <div key={idx} className={`flex items-center gap-2 rounded-md px-2 py-1.5 ${s.state === "current" ? "bg-[hsl(var(--primary)/0.06)] border border-[hsl(var(--primary)/0.3)]" : ""}`}>
+                              <div key={idx} className={`flex items-center gap-2 rounded-md px-2 py-1.5 ${s.state === "current" && !isStopped ? "bg-[hsl(var(--primary)/0.06)] border border-[hsl(var(--primary)/0.3)]" : ""}`}>
                                 {s.state === "done"
                                   ? <CheckCircle2 className="size-4 shrink-0 text-green-600" />
                                   : s.state === "current"
-                                    ? <span className="size-4 shrink-0 grid place-items-center"><span className="size-2.5 rounded-full bg-[hsl(var(--primary))] animate-pulse" /></span>
+                                    ? (isStopped
+                                        ? <span className="size-4 shrink-0 grid place-items-center"><span className={`size-2.5 rounded-full ${c.status === "bounced" ? "bg-red-400" : "bg-amber-400"}`} /></span>
+                                        : <span className="size-4 shrink-0 grid place-items-center"><span className="size-2.5 rounded-full bg-[hsl(var(--primary))] animate-pulse" /></span>)
                                     : <Circle className="size-4 shrink-0 text-muted-foreground/40" />}
                                 <span className={`text-xs flex-1 min-w-0 truncate ${s.state === "upcoming" ? "text-muted-foreground" : "font-medium"}`}>
                                   {idx + 1}. {s.stepName}
@@ -1091,6 +1102,20 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
                           {" — "}{activeCampaigns.map((c) => c.campaignName).join(", ")}
                         </span>
                         <span className="ml-auto shrink-0 font-medium text-green-700 dark:text-green-400">View →</span>
+                      </button>
+                    ) : clientCampaigns.length > 0 ? (
+                      <button
+                        onClick={() => setTab("campaigns")}
+                        className="w-full flex items-center gap-2 rounded-lg border border-muted bg-muted/30 px-3 py-2 text-left text-xs text-muted-foreground hover:bg-muted/50 transition-colors"
+                      >
+                        <span className="size-2 shrink-0 rounded-full bg-red-400" />
+                        <span>
+                          <span className="font-semibold text-foreground">{firstName}</span> isn't active —{" "}
+                          {clientCampaigns.filter((c) => c.status === "bounced").length > 0
+                            ? <>enrollment in <span className="font-medium text-foreground">{clientCampaigns.find((c) => c.status === "bounced")?.campaignName}</span> stopped (email bounced).</>
+                            : <>{clientCampaigns.length} enrollment{clientCampaigns.length > 1 ? "s" : ""}, none active.</>}
+                        </span>
+                        <span className="ml-auto shrink-0 font-medium text-foreground/70">View →</span>
                       </button>
                     ) : (
                       <div className="w-full flex items-center gap-2 rounded-lg border border-muted bg-muted/30 px-3 py-2 text-xs text-muted-foreground">

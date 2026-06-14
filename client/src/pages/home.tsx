@@ -356,11 +356,23 @@ function HomepageVideoCard({ hero = false }: { hero?: boolean }) {
               </motion.div>
             </AnimatePresence>
 
-            {/* Large, obvious play CTA while idle so it clearly reads as a video */}
+            {/* Idle: play CTA pinned to the TOP of the stage so it never covers
+                the scene title/copy below. */}
             {!isPlaying && (
-              <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center bg-[hsl(var(--primary))]/30">
-                <div className="grid size-20 place-items-center rounded-full bg-white shadow-2xl ring-1 ring-black/5 transition duration-300 group-hover:scale-110 md:size-24">
-                  <span className="ml-1.5 block h-0 w-0 border-y-[16px] border-l-[26px] border-y-transparent border-l-red-600 md:border-y-[18px] md:border-l-[30px]" />
+              <div className="pointer-events-none absolute inset-0 z-10 bg-[hsl(var(--primary))]/25">
+                <div className="absolute inset-x-0 top-0 flex justify-center pt-5 md:pt-6">
+                  <div className="grid size-16 place-items-center rounded-full bg-white shadow-2xl ring-1 ring-black/5 transition duration-300 group-hover:scale-110 md:size-20">
+                    <span className="ml-1.5 block h-0 w-0 border-y-[14px] border-l-[22px] border-y-transparent border-l-red-600 md:border-y-[16px] md:border-l-[26px]" />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Playing: pause button fades in on hover, in the same top spot. */}
+            {isPlaying && (
+              <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center pt-5 opacity-0 transition-opacity duration-200 group-hover:opacity-100 md:pt-6">
+                <div className="grid size-16 place-items-center rounded-full bg-white shadow-2xl ring-1 ring-black/5 md:size-20">
+                  <Pause className="size-7 text-red-600 md:size-8" />
                 </div>
               </div>
             )}

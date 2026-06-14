@@ -54,7 +54,7 @@ export interface IStorage {
   getDripEnrollment(id: string): Promise<DripEnrollment | undefined>;
   createDripEnrollment(enrollment: InsertDripEnrollment): Promise<DripEnrollment>;
   updateDripEnrollment(id: string, data: Partial<DripEnrollment>): Promise<DripEnrollment>;
-  getActiveEnrollments(): Promise<DripEnrollment[]>;
+  getActiveEnrollments(campaignId?: string): Promise<DripEnrollment[]>;
   getDripSends(enrollmentId?: string): Promise<DripSend[]>;
   getAllDripSends(): Promise<DripSend[]>;
   countSentEmailsSince(since: Date): Promise<number>;
@@ -372,9 +372,12 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async getActiveEnrollments(): Promise<DripEnrollment[]> {
+  async getActiveEnrollments(campaignId?: string): Promise<DripEnrollment[]> {
+    const where = campaignId
+      ? and(eq(dripEnrollments.status, "active"), eq(dripEnrollments.campaignId, campaignId))
+      : eq(dripEnrollments.status, "active");
     return db.select().from(dripEnrollments)
-      .where(eq(dripEnrollments.status, "active"))
+      .where(where)
       .orderBy(asc(dripEnrollments.enrolledAt));
   }
 

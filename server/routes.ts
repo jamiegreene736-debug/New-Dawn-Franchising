@@ -2660,17 +2660,20 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
   });
 
   // --- Manual send / process trigger ---
-  app.post("/api/crm/drip/process", requireAdminAuth, async (_req, res) => {
-    // Manual "Send Due Now" — override the optimal-window + hourly-cap gating so
-    // due emails go out immediately (e.g. testing on a weekend). Run in the
-    // BACKGROUND and respond right away so the UI never hangs on a slow SMTP
-    // connection or a large batch; results show up as the stats/schedule refresh.
-    // The daily cap stays as a safety rail and an in-progress guard prevents
-    // overlapping runs.
-    processDripEmails({ force: true }).catch((err) =>
+  app.post("/api/crm/drip/process", requireAdminAuth, async (req, res) => {
+    // Manual "Send Due Now". REQUIRES a campaignId so it only ever sends to the
+    // enrollments of the campaign the user is looking at — never a global blast
+    // across every campaign. Overrides the optimal-window + hourly-cap gating so
+    // due emails go out immediately, runs in the BACKGROUND, and responds right
+    // away so the UI never hangs. The daily cap + in-progress guard remain.
+    const campaignId = (req.body?.campaignId as string | undefined)?.trim();
+    if (!campaignId) {
+      return res.status(400).json({ message: "campaignId is required for manual send." });
+    }
+    processDripEmails({ force: true, campaignId }).catch((err) =>
       console.error("[Drip] Manual process error:", err),
     );
-    res.status(202).json({ message: "Processing started", started: true });
+    res.status(202).json({ message: "Processing started", started: true, campaignId });
   });
 
   // --- Test email ---

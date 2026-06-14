@@ -49,9 +49,9 @@ function channelOf(stepType: string): string {
 // or repeated clicks) so the same enrollments aren't processed twice in parallel.
 let dripRunInProgress = false;
 
-export async function processDripEmails(opts: { force?: boolean } = {}) {
-  const { force = false } = opts;
-  console.log(`[Drip] Processing scheduled emails...${force ? " (manual override — bypassing window + hourly cap)" : ""}`);
+export async function processDripEmails(opts: { force?: boolean; campaignId?: string } = {}) {
+  const { force = false, campaignId } = opts;
+  console.log(`[Drip] Processing scheduled emails...${campaignId ? ` (campaign ${campaignId} only)` : ""}${force ? " (manual override — bypassing window + hourly cap)" : ""}`);
 
   if (dripRunInProgress) {
     console.log("[Drip] A run is already in progress — skipping this trigger.");
@@ -86,7 +86,9 @@ export async function processDripEmails(opts: { force?: boolean } = {}) {
       return;
     }
 
-    const activeEnrollments = await storage.getActiveEnrollments();
+    // Scope to a single campaign when requested (manual "Send Due Now"); the
+    // scheduled cron passes no campaignId and processes all active enrollments.
+    const activeEnrollments = await storage.getActiveEnrollments(campaignId);
     let sentThisRun = 0;
     // Last send time per recipient domain, to pace bursts to one ISP/domain.
     const lastSendByDomain = new Map<string, number>();

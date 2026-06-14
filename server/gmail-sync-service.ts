@@ -52,6 +52,22 @@ function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+// A bounce/non-delivery report (NDR) from the mail system rather than a person.
+function isBounceNotification(fromAddr: string, subject: string): boolean {
+  if (/mailer-daemon|postmaster/i.test(fromAddr)) return true;
+  return /delivery status notification|delivery (has )?failed|undeliverable|mail delivery (failed|subsystem)|address not found|failure notice|returned mail|delivery incomplete/i.test(subject);
+}
+
+// Pull the failed recipient address out of an NDR body. Prefers the structured
+// DSN fields, then Gmail's human-readable phrasing.
+function extractBouncedRecipient(body: string): string | null {
+  const dsn = body.match(/(?:Final|Original)-Recipient:\s*rfc822;\s*<?([^\s<>]+@[^\s<>]+?)>?\s/i);
+  if (dsn) return dsn[1].toLowerCase();
+  const human = body.match(/(?:wasn'?t delivered to|couldn'?t be delivered to|delivery to the following recipient[s]? failed[^]*?)\s*<?([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})>?/i);
+  if (human) return human[1].replace(/[.,;:]+$/, "").toLowerCase();
+  return null;
+}
+
 /**
  * Poll the franchising@ inbox once and import any new client replies.
  * No-ops (with a clear reason) when the app password isn't configured.
@@ -103,6 +119,22 @@ export async function syncFranchisingInbox(): Promise<SyncResult> {
         const bodyText = (textPart ? Buffer.from(textPart).toString("utf8") : "").replace(/\r\n/g, "\n").trim();
         const bodyHtml = `<pre style="white-space:pre-wrap;font-family:inherit;margin:0;">${escapeHtml(bodyText)}</pre>`;
         const preview = bodyText.slice(0, 240);
+
+        // Bounce / non-delivery report: flip the matching send to "bounced" so the
+        // Activity tab stops showing it as delivered. These never match a CRM
+        // record (sender is the mail system), so handle them before that lookup.
+        if (isBounceNotification(fromAddr, subject)) {
+          const failed = extractBouncedRecipient(bodyText);
+          if (failed) {
+            const marked = await storage.markDripSendBounced(failed, `Bounced: ${subject}`);
+            if (marked) {
+              stored++;
+              console.log(`[GmailSync] bounce detected — marked ${failed} as bounced (${subject})`);
+            }
+          }
+          processedMessageIds.add(msgId);
+          continue;
+        }
 
         // Primary match: investor CRM client by email.
         const clientRow = await storage.getCrmClientByEmail(fromAddr);

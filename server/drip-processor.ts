@@ -297,6 +297,72 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
   }
 }
 
+// Force-resend ONE step to every enrolled contact in a campaign — used by the
+// per-step "Reprocess" button. Unlike processDripEmails this ignores delay
+// timing and the already-sent guard (that's the whole point) but still respects
+// suppression (DNC) for email and requires a phone for SMS.
+export async function reprocessStep(campaignId: string, stepId: string): Promise<{ attempted: number; sent: number; failed: number; skipped: number }> {
+  const steps = await storage.getDripSteps(campaignId);
+  const step = steps.find((s) => s.id === stepId);
+  const result = { attempted: 0, sent: 0, failed: 0, skipped: 0 };
+  if (!step) return result;
+
+  const stepType = (step.stepType || "email").toLowerCase();
+  if (!["email", "manual_email", "sms"].includes(stepType)) return result;
+
+  const enrollments = await storage.getDripEnrollments(campaignId);
+  console.log(`[Reprocess] Step "${step.stepName || step.subject}" → ${enrollments.length} enrolled contact(s)`);
+
+  for (const enrollment of enrollments) {
+    result.attempted++;
+    const firstName = (enrollment.prospectName || "").trim().split(/\s+/)[0] || enrollment.prospectName || "there";
+    const personalize = (s: string | null | undefined): string =>
+      (s || "")
+        .replace(/\[Contact First Name\]/gi, firstName)
+        .replace(/\{\{\s*firstName\s*\}\}/gi, firstName)
+        .replace(/\{\{\s*name\s*\}\}/gi, enrollment.prospectName)
+        .replace(/\{\{\s*email\s*\}\}/gi, enrollment.prospectEmail);
+
+    try {
+      if (stepType === "sms") {
+        const prospect = await storage.getProspect(enrollment.prospectId);
+        const phone = prospect?.phone || "";
+        const send = await storage.createDripSend({
+          enrollmentId: enrollment.id, stepId: step.id, channel: "sms",
+          recipientEmail: phone || enrollment.prospectEmail, recipientName: enrollment.prospectName,
+          subject: step.stepName || "Text message", status: "pending",
+        });
+        if (!phone) {
+          await storage.updateDripSend(send.id, { status: "failed", errorMessage: "Prospect has no phone number" } as any);
+          result.skipped++;
+          continue;
+        }
+        const r = await sendSmsViaQuo(phone, personalize(step.bodyHtml));
+        if (r.success) { await storage.updateDripSend(send.id, { status: "sent", sentAt: new Date() } as any); result.sent++; }
+        else { await storage.updateDripSend(send.id, { status: "failed", errorMessage: r.error } as any); result.failed++; }
+      } else {
+        if (await isOnDnc(enrollment.prospectEmail)) { result.skipped++; continue; }
+        const send = await storage.createDripSend({
+          enrollmentId: enrollment.id, stepId: step.id, channel: "email",
+          recipientEmail: enrollment.prospectEmail, recipientName: enrollment.prospectName,
+          subject: step.subject || step.stepName || "Email", status: "pending",
+        });
+        const trackingUrl = getTrackingPixelUrl(getBaseUrl(), send.id);
+        const r = await sendEmail(enrollment.prospectEmail, personalize(step.subject), personalize(step.bodyHtml), trackingUrl);
+        if (r.success) { await storage.updateDripSend(send.id, { status: "sent", sentAt: new Date() } as any); result.sent++; }
+        else { await storage.updateDripSend(send.id, { status: "failed", errorMessage: r.error } as any); result.failed++; }
+        await sleep(1200); // gentle pacing so a reprocess isn't a hard burst
+      }
+    } catch (err: any) {
+      console.error(`[Reprocess] ${enrollment.prospectEmail} failed:`, err?.message || err);
+      result.failed++;
+    }
+  }
+
+  console.log(`[Reprocess] Done — attempted ${result.attempted}, sent ${result.sent}, failed ${result.failed}, skipped ${result.skipped}`);
+  return result;
+}
+
 export function scheduleDripProcessing() {
   // Run hourly during business hours (8 AM–6 PM ET) — window check inside prevents off-hours sends
   // This ensures late-enrolling prospects don't have to wait until the next day

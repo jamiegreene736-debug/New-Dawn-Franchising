@@ -35,6 +35,7 @@ import heygenRouter from "./heygen-routes";
 import partnerRouter from "./partner-routes";
 import { processPartnerSequence } from "./partner-sequence-service";
 import { runDailyPreparation, runDailyBrief, pollForApprovalReply, runApprovalDeadlineCheck } from "./agent-service";
+import { hunterFindEmail, hunterDomainPattern, buildEmailFromPattern } from "./hunter-service";
 import { pollAllRenderingVideos, runHeygenPreparation } from "./heygen-service";
 import { heygenVideos, prospectLists } from "../shared/schema";
 import { eq, desc } from "drizzle-orm";
@@ -2667,6 +2668,85 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
     } catch (err) {
       console.error("[Activity] Failed to build feed:", err);
       res.status(500).json({ message: "Failed to fetch activity" });
+    }
+  });
+
+  // Find a better email for a bounced/failed send via Hunter.io (email finder,
+  // then domain-pattern fallback). Returns a candidate for the user to confirm —
+  // it never changes anything on its own.
+  app.post("/api/crm/sends/:id/find-email", requireAdminAuth, async (req, res) => {
+    try {
+      const send = await storage.getDripSend(String(req.params.id));
+      if (!send) return res.status(404).json({ message: "Send not found" });
+
+      const name = (send.recipientName || "").trim();
+      const parts = name.split(/\s+/).filter(Boolean);
+      const firstName = parts[0] || "";
+      const lastName = parts.slice(1).join(" ");
+      const domain = String(req.body?.domain || (send.recipientEmail || "").split("@")[1] || "")
+        .trim().toLowerCase();
+
+      if (!domain) return res.status(400).json({ message: "No company domain to search" });
+      if (!firstName || !lastName) return res.status(400).json({ message: "Need the contact's full name to find an email" });
+
+      let candidate: { email: string; confidence: number; source: string } | null = null;
+      const hit = await hunterFindEmail(firstName, lastName, domain);
+      if (hit) {
+        candidate = { email: hit.email, confidence: hit.confidence, source: "Hunter.io" };
+      } else {
+        const pattern = await hunterDomainPattern(domain);
+        if (pattern) {
+          candidate = {
+            email: buildEmailFromPattern(firstName, lastName, domain, pattern),
+            confidence: 50,
+            source: `Domain pattern (${pattern})`,
+          };
+        }
+      }
+
+      // Don't suggest the exact address that just bounced.
+      if (candidate && candidate.email.toLowerCase() === (send.recipientEmail || "").toLowerCase()) {
+        candidate = null;
+      }
+      if (!candidate) return res.json({ found: false, domain });
+      res.json({ found: true, candidate, domain });
+    } catch (err: any) {
+      console.error("[FindEmail] lookup failed:", err?.message || err);
+      res.status(500).json({ message: err?.message || "Email lookup failed" });
+    }
+  });
+
+  // Apply a corrected email to a bounced send's enrollment: update the address,
+  // clear the dead send so the step re-sends, and resume the enrollment.
+  app.post("/api/crm/sends/:id/apply-email", requireAdminAuth, async (req, res) => {
+    try {
+      const email = String(req.body?.email || "").trim().toLowerCase();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+        return res.status(400).json({ message: "A valid email address is required" });
+      }
+      const send = await storage.getDripSend(String(req.params.id));
+      if (!send) return res.status(404).json({ message: "Send not found" });
+      const enrollment = await storage.getDripEnrollment(send.enrollmentId);
+      if (!enrollment) return res.status(404).json({ message: "Enrollment not found" });
+
+      // Point the enrollment (and prospect) at the corrected address.
+      await storage.updateProspect(enrollment.prospectId, { email }).catch(() => {});
+
+      // Re-send the step that bounced: drop the dead send and rewind currentStep
+      // to it so the processor re-attempts it to the new address next run.
+      const steps = await storage.getDripSteps(enrollment.campaignId);
+      const stepIndex = steps.findIndex((s) => s.id === send.stepId);
+      await storage.deleteDripSend(send.id).catch(() => {});
+      await storage.updateDripEnrollment(enrollment.id, {
+        prospectEmail: email,
+        status: "active",
+        ...(stepIndex >= 0 ? { currentStep: stepIndex } : {}),
+      } as any);
+
+      res.json({ success: true, email });
+    } catch (err: any) {
+      console.error("[ApplyEmail] failed:", err?.message || err);
+      res.status(500).json({ message: err?.message || "Failed to update email" });
     }
   });
 

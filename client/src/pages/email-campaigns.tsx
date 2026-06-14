@@ -11,6 +11,7 @@ import {
   ExternalLink,
   Linkedin,
   Loader2,
+  Search,
   Mail,
   MailOpen,
   MessageSquare,
@@ -293,6 +294,12 @@ function EmailCampaignTab() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterChannel, setFilterChannel] = useState("all");
 
+  // Inline "fix bounced email" state — which send row is being worked, the
+  // suggested replacement email, and the editable draft.
+  const [enrichSendId, setEnrichSendId] = useState<string | null>(null);
+  const [enrichResult, setEnrichResult] = useState<{ found: boolean; candidate?: { email: string; confidence: number; source: string } } | null>(null);
+  const [emailDraft, setEmailDraft] = useState("");
+
   const { data: campaigns = [] } = useQuery<Campaign[]>({
     queryKey: ["/api/crm/campaigns"],
   });
@@ -481,6 +488,42 @@ function EmailCampaignTab() {
     },
     onError: (err: Error) => {
       toast({ title: "Couldn't start sending", description: err.message, variant: "destructive" });
+    },
+  });
+
+  // Look up a replacement email for a bounced send (Hunter.io), then let the
+  // user apply it — which corrects the address and resumes the enrollment.
+  const findEmailMutation = useMutation({
+    mutationFn: async (sendId: string) => {
+      const res = await apiRequest("POST", `/api/crm/sends/${sendId}/find-email`, {});
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      setEnrichResult(data);
+      setEmailDraft(data?.candidate?.email || "");
+    },
+    onError: (err: Error) => {
+      setEnrichResult({ found: false });
+      toast({ title: "Lookup failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const applyEmailMutation = useMutation({
+    mutationFn: async ({ sendId, email }: { sendId: string; email: string }) => {
+      const res = await apiRequest("POST", `/api/crm/sends/${sendId}/apply-email`, { email });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      setEnrichSendId(null);
+      setEnrichResult(null);
+      setEmailDraft("");
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/activity"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/enrollments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/campaigns", selectedCampaign] });
+      toast({ title: "Email updated", description: `The campaign will retry sending to ${data.email}.` });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Couldn't update email", description: err.message, variant: "destructive" });
     },
   });
 
@@ -1439,6 +1482,8 @@ function EmailCampaignTab() {
                   {filteredActivity.map((item) => {
                     const meta = channelMeta(item.channel);
                     const Icon = meta.icon;
+                    const rawSendId = item.id.replace(/^send-/, "");
+                    const canFix = item.source === "campaign" && (item.status === "bounced" || item.status === "failed");
                     return (
                       <tr key={item.id} data-testid={`activity-row-${item.id}`} className="border-b hover:bg-gray-50">
                         <td className="py-2 px-3">
@@ -1472,6 +1517,58 @@ function EmailCampaignTab() {
                                   </span>
                                 )}
                               </div>
+                            )}
+                            {canFix && (
+                              enrichSendId === rawSendId ? (
+                                <div className="mt-1 flex w-64 flex-col gap-1 rounded-md border bg-gray-50 p-2">
+                                  {findEmailMutation.isPending ? (
+                                    <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                                      <Loader2 className="size-3 animate-spin" /> Searching for a valid email…
+                                    </span>
+                                  ) : (
+                                    <>
+                                      <span className="text-[11px] text-muted-foreground">
+                                        {enrichResult?.found && enrichResult.candidate
+                                          ? <>Suggested ({enrichResult.candidate.confidence}% · {enrichResult.candidate.source}):</>
+                                          : <>No match found — enter an email to try.</>}
+                                      </span>
+                                      <input
+                                        data-testid={`fix-email-input-${rawSendId}`}
+                                        value={emailDraft}
+                                        onChange={(e) => setEmailDraft(e.target.value)}
+                                        placeholder="name@company.com"
+                                        className="h-7 rounded border border-input px-2 text-xs"
+                                      />
+                                      <div className="flex gap-1">
+                                        <Button
+                                          size="sm"
+                                          className="h-7 px-2 text-[11px]"
+                                          disabled={applyEmailMutation.isPending || !emailDraft.trim()}
+                                          onClick={() => applyEmailMutation.mutate({ sendId: rawSendId, email: emailDraft.trim() })}
+                                        >
+                                          {applyEmailMutation.isPending ? <Loader2 className="size-3 animate-spin" /> : "Use & retry"}
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          className="h-7 px-2 text-[11px]"
+                                          onClick={() => { setEnrichSendId(null); setEnrichResult(null); setEmailDraft(""); }}
+                                        >
+                                          Cancel
+                                        </Button>
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              ) : (
+                                <button
+                                  data-testid={`fix-email-btn-${rawSendId}`}
+                                  onClick={() => { setEnrichSendId(rawSendId); setEnrichResult(null); setEmailDraft(""); findEmailMutation.mutate(rawSendId); }}
+                                  className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 hover:underline"
+                                >
+                                  <Search className="size-3" /> Find better email
+                                </button>
+                              )
                             )}
                           </div>
                         </td>

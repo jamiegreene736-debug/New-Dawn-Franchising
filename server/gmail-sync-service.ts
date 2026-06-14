@@ -11,6 +11,7 @@
 import { ImapFlow } from "imapflow";
 import cron from "node-cron";
 import { storage } from "./storage";
+import { addToDnc } from "./agent-service";
 
 const FRANCHISING_EMAIL = "franchising@newdawnfranchising.com";
 
@@ -129,7 +130,15 @@ export async function syncFranchisingInbox(): Promise<SyncResult> {
             const marked = await storage.markDripSendBounced(failed, `Bounced: ${subject}`);
             if (marked) {
               stored++;
-              console.log(`[GmailSync] bounce detected — marked ${failed} as bounced (${subject})`);
+              // Suppress the address so future drip steps skip it, and stop the
+              // enrollment so it doesn't keep retrying a dead mailbox.
+              try { await addToDnc(failed, undefined, undefined, "Email hard-bounced"); } catch {}
+              try {
+                if (marked.enrollmentId) {
+                  await storage.updateDripEnrollment(marked.enrollmentId, { status: "bounced" } as any);
+                }
+              } catch {}
+              console.log(`[GmailSync] bounce detected — marked ${failed} as bounced + suppressed (${subject})`);
             }
           }
           processedMessageIds.add(msgId);

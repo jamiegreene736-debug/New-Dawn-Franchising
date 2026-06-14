@@ -2,6 +2,7 @@ import cron from "node-cron";
 import { storage } from "./storage";
 import { sendEmail, getTrackingPixelUrl } from "./email-service";
 import { sendSmsViaQuo } from "./quo-service";
+import { isOnDnc } from "./agent-service";
 import {
   isOptimalEmailWindow,
   smartEmailDelay,
@@ -164,6 +165,15 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
         const stepType = (step.stepType || "email").toLowerCase();
 
         if (stepType === "email" || stepType === "manual_email") {
+          // Skip addresses that are suppressed (e.g. hard-bounced). Stop the
+          // enrollment so it doesn't keep retrying a dead mailbox — the user
+          // can fix the email from the Activity tab to resume it.
+          if (await isOnDnc(enrollment.prospectEmail)) {
+            await storage.updateDripEnrollment(enrollment.id, { status: "bounced" } as any);
+            console.log(`[Drip] Skipping suppressed/bounced address ${enrollment.prospectEmail} — enrollment stopped`);
+            continue;
+          }
+
           // Per-domain pacing: if we sent to this recipient's domain very
           // recently in this run, wait out the remainder of the domain gap
           // before sending again (avoids rapid bursts to one ISP).

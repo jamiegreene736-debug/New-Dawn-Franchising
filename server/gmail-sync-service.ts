@@ -35,11 +35,12 @@ interface SyncResult {
   scanned: number;
   matched: number;
   stored: number;
+  bounced: number;
   error: string | null;
   lastRunAt: Date | null;
 }
 
-let lastResult: SyncResult = { scanned: 0, matched: 0, stored: 0, error: null, lastRunAt: null };
+let lastResult: SyncResult = { scanned: 0, matched: 0, stored: 0, bounced: 0, error: null, lastRunAt: null };
 export function getGmailSyncLastResult(): SyncResult {
   return lastResult;
 }
@@ -54,19 +55,46 @@ function escapeHtml(s: string): string {
 }
 
 // A bounce/non-delivery report (NDR) from the mail system rather than a person.
-function isBounceNotification(fromAddr: string, subject: string): boolean {
-  if (/mailer-daemon|postmaster/i.test(fromAddr)) return true;
-  return /delivery status notification|delivery (has )?failed|undeliverable|mail delivery (failed|subsystem)|address not found|failure notice|returned mail|delivery incomplete/i.test(subject);
+// Checks the sender, subject, and (as a fallback) the top of the raw source.
+function isBounceNotification(fromAddr: string, subject: string, rawHead = ""): boolean {
+  if (/mailer-daemon|postmaster|mail.?delivery/i.test(fromAddr)) return true;
+  if (/delivery status notification|delivery (has )?failed|undeliverable|mail delivery (failed|subsystem)|address not found|failure notice|returned mail|delivery incomplete|delivery has failed/i.test(subject)) return true;
+  // Some relays send NDRs from odd addresses — detect the report content type.
+  return /content-type:\s*multipart\/report;\s*report-type=delivery-status|^x-failed-recipients:/im.test(rawHead);
 }
 
-// Pull the failed recipient address out of an NDR body. Prefers the structured
-// DSN fields, then Gmail's human-readable phrasing.
-function extractBouncedRecipient(body: string): string | null {
-  const dsn = body.match(/(?:Final|Original)-Recipient:\s*rfc822;\s*<?([^\s<>]+@[^\s<>]+?)>?\s/i);
-  if (dsn) return dsn[1].toLowerCase();
-  const human = body.match(/(?:wasn'?t delivered to|couldn'?t be delivered to|delivery to the following recipient[s]? failed[^]*?)\s*<?([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})>?/i);
-  if (human) return human[1].replace(/[.,;:]+$/, "").toLowerCase();
-  return null;
+// Pull every plausible failed-recipient address out of an NDR. We try the
+// reliable structured signals first, then fall back to scanning ALL addresses
+// in the raw source (which includes the quoted original message). The caller
+// attempts to mark each against a real send, so noise addresses are harmless.
+function extractBouncedRecipients(raw: string): string[] {
+  const out = new Set<string>();
+  const add = (a?: string | null) => {
+    if (!a) return;
+    const clean = a.trim().replace(/^<|>$/g, "").replace(/[.,;:]+$/, "").toLowerCase();
+    if (/^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/.test(clean)) out.add(clean);
+  };
+
+  // 1) Gmail/most relays add this header on bounces — most reliable.
+  for (const m of raw.matchAll(/^x-failed-recipients:\s*(.+)$/gim)) {
+    m[1].split(/[,;]/).forEach((a) => add(a));
+  }
+  // 2) Structured DSN fields.
+  for (const m of raw.matchAll(/(?:Final|Original)-Recipient:\s*(?:rfc822|RFC822);\s*([^\s<>;]+@[^\s<>;]+)/gi)) add(m[1]);
+  // 3) Human-readable phrasing.
+  for (const m of raw.matchAll(/(?:delivered to|deliver to|recipient[s]?[^@\n]{0,40}?)\s*<?([a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,})>?/gi)) add(m[1]);
+
+  if (out.size > 0) return [...out];
+
+  // 4) Last resort: every address in the message, minus our own + mail-system
+  //    noise. The caller only flips addresses that match an actual send.
+  for (const m of raw.matchAll(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi)) {
+    const a = m[0].toLowerCase();
+    if (a.endsWith("newdawnfranchising.com")) continue;
+    if (/mailer-daemon|postmaster|googlemail\.com|google\.com|@gmail\.com$/.test(a)) continue;
+    add(a);
+  }
+  return [...out];
 }
 
 /**
@@ -76,7 +104,7 @@ function extractBouncedRecipient(body: string): string | null {
 export async function syncFranchisingInbox(): Promise<SyncResult> {
   const password = getAppPassword();
   if (!password) {
-    lastResult = { scanned: 0, matched: 0, stored: 0, error: "GMAIL_APP_PASSWORD_FRANCHISING not set", lastRunAt: new Date() };
+    lastResult = { scanned: 0, matched: 0, stored: 0, bounced: 0, error: "GMAIL_APP_PASSWORD_FRANCHISING not set", lastRunAt: new Date() };
     return lastResult;
   }
 
@@ -84,6 +112,7 @@ export async function syncFranchisingInbox(): Promise<SyncResult> {
   let scanned = 0;
   let matched = 0;
   let stored = 0;
+  let bounced = 0;
 
   try {
     client = new ImapFlow({
@@ -98,17 +127,47 @@ export async function syncFranchisingInbox(): Promise<SyncResult> {
     const lock = await client.getMailboxLock("INBOX");
 
     try {
-      // Look back 2 days; Message-ID dedupe keeps repeats out of the CRM.
-      const since = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+      // Look back 7 days so recent bounces are caught even after a restart.
+      const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-      for await (const msg of client.fetch({ since }, { envelope: true, bodyParts: ["TEXT"] })) {
+      // Fetch full raw source too — bounce parsing needs headers + all MIME
+      // parts (the decoded TEXT part alone is often MIME-encoded).
+      for await (const msg of client.fetch({ since }, { envelope: true, bodyParts: ["TEXT"], source: true })) {
         scanned++;
         const msgId = msg.envelope?.messageId || `seq-${msg.seq}`;
-        if (processedMessageIds.has(msgId)) continue;
 
         const fromAddr = msg.envelope?.from?.[0]?.address?.toLowerCase() || "";
         const fromName = msg.envelope?.from?.[0]?.name || fromAddr;
         const subject = msg.envelope?.subject || "(no subject)";
+        const rawSource = msg.source ? msg.source.toString("utf8") : "";
+
+        // Bounce / non-delivery reports FIRST — and intentionally NOT subject to
+        // the in-memory dedup, so a manual "Check for bounces" always re-scans.
+        // markDripSendBounced is idempotent (returns null once already bounced).
+        if (isBounceNotification(fromAddr, subject, rawSource.slice(0, 4000))) {
+          const candidates = extractBouncedRecipients(rawSource || subject);
+          for (const addr of candidates) {
+            const marked = await storage.markDripSendBounced(addr, `Bounced: ${subject}`.slice(0, 200));
+            if (marked) {
+              bounced++;
+              stored++;
+              // Suppress the address so future drip steps skip it, and stop the
+              // enrollment so it doesn't keep retrying a dead mailbox.
+              try { await addToDnc(addr, undefined, undefined, "Email hard-bounced"); } catch {}
+              try {
+                if (marked.enrollmentId) {
+                  await storage.updateDripEnrollment(marked.enrollmentId, { status: "bounced" } as any);
+                }
+              } catch {}
+              console.log(`[GmailSync] bounce — marked ${addr} bounced + suppressed (${subject})`);
+            }
+          }
+          processedMessageIds.add(msgId);
+          continue;
+        }
+
+        // From here on it's a normal message — apply the dedup cache.
+        if (processedMessageIds.has(msgId)) continue;
 
         // Skip our own messages / anything without a sender.
         if (!fromAddr || fromAddr === FRANCHISING_EMAIL) {
@@ -120,30 +179,6 @@ export async function syncFranchisingInbox(): Promise<SyncResult> {
         const bodyText = (textPart ? Buffer.from(textPart).toString("utf8") : "").replace(/\r\n/g, "\n").trim();
         const bodyHtml = `<pre style="white-space:pre-wrap;font-family:inherit;margin:0;">${escapeHtml(bodyText)}</pre>`;
         const preview = bodyText.slice(0, 240);
-
-        // Bounce / non-delivery report: flip the matching send to "bounced" so the
-        // Activity tab stops showing it as delivered. These never match a CRM
-        // record (sender is the mail system), so handle them before that lookup.
-        if (isBounceNotification(fromAddr, subject)) {
-          const failed = extractBouncedRecipient(bodyText);
-          if (failed) {
-            const marked = await storage.markDripSendBounced(failed, `Bounced: ${subject}`);
-            if (marked) {
-              stored++;
-              // Suppress the address so future drip steps skip it, and stop the
-              // enrollment so it doesn't keep retrying a dead mailbox.
-              try { await addToDnc(failed, undefined, undefined, "Email hard-bounced"); } catch {}
-              try {
-                if (marked.enrollmentId) {
-                  await storage.updateDripEnrollment(marked.enrollmentId, { status: "bounced" } as any);
-                }
-              } catch {}
-              console.log(`[GmailSync] bounce detected — marked ${failed} as bounced + suppressed (${subject})`);
-            }
-          }
-          processedMessageIds.add(msgId);
-          continue;
-        }
 
         // Primary match: investor CRM client by email.
         const clientRow = await storage.getCrmClientByEmail(fromAddr);
@@ -199,14 +234,14 @@ export async function syncFranchisingInbox(): Promise<SyncResult> {
     if (client) {
       try { await client.logout(); } catch {}
     }
-    lastResult = { scanned, matched, stored, error, lastRunAt: new Date() };
+    lastResult = { scanned, matched, stored, bounced, error, lastRunAt: new Date() };
     return lastResult;
   }
 
-  if (stored > 0) {
-    console.log(`[GmailSync] franchising@ — scanned ${scanned}, matched ${matched}, stored ${stored} new inbound reply(ies)`);
+  if (stored > 0 || bounced > 0) {
+    console.log(`[GmailSync] franchising@ — scanned ${scanned}, matched ${matched}, stored ${stored} (${bounced} bounce[s])`);
   }
-  lastResult = { scanned, matched, stored, error: null, lastRunAt: new Date() };
+  lastResult = { scanned, matched, stored, bounced, error: null, lastRunAt: new Date() };
   return lastResult;
 }
 

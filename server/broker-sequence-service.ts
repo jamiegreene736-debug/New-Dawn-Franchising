@@ -1,20 +1,23 @@
 /**
  * Broker Outreach Sequence Service
- * Manages the 11-touch omnichannel sequence for broker leads.
+ * Manages the expanded omnichannel sequence for broker leads (more steps, earlier value + explicit commission follow-ups).
  *
  * Sequence:
  *   Day  0 — LinkedIn connection request
  *   Day  1 — Email Touch 1 (soft intro)
  *   Day  1 — SMS trigger (if email opened <24hr)
  *   Day  1 — Lob postcard (if tag=lob_enabled)
+ *   Day  2 — LinkedIn DM (if connected)
  *   Day  3 — Email Touch 2 (credibility + social proof)
- *   Day  3 — LinkedIn DM (if connected)
+ *   Day  4 — Email Touch 2b — The Referral Opportunity for Brokers (early earnings teaser)
  *   Day  5 — HeyGen video email (if tag=heygen_flow)
- *   Day  7 — Email Touch 3 (referral fee reveal)
+ *   Day  7 — Email Touch 3 (referral fee reveal — average commission of 12.5% of $225,000)
  *   Day  7 — SMS trigger (if email opened <4hr)
  *   Day  7 — Lob premium letter (if tag=lob_enabled)
+ *   Day  9 — Email Touch 4 — Real client outcomes (sooner proof)
  *   Day 10 — WhatsApp (if no reply on any channel)
- *   Day 14 — Case study email (if tag=heygen_flow)
+ *   Day 14 — Email Touch 5 — Case Study Email (if tag=heygen_flow)
+ *   Day 17 — Email Touch 6 — Checking in on your E-2 pipeline
  *   Day 21 — Final breakup email
  */
 
@@ -100,14 +103,17 @@ const SEQUENCE_EVENTS: EventDef[] = [
   { day: 1,  channel: "email",     touchName: "Touch 1 — Soft Intro Email" },
   { day: 1,  channel: "sms",       touchName: "Day 1 SMS — Email Open Trigger", condition: "sms_trigger_1" },
   { day: 1,  channel: "lob",       touchName: "Day 1 — Lob Postcard",            condition: "lob_enabled" },
+  { day: 2,  channel: "linkedin",  touchName: "Day 2 — LinkedIn DM",              condition: "linkedin_connected" },
   { day: 3,  channel: "email",     touchName: "Touch 2 — Credibility & Social Proof" },
-  { day: 3,  channel: "linkedin",  touchName: "Day 3 — LinkedIn DM",              condition: "linkedin_connected" },
+  { day: 4,  channel: "email",     touchName: "Touch 2b — The Referral Opportunity for Brokers" },
   { day: 5,  channel: "heygen",    touchName: "Day 5 — HeyGen AI Video Email",    condition: "heygen_flow" },
   { day: 7,  channel: "email",     touchName: "Touch 3 — Referral Fee Reveal" },
   { day: 7,  channel: "sms",       touchName: "Day 7 SMS — Email Open Trigger",  condition: "sms_trigger_7" },
   { day: 7,  channel: "lob",       touchName: "Day 7 — Lob Premium Letter",      condition: "lob_enabled" },
+  { day: 9,  channel: "email",     touchName: "Touch 4 — Real client outcomes" },
   { day: 10, channel: "whatsapp",  touchName: "Day 10 — WhatsApp Follow-Up",     condition: "no_reply" },
   { day: 14, channel: "email",     touchName: "Day 14 — Case Study Email",        condition: "heygen_flow" },
+  { day: 17, channel: "email",     touchName: "Touch 6 — Checking in on your E-2 pipeline" },
   { day: 21, channel: "email",     touchName: "Day 21 — Final Breakup Email" },
 ];
 
@@ -245,7 +251,7 @@ export async function handleEmailOpen(trackingToken: string): Promise<void> {
 
   const firstName = lead.fullName.split(" ")[0];
   const smsBody = isDay7
-    ? `Hey ${firstName} — saw you opened. Quick flag: $28,125 referral fee, fully escrowed with zero risk to you — client gets refund if visa denied. Happy to hop on a quick call this week — Dylan`
+    ? `Hey ${firstName} — saw you opened. Quick note: brokers earn an average commission of 12.5% of $225,000 ($28,125 per client) — fully escrowed, zero risk, paid when visa clears. Happy to hop on a quick call this week — Dylan`
     : `Hey ${firstName}, Dylan here from New Dawn. Just emailed about our E-2 platform (PM, Telecom, Insurance) for clients who want to direct a US business without daily ops. Worth a look?`;
 
   const result = await sendSms(lead.phone, smsBody);
@@ -264,9 +270,12 @@ async function draftEmail(lead: OutreachLead, touchNumber: number): Promise<{ su
   const touchInstructions: Record<number, string> = {
     1: `Touch 1 — Soft intro, ~120 words. Warm, curious tone. Reference something specific about their brokerage or market (${location}). Ask ONE genuine question about the type of clients they work with. Zero pitch. Zero mention of visa amounts or fees. Subject should feel personal, not like a campaign (e.g. "Quick question, ${firstName}").`,
     2: `Touch 2 — ~150 words. Credibility + social proof. Say you wanted to follow up. Introduce the concept briefly: you help international investors get E-2 Visas through New Dawn's multi-vertical platform (Property Management, Telecom, or Insurance) — the first franchise designed specifically for E-2. Drop trust signals naturally: Forbes 30 Under 30 recognition, escrow-protected funds (client gets full refund if visa denied), established brand. Still zero referral fee mention. Soft CTA: "Happy to send over a one-pager if helpful."`,
-    3: `Touch 3 — ~180 words. "The Reveal". Subject: "Here's what's in it for you, ${firstName}" or "The part I haven't mentioned yet". Reveal the referral fee clearly: 12.5% of every investment = $28,125 per client referred. Reinforce zero risk: funds held in escrow until visa clears, client gets refund if denied. Mention clients choose their vertical (PM/Telecom/Insurance). Include Calendly link: ${CALENDLY}. Light urgency: opportunities structured for E-2 are limited.`,
+    3: `Touch 3 — ~180 words. "The Reveal". Subject: "Here's what's in it for you, ${firstName}" or "The part I haven't mentioned yet". Reveal the referral fee clearly as an average commission of 12.5% of $225,000 — that's $28,125 per client referred. Reinforce zero risk: funds held in escrow until visa clears, client gets full refund if denied. Mention clients choose their vertical (PM/Telecom/Insurance). Include Calendly link: ${CALENDLY}. Light urgency: opportunities structured for E-2 are limited.`,
+    4: `Touch 2b / 4 — Broker Referral Opportunity, ~140 words. Early but clear teaser of the money: "Brokers in our program earn an average commission of 12.5% of $225,000 ($28,125 per successful referral)." Zero risk, escrowed, paid on visa approval. Clients get to choose Property Management, Telecom or Insurance. Soft CTA to reply or book a short call. Keep warm and professional.`,
+    5: `Touch 4 / 5 — Real client outcomes, ~150 words. Brief positive example of a broker-referred client who chose a vertical, invested $225K, got E-2 visa, and is now directing a real operating business. Re-mention escrow protection and that referring brokers earn the 12.5% commission. End with Calendly link: ${CALENDLY}.`,
+    6: `Touch 6 — Pipeline check-in, ~120 words. Friendly follow up: "Any E-2 clients exploring US business options right now?" Remind of the choice of three verticals, the director-level model, and that brokers earn an average commission of 12.5% of $225,000 per referred client. Offer to send one-pager or jump on 15 min call. Include Calendly: ${CALENDLY}.`,
     14: `Case study email — ~160 words. Brief anonymized success story: a client who came through a broker referral, invested $225K in one of our three E-2 verticals (e.g. Property Management or Telecom), got their E-2 Visa, and is now directing operations in the US. Reinforce escrow protection. End with Calendly link: ${CALENDLY} and: "Even if the timing isn't right now, I'd love to be your go-to when it is."`,
-    21: `Final breakup email — ~100 words. Subject: "Closing the loop, ${firstName}". Gracious, no guilt. Won't follow up again after this. Leave the door open. Re-include the referral fee and Calendly link: ${CALENDLY} one final time. Must feel genuinely human, not automated.`,
+    21: `Final breakup email — ~100 words. Subject: "Closing the loop, ${firstName}". Gracious, no guilt. Won't follow up again after this. Leave the door open. Re-include the referral fee (average commission of 12.5% of $225,000) and Calendly link: ${CALENDLY} one final time. Must feel genuinely human, not automated.`,
   };
 
   const instruction = touchInstructions[touchNumber] ?? touchInstructions[1];
@@ -299,12 +308,12 @@ function draftLinkedInMessage(lead: OutreachLead, touchNumber: number): string {
     const location = lead.company ? `at ${lead.company}` : "";
     return `Hi ${firstName} — I came across your work${location} and wanted to reach out. I'm Dylan Delaney, founder of New Dawn Franchising. Really impressed by what you're building. Would love to connect!`.slice(0, 300);
   }
-  return `Hi ${firstName}, sent you an email too — didn't want it to get buried. Thought this might be relevant for any of your clients eyeing an E-2 qualifying US business (PM, Telecom or Insurance verticals). Happy to chat when it suits you.`;
+  return `Hi ${firstName}, sent you an email too — didn't want it to get buried. Thought this might be relevant for any of your clients eyeing an E-2 qualifying US business (choice of PM, Telecom or Insurance). Brokers earn average 12.5% commission on referred investments. Happy to chat when it suits you.`;
 }
 
 function draftWhatsApp(lead: OutreachLead): string {
   const firstName = lead.fullName.split(" ")[0];
-  return `Hey ${firstName}, following up on the E-2 referral. Clients choose Property Management, Telecom or Insurance — $225K, they direct the business while teams execute, escrow protected + $28,125 referral fee (zero downside). 20 min? ${CALENDLY} — Dylan`;
+  return `Hey ${firstName}, following up on the E-2 referral. Clients choose Property Management, Telecom or Insurance — $225K, they direct while teams execute, escrow protected. Brokers earn an average commission of 12.5% of $225,000 ($28,125 per client). 20 min? ${CALENDLY} — Dylan`;
 }
 
 // ─── Execute individual event ─────────────────────────────────────────────────
@@ -423,7 +432,7 @@ async function executeEvent(event: OutreachSequenceEvent, lead: OutreachLead): P
     }
     // Create HeyGen video for this lead
     const { generateHeygenVideo } = await import("./heygen-service") as any;
-    const script = `Hi ${firstName}, this is Dylan Delaney from New Dawn Franchising. I wanted to personally reach out because I believe you may have clients who could benefit from our E-2 Visa franchise investment model. We've helped dozens of international investors secure their visa and start operating in the US through our established franchise in El Paso, Texas. We were recognized by Forbes 30 Under 30, and all client funds are held in escrow — full refund guaranteed if the visa is denied. I'd love to connect for 20 minutes. Book a time at ${CALENDLY}. Looking forward to speaking with you.`;
+    const script = `Hi ${firstName}, this is Dylan Delaney from New Dawn Franchising. I wanted to personally reach out because I believe you may have clients who could benefit from our E-2 Visa franchise investment model. We help international investors secure their visa and operate a real US business (Property Management, Telecom or Insurance) while local teams execute day-to-day. We were recognized by Forbes 30 Under 30, funds held in escrow with full refund if visa denied, and referring brokers earn an average commission of 12.5% of $225,000 ($28,125 per client). I'd love to connect for 20 minutes. Book a time at ${CALENDLY}. Looking forward to speaking with you.`;
 
     let videoUrl = "";
     let heygenId = "";
@@ -445,7 +454,7 @@ async function executeEvent(event: OutreachSequenceEvent, lead: OutreachLead): P
 <p>I made this for you — a quick personal video explaining what we do and why it may be relevant for your clients.</p>
 ${thumbnail}
 ${videoUrl ? `<p><a href="${videoUrl}" style="color:#1a2a4a">▶ Watch the video</a></p>` : ""}
-<p>The short version: we help international investors get E-2 Visas through a proven franchise model in El Paso, TX. Brokers who refer clients earn $28,125 per referral. Funds are held in escrow — zero risk.</p>
+<p>The short version: we help international investors get E-2 Visas through a proven multi-vertical franchise model (Property Management, Telecom or Insurance). Brokers earn an average commission of 12.5% of $225,000 ($28,125 per referral). Funds are held in escrow — zero risk.</p>
 <p>I'd love 20 minutes on a call: <a href="${CALENDLY}">${CALENDLY}</a></p>
 ${trackingPixel(token)}
 </body></html>`;
@@ -471,10 +480,13 @@ ${trackingPixel(token)}
       return;
     }
 
-    // Map touch name → touch number
+    // Map touch name → touch number (extended for new steps; Touch 3 kept for SMS trigger + reveal instruction)
     let touchNum = 1;
     if (event.touchName.includes("Touch 2") || event.touchName.includes("Credibility")) touchNum = 2;
     else if (event.touchName.includes("Touch 3") || event.touchName.includes("Reveal")) touchNum = 3;
+    else if (event.touchName.includes("Touch 2b") || event.touchName.includes("Referral Opportunity") || event.touchName.includes("for Brokers")) touchNum = 4;
+    else if (event.touchName.includes("Touch 4") || event.touchName.includes("Real client outcomes")) touchNum = 5;
+    else if (event.touchName.includes("Touch 6") || event.touchName.includes("Checking in on your E-2 pipeline")) touchNum = 6;
     else if (event.touchName.includes("Case Study") || event.day === 14) touchNum = 14;
     else if (event.touchName.includes("Final") || event.day === 21) touchNum = 21;
 

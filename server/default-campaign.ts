@@ -23,7 +23,7 @@ const DEFAULT_STEPS = [
   },
   {
     stepOrder: 2,
-    delayDays: 3,
+    delayDays: 2,
     subject: "Quick follow-up — E-2 Visa franchise platform for your clients",
     bodyHtml: `<div style="font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1a1a2e;">
   <p>Hi {{name}},</p>
@@ -72,9 +72,9 @@ const DEFAULT_STEPS = [
     bodyHtml: `<div style="font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1a1a2e;">
   <p>Hi {{name}},</p>
   <p>I've reached out a few times about our E-2 visa franchise opportunity, and I understand timing may not have been right. I wanted to make one more point about our <strong>Referring Broker Program</strong>.</p>
-  <p>We've built a formal referral partnership for immigration attorneys, business brokers, and E-2 consultants. Here's what it includes:</p>
+  <p>We've built a formal referral partnership for immigration attorneys, business brokers, and E-2 consultants. Brokers earn an average commission of 12.5% of $225,000 ($28,125 per client referred). Here's what it includes:</p>
   <ul>
-    <li><strong>Competitive referral commissions</strong> for qualified investor introductions</li>
+    <li><strong>Average $28,125 commission</strong> per qualified investor (12.5% of the investment), paid when the visa clears</li>
     <li><strong>Dedicated broker portal</strong> where you can track your referrals and manage clients</li>
     <li><strong>Marketing materials</strong> we provide for you to share with prospective investors</li>
     <li><strong>No exclusivity required</strong> — partner with us alongside your other referral relationships</li>
@@ -95,10 +95,10 @@ const DEFAULT_STEPS = [
   <p><strong>Quick recap:</strong></p>
   <ul>
     <li>$225K investment packages with financing available</li>
-    <li>Director model: clients oversee while local teams execute daily ops in their chosen vertical</li>
+    <li>Director model: clients oversee while local teams execute daily ops in their chosen vertical (PM, Telecom or Insurance)</li>
     <li>Proprietary tech, E-2 compliance support, and in-house buy-back program</li>
     <li>Escrow protections and spouse work authorization eligibility</li>
-    <li>Competitive referral commissions for introducing investors</li>
+    <li>Brokers earn an average commission of 12.5% of $225,000 ($28,125 per referred client)</li>
   </ul>
   <p>Feel free to reach out anytime at <a href="mailto:dylan@newdawnfranchising.com">dylan@newdawnfranchising.com</a>. We're always here.</p>
   <p>Wishing you continued success,<br/><strong>New Dawn Franchising</strong><br/>El Paso, Texas</p>

@@ -28,6 +28,7 @@ export interface IStorage {
   deleteCrmClient(id: string): Promise<void>;
   getProspects(): Promise<Prospect[]>;
   getProspect(id: string): Promise<Prospect | undefined>;
+  updateProspect(id: string, data: Partial<Prospect>): Promise<Prospect | undefined>;
   getProspectsByLocation(category: string, location: string): Promise<Prospect[]>;
   createProspect(prospect: InsertProspect): Promise<Prospect>;
   findOrCreateProspectForContact(contact: Contact): Promise<Prospect>;
@@ -63,9 +64,10 @@ export interface IStorage {
   getDripSend(id: string): Promise<DripSend | undefined>;
   createDripSend(send: InsertDripSend): Promise<DripSend>;
   updateDripSend(id: string, data: Partial<DripSend>): Promise<DripSend>;
+  deleteDripSend(id: string): Promise<void>;
   recordEmailOpen(sendId: string): Promise<DripSend | undefined>;
   recordEmailClick(sendId: string): Promise<void>;
-  markDripSendBounced(recipientEmail: string, reason: string): Promise<boolean>;
+  markDripSendBounced(recipientEmail: string, reason: string): Promise<DripSend | null>;
   getSmsCampaigns(): Promise<SmsCampaign[]>;
   createSmsCampaign(data: InsertSmsCampaign): Promise<SmsCampaign>;
   updateSmsCampaign(id: string, data: Partial<SmsCampaign>): Promise<SmsCampaign>;
@@ -239,6 +241,11 @@ export class DatabaseStorage implements IStorage {
   async getProspect(id: string): Promise<Prospect | undefined> {
     const [p] = await db.select().from(prospects).where(eq(prospects.id, id)).limit(1);
     return p;
+  }
+
+  async updateProspect(id: string, data: Partial<Prospect>): Promise<Prospect | undefined> {
+    const [updated] = await db.update(prospects).set(data).where(eq(prospects.id, id)).returning();
+    return updated;
   }
 
   async getProspectsByLocation(category: string, location: string): Promise<Prospect[]> {
@@ -446,6 +453,10 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
+  async deleteDripSend(id: string): Promise<void> {
+    await db.delete(dripSends).where(eq(dripSends.id, id));
+  }
+
   async getFacebookPosts(): Promise<FacebookPost[]> {
     return db.select().from(facebookPosts).orderBy(desc(facebookPosts.createdAt));
   }
@@ -497,20 +508,21 @@ export class DatabaseStorage implements IStorage {
       .where(eq(dripSends.id, sendId));
   }
 
-  async markDripSendBounced(recipientEmail: string, reason: string): Promise<boolean> {
+  async markDripSendBounced(recipientEmail: string, reason: string): Promise<DripSend | null> {
     // A bounce NDR arrives asynchronously (minutes after Gmail accepted the
     // message), so flip the most recent delivered send to this address from
     // "sent" → "bounced" and store the reason. Falls back to the newest send.
     const rows = await db.select().from(dripSends)
       .where(eq(dripSends.recipientEmail, recipientEmail))
       .orderBy(desc(dripSends.sentAt));
-    if (rows.length === 0) return false;
+    if (rows.length === 0) return null;
     const target = rows.find((r) => r.status === "sent" || r.status === "pending") || rows[0];
-    if (target.status === "bounced") return false; // already recorded
-    await db.update(dripSends)
+    if (target.status === "bounced") return null; // already recorded
+    const [updated] = await db.update(dripSends)
       .set({ status: "bounced", errorMessage: reason.slice(0, 500) })
-      .where(eq(dripSends.id, target.id));
-    return true;
+      .where(eq(dripSends.id, target.id))
+      .returning();
+    return updated ?? target;
   }
 
   async getSmsCampaigns(): Promise<SmsCampaign[]> {

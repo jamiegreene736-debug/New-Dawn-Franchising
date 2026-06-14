@@ -62,7 +62,7 @@ function randomInt(min: number, max: number) {
 
 // ─── DNC Check ──────────────────────────────────────────────────────────────
 
-async function isOnDnc(email?: string | null, phone?: string | null, domain?: string | null): Promise<boolean> {
+export async function isOnDnc(email?: string | null, phone?: string | null, domain?: string | null): Promise<boolean> {
   const conditions: any[] = [];
   if (email) conditions.push(eq(agentDnc.email, email));
   if (phone) conditions.push(eq(agentDnc.phone, phone));

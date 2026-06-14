@@ -2591,12 +2591,17 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
         id: string; source: string; channel: string; direction: string;
         name: string; target: string; detail: string; status: string;
         timestamp: string | null;
+        opened?: boolean; openedAt?: string | null; openCount?: number;
+        clicked?: boolean; clickedAt?: string | null; clickCount?: number;
       }> = [];
 
       // 1) Campaign touches
       for (const s of sends as any[]) {
         const channel = s.channel || (s.status === "task" ? "task" : "email");
-        const status = s.openedAt ? "opened" : s.status;
+        const opened = !!s.openedAt;
+        const clicked = !!s.clickedAt;
+        // Status reflects the furthest engagement: clicked > opened > raw status.
+        const status = clicked ? "clicked" : opened ? "opened" : s.status;
         items.push({
           id: `send-${s.id}`,
           source: "campaign",
@@ -2607,6 +2612,12 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
           detail: s.subject || s.errorMessage || "",
           status,
           timestamp: (s.sentAt || s.createdAt) ? new Date(s.sentAt || s.createdAt).toISOString() : null,
+          opened,
+          openedAt: s.openedAt ? new Date(s.openedAt).toISOString() : null,
+          openCount: s.openCount ?? 0,
+          clicked,
+          clickedAt: s.clickedAt ? new Date(s.clickedAt).toISOString() : null,
+          clickCount: s.clickCount ?? 0,
         });
       }
 

@@ -133,6 +133,13 @@ interface ActivityItem {
   detail: string;
   status: string;
   timestamp: string | null;
+  // Email engagement (campaign sends only)
+  opened?: boolean;
+  openedAt?: string | null;
+  openCount?: number;
+  clicked?: boolean;
+  clickedAt?: string | null;
+  clickCount?: number;
 }
 
 interface Prospect {
@@ -207,6 +214,7 @@ const CHANNEL_FILTERS: { key: string; label: string; icon: typeof Mail }[] = [
 
 function ActivityStatusBadge({ item }: { item: ActivityItem }) {
   const map: Record<string, { label: string; cls: string }> = {
+    clicked:  { label: "Clicked",  cls: "bg-emerald-100 text-emerald-800" },
     opened:   { label: "Opened",   cls: "bg-green-100 text-green-700" },
     sent:     { label: item.direction === "inbound" ? "Received" : "Sent", cls: "bg-blue-100 text-blue-700" },
     received: { label: "Received", cls: "bg-cyan-100 text-cyan-700" },
@@ -591,7 +599,11 @@ function EmailCampaignTab() {
       result = result.filter((a) => a.channel === filterChannel);
     }
     if (filterStatus !== "all") {
-      result = result.filter((a) => (filterStatus === "opened" ? a.status === "opened" : a.status === filterStatus));
+      result = result.filter((a) =>
+        filterStatus === "opened" ? (a.opened || a.status === "opened")
+          : filterStatus === "clicked" ? (a.clicked || a.status === "clicked")
+          : a.status === filterStatus,
+      );
     }
     if (filterText) {
       const q = filterText.toLowerCase();
@@ -615,7 +627,8 @@ function EmailCampaignTab() {
       sms: byChannel.sms || 0,
       linkedin: byChannel.linkedin || 0,
       call: byChannel.call || 0,
-      opened: activity.filter((a) => a.status === "opened").length,
+      opened: activity.filter((a) => a.opened || a.status === "opened").length,
+      clicked: activity.filter((a) => a.clicked || a.status === "clicked").length,
     };
   }, [activity]);
 
@@ -1336,7 +1349,7 @@ function EmailCampaignTab() {
             <p className="text-xs text-muted-foreground">Every outreach touch across all channels — campaign sends, manual emails &amp; texts, calls, LinkedIn and inbound replies.</p>
           </div>
 
-          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 my-4">
+          <div className="grid grid-cols-3 sm:grid-cols-7 gap-2 my-4">
             {[
               { label: "All Activity", value: activityStats.total, color: "text-[hsl(var(--primary))]" },
               { label: "Email", value: activityStats.email, color: "text-blue-600" },
@@ -1344,6 +1357,7 @@ function EmailCampaignTab() {
               { label: "LinkedIn", value: activityStats.linkedin, color: "text-sky-600" },
               { label: "Calls", value: activityStats.call, color: "text-amber-600" },
               { label: "Opened", value: activityStats.opened, color: "text-green-600" },
+              { label: "Clicked", value: activityStats.clicked, color: "text-emerald-700" },
             ].map((s) => (
               <Card key={s.label} className="p-3 text-center">
                 <div className={`text-xl font-bold ${s.color}`}>{s.value}</div>
@@ -1390,6 +1404,7 @@ function EmailCampaignTab() {
                 <option value="all">All statuses</option>
                 <option value="sent">Sent</option>
                 <option value="opened">Opened</option>
+                <option value="clicked">Clicked</option>
                 <option value="received">Received</option>
                 <option value="failed">Failed</option>
                 <option value="task">Task</option>
@@ -1433,7 +1448,31 @@ function EmailCampaignTab() {
                         <td className="py-2 px-3 font-medium">{item.name || "—"}</td>
                         <td className="py-2 px-3 text-muted-foreground max-w-44 truncate">{item.target || "—"}</td>
                         <td className="py-2 px-3 max-w-72 truncate" title={item.detail}>{item.detail || "—"}</td>
-                        <td className="py-2 px-3"><ActivityStatusBadge item={item} /></td>
+                        <td className="py-2 px-3">
+                          <div className="flex flex-col items-start gap-1">
+                            <ActivityStatusBadge item={item} />
+                            {(item.opened || item.clicked) && (
+                              <div className="flex flex-wrap items-center gap-1">
+                                {item.opened && (
+                                  <span
+                                    className="inline-flex items-center gap-1 rounded-full bg-green-50 px-1.5 py-0.5 text-[10px] font-medium text-green-700"
+                                    title={item.openedAt ? `First opened ${new Date(item.openedAt).toLocaleString()}` : "Opened"}
+                                  >
+                                    <Eye className="size-2.5" /> {item.openCount && item.openCount > 1 ? `${item.openCount}×` : "Opened"}
+                                  </span>
+                                )}
+                                {item.clicked && (
+                                  <span
+                                    className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-800"
+                                    title={item.clickedAt ? `First click ${new Date(item.clickedAt).toLocaleString()}` : "Clicked a link"}
+                                  >
+                                    <ExternalLink className="size-2.5" /> {item.clickCount && item.clickCount > 1 ? `${item.clickCount}×` : "Clicked"}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </td>
                         <td className="py-2 px-3 text-xs text-muted-foreground whitespace-nowrap">
                           {item.timestamp ? new Date(item.timestamp).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "—"}
                         </td>

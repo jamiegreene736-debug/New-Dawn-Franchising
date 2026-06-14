@@ -132,7 +132,7 @@ const OVERVIEW_SCENES = [
   {
     id: "unique",
     kicker: "Why New Dawn",
-    title: "Own a U.S. business without running it",
+    title: "Own a U.S. business without running the day-to-day operations",
     copy: "The first franchise built from the ground up for the E-2 visa — keep full oversight, skip the day-to-day, let our proprietary AI drive the growth, and live anywhere in the USA.",
     icon: Landmark,
   },

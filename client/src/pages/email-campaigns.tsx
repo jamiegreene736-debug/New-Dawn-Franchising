@@ -301,6 +301,20 @@ function EmailCampaignTab() {
   const [enrichResult, setEnrichResult] = useState<{ found: boolean; candidate?: { email: string; confidence: number; source: string } } | null>(null);
   const [emailDraft, setEmailDraft] = useState("");
 
+  // Which send's email content is open in the viewer modal.
+  const [viewSendId, setViewSendId] = useState<string | null>(null);
+  const { data: emailContent, isLoading: contentLoading } = useQuery<{
+    recipientName: string; recipientEmail: string; subject: string; bodyHtml: string;
+    channel: string; status: string; sentAt: string | null; errorMessage: string | null; available: boolean;
+  }>({
+    queryKey: ["/api/crm/sends", viewSendId, "content"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/crm/sends/${viewSendId}/content`);
+      return res.json();
+    },
+    enabled: !!viewSendId,
+  });
+
   const { data: campaigns = [] } = useQuery<Campaign[]>({
     queryKey: ["/api/crm/campaigns"],
   });
@@ -1533,7 +1547,17 @@ function EmailCampaignTab() {
                         </td>
                         <td className="py-2 px-3 font-medium">{item.name || "—"}</td>
                         <td className="py-2 px-3 text-muted-foreground max-w-44 truncate">{item.target || "—"}</td>
-                        <td className="py-2 px-3 max-w-72 truncate" title={item.detail}>{item.detail || "—"}</td>
+                        <td className="py-2 px-3 max-w-72 truncate" title={item.source === "campaign" ? "Click to view the email that was sent" : item.detail}>
+                          {item.source === "campaign" ? (
+                            <button
+                              data-testid={`view-email-${rawSendId}`}
+                              onClick={() => setViewSendId(rawSendId)}
+                              className="text-left text-blue-600 hover:underline truncate max-w-full"
+                            >
+                              {item.detail || "(no subject)"}
+                            </button>
+                          ) : (item.detail || "—")}
+                        </td>
                         <td className="py-2 px-3">
                           <div className="flex flex-col items-start gap-1">
                             <ActivityStatusBadge item={item} />
@@ -1622,6 +1646,40 @@ function EmailCampaignTab() {
             </div>
           )}
         </>
+      )}
+
+      {viewSendId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setViewSendId(null)}>
+          <Card className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between border-b p-4">
+              <div className="min-w-0">
+                <div className="text-sm font-semibold truncate">{emailContent?.subject || "Email"}</div>
+                <div className="text-xs text-muted-foreground truncate">
+                  To {emailContent?.recipientName || "—"} &lt;{emailContent?.recipientEmail || "—"}&gt;
+                  {emailContent?.sentAt && <> · {new Date(emailContent.sentAt).toLocaleString()}</>}
+                </div>
+              </div>
+              <Button size="sm" variant="ghost" onClick={() => setViewSendId(null)}><X className="size-4" /></Button>
+            </div>
+            <div className="overflow-y-auto p-4">
+              {contentLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" /> Loading…</div>
+              ) : emailContent?.available && emailContent.bodyHtml ? (
+                <div
+                  className="prose prose-sm max-w-none text-sm [&_a]:text-blue-600"
+                  dangerouslySetInnerHTML={{ __html: emailContent.bodyHtml }}
+                />
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  The original content for this step is no longer available (the step may have been edited or removed).
+                </p>
+              )}
+              {emailContent?.errorMessage && (
+                <p className="mt-3 rounded bg-red-50 p-2 text-xs text-red-700">{emailContent.errorMessage}</p>
+              )}
+            </div>
+          </Card>
+        </div>
       )}
     </div>
   );

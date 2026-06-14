@@ -535,7 +535,12 @@ function EmailCampaignTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/activity"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/enrollments"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/campaigns", selectedCampaign] });
-      toast({ title: "Email updated", description: `The campaign will retry sending to ${data.email}.` });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/contacts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/clients"] });
+      const saved = Array.isArray(data?.updated) && data.updated.length
+        ? ` Saved to ${data.updated.includes("contact") || data.updated.includes("client") ? "their contact record" : "the campaign"}.`
+        : "";
+      toast({ title: "Email updated", description: `The campaign will retry sending to ${data.email}.${saved}` });
     },
     onError: (err: Error) => {
       toast({ title: "Couldn't update email", description: err.message, variant: "destructive" });

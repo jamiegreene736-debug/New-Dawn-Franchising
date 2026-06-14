@@ -91,7 +91,7 @@ const ADMIN_PASSWORD = (process.env.ADMIN_PASSWORD || "NewHorizons@12").trim();
 // scene that is on screen. ("two hundred twenty-five thousand" / "F D D" are
 // spelled for natural text-to-speech pronunciation.)
 const OVERVIEW_SEGMENTS = [
-  "New Dawn Franchising is the first franchise built from the ground up for the E-2 visa investor. You keep full ownership and oversight — without the day-to-day operations — while our proprietary A I puts your business growth on a more automated path.",
+  "New Dawn Franchising is the first franchise built from the ground up for the E-2 visa investor. You keep full ownership and oversight — without the day-to-day operations — while our proprietary A I puts your business growth on a more automated path. And you can live anywhere in the United States.",
   "You own and direct a real U.S. business while our local teams handle the day-to-day operations. And you can live anywhere in the United States with your family.",
   "Choose from three recurring-revenue franchises: property management, telecom, or insurance — each selected to fit the E-2 visa.",
   "These are recurring-revenue businesses, designed to generate steady, ongoing returns. Full financial details are in the F D D.",

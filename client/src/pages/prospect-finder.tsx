@@ -18,6 +18,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
 import SeamlessSearchPanel, { type LeadFilters, EMPTY_FILTERS, countActiveFilters } from "@/components/seamless-search-panel";
+import LeadResearchAgent from "@/components/lead-research-agent";
 
 const US_STATES = [
   "Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut",
@@ -1745,6 +1746,9 @@ export default function ProspectFinder() {
       {/* ── Search Tab ── */}
       {viewTab === "search" && (
         <div className="space-y-4">
+          {/* Conversational AI lead-research assistant */}
+          <LeadResearchAgent />
+
           {/* Seamless.AI search */}
           <SeamlessSearchPanel
             searchTab={searchTab}

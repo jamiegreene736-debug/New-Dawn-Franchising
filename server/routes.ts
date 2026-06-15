@@ -3896,6 +3896,77 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
     }
   });
 
+  // ─── Meta WhatsApp Cloud API webhook ──────────────────────────────────────
+  // Receives inbound replies so the conversation logs automatically in the CRM.
+  // Configure in Meta App Dashboard → WhatsApp → Configuration:
+  //   Callback URL:  https://<your-domain>/api/webhooks/whatsapp
+  //   Verify token:  value of META_WHATSAPP_VERIFY_TOKEN
+  //   Subscribe to the "messages" field.
+
+  // GET — Meta's one-time verification handshake.
+  app.get("/api/webhooks/whatsapp", (req, res) => {
+    const verifyToken = process.env.META_WHATSAPP_VERIFY_TOKEN || "";
+    const mode = req.query["hub.mode"];
+    const token = req.query["hub.verify_token"];
+    const challenge = req.query["hub.challenge"];
+    if (mode === "subscribe" && verifyToken && token === verifyToken) {
+      return res.status(200).send(String(challenge ?? ""));
+    }
+    return res.sendStatus(403);
+  });
+
+  // POST — inbound messages and status updates.
+  app.post("/api/webhooks/whatsapp", async (req, res) => {
+    res.sendStatus(200); // acknowledge immediately so Meta doesn't retry
+    try {
+      const body = req.body as any;
+      if (body?.object !== "whatsapp_business_account") return;
+
+      for (const entry of body.entry || []) {
+        for (const change of entry.changes || []) {
+          if (change.field !== "messages") continue;
+          const value = change.value || {};
+          const contactName = value.contacts?.[0]?.profile?.name as string | undefined;
+
+          for (const message of value.messages || []) {
+            const from = String(message.from || "");
+            // Extract text across the common message types.
+            const text =
+              message.text?.body ??
+              message.button?.text ??
+              message.interactive?.button_reply?.title ??
+              message.interactive?.list_reply?.title ??
+              (message.type ? `[${message.type} message]` : "");
+            if (!from || !text) continue;
+
+            const allClients = await storage.getCrmClients();
+            const matched = allClients.find(
+              (c) => c.phone && phoneLast10(c.phone) === phoneLast10(from),
+            );
+            if (!matched) continue;
+
+            // Skip duplicates — Meta can deliver the same webhook more than once.
+            const acts = await storage.getCrmClientActivities(matched.id);
+            const msgId = String(message.id || "");
+            const already = acts.some((a) => {
+              const m = (a.metadata || {}) as Record<string, string>;
+              return msgId && m.messageId === msgId;
+            });
+            if (already) continue;
+
+            await storage.createCrmClientActivity({
+              clientId: matched.id,
+              activityType: "whatsapp_received",
+              metadata: { message: text, messageId: msgId, from, contactName },
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.error("[WhatsApp webhook]", err);
+    }
+  });
+
   // Send WhatsApp free-form text to any phone number (prospect finder)
   app.post("/api/prospects/whatsapp/send", requireAdminAuth, async (req, res) => {
     try {

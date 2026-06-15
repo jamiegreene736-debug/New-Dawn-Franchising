@@ -1,3 +1,3 @@
 Redeploy trigger
-last: 2026-06-15T15:54:00Z
-Fix Railway build: skip Cypress/Playwright binary downloads during install
+last: 2026-06-15T15:58:15Z
+Force Railway rebuild of main tip (mobile menu nav + Cypress install fix)

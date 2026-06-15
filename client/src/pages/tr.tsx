@@ -5,12 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Spanish (es) investor landing page — pilot locale.
+// Turkish (tr) investor landing page.
 //
 // ⚠️  FIRST-PASS TRANSLATION — NEEDS NATIVE-SPEAKER REVIEW BEFORE PROMOTION.
-// The copy below is a solid working draft of the English value proposition, but
-// it should be reviewed by a native Spanish speaker (ideally one familiar with
-// the E-2 investor audience) before this page is featured in outreach/ads.
+// Turkey is one of the largest and fastest-growing sources of E-2 visas, so this
+// is a high-value locale — but have a native Turkish speaker review the copy
+// (and especially the legal disclaimer) before featuring it in outreach/ads.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const SITE = "https://www.newdawnfranchising.com";
@@ -25,59 +25,59 @@ const COMPANY = {
 };
 
 const SEO = {
-  title: "New Dawn Franchising | Franquicias para inversionistas de la visa E-2",
+  title: "New Dawn Franchising | E-2 vizesi yatırımcıları için franchise",
   description:
-    "Franquiciante multisectorial para inversionistas de la visa E-2. Elija entre tres franquicias de ingresos recurrentes —Administración de Propiedades, Telecomunicaciones (VoIP) o Seguros—. Usted dirige el negocio; nuestros equipos manejan las operaciones diarias. FDD disponible a solicitud.",
-  canonical: `${SITE}/es`,
+    "E-2 vizesi yatırımcıları için çok sektörlü bir franchise veren. Yinelenen gelir sağlayan üç franchise arasından birini seçin: Mülk Yönetimi, Telekom (VoIP) veya Sigorta. İşi siz yönetir ve finansınızı kontrol edersiniz; günlük operasyonları ekiplerimiz yürütür. FDD talep üzerine sunulur.",
+  canonical: `${SITE}/tr`,
 };
 
 const VERTICALS = [
   {
     icon: <Building2 className="size-5 text-primary" />,
-    title: "Administración de Propiedades",
-    desc: "Ingresos recurrentes por honorarios de administración de alquileres. Nuestro equipo gestiona inquilinos, mantenimiento y cobros mientras usted supervisa el negocio.",
+    title: "Mülk Yönetimi",
+    desc: "Kira yönetim ücretlerinden yinelenen gelir. Ekibimiz kiracıları, bakımı ve tahsilatı yönetirken siz işi denetlersiniz.",
   },
   {
     icon: <Cpu className="size-5 text-primary" />,
-    title: "Telecomunicaciones (VoIP)",
-    desc: "Servicios de telefonía empresarial en la nube con facturación mensual recurrente. Una categoría en crecimiento con clientes comerciales de largo plazo.",
+    title: "Telekom (VoIP)",
+    desc: "İşletmeler için bulut tabanlı telefon hizmetleri; aylık yinelenen faturalandırma. Uzun vadeli ticari müşterilere sahip, büyüyen bir kategori.",
   },
   {
     icon: <ShieldCheck className="size-5 text-primary" />,
-    title: "Seguros",
-    desc: "Una agencia de seguros con comisiones recurrentes por renovación. Construya una cartera de pólizas que genera ingresos año tras año.",
+    title: "Sigorta",
+    desc: "Yinelenen yenileme komisyonları olan bir sigorta acentesi. Yıldan yıla gelir getiren bir poliçe portföyü oluşturun.",
   },
 ];
 
 const BENEFITS = [
   {
     icon: <Banknote className="size-5 text-primary" />,
-    title: "Modelo de ingresos recurrentes",
-    desc: "Las tres franquicias se basan en ingresos mensuales o por renovación, no en ventas únicas.",
+    title: "Yinelenen gelir modeli",
+    desc: "Üç franchise de tek seferlik satışlara değil, aylık veya yenileme gelirlerine dayanır.",
   },
   {
     icon: <Handshake className="size-5 text-primary" />,
-    title: "Nuestros equipos operan el negocio",
-    desc: "Usted dirige la franquicia y controla sus finanzas; nuestros equipos se encargan de las operaciones diarias.",
+    title: "İşi ekiplerimiz yürütür",
+    desc: "Franchise'ı siz yönetir ve finansınızı kontrol edersiniz; günlük operasyonlarla ekiplerimiz ilgilenir.",
   },
   {
     icon: <MapPin className="size-5 text-primary" />,
-    title: "Territorios protegidos",
-    desc: "Opere en un territorio definido con el respaldo de nuestra tecnología y experiencia.",
+    title: "Korumalı bölgeler",
+    desc: "Teknolojimiz ve deneyimimizle desteklenen, tanımlı bir bölgede faaliyet gösterin.",
   },
   {
     icon: <FileText className="size-5 text-primary" />,
-    title: "FDD disponible a solicitud",
-    desc: "El Documento de Divulgación de la Franquicia (FDD) está disponible cuando usted esté listo para revisarlo.",
+    title: "FDD talep üzerine sunulur",
+    desc: "Franchise Açıklama Belgesi (FDD), incelemeye hazır olduğunuzda sunulur.",
   },
 ];
 
-function useEsSeo() {
+function useTrSeo() {
   useEffect(() => {
     const prevTitle = document.title;
     const prevLang = document.documentElement.lang;
     document.title = SEO.title;
-    document.documentElement.lang = "es";
+    document.documentElement.lang = "tr";
 
     const created: HTMLElement[] = [];
 
@@ -93,7 +93,6 @@ function useEsSeo() {
     };
     setMeta('meta[name="description"]', "name", "description", SEO.description);
 
-    // canonical + hreflang alternates (pairs the EN home with this ES page)
     const addLink = (rel: string, href: string, hreflang?: string) => {
       const link = document.createElement("link");
       link.setAttribute("rel", rel);
@@ -120,44 +119,44 @@ function useEsSeo() {
   }, []);
 }
 
-export default function EsPage() {
-  useEsSeo();
+export default function TrPage() {
+  useTrSeo();
 
   return (
-    <div data-testid="page-es" lang="es" className="min-h-screen">
+    <div data-testid="page-tr" lang="tr" className="min-h-screen">
       {/* Hero */}
-      <section data-testid="section-es-hero" className="border-b">
+      <section data-testid="section-tr-hero" className="border-b">
         <div className="nh-container py-16 md:py-24">
           <div className="mx-auto max-w-3xl text-center">
             <span className="inline-flex items-center rounded-full border bg-white/60 px-3 py-1 text-xs font-medium text-foreground/70">
-              Franquicias para inversionistas de la visa E-2
+              E-2 vizesi yatırımcıları için franchise
             </span>
             <h1 className="mt-5 text-balance text-4xl font-semibold tracking-tight md:text-5xl">
-              Sea dueño de una franquicia en EE. UU. con la visa E-2
+              E-2 vizesiyle ABD'de bir franchise sahibi olun
             </h1>
             <p className="mt-5 text-pretty text-base leading-relaxed text-muted-foreground md:text-lg">
-              <span translate="no">New Dawn Franchising</span> es un franquiciante multisectorial para
-              inversionistas de la visa E-2. Elija entre tres franquicias de ingresos recurrentes
-              —Administración de Propiedades, Telecomunicaciones (VoIP) o Seguros—. Usted dirige el
-              negocio y controla sus finanzas; nuestros equipos manejan las operaciones diarias.
+              <span translate="no">New Dawn Franchising</span>, E-2 vizesi yatırımcıları için çok sektörlü
+              bir franchise verendir. Yinelenen gelir sağlayan üç franchise arasından seçim yapın:
+              Mülk Yönetimi, Telekom (VoIP) veya Sigorta. İşi siz yönetir ve finansınızı kontrol
+              edersiniz; günlük operasyonları ekiplerimiz yürütür.
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-              <Button data-testid="button-es-contact" className="gap-2" asChild>
+              <Button data-testid="button-tr-contact" className="gap-2" asChild>
                 <Link href="/contact">
-                  Solicitar información
+                  Bilgi isteyin
                   <ArrowRight className="size-4" />
                 </Link>
               </Button>
-              <Button data-testid="button-es-calendly" variant="secondary" className="gap-2" asChild>
+              <Button data-testid="button-tr-calendly" variant="secondary" className="gap-2" asChild>
                 <a href={CALENDLY} target="_blank" rel="noopener noreferrer">
-                  Agendar una llamada
+                  Görüşme planlayın
                 </a>
               </Button>
             </div>
             <p className="mt-4 text-xs text-muted-foreground/70">
-              ¿Prefiere leer en inglés?{" "}
+              İngilizce okumayı mı tercih edersiniz?{" "}
               <Link href="/" className="underline underline-offset-2 hover:text-foreground" translate="no">
-                Ver el sitio en English
+                Siteyi English görüntüleyin
               </Link>
             </p>
           </div>
@@ -165,15 +164,13 @@ export default function EsPage() {
       </section>
 
       {/* Verticals */}
-      <section data-testid="section-es-verticals" className="border-b">
+      <section data-testid="section-tr-verticals" className="border-b">
         <div className="nh-container py-16">
           <div className="mx-auto max-w-3xl text-center">
             <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">
-              Tres franquicias. Un modelo de ingresos recurrentes.
+              Üç franchise. Tek bir yinelenen gelir modeli.
             </h2>
-            <p className="mt-3 text-muted-foreground">
-              Elija el sector que mejor se adapte a sus objetivos como inversionista.
-            </p>
+            <p className="mt-3 text-muted-foreground">Yatırım hedeflerinize en uygun sektörü seçin.</p>
           </div>
           <div className="mt-10 grid gap-6 md:grid-cols-3">
             {VERTICALS.map((v) => (
@@ -190,11 +187,11 @@ export default function EsPage() {
       </section>
 
       {/* Benefits */}
-      <section data-testid="section-es-benefits" className="border-b">
+      <section data-testid="section-tr-benefits" className="border-b">
         <div className="nh-container py-16">
           <div className="mx-auto max-w-3xl text-center">
             <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">
-              ¿Por qué <span translate="no">New Dawn Franchising</span>?
+              Neden <span translate="no">New Dawn Franchising</span>?
             </h2>
           </div>
           <div className="mx-auto mt-10 grid max-w-4xl gap-6 md:grid-cols-2">
@@ -214,20 +211,20 @@ export default function EsPage() {
       </section>
 
       {/* CTA */}
-      <section data-testid="section-es-cta">
+      <section data-testid="section-tr-cta">
         <div className="nh-container py-16">
           <div className="mx-auto max-w-3xl rounded-2xl border bg-white/60 p-8 text-center md:p-12">
             <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">
-              Hablemos sobre su camino con la visa E-2
+              E-2 vizesi yolculuğunuzu konuşalım
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
-              Cuéntenos sobre sus objetivos y le explicaremos cómo funciona el modelo de franquicia.
-              Atendemos a inversionistas de todo el mundo y hablamos español.
+              Hedeflerinizi bizimle paylaşın, franchise modelinin nasıl işlediğini anlatalım. Dünyanın
+              her yerinden yatırımcılara hizmet veriyoruz.
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-              <Button data-testid="button-es-cta-contact" className="gap-2" asChild>
+              <Button data-testid="button-tr-cta-contact" className="gap-2" asChild>
                 <Link href="/contact">
-                  Solicitar información
+                  Bilgi isteyin
                   <ArrowRight className="size-4" />
                 </Link>
               </Button>
@@ -240,7 +237,7 @@ export default function EsPage() {
               <Button variant="secondary" className="gap-2" asChild>
                 <a href={`mailto:${COMPANY.email}`}>
                   <Mail className="size-4" />
-                  Escríbanos
+                  Bize yazın
                 </a>
               </Button>
             </div>
@@ -255,16 +252,15 @@ export default function EsPage() {
             </a>
 
             <p className="mx-auto mt-8 max-w-2xl text-[11px] leading-relaxed text-muted-foreground/60">
-              Esta información es solo de carácter general y educativo; no es una oferta para vender
-              una franquicia ni constituye asesoría legal, migratoria, fiscal o financiera. Una
-              franquicia se ofrece y se vende únicamente mediante un Documento de Divulgación de la
-              Franquicia (FDD). La elegibilidad y aprobación de la visa E-2 las determina únicamente
-              el gobierno de EE. UU. y nunca están garantizadas. Consulte el aviso legal completo en
-              nuestros{" "}
+              Bu bilgiler yalnızca genel ve eğitim amaçlıdır; bir franchise satış teklifi değildir ve
+              hukuki, göçmenlik, vergi veya mali danışmanlık niteliği taşımaz. Bir franchise yalnızca
+              bir Franchise Açıklama Belgesi (FDD) aracılığıyla sunulur ve satılır. E-2 vizesi
+              uygunluğu ve onayı yalnızca ABD hükümeti tarafından belirlenir ve asla garanti edilmez.
+              Tüm yasal açıklamalar için{" "}
               <Link href="/terms" className="underline underline-offset-2 hover:text-muted-foreground">
-                Términos y Condiciones
-              </Link>
-              .
+                Şartlar ve Koşullarımıza
+              </Link>{" "}
+              bakın.
             </p>
           </div>
         </div>

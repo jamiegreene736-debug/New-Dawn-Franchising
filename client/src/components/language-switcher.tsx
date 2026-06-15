@@ -1,54 +1,81 @@
-import { Link, useLocation } from "wouter";
+import { useLocation } from "wouter";
+import { Globe, Check, ChevronDown } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 
-// Text-based locale switcher (e.g. EN / ES). Deliberately NOT flag icons —
-// flags represent countries, not languages. Add new locales here as their
-// landing pages ship (e.g. /fr, /zh); the UI scales automatically.
+// Locale switcher. Text labels (not flag icons — flags represent countries, not
+// languages). Add new locales here as their landing pages ship; the dropdown
+// scales automatically. Rendered as a compact dropdown so it stays tidy in the
+// header/footer regardless of how many locales exist.
 type Locale = { code: string; label: string; href: string };
 
 const LOCALES: Locale[] = [
-  { code: "en", label: "EN", href: "/" },
-  { code: "es", label: "ES", href: "/es" },
+  { code: "en", label: "English", href: "/" },
+  { code: "es", label: "Español", href: "/es" },
+  { code: "fr", label: "Français", href: "/fr" },
+  { code: "zh", label: "中文", href: "/zh" },
+  { code: "ja", label: "日本語", href: "/ja" },
+  { code: "ko", label: "한국어", href: "/ko" },
+  { code: "tr", label: "Türkçe", href: "/tr" },
 ];
 
-function currentCode(location: string): string {
+// Short labels for the trigger button (keeps the header compact).
+const SHORT: Record<string, string> = {
+  en: "EN",
+  es: "ES",
+  fr: "FR",
+  zh: "中文",
+  ja: "日本語",
+  ko: "한국어",
+  tr: "TR",
+};
+
+function currentLocale(location: string): Locale {
   const match = LOCALES.find(
     (l) => l.href !== "/" && (location === l.href || location.startsWith(l.href + "/")),
   );
-  return match ? match.code : "en";
+  return match ?? LOCALES[0];
 }
 
 export function LanguageSwitcher({ className = "" }: { className?: string }) {
-  const [location] = useLocation();
-  const active = currentCode(location);
+  const [location, navigate] = useLocation();
+  const active = currentLocale(location);
 
   return (
-    <div
-      data-testid="language-switcher"
-      className={"inline-flex items-center gap-1 text-xs " + className}
-      aria-label="Language"
-    >
-      {LOCALES.map((locale, i) => {
-        const isActive = locale.code === active;
-        return (
-          <span key={locale.code} className="inline-flex items-center">
-            {i > 0 && <span className="px-1 text-foreground/25">/</span>}
-            <Link
-              href={locale.href}
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        data-testid="language-switcher"
+        aria-label="Language"
+        className={
+          "inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-foreground/70 transition-colors hover:bg-black/[0.03] hover:text-foreground " +
+          className
+        }
+      >
+        <Globe className="size-3.5" />
+        <span translate="no">{SHORT[active.code]}</span>
+        <ChevronDown className="size-3 opacity-60" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-[9rem]">
+        {LOCALES.map((locale) => {
+          const isActive = locale.code === active.code;
+          return (
+            <DropdownMenuItem
+              key={locale.code}
               data-testid={`link-lang-${locale.code}`}
-              aria-current={isActive ? "true" : undefined}
               translate="no"
-              className={
-                "rounded px-1 py-0.5 transition-colors " +
-                (isActive
-                  ? "font-semibold text-foreground"
-                  : "text-foreground/60 hover:text-foreground")
-              }
+              onSelect={() => navigate(locale.href)}
+              className="flex items-center justify-between gap-2"
             >
-              {locale.label}
-            </Link>
-          </span>
-        );
-      })}
-    </div>
+              <span>{locale.label}</span>
+              {isActive && <Check className="size-3.5 opacity-70" />}
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

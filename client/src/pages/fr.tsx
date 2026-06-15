@@ -5,12 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Spanish (es) investor landing page — pilot locale.
+// French (fr) investor landing page.
 //
 // ⚠️  FIRST-PASS TRANSLATION — NEEDS NATIVE-SPEAKER REVIEW BEFORE PROMOTION.
-// The copy below is a solid working draft of the English value proposition, but
-// it should be reviewed by a native Spanish speaker (ideally one familiar with
-// the E-2 investor audience) before this page is featured in outreach/ads.
+// Solid working draft of the English value proposition; have a native French
+// speaker (ideally familiar with the E-2 investor audience) review before this
+// page is featured in outreach/ads.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const SITE = "https://www.newdawnfranchising.com";
@@ -25,59 +25,59 @@ const COMPANY = {
 };
 
 const SEO = {
-  title: "New Dawn Franchising | Franquicias para inversionistas de la visa E-2",
+  title: "New Dawn Franchising | Franchises pour les investisseurs du visa E-2",
   description:
-    "Franquiciante multisectorial para inversionistas de la visa E-2. Elija entre tres franquicias de ingresos recurrentes —Administración de Propiedades, Telecomunicaciones (VoIP) o Seguros—. Usted dirige el negocio; nuestros equipos manejan las operaciones diarias. FDD disponible a solicitud.",
-  canonical: `${SITE}/es`,
+    "Franchiseur multisectoriel pour les investisseurs du visa E-2. Choisissez parmi trois franchises à revenus récurrents — Gestion immobilière, Télécommunications (VoIP) ou Assurance. Vous dirigez l'entreprise ; nos équipes gèrent les opérations quotidiennes. FDD disponible sur demande.",
+  canonical: `${SITE}/fr`,
 };
 
 const VERTICALS = [
   {
     icon: <Building2 className="size-5 text-primary" />,
-    title: "Administración de Propiedades",
-    desc: "Ingresos recurrentes por honorarios de administración de alquileres. Nuestro equipo gestiona inquilinos, mantenimiento y cobros mientras usted supervisa el negocio.",
+    title: "Gestion immobilière",
+    desc: "Revenus récurrents issus des honoraires de gestion locative. Notre équipe gère les locataires, l'entretien et les encaissements pendant que vous supervisez l'entreprise.",
   },
   {
     icon: <Cpu className="size-5 text-primary" />,
-    title: "Telecomunicaciones (VoIP)",
-    desc: "Servicios de telefonía empresarial en la nube con facturación mensual recurrente. Una categoría en crecimiento con clientes comerciales de largo plazo.",
+    title: "Télécommunications (VoIP)",
+    desc: "Services de téléphonie d'entreprise dans le cloud avec facturation mensuelle récurrente. Une catégorie en croissance, avec des clients commerciaux de long terme.",
   },
   {
     icon: <ShieldCheck className="size-5 text-primary" />,
-    title: "Seguros",
-    desc: "Una agencia de seguros con comisiones recurrentes por renovación. Construya una cartera de pólizas que genera ingresos año tras año.",
+    title: "Assurance",
+    desc: "Une agence d'assurance avec des commissions de renouvellement récurrentes. Constituez un portefeuille de polices qui génère des revenus année après année.",
   },
 ];
 
 const BENEFITS = [
   {
     icon: <Banknote className="size-5 text-primary" />,
-    title: "Modelo de ingresos recurrentes",
-    desc: "Las tres franquicias se basan en ingresos mensuales o por renovación, no en ventas únicas.",
+    title: "Modèle de revenus récurrents",
+    desc: "Les trois franchises reposent sur des revenus mensuels ou de renouvellement, et non sur des ventes ponctuelles.",
   },
   {
     icon: <Handshake className="size-5 text-primary" />,
-    title: "Nuestros equipos operan el negocio",
-    desc: "Usted dirige la franquicia y controla sus finanzas; nuestros equipos se encargan de las operaciones diarias.",
+    title: "Nos équipes gèrent l'entreprise",
+    desc: "Vous dirigez la franchise et contrôlez vos finances ; nos équipes s'occupent des opérations quotidiennes.",
   },
   {
     icon: <MapPin className="size-5 text-primary" />,
-    title: "Territorios protegidos",
-    desc: "Opere en un territorio definido con el respaldo de nuestra tecnología y experiencia.",
+    title: "Territoires protégés",
+    desc: "Exploitez un territoire défini, soutenu par notre technologie et notre expérience.",
   },
   {
     icon: <FileText className="size-5 text-primary" />,
-    title: "FDD disponible a solicitud",
-    desc: "El Documento de Divulgación de la Franquicia (FDD) está disponible cuando usted esté listo para revisarlo.",
+    title: "FDD disponible sur demande",
+    desc: "Le Document d'information sur la franchise (FDD) est disponible lorsque vous êtes prêt à l'examiner.",
   },
 ];
 
-function useEsSeo() {
+function useFrSeo() {
   useEffect(() => {
     const prevTitle = document.title;
     const prevLang = document.documentElement.lang;
     document.title = SEO.title;
-    document.documentElement.lang = "es";
+    document.documentElement.lang = "fr";
 
     const created: HTMLElement[] = [];
 
@@ -93,7 +93,6 @@ function useEsSeo() {
     };
     setMeta('meta[name="description"]', "name", "description", SEO.description);
 
-    // canonical + hreflang alternates (pairs the EN home with this ES page)
     const addLink = (rel: string, href: string, hreflang?: string) => {
       const link = document.createElement("link");
       link.setAttribute("rel", rel);
@@ -120,44 +119,44 @@ function useEsSeo() {
   }, []);
 }
 
-export default function EsPage() {
-  useEsSeo();
+export default function FrPage() {
+  useFrSeo();
 
   return (
-    <div data-testid="page-es" lang="es" className="min-h-screen">
+    <div data-testid="page-fr" lang="fr" className="min-h-screen">
       {/* Hero */}
-      <section data-testid="section-es-hero" className="border-b">
+      <section data-testid="section-fr-hero" className="border-b">
         <div className="nh-container py-16 md:py-24">
           <div className="mx-auto max-w-3xl text-center">
             <span className="inline-flex items-center rounded-full border bg-white/60 px-3 py-1 text-xs font-medium text-foreground/70">
-              Franquicias para inversionistas de la visa E-2
+              Franchises pour les investisseurs du visa E-2
             </span>
             <h1 className="mt-5 text-balance text-4xl font-semibold tracking-tight md:text-5xl">
-              Sea dueño de una franquicia en EE. UU. con la visa E-2
+              Devenez propriétaire d'une franchise aux États-Unis avec le visa E-2
             </h1>
             <p className="mt-5 text-pretty text-base leading-relaxed text-muted-foreground md:text-lg">
-              <span translate="no">New Dawn Franchising</span> es un franquiciante multisectorial para
-              inversionistas de la visa E-2. Elija entre tres franquicias de ingresos recurrentes
-              —Administración de Propiedades, Telecomunicaciones (VoIP) o Seguros—. Usted dirige el
-              negocio y controla sus finanzas; nuestros equipos manejan las operaciones diarias.
+              <span translate="no">New Dawn Franchising</span> est un franchiseur multisectoriel pour
+              les investisseurs du visa E-2. Choisissez parmi trois franchises à revenus récurrents
+              — Gestion immobilière, Télécommunications (VoIP) ou Assurance. Vous dirigez l'entreprise
+              et contrôlez vos finances ; nos équipes gèrent les opérations quotidiennes.
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-              <Button data-testid="button-es-contact" className="gap-2" asChild>
+              <Button data-testid="button-fr-contact" className="gap-2" asChild>
                 <Link href="/contact">
-                  Solicitar información
+                  Demander des informations
                   <ArrowRight className="size-4" />
                 </Link>
               </Button>
-              <Button data-testid="button-es-calendly" variant="secondary" className="gap-2" asChild>
+              <Button data-testid="button-fr-calendly" variant="secondary" className="gap-2" asChild>
                 <a href={CALENDLY} target="_blank" rel="noopener noreferrer">
-                  Agendar una llamada
+                  Planifier un appel
                 </a>
               </Button>
             </div>
             <p className="mt-4 text-xs text-muted-foreground/70">
-              ¿Prefiere leer en inglés?{" "}
+              Vous préférez lire en anglais ?{" "}
               <Link href="/" className="underline underline-offset-2 hover:text-foreground" translate="no">
-                Ver el sitio en English
+                Voir le site en English
               </Link>
             </p>
           </div>
@@ -165,14 +164,14 @@ export default function EsPage() {
       </section>
 
       {/* Verticals */}
-      <section data-testid="section-es-verticals" className="border-b">
+      <section data-testid="section-fr-verticals" className="border-b">
         <div className="nh-container py-16">
           <div className="mx-auto max-w-3xl text-center">
             <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">
-              Tres franquicias. Un modelo de ingresos recurrentes.
+              Trois franchises. Un modèle de revenus récurrents.
             </h2>
             <p className="mt-3 text-muted-foreground">
-              Elija el sector que mejor se adapte a sus objetivos como inversionista.
+              Choisissez le secteur qui correspond le mieux à vos objectifs d'investisseur.
             </p>
           </div>
           <div className="mt-10 grid gap-6 md:grid-cols-3">
@@ -190,11 +189,11 @@ export default function EsPage() {
       </section>
 
       {/* Benefits */}
-      <section data-testid="section-es-benefits" className="border-b">
+      <section data-testid="section-fr-benefits" className="border-b">
         <div className="nh-container py-16">
           <div className="mx-auto max-w-3xl text-center">
             <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">
-              ¿Por qué <span translate="no">New Dawn Franchising</span>?
+              Pourquoi <span translate="no">New Dawn Franchising</span> ?
             </h2>
           </div>
           <div className="mx-auto mt-10 grid max-w-4xl gap-6 md:grid-cols-2">
@@ -214,20 +213,20 @@ export default function EsPage() {
       </section>
 
       {/* CTA */}
-      <section data-testid="section-es-cta">
+      <section data-testid="section-fr-cta">
         <div className="nh-container py-16">
           <div className="mx-auto max-w-3xl rounded-2xl border bg-white/60 p-8 text-center md:p-12">
             <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">
-              Hablemos sobre su camino con la visa E-2
+              Parlons de votre parcours avec le visa E-2
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
-              Cuéntenos sobre sus objetivos y le explicaremos cómo funciona el modelo de franquicia.
-              Atendemos a inversionistas de todo el mundo y hablamos español.
+              Parlez-nous de vos objectifs et nous vous expliquerons le fonctionnement du modèle de
+              franchise. Nous accompagnons des investisseurs du monde entier et nous parlons français.
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-              <Button data-testid="button-es-cta-contact" className="gap-2" asChild>
+              <Button data-testid="button-fr-cta-contact" className="gap-2" asChild>
                 <Link href="/contact">
-                  Solicitar información
+                  Demander des informations
                   <ArrowRight className="size-4" />
                 </Link>
               </Button>
@@ -240,7 +239,7 @@ export default function EsPage() {
               <Button variant="secondary" className="gap-2" asChild>
                 <a href={`mailto:${COMPANY.email}`}>
                   <Mail className="size-4" />
-                  Escríbanos
+                  Écrivez-nous
                 </a>
               </Button>
             </div>
@@ -255,14 +254,14 @@ export default function EsPage() {
             </a>
 
             <p className="mx-auto mt-8 max-w-2xl text-[11px] leading-relaxed text-muted-foreground/60">
-              Esta información es solo de carácter general y educativo; no es una oferta para vender
-              una franquicia ni constituye asesoría legal, migratoria, fiscal o financiera. Una
-              franquicia se ofrece y se vende únicamente mediante un Documento de Divulgación de la
-              Franquicia (FDD). La elegibilidad y aprobación de la visa E-2 las determina únicamente
-              el gobierno de EE. UU. y nunca están garantizadas. Consulte el aviso legal completo en
-              nuestros{" "}
+              Ces informations sont fournies à titre général et éducatif uniquement ; elles ne
+              constituent pas une offre de vente d'une franchise ni un conseil juridique,
+              d'immigration, fiscal ou financier. Une franchise est proposée et vendue uniquement au
+              moyen d'un Document d'information sur la franchise (FDD). L'admissibilité et l'approbation
+              du visa E-2 relèvent uniquement du gouvernement des États-Unis et ne sont jamais
+              garanties. Consultez l'avis juridique complet dans nos{" "}
               <Link href="/terms" className="underline underline-offset-2 hover:text-muted-foreground">
-                Términos y Condiciones
+                Conditions générales
               </Link>
               .
             </p>

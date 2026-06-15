@@ -5,12 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Spanish (es) investor landing page — pilot locale.
+// Japanese (ja) investor landing page.
 //
 // ⚠️  FIRST-PASS TRANSLATION — NEEDS NATIVE-SPEAKER REVIEW BEFORE PROMOTION.
-// The copy below is a solid working draft of the English value proposition, but
-// it should be reviewed by a native Spanish speaker (ideally one familiar with
-// the E-2 investor audience) before this page is featured in outreach/ads.
+// Japan is consistently a top source of E-2 visas, so this is a high-value
+// locale — but have a native Japanese speaker review the copy (and especially
+// the legal disclaimer) before featuring it in outreach/ads.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const SITE = "https://www.newdawnfranchising.com";
@@ -25,59 +25,59 @@ const COMPANY = {
 };
 
 const SEO = {
-  title: "New Dawn Franchising | Franquicias para inversionistas de la visa E-2",
+  title: "New Dawn Franchising | E-2ビザ投資家向けフランチャイズ",
   description:
-    "Franquiciante multisectorial para inversionistas de la visa E-2. Elija entre tres franquicias de ingresos recurrentes —Administración de Propiedades, Telecomunicaciones (VoIP) o Seguros—. Usted dirige el negocio; nuestros equipos manejan las operaciones diarias. FDD disponible a solicitud.",
-  canonical: `${SITE}/es`,
+    "E-2ビザ投資家向けのマルチ業種フランチャイザー。継続収益型の3つのフランチャイズ（不動産管理、テレコム（VoIP）、保険）からお選びいただけます。あなたが事業を統括し財務を管理し、当社のチームが日常業務を担当します。FDDはご要望に応じてご提供します。",
+  canonical: `${SITE}/ja`,
 };
 
 const VERTICALS = [
   {
     icon: <Building2 className="size-5 text-primary" />,
-    title: "Administración de Propiedades",
-    desc: "Ingresos recurrentes por honorarios de administración de alquileres. Nuestro equipo gestiona inquilinos, mantenimiento y cobros mientras usted supervisa el negocio.",
+    title: "不動産管理",
+    desc: "賃貸管理手数料による継続的な収益。当社のチームが入居者対応、メンテナンス、集金を行い、あなたは事業を監督します。",
   },
   {
     icon: <Cpu className="size-5 text-primary" />,
-    title: "Telecomunicaciones (VoIP)",
-    desc: "Servicios de telefonía empresarial en la nube con facturación mensual recurrente. Una categoría en crecimiento con clientes comerciales de largo plazo.",
+    title: "テレコム（VoIP）",
+    desc: "企業向けのクラウド電話サービス。毎月の継続課金。長期的な法人顧客を抱える成長分野です。",
   },
   {
     icon: <ShieldCheck className="size-5 text-primary" />,
-    title: "Seguros",
-    desc: "Una agencia de seguros con comisiones recurrentes por renovación. Construya una cartera de pólizas que genera ingresos año tras año.",
+    title: "保険",
+    desc: "継続的な更新手数料が得られる保険代理店。年々収益を生む保険ポートフォリオを構築します。",
   },
 ];
 
 const BENEFITS = [
   {
     icon: <Banknote className="size-5 text-primary" />,
-    title: "Modelo de ingresos recurrentes",
-    desc: "Las tres franquicias se basan en ingresos mensuales o por renovación, no en ventas únicas.",
+    title: "継続収益モデル",
+    desc: "3つのフランチャイズはいずれも、単発の販売ではなく月額または更新による収益に基づいています。",
   },
   {
     icon: <Handshake className="size-5 text-primary" />,
-    title: "Nuestros equipos operan el negocio",
-    desc: "Usted dirige la franquicia y controla sus finanzas; nuestros equipos se encargan de las operaciones diarias.",
+    title: "当社のチームが事業を運営",
+    desc: "あなたがフランチャイズを統括し財務を管理し、当社のチームが日常業務を担当します。",
   },
   {
     icon: <MapPin className="size-5 text-primary" />,
-    title: "Territorios protegidos",
-    desc: "Opere en un territorio definido con el respaldo de nuestra tecnología y experiencia.",
+    title: "保護されたテリトリー",
+    desc: "当社の技術と経験に支えられ、定められたテリトリーで事業を運営します。",
   },
   {
     icon: <FileText className="size-5 text-primary" />,
-    title: "FDD disponible a solicitud",
-    desc: "El Documento de Divulgación de la Franquicia (FDD) está disponible cuando usted esté listo para revisarlo.",
+    title: "FDDはご要望に応じて提供",
+    desc: "フランチャイズ開示書類（FDD）は、ご確認の準備が整い次第ご提供します。",
   },
 ];
 
-function useEsSeo() {
+function useJaSeo() {
   useEffect(() => {
     const prevTitle = document.title;
     const prevLang = document.documentElement.lang;
     document.title = SEO.title;
-    document.documentElement.lang = "es";
+    document.documentElement.lang = "ja";
 
     const created: HTMLElement[] = [];
 
@@ -93,7 +93,6 @@ function useEsSeo() {
     };
     setMeta('meta[name="description"]', "name", "description", SEO.description);
 
-    // canonical + hreflang alternates (pairs the EN home with this ES page)
     const addLink = (rel: string, href: string, hreflang?: string) => {
       const link = document.createElement("link");
       link.setAttribute("rel", rel);
@@ -120,44 +119,43 @@ function useEsSeo() {
   }, []);
 }
 
-export default function EsPage() {
-  useEsSeo();
+export default function JaPage() {
+  useJaSeo();
 
   return (
-    <div data-testid="page-es" lang="es" className="min-h-screen">
+    <div data-testid="page-ja" lang="ja" className="min-h-screen">
       {/* Hero */}
-      <section data-testid="section-es-hero" className="border-b">
+      <section data-testid="section-ja-hero" className="border-b">
         <div className="nh-container py-16 md:py-24">
           <div className="mx-auto max-w-3xl text-center">
             <span className="inline-flex items-center rounded-full border bg-white/60 px-3 py-1 text-xs font-medium text-foreground/70">
-              Franquicias para inversionistas de la visa E-2
+              E-2ビザ投資家向けフランチャイズ
             </span>
             <h1 className="mt-5 text-balance text-4xl font-semibold tracking-tight md:text-5xl">
-              Sea dueño de una franquicia en EE. UU. con la visa E-2
+              E-2ビザで米国のフランチャイズを所有する
             </h1>
             <p className="mt-5 text-pretty text-base leading-relaxed text-muted-foreground md:text-lg">
-              <span translate="no">New Dawn Franchising</span> es un franquiciante multisectorial para
-              inversionistas de la visa E-2. Elija entre tres franquicias de ingresos recurrentes
-              —Administración de Propiedades, Telecomunicaciones (VoIP) o Seguros—. Usted dirige el
-              negocio y controla sus finanzas; nuestros equipos manejan las operaciones diarias.
+              <span translate="no">New Dawn Franchising</span> は、E-2ビザ投資家向けのマルチ業種フランチャイザーです。
+              継続収益型の3つのフランチャイズ（不動産管理、テレコム（VoIP）、保険）からお選びいただけます。
+              あなたが事業を統括し財務を管理し、当社のチームが日常業務を担当します。
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-              <Button data-testid="button-es-contact" className="gap-2" asChild>
+              <Button data-testid="button-ja-contact" className="gap-2" asChild>
                 <Link href="/contact">
-                  Solicitar información
+                  資料を請求する
                   <ArrowRight className="size-4" />
                 </Link>
               </Button>
-              <Button data-testid="button-es-calendly" variant="secondary" className="gap-2" asChild>
+              <Button data-testid="button-ja-calendly" variant="secondary" className="gap-2" asChild>
                 <a href={CALENDLY} target="_blank" rel="noopener noreferrer">
-                  Agendar una llamada
+                  通話を予約する
                 </a>
               </Button>
             </div>
             <p className="mt-4 text-xs text-muted-foreground/70">
-              ¿Prefiere leer en inglés?{" "}
+              英語で読みますか？{" "}
               <Link href="/" className="underline underline-offset-2 hover:text-foreground" translate="no">
-                Ver el sitio en English
+                English サイトを見る
               </Link>
             </p>
           </div>
@@ -165,15 +163,13 @@ export default function EsPage() {
       </section>
 
       {/* Verticals */}
-      <section data-testid="section-es-verticals" className="border-b">
+      <section data-testid="section-ja-verticals" className="border-b">
         <div className="nh-container py-16">
           <div className="mx-auto max-w-3xl text-center">
             <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">
-              Tres franquicias. Un modelo de ingresos recurrentes.
+              3つのフランチャイズ。1つの継続収益モデル。
             </h2>
-            <p className="mt-3 text-muted-foreground">
-              Elija el sector que mejor se adapte a sus objetivos como inversionista.
-            </p>
+            <p className="mt-3 text-muted-foreground">投資目標に最も合った分野をお選びください。</p>
           </div>
           <div className="mt-10 grid gap-6 md:grid-cols-3">
             {VERTICALS.map((v) => (
@@ -190,11 +186,11 @@ export default function EsPage() {
       </section>
 
       {/* Benefits */}
-      <section data-testid="section-es-benefits" className="border-b">
+      <section data-testid="section-ja-benefits" className="border-b">
         <div className="nh-container py-16">
           <div className="mx-auto max-w-3xl text-center">
             <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">
-              ¿Por qué <span translate="no">New Dawn Franchising</span>?
+              なぜ <span translate="no">New Dawn Franchising</span> なのか？
             </h2>
           </div>
           <div className="mx-auto mt-10 grid max-w-4xl gap-6 md:grid-cols-2">
@@ -214,20 +210,19 @@ export default function EsPage() {
       </section>
 
       {/* CTA */}
-      <section data-testid="section-es-cta">
+      <section data-testid="section-ja-cta">
         <div className="nh-container py-16">
           <div className="mx-auto max-w-3xl rounded-2xl border bg-white/60 p-8 text-center md:p-12">
             <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">
-              Hablemos sobre su camino con la visa E-2
+              あなたのE-2ビザへの道についてお話ししましょう
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
-              Cuéntenos sobre sus objetivos y le explicaremos cómo funciona el modelo de franquicia.
-              Atendemos a inversionistas de todo el mundo y hablamos español.
+              あなたの目標をお聞かせください。フランチャイズモデルの仕組みをご説明します。当社は世界中の投資家をサポートしています。
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-              <Button data-testid="button-es-cta-contact" className="gap-2" asChild>
+              <Button data-testid="button-ja-cta-contact" className="gap-2" asChild>
                 <Link href="/contact">
-                  Solicitar información
+                  資料を請求する
                   <ArrowRight className="size-4" />
                 </Link>
               </Button>
@@ -240,7 +235,7 @@ export default function EsPage() {
               <Button variant="secondary" className="gap-2" asChild>
                 <a href={`mailto:${COMPANY.email}`}>
                   <Mail className="size-4" />
-                  Escríbanos
+                  メールでお問い合わせ
                 </a>
               </Button>
             </div>
@@ -255,16 +250,13 @@ export default function EsPage() {
             </a>
 
             <p className="mx-auto mt-8 max-w-2xl text-[11px] leading-relaxed text-muted-foreground/60">
-              Esta información es solo de carácter general y educativo; no es una oferta para vender
-              una franquicia ni constituye asesoría legal, migratoria, fiscal o financiera. Una
-              franquicia se ofrece y se vende únicamente mediante un Documento de Divulgación de la
-              Franquicia (FDD). La elegibilidad y aprobación de la visa E-2 las determina únicamente
-              el gobierno de EE. UU. y nunca están garantizadas. Consulte el aviso legal completo en
-              nuestros{" "}
+              本情報は一般的かつ教育的な目的のみのものであり、フランチャイズの販売の申し出ではなく、法律・移民・税務・財務に関する助言でもありません。
+              フランチャイズはフランチャイズ開示書類（FDD）を通じてのみ提供・販売されます。E-2ビザの適格性と承認は米国政府のみが決定し、保証されることは決してありません。
+              完全な法的免責事項は当社の{" "}
               <Link href="/terms" className="underline underline-offset-2 hover:text-muted-foreground">
-                Términos y Condiciones
+                利用規約
               </Link>
-              .
+              をご覧ください。
             </p>
           </div>
         </div>

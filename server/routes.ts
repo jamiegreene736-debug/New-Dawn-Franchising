@@ -1750,6 +1750,26 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
       const started = Date.now();
       const result = await cachedProviderSearch(provider, mode === "companies" ? "companies" : "contacts", appliedFilters, { nextToken });
 
+      // A provider error (out of credits, rate-limited, unauthorized, network) is
+      // NOT an empty result — surface it as a non-2xx so the UI shows the real
+      // reason instead of a misleading "no contacts found".
+      if (result.error) {
+        void logSearchEvent({
+          surface: "seamless-panel",
+          provider,
+          query: aiQuery?.trim() || null,
+          filters: appliedFilters,
+          resultCount: 0,
+          error: `${result.error.code}: ${result.error.message}`,
+          durationMs: Date.now() - started,
+          userEmail: req.session.adminId ?? null,
+        });
+        const httpStatus =
+          result.error.code === "insufficientCredits" ? 402 :
+          result.error.code === "rateLimited" ? 429 : 502;
+        return res.status(httpStatus).json({ message: result.error.message, code: result.error.code, provider });
+      }
+
       void logSearchEvent({
         surface: "seamless-panel",
         provider,

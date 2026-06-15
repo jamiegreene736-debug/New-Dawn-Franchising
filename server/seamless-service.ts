@@ -65,6 +65,71 @@ function authHeaders(key: string): Record<string, string> {
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
+// ─── Provider error (surfaced, never swallowed) ─────────────────────────────
+// Search calls used to map EVERY non-2xx/network failure onto an empty result,
+// so the UI + Lead Research agent reported "no contacts found" for what was
+// really an out-of-credits / auth / rate-limit error — and then invented
+// reasons (company "too small" or "misspelled"). We now classify the failure
+// and propagate it so callers can tell the user the truth.
+export interface ProviderError {
+  provider?: string; // filled in by the higher-level provider dispatch
+  status: number; // HTTP status; 0 = network/timeout (request never completed)
+  code: string; // machine code: insufficientCredits | unauthorized | rateLimited | http | network
+  message: string; // human-readable, safe to show the user
+}
+
+/** Classify a non-OK Seamless Response into a ProviderError (reads the body once). */
+async function seamlessHttpError(res: Response): Promise<ProviderError> {
+  let body: any = null;
+  try {
+    body = JSON.parse(await res.text());
+  } catch {
+    /* non-JSON error body — fall back to status-based messaging */
+  }
+  const apiCode = typeof body?.code === "string" ? body.code : "";
+  const apiMsg =
+    (typeof body?.message === "string" && body.message) ||
+    (typeof body?.msg === "string" && body.msg) ||
+    "";
+
+  if (res.status === 422 && apiCode === "insufficientCredits") {
+    return {
+      status: 422,
+      code: "insufficientCredits",
+      message:
+        "Seamless.AI is out of public-API credits, so no searches can run. Top up your Seamless public-API credit balance (the website uses a separate pool) to restore lead search.",
+    };
+  }
+  if (res.status === 401 || res.status === 403) {
+    return {
+      status: res.status,
+      code: "unauthorized",
+      message: "Seamless.AI rejected the API key (unauthorized). Check SEAMLESS_API_KEY.",
+    };
+  }
+  if (res.status === 429) {
+    return {
+      status: 429,
+      code: "rateLimited",
+      message: "Seamless.AI rate limit reached. Wait a moment and try again.",
+    };
+  }
+  return {
+    status: res.status,
+    code: apiCode || "http",
+    message: apiMsg || `Seamless.AI returned an error (HTTP ${res.status}).`,
+  };
+}
+
+/** A network/timeout failure (the request never produced a response). */
+function networkError(): ProviderError {
+  return {
+    status: 0,
+    code: "network",
+    message: "Couldn't reach Seamless.AI (network error or timeout). Try again shortly.",
+  };
+}
+
 // ─── Normalised person shape (provider-agnostic) ────────────────────────────
 
 export interface SeamlessPerson {
@@ -409,7 +474,7 @@ function mapEnrichedContact(
 /** Step 1: search the Seamless DB. No credits. Returns lightweight matches. */
 async function searchContactsRaw(
   filters: SeamlessContactFilters,
-): Promise<{ items: SeamlessSearchItem[]; nextToken: string | null }> {
+): Promise<{ items: SeamlessSearchItem[]; nextToken: string | null; error?: ProviderError | null }> {
   const apiKey = getKey();
   if (!apiKey) return { items: [], nextToken: null };
 
@@ -462,21 +527,27 @@ async function searchContactsRaw(
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
-    if (!res.ok) return { items: [], nextToken: null };
+    if (!res.ok) {
+      const error = await seamlessHttpError(res);
+      console.warn(`[Seamless] /search/contacts ${error.status} ${error.code}: ${error.message}`);
+      return { items: [], nextToken: null, error };
+    }
     const json = (await res.json()) as { data?: SeamlessSearchItem[]; nextToken?: string };
     return {
       items: Array.isArray(json.data) ? json.data : [],
       nextToken: json.nextToken || null,
     };
   } catch {
-    return { items: [], nextToken: null };
+    const error = networkError();
+    console.warn(`[Seamless] /search/contacts ${error.code}: ${error.message}`);
+    return { items: [], nextToken: null, error };
   }
 }
 
 /** Company search. No credits. Returns lightweight company matches. */
 async function searchCompaniesRaw(
   filters: SeamlessCompanyFilters,
-): Promise<{ items: SeamlessCompanyItem[]; nextToken: string | null }> {
+): Promise<{ items: SeamlessCompanyItem[]; nextToken: string | null; error?: ProviderError | null }> {
   const apiKey = getKey();
   if (!apiKey) return { items: [], nextToken: null };
 
@@ -509,14 +580,20 @@ async function searchCompaniesRaw(
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
-    if (!res.ok) return { items: [], nextToken: null };
+    if (!res.ok) {
+      const error = await seamlessHttpError(res);
+      console.warn(`[Seamless] /search/companies ${error.status} ${error.code}: ${error.message}`);
+      return { items: [], nextToken: null, error };
+    }
     const json = (await res.json()) as { data?: SeamlessCompanyItem[]; nextToken?: string };
     return {
       items: Array.isArray(json.data) ? json.data : [],
       nextToken: json.nextToken || null,
     };
   } catch {
-    return { items: [], nextToken: null };
+    const error = networkError();
+    console.warn(`[Seamless] /search/companies ${error.code}: ${error.message}`);
+    return { items: [], nextToken: null, error };
   }
 }
 
@@ -662,17 +739,17 @@ export async function seamlessFindPeople(
  */
 export async function seamlessSearchContacts(
   filters: SeamlessContactFilters,
-): Promise<{ people: SeamlessPerson[]; nextToken: string | null }> {
-  const { items, nextToken } = await searchContactsRaw(filters);
-  return { people: items.map(mapSearchItem), nextToken };
+): Promise<{ people: SeamlessPerson[]; nextToken: string | null; error?: ProviderError | null }> {
+  const { items, nextToken, error } = await searchContactsRaw(filters);
+  return { people: items.map(mapSearchItem), nextToken, error: error ?? null };
 }
 
 /** Free company search returning rich, search-level companies + cursor. */
 export async function seamlessSearchCompanies(
   filters: SeamlessCompanyFilters,
-): Promise<{ companies: SeamlessCompany[]; nextToken: string | null }> {
-  const { items, nextToken } = await searchCompaniesRaw(filters);
-  return { companies: items.map(mapCompanyItem), nextToken };
+): Promise<{ companies: SeamlessCompany[]; nextToken: string | null; error?: ProviderError | null }> {
+  const { items, nextToken, error } = await searchCompaniesRaw(filters);
+  return { companies: items.map(mapCompanyItem), nextToken, error: error ?? null };
 }
 
 /**

@@ -25,10 +25,39 @@ import type {
   SeamlessCompany,
   SeamlessContactFilters,
   SeamlessCompanyFilters,
+  ProviderError,
 } from "./seamless-service";
 
 const APOLLO_BASE = "https://api.apollo.io/api/v1";
 const FETCH_TIMEOUT_MS = 12000;
+
+/** Classify a non-OK Apollo Response into a ProviderError (never swallowed). */
+async function apolloHttpError(res: Response): Promise<ProviderError> {
+  let body: any = null;
+  try {
+    body = JSON.parse(await res.text());
+  } catch {
+    /* non-JSON */
+  }
+  const msg =
+    (typeof body?.error === "string" && body.error) ||
+    (typeof body?.message === "string" && body.message) ||
+    "";
+  if (res.status === 401 || res.status === 403) {
+    return { status: res.status, code: "unauthorized", message: "Apollo.io rejected the API key (unauthorized). Check APOLLO_API_KEY." };
+  }
+  if (res.status === 429) {
+    return { status: 429, code: "rateLimited", message: "Apollo.io rate limit reached. Try again shortly." };
+  }
+  if (res.status === 422 && /deprecated/i.test(msg)) {
+    return { status: 422, code: "deprecated", message: "Apollo.io's people-search API endpoint is deprecated for API callers; this integration needs updating before Apollo can return results." };
+  }
+  return { status: res.status, code: "http", message: msg || `Apollo.io returned an error (HTTP ${res.status}).` };
+}
+
+function apolloNetworkError(): ProviderError {
+  return { status: 0, code: "network", message: "Couldn't reach Apollo.io (network error or timeout)." };
+}
 
 function getKey(): string | null {
   return process.env.APOLLO_API_KEY || null;
@@ -211,7 +240,7 @@ function mapCompany(org: ApolloOrg): SeamlessCompany {
 
 export async function apolloSearchContacts(
   filters: SeamlessContactFilters,
-): Promise<{ people: SeamlessPerson[]; nextToken: string | null }> {
+): Promise<{ people: SeamlessPerson[]; nextToken: string | null; error?: ProviderError | null }> {
   const key = getKey();
   if (!key) return { people: [], nextToken: null };
 
@@ -242,7 +271,11 @@ export async function apolloSearchContacts(
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
-    if (!res.ok) return { people: [], nextToken: null };
+    if (!res.ok) {
+      const error = await apolloHttpError(res);
+      console.warn(`[Apollo] /mixed_people/search ${error.status} ${error.code}: ${error.message}`);
+      return { people: [], nextToken: null, error };
+    }
     const json = (await res.json()) as {
       people?: ApolloPerson[];
       pagination?: { page?: number; total_pages?: number };
@@ -255,7 +288,7 @@ export async function apolloSearchContacts(
         : null;
     return { people, nextToken };
   } catch {
-    return { people: [], nextToken: null };
+    return { people: [], nextToken: null, error: apolloNetworkError() };
   }
 }
 
@@ -263,7 +296,7 @@ export async function apolloSearchContacts(
 
 export async function apolloSearchCompanies(
   filters: SeamlessCompanyFilters,
-): Promise<{ companies: SeamlessCompany[]; nextToken: string | null }> {
+): Promise<{ companies: SeamlessCompany[]; nextToken: string | null; error?: ProviderError | null }> {
   const key = getKey();
   if (!key) return { companies: [], nextToken: null };
 
@@ -286,7 +319,11 @@ export async function apolloSearchCompanies(
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
-    if (!res.ok) return { companies: [], nextToken: null };
+    if (!res.ok) {
+      const error = await apolloHttpError(res);
+      console.warn(`[Apollo] /mixed_companies/search ${error.status} ${error.code}: ${error.message}`);
+      return { companies: [], nextToken: null, error };
+    }
     const json = (await res.json()) as {
       organizations?: ApolloOrg[];
       accounts?: ApolloOrg[];
@@ -301,7 +338,7 @@ export async function apolloSearchCompanies(
         : null;
     return { companies, nextToken };
   } catch {
-    return { companies: [], nextToken: null };
+    return { companies: [], nextToken: null, error: apolloNetworkError() };
   }
 }
 

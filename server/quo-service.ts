@@ -1,3 +1,5 @@
+import type { CrmTemplateGroup } from "@shared/crm-template-groups";
+
 // Quo (OpenPhone) SMS Service
 // API docs: https://www.quo.com/docs/mdx/api-reference/messages/send-a-text-message
 // Auth: plain API key in Authorization header
@@ -144,30 +146,53 @@ export async function listQuoPhoneNumbers(): Promise<{ id: string; formattedNumb
   }
 }
 
-export const SMS_TEMPLATES = [
+export const SMS_TEMPLATES: Array<{ id: string; label: string; body: string; group: CrmTemplateGroup }> = [
   {
-    id: "follow_up",
-    label: "Quick follow-up",
-    body: "Hey {{name}}, just following up on your E-2 franchise interest — do you have 15 mins this week?",
+    id: "broker_intro",
+    label: "Step 1: Broker Intro",
+    group: "1 — Pitch the Broker",
+    body: "Hi {{name}}, I'm with New Dawn Franchising — a multi-vertical E-2 franchise platform (PM, Telecom, Insurance) from $225K. Open to a 15-min call on referral partnerships?",
   },
   {
-    id: "intro",
-    label: "Initial outreach",
-    body: "Hi {{name}}, I wanted to share info about our E-2 visa franchise opportunity in Texas. Are you available for a quick call?",
+    id: "broker_followup",
+    label: "Step 2: Broker Follow-Up",
+    group: "1 — Pitch the Broker",
+    body: "Hi {{name}}, following up on New Dawn's E-2 franchise referral program. Happy to send our FDD overview or jump on a quick call — whatever's easier.",
   },
   {
-    id: "next_step",
-    label: "Next step nudge",
-    body: "{{name}}, your E-2 franchise application is looking great. Let's schedule our next step — reply to confirm a time.",
+    id: "investor_intro",
+    label: "Step 1: Investor Intro",
+    group: "2 — Pitch the Investor",
+    body: "Hi {{name}}, New Dawn Franchising offers E-2 visa franchises in Property Management, Telecom, or Insurance from $225K. You direct it; we run ops. 15 mins to chat?",
+  },
+  {
+    id: "investor_discovery",
+    label: "Step 2: Discovery Nudge",
+    group: "2 — Pitch the Investor",
+    body: "Hi {{name}}, wanted to follow up on New Dawn's E-2 franchise platform. Would you have 15 minutes this week for a discovery call? No commitment — just Q&A.",
+  },
+  {
+    id: "investor_post_call",
+    label: "Step 3: Post-Call Follow-Up",
+    group: "2 — Pitch the Investor",
+    body: "Hi {{name}}, great speaking with you today. I'll send your FDD shortly — you'll have 14 days to review before any next steps. Reach out with any questions!",
   },
   {
     id: "fdd_reminder",
-    label: "FDD reminder",
-    body: "Hi {{name}}, just a reminder that your Franchise Disclosure Document is ready for review. Let me know if you have any questions!",
+    label: "Step 1: FDD Review Reminder",
+    group: "3 — FDD & Receipt",
+    body: "Hi {{name}}, checking in on your FDD review. Any questions on Property Management, Telecom, or Insurance? Happy to walk through it on a quick call.",
   },
   {
-    id: "meeting_confirm",
-    label: "Meeting confirmation",
-    body: "{{name}}, confirming our call tomorrow. Looking forward to discussing the E-2 franchise opportunity with you!",
+    id: "fdd_receipt",
+    label: "Step 2: FDD Receipt Nudge",
+    group: "3 — FDD & Receipt",
+    body: "Hi {{name}}, please sign your FDD Receipt when you get a moment — it only confirms you received the document. A secure link is on its way to your email.",
+  },
+  {
+    id: "closing_wire",
+    label: "Step 1: Wire Reminder",
+    group: "4 — Close the Deal",
+    body: "Hi {{name}}, congrats on your Franchise Agreement! Wire instructions are in your email — please send the confirmation number once initiated so we can begin onboarding.",
   },
 ];

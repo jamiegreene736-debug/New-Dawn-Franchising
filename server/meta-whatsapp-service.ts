@@ -1,3 +1,5 @@
+import type { CrmTemplateGroup } from "@shared/crm-template-groups";
+
 // Meta WhatsApp Cloud API Service
 // Docs: https://developers.facebook.com/docs/whatsapp/cloud-api/reference/messages
 // Auth: Bearer token (permanent system user token recommended, or temp token for dev)
@@ -174,41 +176,64 @@ export async function checkWhatsAppNumber(
 // These match the templates you should create in Meta Business Manager.
 // Submit at: business.facebook.com → WhatsApp Manager → Message Templates
 
-export const WHATSAPP_TEMPLATES = [
+export const WHATSAPP_TEMPLATES: Array<{
+  id: string;
+  label: string;
+  metaTemplateName: string | null;
+  languageCode: string;
+  requiresApproval: boolean;
+  body: string;
+  note: string;
+  group: CrmTemplateGroup;
+}> = [
   {
-    id: "wa_intro",
-    label: "Cold intro (template)",
+    id: "wa_broker_intro",
+    label: "Step 1: Broker Intro (template)",
+    group: "1 — Pitch the Broker",
+    metaTemplateName: "new_dawn_broker_intro",
+    languageCode: "en_US",
+    requiresApproval: true,
+    body: "Hi {{name}}, I'm with New Dawn Franchising — three E-2 franchise verticals (Property Management, Telecom, Insurance) from $225K. Would you be open to a quick call about our referral partner program?",
+    note: "Submit as 'new_dawn_broker_intro' (Marketing) in Meta Business Manager. Variable: {{1}} = first name.",
+  },
+  {
+    id: "wa_investor_intro",
+    label: "Step 1: Investor Intro (template)",
+    group: "2 — Pitch the Investor",
     metaTemplateName: "new_dawn_intro",
     languageCode: "en_US",
     requiresApproval: true,
-    body: "Hi {{name}}, I'm Dylan from New Dawn Franchising. We help international investors acquire E-2 visa compliant property management businesses in Texas. Would you be open to a quick call?",
-    note: "Submit this as 'new_dawn_intro' (Marketing) in Meta Business Manager. Variable: {{1}} = first name.",
+    body: "Hi {{name}}, I'm with New Dawn Franchising. We offer E-2 visa franchises across Property Management, Telecom, and Insurance — you own and direct the business; our teams handle daily operations. Open to a 15-min call?",
+    note: "Submit as 'new_dawn_intro' (Marketing) in Meta Business Manager. Variable: {{1}} = first name.",
   },
   {
-    id: "wa_followup",
-    label: "Follow-up (template)",
+    id: "wa_investor_followup",
+    label: "Step 2: Investor Follow-Up (template)",
+    group: "2 — Pitch the Investor",
     metaTemplateName: "new_dawn_followup",
     languageCode: "en_US",
     requiresApproval: true,
-    body: "Hi {{name}}, following up on my note about E-2 visa franchise opportunities in Texas. Happy to send details or jump on a 15-min call. Reply STOP to opt out.",
+    body: "Hi {{name}}, following up on New Dawn's E-2 franchise platform — three industries, one platform, investment from $225K. Happy to send our FDD or schedule a discovery call. Reply STOP to opt out.",
     note: "Submit as 'new_dawn_followup' (Marketing). Variable: {{1}} = first name.",
   },
   {
-    id: "wa_brochure",
-    label: "Brochure offer (template)",
-    metaTemplateName: "new_dawn_brochure",
+    id: "wa_fdd_offer",
+    label: "Step 1: FDD Offer (template)",
+    group: "3 — FDD & Receipt",
+    metaTemplateName: "new_dawn_fdd",
     languageCode: "en_US",
     requiresApproval: true,
-    body: "Hi {{name}}, I've put together an investor brochure covering the full E-2 franchise model, investment details, and Texas market data. Want me to send it over?",
-    note: "Submit as 'new_dawn_brochure' (Marketing). Variable: {{1}} = first name.",
+    body: "Hi {{name}}, your Franchise Disclosure Document is ready. It covers all three verticals so you can compare options — you'll have 14 days to review before any next steps. Shall I send it over?",
+    note: "Submit as 'new_dawn_fdd' (Marketing). Variable: {{1}} = first name.",
   },
   {
     id: "wa_freeform_reply",
-    label: "Free-form reply (existing contacts only)",
+    label: "Free-form reply (24hr window)",
+    group: "5 — Follow-Up",
     metaTemplateName: null,
     languageCode: "en_US",
     requiresApproval: false,
-    body: "Hi {{name}}, Dylan here from New Dawn Franchising. Just wanted to check in — any questions I can answer about the E-2 franchise opportunity?",
+    body: "Hi {{name}}, Dylan here from New Dawn Franchising. Just checking in — any questions I can answer about our E-2 franchise platform?",
     note: "Only works if the contact has messaged you within the last 24 hours.",
   },
 ];

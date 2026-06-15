@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import type { CrmTemplateGroup } from "@shared/crm-template-groups";
 
 // ─── Sender Profiles ──────────────────────────────────────────────────────────
 // Each profile maps an email address to its Gmail App Password env var name.
@@ -357,6 +358,7 @@ export interface EmailTemplate {
   label: string;
   subject: string;
   bodyHtml: string;
+  group: CrmTemplateGroup;
   signatureRequest?: boolean;
 }
 
@@ -364,7 +366,8 @@ export const CRM_EMAIL_TEMPLATES: EmailTemplate[] = [
   // ── Broker / Referral Partner ─────────────────────────────────────────────
   {
     id: "broker_intro",
-    label: "Broker — Referral Partner Introduction",
+    label: "Step 1: Referral Partner Introduction",
+    group: "1 — Pitch the Broker",
     subject: "E-2 franchise referral partnership — New Dawn Franchising",
     bodyHtml: `<p>Hi {{name}},</p>
 <p>I'm {{senderName}} with <strong>New Dawn Franchising</strong>. We built a multi-vertical franchise platform specifically for <strong>E-2 Treaty Investor Visa</strong> applicants — and I wanted to introduce a referral opportunity that may be relevant for your clients.</p>
@@ -379,7 +382,8 @@ export const CRM_EMAIL_TEMPLATES: EmailTemplate[] = [
   },
   {
     id: "broker_followup",
-    label: "Broker — Follow-Up (Day 3–7)",
+    label: "Step 2: Broker Follow-Up",
+    group: "1 — Pitch the Broker",
     subject: "Quick follow-up — E-2 franchise option for your clients",
     bodyHtml: `<p>Hi {{name}},</p>
 <p>I wanted to follow up on my note about <strong>New Dawn Franchising</strong>. I know your calendar is full, so I'll keep this brief.</p>
@@ -396,7 +400,8 @@ export const CRM_EMAIL_TEMPLATES: EmailTemplate[] = [
   },
   {
     id: "broker_partnership",
-    label: "Broker — Referral Partnership Details",
+    label: "Step 3: Referral Partnership Details",
+    group: "1 — Pitch the Broker",
     subject: "Referral partnership details — New Dawn Franchising",
     bodyHtml: `<p>Hi {{name}},</p>
 <p>Thank you for your interest in partnering with New Dawn Franchising. Here's a quick overview of how our <strong>Referring Broker Program</strong> works:</p>
@@ -411,7 +416,8 @@ export const CRM_EMAIL_TEMPLATES: EmailTemplate[] = [
   },
   {
     id: "broker_referral_thanks",
-    label: "Broker — Thank You for Client Referral",
+    label: "Step 4: Thank You for Client Referral",
+    group: "1 — Pitch the Broker",
     subject: "Thank you for the referral — {{name}}",
     bodyHtml: `<p>Hi {{name}},</p>
 <p>Thank you for introducing your client to <strong>New Dawn Franchising</strong>. We truly value referral partners who trust us with their clients' E-2 investment journey.</p>
@@ -428,7 +434,8 @@ export const CRM_EMAIL_TEMPLATES: EmailTemplate[] = [
   // ── Investor — Intro & Discovery ────────────────────────────────────────
   {
     id: "investor_intro",
-    label: "Investor — E-2 Franchise Introduction",
+    label: "Step 1: E-2 Franchise Introduction",
+    group: "2 — Pitch the Investor",
     subject: "E-2 visa franchise opportunity — New Dawn Franchising",
     bodyHtml: `<p>Hi {{name}},</p>
 <p>I'm {{senderName}} with <strong>New Dawn Franchising</strong> — the first franchise platform built specifically for <strong>E-2 Treaty Investor Visa</strong> applicants.</p>
@@ -444,7 +451,8 @@ export const CRM_EMAIL_TEMPLATES: EmailTemplate[] = [
   },
   {
     id: "investor_broker_referred",
-    label: "Investor — Warm Intro (Broker Referred)",
+    label: "Step 2: Warm Intro (Broker Referred)",
+    group: "2 — Pitch the Investor",
     subject: "Introduction from your advisor — New Dawn E-2 franchise",
     bodyHtml: `<p>Hi {{name}},</p>
 <p>Your advisor connected us, and I wanted to reach out personally. I'm {{senderName}} with <strong>New Dawn Franchising</strong>.</p>
@@ -454,7 +462,8 @@ export const CRM_EMAIL_TEMPLATES: EmailTemplate[] = [
   },
   {
     id: "investor_discovery_invite",
-    label: "Investor — Schedule Discovery Call",
+    label: "Step 3: Schedule Discovery Call",
+    group: "2 — Pitch the Investor",
     subject: "Let's find your best E-2 franchise fit — 15-minute call?",
     bodyHtml: `<p>Hi {{name}},</p>
 <p>Thank you for your interest in <strong>New Dawn Franchising</strong>. The next step is a brief discovery call where we can:</p>
@@ -469,7 +478,8 @@ export const CRM_EMAIL_TEMPLATES: EmailTemplate[] = [
   },
   {
     id: "investor_vertical_guide",
-    label: "Investor — Vertical Comparison Guide",
+    label: "Step 4: Vertical Comparison (PM / Telecom / Insurance)",
+    group: "2 — Pitch the Investor",
     subject: "Property Management vs. Telecom vs. Insurance — which fits you?",
     bodyHtml: `<p>Hi {{name}},</p>
 <p>One of the most common questions we hear: <em>which New Dawn vertical is right for me?</em></p>
@@ -484,7 +494,8 @@ export const CRM_EMAIL_TEMPLATES: EmailTemplate[] = [
   },
   {
     id: "meeting_followup",
-    label: "Investor — Post-Discovery Call Follow-Up",
+    label: "Step 5: Post-Discovery Call Follow-Up",
+    group: "2 — Pitch the Investor",
     subject: "Great speaking with you — next steps",
     bodyHtml: `<p>Hi {{name}},</p>
 <p>Thank you for taking the time to speak with me today. I enjoyed learning more about your background, timeline, and E-2 goals.</p>
@@ -496,7 +507,8 @@ export const CRM_EMAIL_TEMPLATES: EmailTemplate[] = [
   // ── FDD & Legal Milestones ────────────────────────────────────────────────
   {
     id: "fdd_cover",
-    label: "FDD Package Cover Email",
+    label: "Step 1: FDD Package Cover Email",
+    group: "3 — FDD & Receipt",
     subject: "Your Franchise Disclosure Document — New Dawn Franchising",
     bodyHtml: `<p>Hi {{name}},</p>
 <p>Please find attached your <strong>Franchise Disclosure Document (FDD)</strong> from New Dawn Franchising LLC.</p>
@@ -511,7 +523,8 @@ export const CRM_EMAIL_TEMPLATES: EmailTemplate[] = [
   },
   {
     id: "fdd_receipt_request",
-    label: "📋 FDD Receipt — Send Signature Request",
+    label: "Step 2: FDD Receipt — Send Signature Request",
+    group: "3 — FDD & Receipt",
     subject: "Action Required: Please Sign Your FDD Receipt — New Dawn Franchising",
     bodyHtml: `<p>Hi {{name}},</p>
 <p>As part of the franchise disclosure process, we need you to electronically sign the <strong>FDD Receipt</strong> — the last page of the Franchise Disclosure Document.</p>
@@ -523,7 +536,8 @@ export const CRM_EMAIL_TEMPLATES: EmailTemplate[] = [
   },
   {
     id: "waiting_period_checkin",
-    label: "14-Day FDD Review Check-In",
+    label: "Step 3: 14-Day FDD Review Check-In",
+    group: "3 — FDD & Receipt",
     subject: "Checking in — any questions on the FDD?",
     bodyHtml: `<p>Hi {{name}},</p>
 <p>I hope you've had a chance to begin reviewing the Franchise Disclosure Document. We're now midway through your 14-day review period, and I wanted to check in.</p>
@@ -538,7 +552,8 @@ export const CRM_EMAIL_TEMPLATES: EmailTemplate[] = [
   },
   {
     id: "franchise_agreement_cover",
-    label: "Franchise Agreement Cover Email",
+    label: "Step 4: Franchise Agreement Cover Email",
+    group: "3 — FDD & Receipt",
     subject: "Your Franchise Agreement — New Dawn Franchising",
     bodyHtml: `<p>Hi {{name}},</p>
 <p>Your 14-day FDD review period is complete. Please find attached your <strong>Franchise Agreement</strong> for the vertical you've selected.</p>
@@ -556,7 +571,8 @@ export const CRM_EMAIL_TEMPLATES: EmailTemplate[] = [
   // ── Closing & Onboarding ──────────────────────────────────────────────────
   {
     id: "wire_instructions",
-    label: "Wire Transfer Instructions",
+    label: "Step 1: Wire Transfer Instructions",
+    group: "4 — Close the Deal",
     subject: "Wire transfer instructions — franchise fee",
     bodyHtml: `<p>Hi {{name}},</p>
 <p>Congratulations on executing your Franchise Agreement! We are thrilled to welcome you to the New Dawn Franchising family.</p>
@@ -573,7 +589,8 @@ export const CRM_EMAIL_TEMPLATES: EmailTemplate[] = [
   },
   {
     id: "e2_visa_next_steps",
-    label: "E-2 Visa Application Next Steps",
+    label: "Step 2: E-2 Visa Application Next Steps",
+    group: "4 — Close the Deal",
     subject: "E-2 visa next steps — your New Dawn franchise",
     bodyHtml: `<p>Hi {{name}},</p>
 <p>Now that your franchise agreement is in place, here's how we coordinate your <strong>E-2 visa application</strong>:</p>
@@ -588,7 +605,8 @@ export const CRM_EMAIL_TEMPLATES: EmailTemplate[] = [
   },
   {
     id: "closing_congratulations",
-    label: "Closing — Welcome to New Dawn",
+    label: "Step 3: Welcome — You're Officially In",
+    group: "4 — Close the Deal",
     subject: "Welcome to New Dawn Franchising — you're officially in!",
     bodyHtml: `<p>Hi {{name}},</p>
 <p><strong>Congratulations!</strong> Your franchise fee has been received and your onboarding is officially underway. Welcome to New Dawn Franchising.</p>
@@ -607,6 +625,7 @@ export const CRM_EMAIL_TEMPLATES: EmailTemplate[] = [
   {
     id: "reengagement",
     label: "Re-Engagement Check-In",
+    group: "5 — Follow-Up",
     subject: "Checking in — still exploring E-2 franchise options?",
     bodyHtml: `<p>Hi {{name}},</p>
 <p>I wanted to check in — it's been a little while since we last connected, and I wanted to see how your E-2 planning is progressing.</p>
@@ -616,7 +635,8 @@ export const CRM_EMAIL_TEMPLATES: EmailTemplate[] = [
   },
   {
     id: "gentle_breakup",
-    label: "Final Check-In (Breakup Email)",
+    label: "Final Check-In (Last Touch)",
+    group: "5 — Follow-Up",
     subject: "Last note from New Dawn — here if you need us",
     bodyHtml: `<p>Hi {{name}},</p>
 <p>This will be my last email for now — I don't want to clutter your inbox.</p>

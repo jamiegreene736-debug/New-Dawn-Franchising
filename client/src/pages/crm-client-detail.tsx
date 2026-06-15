@@ -41,7 +41,7 @@ function activityLabel(act: { activityType: string; metadata: unknown }): string
     case "email_opened": return `Email opened: ${m.subject || ""}`;
     case "sms_sent": return `SMS sent: "${String(m.message || "").slice(0, 60)}${String(m.message || "").length > 60 ? "…" : ""}"`;
     case "sms_failed": return `SMS failed: ${m.error || ""}`;
-    case "whatsapp_sent": return `WhatsApp sent: "${String(m.message || "").slice(0, 60)}…"`;
+    case "whatsapp_sent": return `WhatsApp ${m.manual ? "opened" : "sent"}: "${String(m.message || "").slice(0, 60)}…"`;
     case "whatsapp_failed": return `WhatsApp failed: ${m.error || ""}`;
     case "voicemail_dropped": return "Ringless voicemail dropped";
     case "voicemail_failed": return `Voicemail failed: ${m.error || ""}`;
@@ -182,8 +182,6 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
   const [waMessage, setWaMessage] = useState("");
   const [linkedinNote, setLinkedinNote] = useState("");
   const [audioUrl, setAudioUrl] = useState("");
-  const [waCheckResult, setWaCheckResult] = useState<{ onWhatsApp: boolean; waId?: string; error?: string } | null>(null);
-  const [waChecking, setWaChecking] = useState(false);
   const [verifyResult, setVerifyResult] = useState<{
     email?: { result: string; status: string; score: number; disposable?: boolean; webmail?: boolean; configured?: boolean };
     phone?: { valid: boolean; normalized: string; note: string };
@@ -340,18 +338,39 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
     onError: (e: Error) => toast({ title: "SMS failed", description: e.message, variant: "destructive" }),
   });
 
-  const waMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/crm/clients/${client.id}/whatsapp`, { message: waMessage });
+  // Logs the WhatsApp touch to the client timeline (the message itself is sent
+  // manually from the WhatsApp desktop app, not via an API).
+  const logWhatsAppMutation = useMutation({
+    mutationFn: async (message: string) => {
+      const res = await apiRequest("POST", `/api/crm/clients/${client.id}/activities`, {
+        activityType: "whatsapp_sent",
+        metadata: { message, manual: true },
+      });
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: activitiesKey });
-      setWaMessage("");
-      toast({ title: "WhatsApp message sent" });
-    },
-    onError: (e: Error) => toast({ title: "WhatsApp failed", description: e.message, variant: "destructive" }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: activitiesKey }),
   });
+
+  // Opens the WhatsApp desktop app on the user's Mac, pre-filled with the
+  // contact's number and the composed message, so the conversation continues
+  // natively in WhatsApp instead of going through the Meta Cloud API.
+  function openWhatsApp() {
+    if (!client.phone) return;
+    const digits = client.phone.replace(/\D/g, "");
+    // Assume a bare 10-digit number is US/Canada and prepend the country code.
+    const intl = digits.length === 10 ? `1${digits}` : digits;
+    const text = waMessage.trim().replace(/\{\{name\}\}/g, client.fullName.split(" ")[0]);
+    const url = `whatsapp://send?phone=${intl}${text ? `&text=${encodeURIComponent(text)}` : ""}`;
+
+    // Trigger the whatsapp:// protocol handler without navigating the page away.
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.click();
+
+    if (text) logWhatsAppMutation.mutate(text);
+    toast({ title: "Opening WhatsApp…", description: "Continue the conversation in the WhatsApp app." });
+    setWaMessage("");
+  }
 
   const logLinkedInMutation = useMutation({
     mutationFn: async () => {
@@ -1645,58 +1664,15 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
               {/* ── WhatsApp ── */}
               {tab === "whatsapp" && (
                 <div className="space-y-4">
-                  {!twilioStatus?.whatsappReady && (
-                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                      WhatsApp not configured. Add META_WHATSAPP_ACCESS_TOKEN and META_WHATSAPP_PHONE_NUMBER_ID in Secrets to enable WhatsApp via Meta Cloud API.
-                    </div>
-                  )}
                   {!client.phone && (
                     <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
                       This client has no phone number on file.
                     </div>
                   )}
 
-                  {/* ── WhatsApp number check ── */}
-                  {client.phone && twilioStatus?.whatsappReady && (
-                    <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-muted-foreground">Is this number on WhatsApp?</span>
-                        <button
-                          disabled={waChecking}
-                          onClick={async () => {
-                            setWaChecking(true);
-                            setWaCheckResult(null);
-                            try {
-                              const res = await apiRequest("POST", "/api/crm/whatsapp-check-number", { phone: client.phone });
-                              setWaCheckResult(await res.json());
-                            } catch {
-                              setWaCheckResult({ onWhatsApp: false, error: "Check failed" });
-                            } finally {
-                              setWaChecking(false);
-                            }
-                          }}
-                          className="text-xs rounded-full border px-2.5 py-1 bg-white hover:bg-muted transition-colors flex items-center gap-1 disabled:opacity-50"
-                        >
-                          {waChecking ? <Loader2 className="size-3 animate-spin" /> : <MessageCircle className="size-3" />}
-                          {waChecking ? "Checking…" : "Check"}
-                        </button>
-                      </div>
-                      {waCheckResult !== null && (
-                        <div className={`text-xs rounded px-2 py-1 font-medium ${waCheckResult.onWhatsApp ? "bg-green-100 text-green-800" : "bg-red-50 text-red-700"}`}>
-                          {waCheckResult.onWhatsApp
-                            ? `✓ Registered on WhatsApp${waCheckResult.waId ? ` (ID: ${waCheckResult.waId})` : ""}`
-                            : `✗ Not on WhatsApp${waCheckResult.error ? ` — ${waCheckResult.error}` : ""}`}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* ── Template guidance ── */}
-                  <div className="rounded-lg border border-blue-100 bg-blue-50/50 p-3 text-xs text-blue-800 space-y-1">
-                    <p className="font-semibold">First-time message?</p>
-                    <p>Meta requires an approved template for cold outreach. Use one of the template options below — they map to templates you submit in Meta Business Manager. Free-form text only works if they've messaged you within the last 24 hours.</p>
-                    <a href="https://business.facebook.com/wa/manage/message-templates/" target="_blank" rel="noopener noreferrer"
-                      className="underline font-medium">Submit templates in Meta Business Manager →</a>
+                  <div className="rounded-lg border border-green-100 bg-green-50/50 p-3 text-xs text-green-800 space-y-1">
+                    <p className="font-semibold">Opens in the WhatsApp app</p>
+                    <p>This launches the WhatsApp desktop app on your Mac for {formatPhone(client.phone) || "this contact"}, pre-filled with any message you compose below — so you can chat directly in WhatsApp. No API or template approval needed; just make sure WhatsApp Desktop is installed and signed in.</p>
                   </div>
 
                   <div>
@@ -1705,20 +1681,20 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
                   </div>
                   <div>
                     <label className="text-xs font-semibold text-muted-foreground mb-1 block">
-                      WhatsApp to {formatPhone(client.phone) || "(no phone)"}
+                      Message to {formatPhone(client.phone) || "(no phone)"}
                     </label>
                     <textarea
                       value={waMessage}
                       onChange={(e) => setWaMessage(e.target.value)}
                       rows={5}
-                      placeholder="Type your WhatsApp message…"
+                      placeholder="Optional — type a message to pre-fill in WhatsApp…"
                       className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm resize-none"
                     />
                   </div>
-                  <Button disabled={!waMessage.trim() || !client.phone || waMutation.isPending}
-                    onClick={() => waMutation.mutate()} className="gap-2 bg-green-600 hover:bg-green-700">
-                    {waMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : <MessageCircle className="size-4" />}
-                    Send WhatsApp
+                  <Button disabled={!client.phone}
+                    onClick={openWhatsApp} className="gap-2 bg-green-600 hover:bg-green-700">
+                    <MessageCircle className="size-4" />
+                    Open in WhatsApp
                   </Button>
                 </div>
               )}

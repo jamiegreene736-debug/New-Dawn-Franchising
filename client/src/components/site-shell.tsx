@@ -4,6 +4,7 @@ import { Link, useLocation } from "wouter";
 import { ArrowRight, ChevronDown, Globe2, Loader2, Mail, MapPin, Menu, Phone, Send, X, MessageCircle, GraduationCap, Megaphone, ShieldCheck, Handshake } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { LanguageSwitcher } from "@/components/language-switcher";
 import logo from "@assets/Gemini_Generated_Image_t1u2o5t1u2o5t1u2_1771946732580.png";
 import mark from "@/assets/images/nhf-mark.png";
 
@@ -770,6 +771,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
           </nav>
 
           <div className="flex items-center gap-2">
+            <LanguageSwitcher />
             <span data-testid="badge-spanish" className="hidden items-center gap-1 rounded-full border bg-white/60 px-2.5 py-1 text-[11px] font-medium text-foreground/60 lg:inline-flex">
               <Globe2 className="size-3" />
               <span>E-2 investor guidance</span>
@@ -974,10 +976,11 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
               </div>
             </div>
 
-            <div className="mt-6 flex flex-wrap gap-4 border-t pt-6 text-xs text-muted-foreground/60">
+            <div className="mt-6 flex flex-wrap items-center gap-4 border-t pt-6 text-xs text-muted-foreground/60">
               <span>&copy; {new Date().getFullYear()} New Dawn Franchising LLC. All rights reserved.</span>
               <Link href="/privacy-policy" data-testid="link-footer-privacy" className="hover:text-muted-foreground transition-colors">Privacy Policy</Link>
               <Link href="/terms" data-testid="link-footer-terms" className="hover:text-muted-foreground transition-colors">Terms &amp; Conditions</Link>
+              <LanguageSwitcher className="ml-auto" />
             </div>
           </div>
         </div>

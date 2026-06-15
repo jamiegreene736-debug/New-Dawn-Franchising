@@ -49,6 +49,11 @@ function searchPath(): string {
   return p.startsWith("/") ? p : `/${p}`;
 }
 
+function enrichPath(): string {
+  const p = process.env.ORIGAMI_ENRICH_PATH || "/v1/contacts/enrich";
+  return p.startsWith("/") ? p : `/${p}`;
+}
+
 function authHeaders(key: string): Record<string, string> {
   return {
     "Content-Type": "application/json",
@@ -248,4 +253,69 @@ export async function origamiSearchCompanies(
     })
     .filter((c): c is SeamlessCompany => !!c);
   return { companies, nextToken };
+}
+
+// ─── Enrichment (POST /v1/contacts/enrich) ───────────────────────────────────
+// Given a name + email/domain, ask Origami for the person's best email/phone/
+// title/company/LinkedIn/location. Defensive + path-overridable like search;
+// reuses the tolerant mapPerson reader so most JSON shapes "just work".
+
+export interface OrigamiEnrichment {
+  email: string | null;
+  phone: string | null;
+  jobTitle: string | null;
+  company: string | null;
+  domain: string | null;
+  linkedinUrl: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+}
+
+export async function origamiEnrichPerson(opts: {
+  firstName?: string | null;
+  lastName?: string | null;
+  name?: string | null;
+  email?: string | null;
+  domain?: string | null;
+  organizationName?: string | null;
+}): Promise<OrigamiEnrichment | null> {
+  const key = getKey();
+  if (!key) return null;
+
+  const body: Record<string, unknown> = {};
+  if (opts.firstName) body.first_name = opts.firstName;
+  if (opts.lastName) body.last_name = opts.lastName;
+  if (opts.name) body.name = opts.name;
+  if (opts.email) body.email = opts.email;
+  if (opts.domain) body.domain = opts.domain;
+  if (opts.organizationName) body.company = opts.organizationName;
+
+  try {
+    const res = await fetch(`${baseUrl()}${enrichPath()}`, {
+      method: "POST",
+      headers: authHeaders(key),
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as Loose;
+    // The person may be at the root or under a common envelope key.
+    const raw = (nested(json, "data", "person", "result", "contact") || json) as Loose;
+    const mapped = mapPerson(raw);
+    if (!mapped) return null;
+    return {
+      email: mapped.email,
+      phone: mapped.phone,
+      jobTitle: mapped.jobTitle,
+      company: mapped.company,
+      domain: mapped.domain,
+      linkedinUrl: mapped.linkedinUrl,
+      city: mapped.city,
+      state: mapped.state,
+      country: mapped.country,
+    };
+  } catch {
+    return null;
+  }
 }

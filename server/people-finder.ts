@@ -11,6 +11,7 @@ import { verifyEmailBatch } from "./zerobounce-service";
 import { lookupPhoneBatch, type PhoneType } from "./twilio-lookup";
 import { fetchPeopleFromPdl, enrichGapsViaPdl, pdlLevelToSeniority, type PdlPerson } from "./pdl-service";
 import { apolloEnrichPerson, apolloConfigured } from "./apollo-service";
+import { origamiEnrichPerson, origamiConfigured } from "./origami-service";
 import { enrichPeopleFromWhitepages } from "./whitepages-service";
 import { seamlessFindPeople, seamlessEnrichByIdentity, type SeamlessPerson } from "./seamless-service";
 
@@ -1558,6 +1559,32 @@ async function enrichGapsFromApollo(people: FoundPerson[], domain: string): Prom
   }
 }
 
+// ─── Phase 4.86: Origami gap enrichment ──────────────────────────────────────
+// Same idea as the Apollo gap-fill, using Origami's Enrichment API for any
+// person still missing an email or phone. Best-effort, bounded, never throws.
+async function enrichGapsFromOrigami(people: FoundPerson[], domain: string): Promise<void> {
+  if (!origamiConfigured() || !domain) return;
+  const gaps = people.filter((p) => (!p.email || !p.phone) && p.firstName && p.lastName).slice(0, 15);
+  for (const person of gaps) {
+    try {
+      const o = await origamiEnrichPerson({ firstName: person.firstName, lastName: person.lastName, domain });
+      if (!o) continue;
+      let used = false;
+      if (!person.email && o.email) {
+        person.email = o.email;
+        person.emailConfidence = 70;
+        person.emailStatus = "unverified";
+        used = true;
+      }
+      if (!person.phone && o.phone) { person.phone = o.phone; used = true; }
+      if (!person.linkedinUrl && o.linkedinUrl) { person.linkedinUrl = o.linkedinUrl; used = true; }
+      if (!person.jobTitle && o.jobTitle) { person.jobTitle = o.jobTitle; used = true; }
+      if (!person.country && o.country) person.country = o.country;
+      if (used && !person.sources.includes("origami")) person.sources.push("origami");
+    } catch { /* best-effort */ }
+  }
+}
+
 // ─── Main export ─────────────────────────────────────────────────────────────
 
 export async function findAllPeopleAtCompany(
@@ -1699,6 +1726,9 @@ export async function findAllPeopleAtCompany(
   // Phase 4.85: Apollo gap enrichment — fill any remaining missing email/phone/
   // LinkedIn for found people via Apollo's Enrichment (People Match) API.
   await enrichGapsFromApollo(valid, domain);
+
+  // Phase 4.86: Origami gap enrichment — same, via Origami's Enrichment API.
+  await enrichGapsFromOrigami(valid, domain);
 
   // Phase 4.6: Country-based WhatsApp probability for anyone not yet scored
   // (catches people where Twilio lookup was skipped due to batching caps,

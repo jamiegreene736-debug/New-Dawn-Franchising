@@ -4,6 +4,7 @@ import {
   Folder, Bookmark, Clock, Settings2, Info, Star, Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import LeadResearchAgent from "@/components/lead-research-agent";
 
 // ─── Shared filter shape (mirrors server LeadSearchFilters) ──────────────────
 
@@ -589,30 +590,9 @@ export default function SeamlessSearchPanel({
               Who can I help you find today?
             </h3>
 
-            <div className="relative">
-              <textarea
-                value={aiQuery}
-                data-testid="seamless-ai-query"
-                onChange={(e) => setAiQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (aiQuery.trim()) onAiSearch(); }
-                }}
-                rows={4}
-                placeholder={isCompanies
-                  ? "Property management companies in Florida with 51-200 employees"
-                  : "Finance CEOs in Texas with more than 500 employees"}
-                className="w-full resize-none rounded-2xl border bg-background p-5 pb-16 text-base shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-              />
-              <Button
-                onClick={onAiSearch}
-                disabled={isSearching || !aiQuery.trim()}
-                className="absolute bottom-4 right-4 h-10 gap-1.5"
-                data-testid="seamless-ai-search-btn"
-              >
-                {isSearching ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
-                {isCompanies ? "Search Companies" : "Search Contacts"}
-              </Button>
-            </div>
+            {/* Conversational AI lead-research agent (builds lists, analyzes ICP,
+                drafts outreach, and saves/enrolls results). */}
+            <LeadResearchAgent />
 
             <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
               <button

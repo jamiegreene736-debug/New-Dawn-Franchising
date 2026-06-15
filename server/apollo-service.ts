@@ -304,3 +304,90 @@ export async function apolloSearchCompanies(
     return { companies: [], nextToken: null };
   }
 }
+
+// ─── People enrichment / match (POST /people/match) ──────────────────────────
+// Apollo's Enrichment API: given a name + email/domain it returns the person's
+// best work email, title, company, LinkedIn, location, and (when available)
+// phone numbers. Used for single-contact profile enrichment and to fill gaps in
+// people-search results.
+
+export interface ApolloEnrichment {
+  email: string | null;
+  emailStatus: string | null;
+  phone: string | null;
+  jobTitle: string | null;
+  seniority: string | null;
+  company: string | null;
+  domain: string | null;
+  linkedinUrl: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+}
+
+export async function apolloEnrichPerson(opts: {
+  firstName?: string | null;
+  lastName?: string | null;
+  name?: string | null;
+  email?: string | null;
+  domain?: string | null;
+  organizationName?: string | null;
+  revealPhone?: boolean;
+}): Promise<ApolloEnrichment | null> {
+  const key = getKey();
+  if (!key) return null;
+
+  const body: Record<string, unknown> = { reveal_personal_emails: true };
+  if (opts.firstName) body.first_name = opts.firstName;
+  if (opts.lastName) body.last_name = opts.lastName;
+  if (opts.name) body.name = opts.name;
+  if (opts.email) body.email = opts.email;
+  if (opts.domain) body.domain = opts.domain;
+  if (opts.organizationName) body.organization_name = opts.organizationName;
+  // Phone reveal can be async (needs a webhook) on some plans; only request it
+  // when explicitly asked. Either way we read any phone_numbers Apollo returns.
+  if (opts.revealPhone) body.reveal_phone_number = true;
+
+  try {
+    const res = await fetch(`${APOLLO_BASE}/people/match`, {
+      method: "POST",
+      headers: authHeaders(key),
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as {
+      person?: ApolloPerson & {
+        phone_numbers?: Array<{ sanitized_number?: string; raw_number?: string }>;
+        organization?: ApolloOrg & { phone?: string };
+      };
+    };
+    const p = json.person;
+    if (!p) return null;
+    const org = p.organization || {};
+    const phone =
+      p.phone_numbers?.find((n) => n.sanitized_number)?.sanitized_number ||
+      p.phone_numbers?.[0]?.raw_number ||
+      (org as ApolloOrg & { phone?: string }).phone ||
+      null;
+    const domain =
+      org.primary_domain ||
+      (org.website_url ? org.website_url.replace(/^https?:\/\//, "").replace(/\/.*$/, "") : null) ||
+      null;
+    return {
+      email: realEmail(p.email, p.email_status),
+      emailStatus: p.email_status || null,
+      phone,
+      jobTitle: p.title || null,
+      seniority: titleCase(p.seniority),
+      company: org.name || null,
+      domain,
+      linkedinUrl: p.linkedin_url || null,
+      city: p.city || org.city || null,
+      state: p.state || org.state || null,
+      country: p.country || org.country || null,
+    };
+  } catch {
+    return null;
+  }
+}

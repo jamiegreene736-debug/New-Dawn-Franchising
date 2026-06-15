@@ -6,7 +6,7 @@ import {
   Trash2, FileText, Loader2, CheckCircle2, Circle, ExternalLink,
   Linkedin, Globe, ChevronDown, RefreshCw, Clock, Paperclip,
   PhoneCall, MessageCircle, PenLine, Timer, AlertTriangle, Sparkles,
-  Printer, Zap, Check, Search, Megaphone,
+  Printer, Zap, Check, Search, Megaphone, Copy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -838,7 +838,7 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
                     iconColor: "text-sky-600",
                     description: "Send a personalised connection request on LinkedIn to open the relationship.",
                     sendType: "manual",
-                    defaultBody: "",
+                    defaultBody: `Hi ${firstName} — I came across your work and wanted to connect. I'm with New Dawn Franchising, built specifically for E-2 Treaty Investor Visa candidates who want to own a U.S. business without running the day-to-day. Would love to connect.`,
                   },
                   {
                     id: "d1_email",
@@ -900,7 +900,7 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
                     description: "If they accepted the Day 0 connection request, send a short LinkedIn DM.",
                     condition: "If: LinkedIn connected",
                     sendType: "manual",
-                    defaultBody: "",
+                    defaultBody: `Hi ${firstName} — thanks for connecting! I sent you an email too so it doesn't get buried. We built New Dawn for E-2 candidates: a qualifying U.S. business they direct while our team runs daily ops, and they can live anywhere in the U.S. Happy to share a quick overview if it's useful for anyone in your pipeline.`,
                   },
                   {
                     id: "d5_heygen",
@@ -1141,6 +1141,11 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
                       const isEmail = s.sendType === "email";
                       const needsPhone = s.sendType === "sms" || s.sendType === "whatsapp";
                       const hasContact = isEmail ? !!client.email : !!client.phone;
+                      const isLinkedInStep = /linkedin/i.test(s.channel);
+                      // Direct profile link if we have it, otherwise a name search on LinkedIn.
+                      const linkedInHref = client.linkedinUrl
+                        ? client.linkedinUrl
+                        : `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(client.fullName || "")}`;
 
                       return (
                         <div key={s.id} className={`rounded-xl border transition-all ${status.done ? "border-green-100 bg-green-50/50" : isExpanded ? "border-[hsl(var(--primary)/0.4)] bg-[hsl(var(--primary)/0.03)]" : "border-muted bg-card"}`}>
@@ -1153,6 +1158,9 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
                               <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
                                 <span className="text-[10px] font-semibold text-muted-foreground">Step {i + 1}</span>
                                 <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${s.iconBg} ${s.iconColor}`}>{s.day}</span>
+                                {s.sendType === "manual" && (
+                                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600 border border-gray-200">Manual — you do this</span>
+                                )}
                                 {s.condition && (
                                   <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">{s.condition}</span>
                                 )}
@@ -1181,6 +1189,47 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
                               )}
                             </div>
                           </div>
+
+                          {/* LinkedIn manual-step helper: jump to the profile + copy the note */}
+                          {isLinkedInStep && s.sendType === "manual" && !status.done && (
+                            <div className="border-t px-3 pb-3 pt-2.5 space-y-2">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <a
+                                  href={linkedInHref}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1.5 rounded-md bg-sky-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-sky-700"
+                                >
+                                  <Linkedin className="size-3.5" />
+                                  {client.linkedinUrl ? "Open LinkedIn profile" : "Find on LinkedIn"}
+                                  <ExternalLink className="size-3" />
+                                </a>
+                                {s.defaultBody && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8 gap-1.5 text-xs"
+                                    onClick={() => {
+                                      navigator.clipboard?.writeText(s.defaultBody);
+                                      toast({ title: "Note copied", description: "Paste it into your LinkedIn message." });
+                                    }}
+                                  >
+                                    <Copy className="size-3.5" /> Copy note
+                                  </Button>
+                                )}
+                              </div>
+                              {s.defaultBody && (
+                                <div className="rounded-md border bg-muted/40 px-3 py-2 text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap">
+                                  {s.defaultBody}
+                                </div>
+                              )}
+                              {!client.linkedinUrl && (
+                                <p className="text-[11px] text-muted-foreground">
+                                  No LinkedIn URL on file — this opens a name search. Add their profile via Edit to link directly.
+                                </p>
+                              )}
+                            </div>
+                          )}
 
                           {/* Inline compose area */}
                           {isExpanded && !status.done && (

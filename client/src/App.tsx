@@ -11,6 +11,11 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import AboutPage from "@/pages/about";
 import EsPage from "@/pages/es";
+import FrPage from "@/pages/fr";
+import ZhPage from "@/pages/zh";
+import JaPage from "@/pages/ja";
+import KoPage from "@/pages/ko";
+import TrPage from "@/pages/tr";
 import E2FitPage from "@/pages/e2-fit";
 import E2VisaFranchisePage from "@/pages/e2-visa-franchise";
 import E2VisaProcessPage from "@/pages/e2-visa-process";
@@ -82,6 +87,11 @@ function Router() {
               <Route path="/about" component={AboutPage} />
               <Route path="/es" component={EsPage} />
               <Route path="/es/property-management" component={EsPropertyManagementPage} />
+              <Route path="/fr" component={FrPage} />
+              <Route path="/zh" component={ZhPage} />
+              <Route path="/ja" component={JaPage} />
+              <Route path="/ko" component={KoPage} />
+              <Route path="/tr" component={TrPage} />
               <Route path="/e-2-visa-process" component={E2VisaProcessPage} />
               <Route path="/request-fdd" component={RequestFddPage} />
               <Route path="/legal" component={LegalPage} />

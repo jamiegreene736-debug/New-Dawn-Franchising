@@ -8,6 +8,8 @@ type Locale = { code: string; label: string; href: string };
 const LOCALES: Locale[] = [
   { code: "en", label: "EN", href: "/" },
   { code: "es", label: "ES", href: "/es" },
+  { code: "fr", label: "FR", href: "/fr" },
+  { code: "zh", label: "中文", href: "/zh" },
 ];
 
 function currentCode(location: string): string {

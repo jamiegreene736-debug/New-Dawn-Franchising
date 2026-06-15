@@ -42,7 +42,8 @@ const FOOTER_I18N = {
   en: {
     groupPrefix: "Part of the ",
     groupSuffix: " — proprietary technology, decades of experience",
-    spanishLine: "Servimos a inversionistas de todo el mundo — hablamos español",
+    outreachLine: "Servimos a inversionistas de todo el mundo — hablamos español",
+    outreachLang: "es",
     followFacebook: "Follow us on Facebook",
     stayUpdated: "Stay updated",
     newsletterDesc:
@@ -64,7 +65,8 @@ const FOOTER_I18N = {
   es: {
     groupPrefix: "Parte del ",
     groupSuffix: " — tecnología propia y décadas de experiencia",
-    spanishLine: "Servimos a inversionistas de todo el mundo — hablamos español",
+    outreachLine: "Servimos a inversionistas de todo el mundo — hablamos español",
+    outreachLang: "es",
     followFacebook: "Síganos en Facebook",
     stayUpdated: "Manténgase informado",
     newsletterDesc:
@@ -88,12 +90,71 @@ const FOOTER_I18N = {
     privacy: "Política de Privacidad",
     terms: "Términos y Condiciones",
   },
+  fr: {
+    groupPrefix: "Membre du ",
+    groupSuffix: " — technologie propriétaire, des décennies d'expérience",
+    outreachLine: "Nous accompagnons des investisseurs du monde entier — nous parlons français",
+    outreachLang: "fr",
+    followFacebook: "Suivez-nous sur Facebook",
+    stayUpdated: "Restez informé",
+    newsletterDesc:
+      "Recevez les dernières actualités sur les franchises, les nouveautés du visa E-2 et des analyses du secteur directement dans votre boîte mail.",
+    newsletterPlaceholder: "Saisissez votre adresse e-mail",
+    subscribe: "S'abonner",
+    newsletterSuccess: "Vous êtes inscrit ! Nous vous tiendrons informé des dernières actualités.",
+    requestInfo: "Demander des informations",
+    legalHeading: "Mentions légales",
+    disclaimerLead:
+      "Ce site web est fourni à titre d'information générale uniquement — il ne s'agit pas d'une offre de vente d'une franchise, ni d'un conseil juridique, d'immigration, fiscal ou financier.",
+    disclaimerParagraphs: [
+      "Les informations de ce site sont fournies uniquement à des fins d'information et d'éducation générales et ne constituent pas une offre de vente, ni une sollicitation d'offre d'achat, d'une franchise. Une franchise est proposée et vendue uniquement au moyen d'un Document d'information sur la franchise (FDD) conforme à la règle de la FTC sur les franchises (16 CFR partie 436) et aux lois étatiques applicables. Certains États réglementent l'offre et la vente de franchises et exigent un enregistrement ou un dépôt ; New Dawn Franchising n'offrira ou ne vendra une franchise que dans les États où nous sommes enregistrés ou exemptés, et seulement après avoir satisfait aux exigences applicables d'enregistrement, de dépôt et d'information préalables à la vente et remis le FDD comme l'exige la loi.",
+      "New Dawn Franchising LLC est un franchiseur, et non un cabinet d'avocats. Rien sur ce site ne constitue un conseil juridique, d'immigration, fiscal ou financier, et aucune relation avocat-client ou professionnelle n'est créée par l'utilisation du site ou la prise de contact avec nous. Nous ne fournissons pas de services d'immigration et ne constituons pas votre entité juridique — c'est votre propre avocat qui le fait. Les informations sur le visa d'investisseur par traité E-2 sont générales et éducatives ; les lois sur l'immigration et les pays signataires de traités évoluent avec le temps. L'admissibilité et l'approbation du visa E-2 relèvent uniquement du gouvernement des États-Unis (les agents consulaires du Département d'État, et l'USCIS pour le changement ou la prolongation de statut), jamais de nous, et un visa n'est jamais garanti.",
+      "Avant de prendre toute décision d'investissement ou liée à l'immigration, vous devez faire appel à votre propre avocat spécialisé en immigration aux États-Unis ainsi qu'à des conseillers fiscaux et financiers qualifiés, et mener votre propre diligence raisonnable indépendante. Les informations sont fournies « en l'état », peuvent être incomplètes ou obsolètes, et nous n'offrons aucune garantie quant à leur exactitude ou leur exhaustivité. Tout chiffre de revenus, de gains, de résultats ou de performance est fourni à titre indicatif uniquement et ne constitue pas une garantie de résultats futurs ; les résultats individuels varient.",
+    ] as readonly string[],
+    seeFullPrefix: "Consultez nos ",
+    seeFullSuffix: " complètes pour l'ensemble des informations légales.",
+    termsLabel: "Conditions générales",
+    rightsReserved: "Tous droits réservés.",
+    privacy: "Politique de confidentialité",
+    terms: "Conditions générales",
+  },
+  zh: {
+    groupPrefix: "隶属于 ",
+    groupSuffix: " —— 自有专利技术，数十年经验",
+    outreachLine: "我们服务来自世界各地的投资者 —— 我们会说中文",
+    outreachLang: "zh",
+    followFacebook: "在 Facebook 上关注我们",
+    stayUpdated: "保持关注",
+    newsletterDesc:
+      "在您的邮箱中获取最新的特许经营新闻、E-2 签证动态和行业洞见。",
+    newsletterPlaceholder: "输入您的电子邮箱",
+    subscribe: "订阅",
+    newsletterSuccess: "订阅成功！我们会向您推送最新消息。",
+    requestInfo: "索取资料",
+    legalHeading: "法律声明",
+    disclaimerLead:
+      "本网站仅供一般参考之用 —— 它并非出售特许经营的要约，也不构成法律、移民、税务或财务建议。",
+    disclaimerParagraphs: [
+      "本网站信息仅供一般参考和教育之用，并非出售特许经营的要约，也不构成购买特许经营要约的招揽。特许经营仅通过符合美国联邦贸易委员会（FTC）特许经营规则（16 CFR 第 436 部分）及适用各州特许经营法律的《特许经营披露文件》（FDD）提供和出售。某些州对特许经营的提供和销售进行监管，并要求注册或备案；New Dawn Franchising 仅在我们已注册或获豁免的州提供或出售特许经营，并且只有在满足适用的销售前注册、备案和披露要求并依法交付 FDD 之后。",
+      "New Dawn Franchising LLC 是特许经营商，而非律师事务所。本网站上的任何内容均不构成法律、移民、税务或财务建议，使用本网站或与我们联系不会建立任何律师-客户关系或其他专业关系。我们不提供移民服务，也不为您设立法律实体 —— 这由您自己的律师完成。E-2 条约投资者签证信息仅为一般性和教育性内容；移民法律和符合条约的国家会随时间变化。E-2 签证的资格和批准完全由美国政府决定（美国国务院领事官员，以及负责身份变更或延期的 USCIS），绝非由我们决定，且签证从不保证。",
+      "在做出任何投资或与移民相关的决定之前，您应聘请您自己持有美国执照的移民律师以及合格的税务和财务顾问，并自行进行独立的尽职调查。信息按其现状提供，可能不完整或已过时，我们不对其准确性或完整性作出任何保证。任何收入、收益、结果或业绩数字均仅为示例，并不保证未来结果；个人结果各不相同。",
+    ] as readonly string[],
+    seeFullPrefix: "完整披露请参阅我们的",
+    seeFullSuffix: "。",
+    termsLabel: "条款与条件",
+    rightsReserved: "保留所有权利。",
+    privacy: "隐私政策",
+    terms: "条款与条件",
+  },
 } as const;
 
 type FooterCopy = (typeof FOOTER_I18N)[keyof typeof FOOTER_I18N];
 
 function localeFromPath(path: string): keyof typeof FOOTER_I18N {
-  return path === "/es" || path.startsWith("/es/") ? "es" : "en";
+  for (const code of ["es", "fr", "zh"] as const) {
+    if (path === `/${code}` || path.startsWith(`/${code}/`)) return code;
+  }
+  return "en";
 }
 
 function FacebookIcon({ className }: { className?: string }) {
@@ -974,7 +1035,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                 </div>
                 <div data-testid="text-footer-spanish" className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground/70">
                   <Globe2 className="size-3" />
-                  <span lang="es">{t.spanishLine}</span>
+                  <span lang={t.outreachLang}>{t.outreachLine}</span>
                 </div>
                 <a data-testid="link-footer-facebook" href={COMPANY.facebook} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground">
                   <FacebookIcon className="size-4" />

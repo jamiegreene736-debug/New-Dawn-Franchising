@@ -5,12 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Spanish (es) investor landing page — pilot locale.
+// Simplified Chinese (zh) investor landing page.
 //
 // ⚠️  FIRST-PASS TRANSLATION — NEEDS NATIVE-SPEAKER REVIEW BEFORE PROMOTION.
-// The copy below is a solid working draft of the English value proposition, but
-// it should be reviewed by a native Spanish speaker (ideally one familiar with
-// the E-2 investor audience) before this page is featured in outreach/ads.
+// Solid working draft of the English value proposition; have a native Chinese
+// speaker review before this page is featured in outreach/ads. Note: mainland
+// China is not an E-2 treaty country — this page targets Taiwan and
+// alternate-citizenship (e.g. Grenada) Chinese-speaking investors.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const SITE = "https://www.newdawnfranchising.com";
@@ -25,59 +26,59 @@ const COMPANY = {
 };
 
 const SEO = {
-  title: "New Dawn Franchising | Franquicias para inversionistas de la visa E-2",
+  title: "New Dawn Franchising | 面向 E-2 签证投资者的特许经营",
   description:
-    "Franquiciante multisectorial para inversionistas de la visa E-2. Elija entre tres franquicias de ingresos recurrentes —Administración de Propiedades, Telecomunicaciones (VoIP) o Seguros—. Usted dirige el negocio; nuestros equipos manejan las operaciones diarias. FDD disponible a solicitud.",
-  canonical: `${SITE}/es`,
+    "面向 E-2 签证投资者的多行业特许经营商。可从三种带来经常性收入的特许经营中选择——物业管理、电信（VoIP）或保险。您主导业务、掌控财务，我们的团队负责日常运营。FDD 可应要求提供。",
+  canonical: `${SITE}/zh`,
 };
 
 const VERTICALS = [
   {
     icon: <Building2 className="size-5 text-primary" />,
-    title: "Administración de Propiedades",
-    desc: "Ingresos recurrentes por honorarios de administración de alquileres. Nuestro equipo gestiona inquilinos, mantenimiento y cobros mientras usted supervisa el negocio.",
+    title: "物业管理",
+    desc: "通过租赁管理费获得经常性收入。我们的团队负责租户、维修与收款，您负责监督业务。",
   },
   {
     icon: <Cpu className="size-5 text-primary" />,
-    title: "Telecomunicaciones (VoIP)",
-    desc: "Servicios de telefonía empresarial en la nube con facturación mensual recurrente. Una categoría en crecimiento con clientes comerciales de largo plazo.",
+    title: "电信（VoIP）",
+    desc: "面向企业的云电话服务，按月经常性计费。这是一个不断增长的领域，拥有长期商业客户。",
   },
   {
     icon: <ShieldCheck className="size-5 text-primary" />,
-    title: "Seguros",
-    desc: "Una agencia de seguros con comisiones recurrentes por renovación. Construya una cartera de pólizas que genera ingresos año tras año.",
+    title: "保险",
+    desc: "经营一家保险代理机构，获得经常性的续保佣金。建立一个年复一年产生收入的保单组合。",
   },
 ];
 
 const BENEFITS = [
   {
     icon: <Banknote className="size-5 text-primary" />,
-    title: "Modelo de ingresos recurrentes",
-    desc: "Las tres franquicias se basan en ingresos mensuales o por renovación, no en ventas únicas.",
+    title: "经常性收入模式",
+    desc: "三种特许经营都以按月或续约收入为基础，而非一次性销售。",
   },
   {
     icon: <Handshake className="size-5 text-primary" />,
-    title: "Nuestros equipos operan el negocio",
-    desc: "Usted dirige la franquicia y controla sus finanzas; nuestros equipos se encargan de las operaciones diarias.",
+    title: "我们的团队为您运营业务",
+    desc: "您主导特许经营并掌控财务；我们的团队负责日常运营。",
   },
   {
     icon: <MapPin className="size-5 text-primary" />,
-    title: "Territorios protegidos",
-    desc: "Opere en un territorio definido con el respaldo de nuestra tecnología y experiencia.",
+    title: "受保护的经营区域",
+    desc: "在划定的区域内经营，并获得我们的技术与经验支持。",
   },
   {
     icon: <FileText className="size-5 text-primary" />,
-    title: "FDD disponible a solicitud",
-    desc: "El Documento de Divulgación de la Franquicia (FDD) está disponible cuando usted esté listo para revisarlo.",
+    title: "FDD 可应要求提供",
+    desc: "当您准备好查阅时，可提供《特许经营披露文件》（FDD）。",
   },
 ];
 
-function useEsSeo() {
+function useZhSeo() {
   useEffect(() => {
     const prevTitle = document.title;
     const prevLang = document.documentElement.lang;
     document.title = SEO.title;
-    document.documentElement.lang = "es";
+    document.documentElement.lang = "zh";
 
     const created: HTMLElement[] = [];
 
@@ -93,7 +94,6 @@ function useEsSeo() {
     };
     setMeta('meta[name="description"]', "name", "description", SEO.description);
 
-    // canonical + hreflang alternates (pairs the EN home with this ES page)
     const addLink = (rel: string, href: string, hreflang?: string) => {
       const link = document.createElement("link");
       link.setAttribute("rel", rel);
@@ -117,44 +117,43 @@ function useEsSeo() {
   }, []);
 }
 
-export default function EsPage() {
-  useEsSeo();
+export default function ZhPage() {
+  useZhSeo();
 
   return (
-    <div data-testid="page-es" lang="es" className="min-h-screen">
+    <div data-testid="page-zh" lang="zh" className="min-h-screen">
       {/* Hero */}
-      <section data-testid="section-es-hero" className="border-b">
+      <section data-testid="section-zh-hero" className="border-b">
         <div className="nh-container py-16 md:py-24">
           <div className="mx-auto max-w-3xl text-center">
             <span className="inline-flex items-center rounded-full border bg-white/60 px-3 py-1 text-xs font-medium text-foreground/70">
-              Franquicias para inversionistas de la visa E-2
+              面向 E-2 签证投资者的特许经营
             </span>
             <h1 className="mt-5 text-balance text-4xl font-semibold tracking-tight md:text-5xl">
-              Sea dueño de una franquicia en EE. UU. con la visa E-2
+              通过 E-2 签证在美国拥有一家特许经营企业
             </h1>
             <p className="mt-5 text-pretty text-base leading-relaxed text-muted-foreground md:text-lg">
-              <span translate="no">New Dawn Franchising</span> es un franquiciante multisectorial para
-              inversionistas de la visa E-2. Elija entre tres franquicias de ingresos recurrentes
-              —Administración de Propiedades, Telecomunicaciones (VoIP) o Seguros—. Usted dirige el
-              negocio y controla sus finanzas; nuestros equipos manejan las operaciones diarias.
+              <span translate="no">New Dawn Franchising</span> 是一家面向 E-2 签证投资者的多行业特许经营商。
+              可从三种带来经常性收入的特许经营中选择——物业管理、电信（VoIP）或保险。您主导业务、掌控财务，
+              我们的团队负责日常运营。
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-              <Button data-testid="button-es-contact" className="gap-2" asChild>
+              <Button data-testid="button-zh-contact" className="gap-2" asChild>
                 <Link href="/contact">
-                  Solicitar información
+                  索取资料
                   <ArrowRight className="size-4" />
                 </Link>
               </Button>
-              <Button data-testid="button-es-calendly" variant="secondary" className="gap-2" asChild>
+              <Button data-testid="button-zh-calendly" variant="secondary" className="gap-2" asChild>
                 <a href={CALENDLY} target="_blank" rel="noopener noreferrer">
-                  Agendar una llamada
+                  预约通话
                 </a>
               </Button>
             </div>
             <p className="mt-4 text-xs text-muted-foreground/70">
-              ¿Prefiere leer en inglés?{" "}
+              想用英文阅读？{" "}
               <Link href="/" className="underline underline-offset-2 hover:text-foreground" translate="no">
-                Ver el sitio en English
+                查看 English 网站
               </Link>
             </p>
           </div>
@@ -162,15 +161,13 @@ export default function EsPage() {
       </section>
 
       {/* Verticals */}
-      <section data-testid="section-es-verticals" className="border-b">
+      <section data-testid="section-zh-verticals" className="border-b">
         <div className="nh-container py-16">
           <div className="mx-auto max-w-3xl text-center">
             <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">
-              Tres franquicias. Un modelo de ingresos recurrentes.
+              三种特许经营，一种经常性收入模式。
             </h2>
-            <p className="mt-3 text-muted-foreground">
-              Elija el sector que mejor se adapte a sus objetivos como inversionista.
-            </p>
+            <p className="mt-3 text-muted-foreground">选择最符合您投资目标的行业。</p>
           </div>
           <div className="mt-10 grid gap-6 md:grid-cols-3">
             {VERTICALS.map((v) => (
@@ -187,11 +184,11 @@ export default function EsPage() {
       </section>
 
       {/* Benefits */}
-      <section data-testid="section-es-benefits" className="border-b">
+      <section data-testid="section-zh-benefits" className="border-b">
         <div className="nh-container py-16">
           <div className="mx-auto max-w-3xl text-center">
             <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">
-              ¿Por qué <span translate="no">New Dawn Franchising</span>?
+              为什么选择 <span translate="no">New Dawn Franchising</span>？
             </h2>
           </div>
           <div className="mx-auto mt-10 grid max-w-4xl gap-6 md:grid-cols-2">
@@ -211,20 +208,19 @@ export default function EsPage() {
       </section>
 
       {/* CTA */}
-      <section data-testid="section-es-cta">
+      <section data-testid="section-zh-cta">
         <div className="nh-container py-16">
           <div className="mx-auto max-w-3xl rounded-2xl border bg-white/60 p-8 text-center md:p-12">
             <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">
-              Hablemos sobre su camino con la visa E-2
+              聊聊您的 E-2 签证之路
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
-              Cuéntenos sobre sus objetivos y le explicaremos cómo funciona el modelo de franquicia.
-              Atendemos a inversionistas de todo el mundo y hablamos español.
+              告诉我们您的目标，我们会向您说明特许经营模式的运作方式。我们服务来自世界各地的投资者。
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-              <Button data-testid="button-es-cta-contact" className="gap-2" asChild>
+              <Button data-testid="button-zh-cta-contact" className="gap-2" asChild>
                 <Link href="/contact">
-                  Solicitar información
+                  索取资料
                   <ArrowRight className="size-4" />
                 </Link>
               </Button>
@@ -237,7 +233,7 @@ export default function EsPage() {
               <Button variant="secondary" className="gap-2" asChild>
                 <a href={`mailto:${COMPANY.email}`}>
                   <Mail className="size-4" />
-                  Escríbanos
+                  给我们发邮件
                 </a>
               </Button>
             </div>
@@ -252,16 +248,13 @@ export default function EsPage() {
             </a>
 
             <p className="mx-auto mt-8 max-w-2xl text-[11px] leading-relaxed text-muted-foreground/60">
-              Esta información es solo de carácter general y educativo; no es una oferta para vender
-              una franquicia ni constituye asesoría legal, migratoria, fiscal o financiera. Una
-              franquicia se ofrece y se vende únicamente mediante un Documento de Divulgación de la
-              Franquicia (FDD). La elegibilidad y aprobación de la visa E-2 las determina únicamente
-              el gobierno de EE. UU. y nunca están garantizadas. Consulte el aviso legal completo en
-              nuestros{" "}
+              本信息仅供一般参考和教育之用，并非出售特许经营的要约，也不构成法律、移民、税务或财务建议。
+              特许经营仅通过《特许经营披露文件》（FDD）提供和出售。E-2 签证的资格和批准完全由美国政府决定，
+              且从不保证。完整法律声明请参阅我们的{" "}
               <Link href="/terms" className="underline underline-offset-2 hover:text-muted-foreground">
-                Términos y Condiciones
+                条款与条件
               </Link>
-              .
+              。
             </p>
           </div>
         </div>

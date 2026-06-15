@@ -18,6 +18,21 @@ const COMPANY = {
   facebook: "https://www.facebook.com/profile.php?id=61588637044169",
 };
 
+// ─── Footer legal disclaimer ──────────────────────────────────────────────────
+// Surfaced on every page (consistent with the fuller Terms & Conditions §1–§2).
+// Covers: (1) franchise / FTC Franchise Rule "not an offer" + FDD + registration
+// states; (2) not a law firm / no legal, immigration, tax or financial advice +
+// E-2 visa never guaranteed (decided solely by DOS & USCIS); (3) consult your own
+// attorneys/advisors, no warranty, earnings are illustrative only.
+const LEGAL_DISCLAIMER = {
+  lead: "This website is for general information only — it is not an offer to sell a franchise, and it is not legal, immigration, tax, or financial advice.",
+  paragraphs: [
+    "The information on this site is provided for general informational and educational purposes only and is not an offer to sell, or a solicitation of an offer to buy, a franchise. A franchise is offered and sold only through a Franchise Disclosure Document (FDD) that complies with the FTC Franchise Rule (16 CFR Part 436) and applicable state franchise laws. Certain states regulate the offer and sale of franchises and require registration or filing; New Dawn Franchising will offer or sell a franchise only in states where we are registered or exempt, and only after we have met applicable pre-sale registration, filing, and disclosure requirements and delivered the FDD as required by law.",
+    "New Dawn Franchising LLC is a franchisor, not a law firm. Nothing on this site is legal, immigration, tax, or financial advice, and no attorney-client or other professional relationship is created by using the site or contacting us. We do not provide immigration services and do not form your legal entity — your own attorney does. E-2 treaty investor visa information is general and educational only; immigration laws and qualifying treaty countries change over time. E-2 eligibility and approval are determined solely by the U.S. government (Department of State consular officers, and USCIS for change or extension of status), never by us, and a visa is never guaranteed.",
+    "Before making any investment or visa-related decision, you should retain your own licensed U.S. immigration attorney and qualified tax and financial advisors, and conduct your own independent due diligence. Information is provided “as is,” may be incomplete or out of date, and we make no warranty as to its accuracy or completeness. Any income, earnings, results, or performance figures are illustrative only and are not guarantees of future results; individual outcomes vary.",
+  ],
+};
+
 function FacebookIcon({ className }: { className?: string }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className}>
@@ -863,7 +878,30 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                 <Link href="/contact">Request info</Link>
               </Button>
             </div>
-            <div className="mt-4 flex flex-wrap gap-4 text-xs text-muted-foreground/60">
+            <div data-testid="footer-legal-disclaimer" className="mt-8 border-t pt-6">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
+                Legal Disclaimer
+              </div>
+              <p data-testid="text-disclaimer-lead" className="mt-2 max-w-4xl text-[11px] font-medium leading-relaxed text-muted-foreground/75">
+                {LEGAL_DISCLAIMER.lead}
+              </p>
+              <div className="mt-2 max-w-4xl space-y-2">
+                {LEGAL_DISCLAIMER.paragraphs.map((para, i) => (
+                  <p key={i} className="text-[11px] leading-relaxed text-muted-foreground/55">
+                    {para}
+                  </p>
+                ))}
+                <p className="text-[11px] leading-relaxed text-muted-foreground/55">
+                  See our full{" "}
+                  <Link href="/terms" data-testid="link-disclaimer-terms" className="underline underline-offset-2 transition-colors hover:text-muted-foreground">
+                    Terms &amp; Conditions
+                  </Link>{" "}
+                  for complete disclosures.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 flex flex-wrap gap-4 border-t pt-6 text-xs text-muted-foreground/60">
               <span>&copy; {new Date().getFullYear()} New Dawn Franchising LLC. All rights reserved.</span>
               <Link href="/privacy-policy" data-testid="link-footer-privacy" className="hover:text-muted-foreground transition-colors">Privacy Policy</Link>
               <Link href="/terms" data-testid="link-footer-terms" className="hover:text-muted-foreground transition-colors">Terms &amp; Conditions</Link>

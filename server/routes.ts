@@ -70,6 +70,9 @@ import {
   type LeadSearchFilters,
   type ProviderId,
 } from "./seamless-prospects";
+import { cachedProviderSearch } from "./search-cache";
+import { logSearchEvent } from "./search-telemetry";
+import { searchCrmContacts } from "./semantic-search";
 import { getProviderStatuses } from "./provider-credits";
 import { seedContactEnrichment } from "./people-finder";
 import { calculateDecisionMakerScore } from "./decision-maker-scorer";
@@ -1716,12 +1719,48 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
         return res.status(400).json({ message: "Add at least one filter or type what you're looking for." });
       }
 
-      const result = await providerSearch(provider, mode === "companies" ? "companies" : "contacts", appliedFilters, { nextToken });
+      const started = Date.now();
+      const result = await cachedProviderSearch(provider, mode === "companies" ? "companies" : "contacts", appliedFilters, { nextToken });
+
+      void logSearchEvent({
+        surface: "seamless-panel",
+        provider,
+        query: aiQuery?.trim() || null,
+        filters: appliedFilters,
+        resultCount: result.totalContacts ?? result.companies?.length ?? null,
+        cached: result.cached ?? null,
+        durationMs: Date.now() - started,
+        userEmail: req.session.adminId ?? null,
+      });
 
       res.json({ ...result, appliedFilters, provider });
     } catch (err: any) {
       console.error("Provider search error:", err);
       res.status(500).json({ message: err.message || "Provider search failed" });
+    }
+  });
+
+  // Semantic search over our OWN CRM contacts ("find people like this" /
+  // "who in our pipeline matches X"). Uses pgvector when available, otherwise
+  // a keyword fallback — see semantic-search.ts.
+  app.post("/api/crm/contacts/semantic-search", requireAdminAuth, async (req, res) => {
+    try {
+      const { query, limit } = req.body as { query?: string; limit?: number };
+      const q = (query || "").trim();
+      if (!q) return res.status(400).json({ message: "query required" });
+      const started = Date.now();
+      const matches = await searchCrmContacts(q, Math.min(Math.max(limit ?? 10, 1), 50));
+      void logSearchEvent({
+        surface: "crm-semantic",
+        query: q,
+        resultCount: matches.length,
+        durationMs: Date.now() - started,
+        userEmail: req.session.adminId ?? null,
+      });
+      res.json({ matches, matchType: matches[0]?.matchType ?? "keyword" });
+    } catch (err: any) {
+      console.error("CRM semantic search error:", err);
+      res.status(500).json({ message: err.message || "CRM search failed" });
     }
   });
 

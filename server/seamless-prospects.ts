@@ -27,6 +27,7 @@ import {
 import { apolloSearchContacts, apolloSearchCompanies } from "./apollo-service";
 import { origamiSearchContacts, origamiSearchCompanies } from "./origami-service";
 import { calculateDecisionMakerScore } from "./decision-maker-scorer";
+import { scoreProspect } from "./lead-intelligence";
 import { createLazyOpenAIClient } from "./openai-client";
 import type { EnrichedContact, EnrichedCompany } from "./prospect-enrichment";
 
@@ -186,6 +187,16 @@ function personToContact(
 ): EnrichedContact {
   const score = scoreFor(p);
   const revealed = !!(p.email || p.phone);
+  const intel = scoreProspect({
+    jobTitle: p.jobTitle,
+    seniority: p.seniority,
+    company: p.company,
+    country: p.country,
+    email: p.email,
+    phone: p.phone,
+    linkedinUrl: p.linkedinUrl,
+    text: [p.jobTitle, p.company, (p.industries || []).join(" ")].filter(Boolean).join(" "),
+  });
   return {
     id: makeId(),
     companyId,
@@ -222,12 +233,19 @@ function personToContact(
     website: p.domain ? `https://${p.domain.replace(/^https?:\/\//, "")}` : null,
     timeAtCompany: p.timeAtCompany ?? null,
     startedAtCurrentCompany: p.startedAtCurrentCompany ?? null,
+    icpScore: intel.composite,
+    icpFitScore: intel.fitScore,
+    icpIntentScore: intel.intentScore,
+    icpTier: intel.tier,
+    icpAudience: intel.audience,
+    icpReasons: intel.reasons,
+    icpExplanation: intel.explanation,
   };
 }
 
 // ─── Shared grouping (provider-agnostic) ─────────────────────────────────────
 
-type SearchResult = { companies: EnrichedCompany[]; totalContacts: number; enrichedCount: number; nextToken: string | null };
+export type SearchResult = { companies: EnrichedCompany[]; totalContacts: number; enrichedCount: number; nextToken: string | null };
 
 /** Group a normalised people list into EnrichedCompany[] tagged with the source provider. */
 function groupPeopleIntoCompanies(
@@ -269,8 +287,12 @@ function groupPeopleIntoCompanies(
 
   const companies = Array.from(groups.values()).map((c) => ({
     ...c,
+    // Best ICP matches first within each company.
+    contacts: [...c.contacts].sort((a, b) => (b.icpScore ?? 0) - (a.icpScore ?? 0)),
     enrichmentStatus: (c.contacts.length ? "complete" : "no_contacts") as EnrichedCompany["enrichmentStatus"],
   }));
+  // Rank companies by their single strongest contact so the hottest fits float up.
+  companies.sort((a, b) => (b.contacts[0]?.icpScore ?? 0) - (a.contacts[0]?.icpScore ?? 0));
 
   const totalContacts = companies.reduce((sum, c) => sum + c.contacts.length, 0);
   const enrichedCount = companies.filter((c) => c.contacts.length > 0).length;

@@ -4,6 +4,16 @@ import { Button } from "@/components/ui/button";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
+interface ProspectIntel {
+  fitScore: number;
+  intentScore: number;
+  composite: number;
+  tier: "hot" | "warm" | "cool" | "low";
+  audience: "investor" | "partner" | "unknown";
+  reasons: string[];
+  explanation: string;
+}
+
 interface AgentPerson {
   fullName: string;
   firstName: string;
@@ -14,7 +24,17 @@ interface AgentPerson {
   phone: string | null;
   linkedinUrl: string | null;
   location: string | null;
+  intel?: ProspectIntel;
+  inCrm?: boolean;
 }
+
+const TIER_STYLE: Record<string, string> = {
+  hot: "border-red-200 bg-red-50 text-red-700",
+  warm: "border-amber-200 bg-amber-50 text-amber-700",
+  cool: "border-sky-200 bg-sky-50 text-sky-700",
+  low: "border-gray-200 bg-gray-50 text-gray-500",
+};
+const TIER_LABEL: Record<string, string> = { hot: "🔥 Hot", warm: "Warm", cool: "Cool", low: "Low fit" };
 
 interface ChatMsg {
   role: "user" | "assistant";
@@ -170,10 +190,23 @@ export default function LeadResearchAgent({ provider }: { provider?: string }) {
                       <div key={j} className="rounded-lg border bg-card px-2 py-1.5">
                         <div className="flex items-center gap-2">
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-xs font-semibold text-foreground">{p.fullName}</p>
+                            <div className="flex items-center gap-1.5">
+                              <p className="truncate text-xs font-semibold text-foreground">{p.fullName}</p>
+                              {p.intel && (
+                                <span className={`shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] font-semibold ${TIER_STYLE[p.intel.tier]}`} title={`Fit ${p.intel.fitScore} · Intent ${p.intel.intentScore}`}>
+                                  {TIER_LABEL[p.intel.tier]} {p.intel.composite}
+                                </span>
+                              )}
+                              {p.inCrm && <span className="shrink-0 rounded-full border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[9px] font-medium text-violet-700">In CRM</span>}
+                            </div>
                             <p className="truncate text-[11px] text-muted-foreground">
                               {[p.jobTitle, p.companyName].filter(Boolean).join(" · ") || p.location || "—"}
                             </p>
+                            {p.intel && p.intel.reasons.length > 0 && (
+                              <p className="mt-0.5 truncate text-[10px] text-muted-foreground/90" title={p.intel.reasons.join(" · ")}>
+                                Why: {p.intel.reasons.slice(0, 3).join(" · ")}
+                              </p>
+                            )}
                             <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
                               {p.email && <span className="inline-flex items-center gap-0.5"><Mail className="size-2.5" />{p.email}</span>}
                               {p.phone && <span className="inline-flex items-center gap-0.5"><Phone className="size-2.5" />{p.phone}</span>}

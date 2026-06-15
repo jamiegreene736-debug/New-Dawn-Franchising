@@ -131,6 +131,29 @@ const STATEMENTS: string[] = [
   // automated engine can run the broker OR the client variant for the same lead
   // pool. Defaults to 'broker' to preserve existing behavior.
   `ALTER TABLE outreach_leads ADD COLUMN IF NOT EXISTS sequence_track text NOT NULL DEFAULT 'broker'`,
+  // ─── AI search telemetry ─────────────────────────────────────────────────
+  // search_events records every AI/lead search so we can measure quality and
+  // tune scoring/prompts. Written fire-and-forget from the search routes.
+  `CREATE TABLE IF NOT EXISTS search_events (
+    id            varchar    PRIMARY KEY DEFAULT gen_random_uuid(),
+    surface       text       NOT NULL,
+    provider      text,
+    query         text,
+    filters       jsonb,
+    result_count  integer,
+    cached        boolean,
+    duration_ms   integer,
+    user_email    text,
+    error         text,
+    created_at    timestamp  NOT NULL DEFAULT now()
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_search_events_created ON search_events (created_at)`,
+  // ─── Semantic CRM search (pgvector) ──────────────────────────────────────
+  // Optional: enables "find contacts like this" semantic search over our own
+  // CRM. If the DB role can't CREATE EXTENSION, these statements are skipped
+  // (logged, non-fatal) and semantic-search.ts falls back to keyword ILIKE.
+  `CREATE EXTENSION IF NOT EXISTS vector`,
+  `ALTER TABLE contacts ADD COLUMN IF NOT EXISTS embedding vector(1536)`,
 ];
 
 export async function ensureSchema(): Promise<void> {

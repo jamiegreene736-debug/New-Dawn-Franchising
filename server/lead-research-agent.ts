@@ -15,8 +15,12 @@
  * errors are caught and surfaced as tool results, never thrown to the caller.
  */
 
-import { providerSearch, type ProviderId, type LeadSearchFilters } from "./seamless-prospects";
-import type { SeamlessPerson } from "./seamless-service";
+import { type ProviderId, type LeadSearchFilters } from "./seamless-prospects";
+import { cachedProviderSearch } from "./search-cache";
+import { scoreProspect, type ProspectIntel } from "./lead-intelligence";
+import { searchCrmContacts } from "./semantic-search";
+import { logSearchEvent } from "./search-telemetry";
+import type { EnrichedContact } from "./prospect-enrichment";
 
 export interface AgentPerson {
   fullName: string;
@@ -28,6 +32,9 @@ export interface AgentPerson {
   phone: string | null;
   linkedinUrl: string | null;
   location: string | null;
+  // ICP fit + buying-intent scoring with a human-readable "why this matches".
+  intel: ProspectIntel;
+  inCrm?: boolean; // true if this person already exists in our CRM
 }
 
 export interface AgentResult {
@@ -43,15 +50,18 @@ const MAX_ROUNDS = 4;
 const SYSTEM_PROMPT = `You are the Lead Research assistant for New Dawn Franchising, an E-2 visa franchise platform (Property Management, Telecom, Insurance) based in El Paso, Texas. You help the team find and reach their ideal customers and referral partners.
 
 You can take real actions through tools:
-- Use "search_people" to build prospect lists when the user describes who they want to reach. Translate their description into structured filters (titles, seniorities, countries, keywords, etc.).
+- Use "search_people" to build prospect lists from external data providers when the user describes who they want to reach. Translate their description into structured filters (titles, seniorities, countries, keywords, etc.).
+- Use "search_crm" to find people we ALREADY have in our CRM (e.g. "who in our pipeline looks like an immigration attorney", "investors from the UK we've talked to"). Prefer this when the user refers to existing contacts/leads rather than net-new prospecting.
 - Use "analyze_icp" when they ask who to target, to analyze their business/website, or when you need context about New Dawn before searching.
+
+Every prospect that search_people returns is automatically scored for ICP FIT and buying INTENT, and tagged hot/warm/cool. The tool result gives you each person's tier and the reasons behind it ("UK-based founder; relocation intent"). Use these to prioritise — lead with the hottest matches and briefly say WHY they're a fit.
 
 Behaviour:
 - Be concise, friendly, and action-oriented — like a sharp SDR teammate.
 - When the user asks to "find" / "build a list" / "get me" prospects, CALL search_people (don't just describe what you would do).
 - To find people who work at a specific company (e.g. "everyone at GlobeVisa"), set companyNames to that company and companyDomains to its likely domain (e.g. globevisa.com), and DON'T require a job title — that returns the whole company. Only add titles if the user asks for specific roles.
 - If a search returns 0 results, retry once with a broader query (e.g. drop titles, or use companyDomains instead of companyNames, or vice-versa) before telling the user nothing was found.
-- After a search, state how many you found, name 2–3 examples (name · title · company), and tell them they can save the results to Contacts using the buttons below the list.
+- After a search, state how many you found, highlight the 2–3 HIGHEST-scoring matches (name · title · company · why they're a strong fit), and tell them they can save the results to Contacts using the buttons below the list.
 - If asked to draft outreach, write the email/message directly in your reply (warm, non-salesy, signed "Dylan Delaney, New Dawn Franchising").
 - Never invent contacts — only reference what search_people returned.
 
@@ -97,6 +107,18 @@ const TOOLS = [
     },
   },
   {
+    name: "search_crm",
+    description:
+      "Search people we ALREADY have in our own CRM (existing contacts/leads), by natural-language description. Use when the user asks about existing pipeline/contacts rather than finding brand-new prospects. Returns matches with their stored lead score and ICP fit.",
+    input_schema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Natural-language description of who to find in the CRM, e.g. 'immigration attorneys in the UK we've contacted'." },
+      },
+      required: ["query"],
+    },
+  },
+  {
     name: "analyze_icp",
     description:
       "Get New Dawn Franchising's business positioning and ideal-customer profile (who to target, suggested search criteria). Use when asked who to target or to analyze the business/website.",
@@ -104,18 +126,29 @@ const TOOLS = [
   },
 ];
 
-function mapPerson(p: SeamlessPerson): AgentPerson {
-  const location = [p.city, p.state, p.country].filter(Boolean).join(", ") || null;
+// Map an EnrichedContact (the shape providerSearch actually returns, grouped
+// into companies) to an AgentPerson, reusing the ICP intel already computed in
+// personToContact so we don't score twice.
+function mapContact(c: EnrichedContact): AgentPerson {
   return {
-    fullName: p.fullName,
-    firstName: p.firstName,
-    lastName: p.lastName,
-    jobTitle: p.jobTitle ?? null,
-    companyName: p.company ?? null,
-    email: p.email ?? null,
-    phone: p.phone ?? null,
-    linkedinUrl: p.linkedinUrl ?? null,
-    location,
+    fullName: c.fullName,
+    firstName: c.firstName,
+    lastName: c.lastName,
+    jobTitle: c.jobTitle ?? null,
+    companyName: c.companyName ?? null,
+    email: c.email ?? null,
+    phone: c.phone ?? null,
+    linkedinUrl: c.linkedinUrl ?? null,
+    location: c.companyLocation ?? null,
+    intel: {
+      fitScore: c.icpFitScore ?? 0,
+      intentScore: c.icpIntentScore ?? 0,
+      composite: c.icpScore ?? 0,
+      tier: c.icpTier ?? "low",
+      audience: c.icpAudience ?? "unknown",
+      reasons: c.icpReasons ?? [],
+      explanation: c.icpExplanation ?? "",
+    },
   };
 }
 
@@ -161,6 +194,35 @@ export async function runLeadResearchAgent(
 
   async function execTool(name: string, input: any): Promise<string> {
     if (name === "analyze_icp") return ICP_SUMMARY;
+    if (name === "search_crm") {
+      const query = String(input?.query || "").trim();
+      if (!query) return JSON.stringify({ error: "query required" });
+      const started = Date.now();
+      try {
+        const matches = await searchCrmContacts(query, 15);
+        for (const m of matches) {
+          const key = (m.email || `${m.fullName}|${m.firmName}`).toLowerCase();
+          if (!foundByKey.has(key)) {
+            const intel = scoreProspect({
+              jobTitle: m.jobTitle, company: m.firmName, country: m.country,
+              personaType: m.personaType, email: m.email, phone: m.phone,
+              linkedinUrl: m.linkedinUrl, text: [m.jobTitle, m.firmName, m.notes].filter(Boolean).join(" "),
+            });
+            foundByKey.set(key, {
+              fullName: m.fullName, firstName: m.fullName.split(" ")[0] || m.fullName,
+              lastName: m.fullName.split(" ").slice(1).join(" "), jobTitle: m.jobTitle,
+              companyName: m.firmName, email: m.email, phone: m.phone, linkedinUrl: m.linkedinUrl,
+              location: m.country, intel, inCrm: true,
+            });
+          }
+        }
+        void logSearchEvent({ surface: "crm-semantic", query, resultCount: matches.length, durationMs: Date.now() - started });
+        const sample = matches.slice(0, 5).map((m) => `${m.fullName} — ${m.jobTitle || "?"}${m.firmName ? ` @ ${m.firmName}` : ""} (lead score ${m.leadScore})`);
+        return JSON.stringify({ source: "crm", found: matches.length, matchType: matches[0]?.matchType ?? "keyword", sample });
+      } catch (e: any) {
+        return JSON.stringify({ error: e?.message || "crm search failed" });
+      }
+    }
     if (name === "search_people") {
       // Map the tool's friendly names onto the REAL LeadSearchFilters fields
       // (jobTitle/contactCountry/companyName/…). Mismatched names here were the
@@ -180,16 +242,32 @@ export async function runLeadResearchAgent(
         keywords: arr(input?.keywords),
       };
       const mode = input?.mode === "companies" ? "companies" : "contacts";
+      const started = Date.now();
       try {
-        const result: any = await providerSearch(provider, mode, filters, { limit: 50 });
-        const people: SeamlessPerson[] = result?.people || [];
-        for (const p of people) {
-          const key = (p.email || `${p.fullName}|${p.company}`).toLowerCase();
-          if (!foundByKey.has(key)) foundByKey.set(key, mapPerson(p));
+        const result = await cachedProviderSearch(provider, mode, filters, { limit: 50 });
+        // providerSearch groups people into companies; flatten back to contacts.
+        const contacts: EnrichedContact[] = (result.companies || []).flatMap((c) => c.contacts || []);
+        const scored: AgentPerson[] = [];
+        for (const ct of contacts) {
+          const key = (ct.email || `${ct.fullName}|${ct.companyName}`).toLowerCase();
+          if (!foundByKey.has(key)) {
+            const mapped = mapContact(ct);
+            foundByKey.set(key, mapped);
+            scored.push(mapped);
+          }
         }
-        const sample = people.slice(0, 5).map((p) => `${p.fullName} — ${p.jobTitle || "?"}${p.company ? ` @ ${p.company}` : ""}`);
-        return JSON.stringify({ provider, found: people.length, total_unique: foundByKey.size, sample });
+        // Lead with the highest-scoring matches so the model explains the best fits.
+        scored.sort((a, b) => b.intel.composite - a.intel.composite);
+        void logSearchEvent({
+          surface: "agent", provider, filters, resultCount: contacts.length,
+          cached: result.cached ?? null, durationMs: Date.now() - started,
+        });
+        const sample = scored.slice(0, 5).map(
+          (p) => `[${p.intel.tier}] ${p.fullName} — ${p.jobTitle || "?"}${p.companyName ? ` @ ${p.companyName}` : ""} · ${p.intel.reasons.slice(0, 2).join(", ") || "match"}`,
+        );
+        return JSON.stringify({ provider, cached: result.cached ?? false, found: contacts.length, total_unique: foundByKey.size, top_matches: sample });
       } catch (e: any) {
+        void logSearchEvent({ surface: "agent", provider, filters, error: e?.message, durationMs: Date.now() - started });
         return JSON.stringify({ error: e?.message || "search failed", provider });
       }
     }
@@ -220,7 +298,9 @@ export async function runLeadResearchAgent(
 
     return {
       reply: reply || "Done.",
-      people: Array.from(foundByKey.values()).slice(0, 60),
+      people: Array.from(foundByKey.values())
+        .sort((a, b) => b.intel.composite - a.intel.composite)
+        .slice(0, 60),
       provider,
     };
   } catch (err: any) {

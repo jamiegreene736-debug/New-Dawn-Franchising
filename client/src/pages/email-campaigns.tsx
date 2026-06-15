@@ -967,6 +967,9 @@ function EmailCampaignTab() {
                 ))}
               </div>
 
+              {/* Automations summary — all active triggers/reactions for this campaign at a glance */}
+              <AutomationsPanel steps={campaignDetail.steps ?? []} />
+
               {/* Sub-tabs */}
               <div className="flex gap-1 mb-4 border-b">
                 {([["overview", "Steps"], ["contacts", `Contacts (${enrollments.length})`]] as const).map(([key, lbl]) => (
@@ -2076,6 +2079,107 @@ function StepEditorModal({
         </div>
       </Card>
     </div>
+  );
+}
+
+// ─── Automations Summary Panel ───────────────────────────────────────────────
+// At-a-glance view of every behavioural automation active on the open campaign:
+// the step-level triggers configured on its steps PLUS the system-wide reactions
+// (click→call/alert, no-open→resend, reply→pause) that apply to every campaign.
+
+function AutomationsPanel({ steps }: { steps: Step[] }) {
+  const sorted = [...steps].sort((a, b) => a.stepOrder - b.stepOrder);
+  const triggered = sorted.filter((s) => s.triggerType && s.triggerType !== "time");
+
+  // Channel → icon for the step-level rows
+  const channelIcon = (stepType?: string) => {
+    const ch = String(CHANNEL_OF[stepType || "email"] || "task");
+    if (ch === "email") return <Mail className="size-3.5" />;
+    if (ch === "sms") return <Smartphone className="size-3.5" />;
+    if (ch === "linkedin") return <Linkedin className="size-3.5" />;
+    if (ch === "call") return <Phone className="size-3.5" />;
+    return <CheckSquare className="size-3.5" />;
+  };
+
+  const describe = (s: Step): string => {
+    const ref = sorted.find((x) => x.stepOrder === (s.triggerRefStep ?? sorted[sorted.findIndex((y) => y.id === s.id) - 1]?.stepOrder));
+    const refName = ref?.stepName || ref?.subject || (ref ? `step ${ref.stepOrder}` : "the previous step");
+    const win = s.triggerWindowHours ?? 120;
+    switch (s.triggerType) {
+      case "email_opened":   return `When "${refName}" is opened (skip if unopened after ${win}h)`;
+      case "link_clicked":   return `When a link in "${refName}" is clicked (skip after ${win}h)`;
+      case "not_opened":     return `If "${refName}" isn't opened after ${win}h — fires this step`;
+      case "engaged":        return `When the contact has opened 3+ emails`;
+      default:               return "Time-based";
+    }
+  };
+
+  // Built-in system-wide reactions — these apply to every campaign automatically.
+  const SYSTEM_REACTIONS: { icon: React.ReactNode; title: string; desc: string }[] = [
+    { icon: <Phone className="size-3.5 text-red-600" />, title: "Click → Call task + alert", desc: "First click on any campaign email creates a 🔥 call task and emails Dylan." },
+    { icon: <RefreshCw className="size-3.5 text-amber-600" />, title: "No open → Auto-resend", desc: "Intro email unopened after 4 days auto-resends once with a fresh subject." },
+    { icon: <Pause className="size-3.5 text-violet-600" />, title: "Reply → Pause + alert", desc: "Any personal reply pauses this contact's enrollment and notifies Dylan." },
+  ];
+
+  return (
+    <Card className="mb-6 p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <Zap className="size-4 text-[hsl(var(--primary))]" />
+        <h3 className="text-sm font-semibold">Automations</h3>
+        <span className="text-[11px] text-muted-foreground">
+          {triggered.length} step trigger{triggered.length === 1 ? "" : "s"} · {SYSTEM_REACTIONS.length} system reactions
+        </span>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        {/* Step-level triggers */}
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">This campaign's triggers</p>
+          {triggered.length === 0 ? (
+            <p className="rounded-md border border-dashed bg-muted/30 px-3 py-3 text-xs text-muted-foreground">
+              No behavioural triggers on this campaign's steps yet. Edit a step and pick a non-time option under "When this step fires".
+            </p>
+          ) : (
+            <ul className="space-y-1.5">
+              {triggered.map((s) => (
+                <li key={s.id} className="flex items-start gap-2 rounded-md border bg-violet-50/40 px-2.5 py-1.5">
+                  <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded bg-white text-[hsl(var(--primary))]">
+                    {channelIcon(s.stepType)}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1">
+                      <span className="text-xs font-medium truncate">{s.stepName || s.subject || `Step ${s.stepOrder}`}</span>
+                      <span className="rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700">
+                        {TRIGGER_LABELS[s.triggerType || ""] || "Triggered"}
+                      </span>
+                    </div>
+                    <p className="text-[11px] leading-snug text-muted-foreground">{describe(s)}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {/* System-wide reactions */}
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">System reactions (all campaigns)</p>
+          <ul className="space-y-1.5">
+            {SYSTEM_REACTIONS.map((r) => (
+              <li key={r.title} className="flex items-start gap-2 rounded-md border bg-muted/30 px-2.5 py-1.5">
+                <span className="mt-0.5 grid size-6 shrink-0 place-items-center rounded bg-white">
+                  {r.icon}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium">{r.title}</p>
+                  <p className="text-[11px] leading-snug text-muted-foreground">{r.desc}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </Card>
   );
 }
 

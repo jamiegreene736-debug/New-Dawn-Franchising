@@ -45,7 +45,7 @@ import { db } from "./db";
 import { runAllHealthChecks, runHealthCheckWithAlerts } from "./api-health";
 import cron from "node-cron";
 import { planDailyIntelligence, getRecentPlans, getTodaysPlan } from "./outreach-intelligence-service";
-import { sendSmsViaQuo, getQuoStatus, listQuoPhoneNumbers, SMS_TEMPLATES } from "./quo-service";
+import { sendSmsViaQuo, getQuoStatus, listQuoPhoneNumbers, SMS_TEMPLATES, fetchSmsConversation, phoneLast10, type SmsConversationMessage } from "./quo-service";
 import { sendAgentSms, handleInboundAgentSms, notifyDraftPending, notifyBlocker, notifyError, getAgentSmsHistory, AGENT_NUMBERS, DYLAN_PHONE } from "./agent-sms-service";
 import { fetchOpenPhoneCalls, fetchCallTranscript, formatTranscript, getCallerNumber, getCallerName } from "./openphone-calls";
 import { smartSmsDelay, smartWhatsAppDelay, isOptimalSmsWindow, nextWindowDescription, estimateSend, projectStepSendTime, EMAIL_WINDOW_SUMMARY, type SendMode } from "./smart-scheduler";
@@ -3340,7 +3340,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
     }
   });
 
-  // Webhook for real-time OpenPhone call events
+  // Webhook for real-time OpenPhone call + SMS events
   app.post("/api/webhooks/openphone", async (req, res) => {
     try {
       const event = req.body as {
@@ -3348,6 +3348,41 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
         data?: { object?: any };
       };
       res.json({ received: true }); // Acknowledge immediately
+
+      // Inbound SMS from CRM prospects
+      if (event.type === "message.received") {
+        const msgData = event?.data?.object;
+        if (!msgData?.id) return;
+
+        const fromNumber = msgData.from || "";
+        const body = msgData.text || msgData.body || "";
+        if (!fromNumber || !body) return;
+
+        const allClients = await storage.getCrmClients();
+        const matched = allClients.find(
+          (c) => c.phone && phoneLast10(c.phone) === phoneLast10(fromNumber),
+        );
+        if (!matched) return;
+
+        const acts = await storage.getCrmClientActivities(matched.id);
+        const already = acts.some((a) => {
+          const m = (a.metadata || {}) as Record<string, string>;
+          return m.messageId === msgData.id || m.id === msgData.id;
+        });
+        if (already) return;
+
+        await storage.createCrmClientActivity({
+          clientId: matched.id,
+          activityType: "sms_received",
+          metadata: {
+            message: body,
+            messageId: msgData.id,
+            from: fromNumber,
+            direction: "incoming",
+          },
+        });
+        return;
+      }
 
       const callData = event?.data?.object;
       if (!callData?.id) return;
@@ -3449,6 +3484,39 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
       res.json({ success: true, id: result.id });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get("/api/crm/clients/:id/sms", requireAdminAuth, async (req, res) => {
+    try {
+      const client = await storage.getCrmClient(String(req.params.id));
+      if (!client) return res.status(404).json({ message: "Client not found" });
+
+      const fromQuo = client.phone ? await fetchSmsConversation(client.phone) : [];
+      const acts = await storage.getCrmClientActivities(client.id);
+      const fromActs: SmsConversationMessage[] = acts
+        .filter((a) => ["sms_sent", "sms_failed", "sms_received"].includes(a.activityType))
+        .map((a) => {
+          const m = (a.metadata || {}) as Record<string, string>;
+          return {
+            id: m.id || m.messageId || a.id,
+            direction: a.activityType === "sms_received" ? "inbound" as const : "outbound" as const,
+            body: m.message || "",
+            status: a.activityType === "sms_failed" ? "failed" : a.activityType === "sms_received" ? "received" : "sent",
+            sentAt: new Date(a.createdAt).toISOString(),
+          };
+        })
+        .filter((m) => m.body.trim().length > 0);
+
+      const byId = new Map<string, SmsConversationMessage>();
+      for (const msg of [...fromActs, ...fromQuo]) {
+        byId.set(msg.id, msg);
+      }
+      const messages = [...byId.values()].sort((a, b) => Date.parse(a.sentAt) - Date.parse(b.sentAt));
+
+      res.json(messages);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch SMS history" });
     }
   });
 
@@ -3941,9 +4009,32 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
       const msg = body?.data?.object ?? body;
       const text = msg?.body ?? msg?.content ?? msg?.text ?? "";
       const from = msg?.from ?? "";
-      const to = msg?.to ?? "";
+      const to = Array.isArray(msg?.to) ? msg.to[0] : (msg?.to ?? "");
       if (!text || !from || !to) return;
-      await handleInboundAgentSms(to, from, text, msg?.id);
+
+      const agentResult = await handleInboundAgentSms(to, from, text, msg?.id);
+      if (agentResult.handled) return;
+
+      // Prospect reply to the shared Quo line — log on matching CRM client
+      const allClients = await storage.getCrmClients();
+      const matched = allClients.find(
+        (c) => c.phone && phoneLast10(c.phone) === phoneLast10(from),
+      );
+      if (!matched) return;
+
+      const acts = await storage.getCrmClientActivities(matched.id);
+      const msgId = msg?.id || "";
+      const already = acts.some((a) => {
+        const m = (a.metadata || {}) as Record<string, string>;
+        return msgId && (m.messageId === msgId || m.id === msgId);
+      });
+      if (already) return;
+
+      await storage.createCrmClientActivity({
+        clientId: matched.id,
+        activityType: "sms_received",
+        metadata: { message: text, messageId: msgId, from, direction: "incoming" },
+      });
     } catch (err) {
       console.error("[AgentSMS webhook]", err);
     }

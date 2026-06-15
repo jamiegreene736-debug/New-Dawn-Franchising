@@ -275,7 +275,7 @@ function AddressValidityBadge({ validity }: { validity?: string }) {
 
 
 
-type WaState = "idle" | "checking" | "confirmed" | "not_found" | "error" | "sent";
+type WaState = "idle" | "open" | "sent";
 
 function ContactCard({
   contact,
@@ -320,21 +320,6 @@ function ContactCard({
     { id: "wa_brochure",  label: "Brochure offer",    metaName: "new_dawn_brochure",  lang: "en_US", body: `Hi ${contact.firstName}, I've put together an investor brochure covering the full E-2 franchise model, investment details, and Texas market data. Want me to send it over?` },
   ];
   const selectedTpl = WA_TEMPLATES.find(t => t.id === waTemplateId) ?? WA_TEMPLATES[0];
-
-  const checkWa = useMutation({
-    mutationFn: async (phone: string) => {
-      const res = await apiRequest("POST", "/api/crm/whatsapp-check-number", { phone });
-      return res.json() as Promise<{ onWhatsApp: boolean; waId?: string; error?: string }>;
-    },
-    onMutate: () => setWaState("checking"),
-    onSuccess: (data) => {
-      setWaState(data.onWhatsApp ? "confirmed" : "not_found");
-    },
-    onError: () => {
-      setWaState("error");
-      toast({ title: "WhatsApp check failed", variant: "destructive" });
-    },
-  });
 
   const sendWaFreeform = useMutation({
     mutationFn: async ({ to, message }: { to: string; message: string }) => {
@@ -487,29 +472,17 @@ function ContactCard({
                 )}
                 {contact.whatsappEligible && (
                   <button
-                    title={waState === "sent" ? "Message sent" : "Check & send WhatsApp"}
-                    onClick={() => {
-                      if (waState === "idle" || waState === "error") {
-                        checkWa.mutate(contact.phone!);
-                      } else if (waState === "confirmed" || waState === "not_found") {
-                        setWaState("idle");
-                      }
-                    }}
+                    title={waState === "sent" ? "Message sent" : "Send WhatsApp"}
+                    onClick={() => setWaState(waState === "open" ? "idle" : "open")}
                     className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-semibold transition-colors ${
                       waState === "sent" ? "bg-green-600 text-white cursor-default" :
-                      waState === "confirmed" ? "bg-green-500 text-white" :
-                      waState === "not_found" ? "bg-orange-100 text-orange-700 border border-orange-300" :
-                      waState === "checking" ? "bg-green-50 text-green-500 animate-pulse" :
+                      waState === "open" ? "bg-green-500 text-white" :
                       "bg-green-100 text-green-700 hover:bg-green-200 cursor-pointer"
                     }`}
                     data-testid={`wa-badge-${contact.id}`}
                   >
                     <MessageCircle className="size-2.5" />
-                    {waState === "checking" ? "…" :
-                     waState === "confirmed" ? "✓ WA" :
-                     waState === "not_found" ? "Not on WA" :
-                     waState === "sent" ? "Sent" :
-                     "WA"}
+                    {waState === "sent" ? "Sent" : "WA"}
                   </button>
                 )}
               </span>
@@ -534,16 +507,13 @@ function ContactCard({
           )}
 
           {/* WhatsApp compose panel */}
-          {(waState === "confirmed" || waState === "not_found") && contact.phone && (
+          {waState === "open" && contact.phone && (
             <div className="mt-2 rounded-md border border-green-200 bg-green-50/60 p-2 space-y-2" data-testid={`wa-compose-${contact.id}`}>
 
               {/* Header */}
               <div className="flex items-center gap-1.5 text-[10px] font-semibold text-green-800">
                 <MessageCircle className="size-3" />
-                {waState === "confirmed"
-                  ? `${contact.firstName} is on WhatsApp ✓`
-                  : <span className="text-orange-700">Not confirmed on WhatsApp — you can still try</span>
-                }
+                Send WhatsApp to {contact.firstName}
                 <button onClick={() => setWaState("idle")} className="ml-auto text-green-600 hover:text-green-800" title="Close">
                   <X className="size-3" />
                 </button>

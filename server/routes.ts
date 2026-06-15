@@ -3883,19 +3883,6 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
     res.json(WHATSAPP_TEMPLATES);
   });
 
-  // Check if a phone number is registered on WhatsApp
-  app.post("/api/crm/whatsapp-check-number", requireAdminAuth, async (req, res) => {
-    try {
-      const { phone } = req.body as { phone: string };
-      if (!phone) return res.status(400).json({ error: "phone required" });
-      const { checkWhatsAppNumber } = await import("./meta-whatsapp-service");
-      const result = await checkWhatsAppNumber(phone);
-      res.json(result);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
   // ─── Meta WhatsApp Cloud API webhook ──────────────────────────────────────
   // Receives inbound replies so the conversation logs automatically in the CRM.
   // Configure in Meta App Dashboard → WhatsApp → Configuration:

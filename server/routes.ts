@@ -40,6 +40,7 @@ import { runDailyPreparation, runDailyBrief, pollForApprovalReply, runApprovalDe
 import { hunterFindEmail, hunterDomainPattern, buildEmailFromPattern, hunterVerifyEmail, getHunterStatus } from "./hunter-service";
 import { apolloEnrichPerson, apolloConfigured } from "./apollo-service";
 import { origamiEnrichPerson, origamiConfigured } from "./origami-service";
+import { runLeadResearchAgent } from "./lead-research-agent";
 import { pollAllRenderingVideos, runHeygenPreparation } from "./heygen-service";
 import { heygenVideos, prospectLists } from "../shared/schema";
 import { eq, desc } from "drizzle-orm";
@@ -1642,6 +1643,26 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
 
   app.get("/api/crm/enrichment-status", requireAdminAuth, (_req, res) => {
     res.json(getEnrichmentApiStatus());
+  });
+
+  // Conversational Lead Research agent — natural language → searches, ICP
+  // analysis, and outreach drafting via Claude tool-use. Returns the assistant
+  // reply plus any prospects it built (the UI renders + saves them).
+  app.post("/api/crm/lead-research/agent", requireAdminAuth, async (req, res) => {
+    try {
+      const { messages, provider } = req.body as {
+        messages?: Array<{ role: "user" | "assistant"; content: string }>;
+        provider?: string;
+      };
+      if (!Array.isArray(messages) || messages.length === 0) {
+        return res.status(400).json({ message: "messages required" });
+      }
+      const result = await runLeadResearchAgent(messages, provider);
+      res.json(result);
+    } catch (err: any) {
+      console.error("[lead-research/agent] error:", err?.message || err);
+      res.status(500).json({ message: err?.message || "Lead research agent failed" });
+    }
   });
 
   // ─── Seamless.AI Lead Research (search free · reveal spends credits) ────────

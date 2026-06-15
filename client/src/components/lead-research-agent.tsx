@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Sparkles, Send, Loader2, UserPlus, Check, Linkedin, Mail, Phone, Megaphone, PenLine, Copy } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -49,14 +50,27 @@ const SUGGESTIONS = [
   "Find investors in Japan and South Korea, titles CEO or Owner",
 ];
 
+// Stable per-person key used for selection / added tracking.
+const keyOf = (p: AgentPerson) => (p.email || p.fullName).toLowerCase();
+
+// Map an agent person onto the add-to-contacts payload shape.
+const toContactBody = (p: AgentPerson) => ({
+  fullName: p.fullName, firstName: p.firstName, lastName: p.lastName,
+  companyName: p.companyName || "", email: p.email, phone: p.phone,
+  linkedinUrl: p.linkedinUrl, jobTitle: p.jobTitle, country: p.location, bio: null,
+});
+
 export default function LeadResearchAgent({ provider }: { provider?: string }) {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [messages, setMessages] = useState<ChatMsg[]>([
     { role: "assistant", content: "Hi — I'm your Lead Research assistant. Describe who you want to reach and I'll build the list, analyze your ideal customer profile, or draft outreach. What are we looking for?" },
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [added, setAdded] = useState<Set<string>>(new Set());
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkAdding, setBulkAdding] = useState(false);
   const [campaigns, setCampaigns] = useState<{ id: string; name: string }[]>([]);
   const [enrollOpenFor, setEnrollOpenFor] = useState<string | null>(null);
   const [enrolling, setEnrolling] = useState<string | null>(null);
@@ -76,24 +90,23 @@ export default function LeadResearchAgent({ provider }: { provider?: string }) {
       .catch(() => {});
   }, []);
 
+  // After adding contact(s), refetch the CRM tab so they show up immediately.
+  // The contacts list query uses staleTime:Infinity, so without this it keeps
+  // serving a cached list and the new contact appears "missing" until refresh.
+  function refreshCrm() {
+    queryClient.invalidateQueries({ queryKey: ["/api/contacts"] }); // CRM Contacts tab list
+    queryClient.invalidateQueries({ queryKey: ["/api/crm/reports"] }); // dashboard counts
+  }
+
   // Ensure the agent-found person exists as a CRM contact; returns the id.
   async function ensureContact(p: AgentPerson): Promise<string | null> {
-    const body = {
-      contact: {
-        fullName: p.fullName, firstName: p.firstName, lastName: p.lastName,
-        companyName: p.companyName || "", email: p.email, phone: p.phone,
-        linkedinUrl: p.linkedinUrl, jobTitle: p.jobTitle, bio: null,
-        decisionMakerScore: 0, e2ViaBio: false, internationalBio: false,
-      },
-      category: "ai_research",
-    };
     const res = await fetch("/api/crm/prospects/add-to-contacts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify(body),
+      body: JSON.stringify({ contact: toContactBody(p), category: "ai_research" }),
     });
-    if (res.ok) return (await res.json())?.id ?? null;
+    if (res.ok) { refreshCrm(); return (await res.json())?.id ?? null; }
     if (res.status === 409) return (await res.json())?.existing?.id ?? null;
     return null;
   }
@@ -120,19 +133,15 @@ export default function LeadResearchAgent({ provider }: { provider?: string }) {
   }
 
   async function addToContacts(p: AgentPerson) {
-    const key = (p.email || p.fullName).toLowerCase();
+    const key = keyOf(p);
     try {
       await apiRequest("POST", "/api/crm/prospects/add-to-contacts", {
-        contact: {
-          fullName: p.fullName, firstName: p.firstName, lastName: p.lastName,
-          companyName: p.companyName || "", email: p.email, phone: p.phone,
-          linkedinUrl: p.linkedinUrl, jobTitle: p.jobTitle, bio: null,
-          decisionMakerScore: 0, e2ViaBio: false, internationalBio: false,
-        },
+        contact: toContactBody(p),
         category: "ai_research",
       });
       setAdded((s) => new Set(s).add(key));
-      toast({ title: "Added to Contacts", description: p.fullName });
+      refreshCrm();
+      toast({ title: "Added to Contacts", description: `${p.fullName} is now in the CRM tab.` });
     } catch (err: any) {
       const m = String(err?.message || "");
       if (m.includes("already exists")) {
@@ -141,6 +150,64 @@ export default function LeadResearchAgent({ provider }: { provider?: string }) {
       } else {
         toast({ title: "Couldn't add contact", description: p.fullName, variant: "destructive" });
       }
+    }
+  }
+
+  // Toggle one person's selection.
+  function toggleSelect(p: AgentPerson) {
+    const key = keyOf(p);
+    setSelected((s) => {
+      const next = new Set(s);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  }
+
+  // Select / deselect every not-yet-added person in a result list.
+  function toggleSelectAll(people: AgentPerson[]) {
+    const selectable = people.filter((p) => !added.has(keyOf(p))).map(keyOf);
+    const allOn = selectable.length > 0 && selectable.every((k) => selected.has(k));
+    setSelected((s) => {
+      const next = new Set(s);
+      if (allOn) selectable.forEach((k) => next.delete(k));
+      else selectable.forEach((k) => next.add(k));
+      return next;
+    });
+  }
+
+  // Add every selected (and not-yet-added) person in a result list at once.
+  async function addSelected(people: AgentPerson[]) {
+    const targets = people.filter((p) => selected.has(keyOf(p)) && !added.has(keyOf(p)));
+    if (targets.length === 0) {
+      toast({ title: "Nothing selected", description: "Tick the contacts you want to add first." });
+      return;
+    }
+    setBulkAdding(true);
+    try {
+      const res = await apiRequest("POST", "/api/crm/prospects/add-to-contacts/bulk", {
+        contacts: targets.map(toContactBody),
+        category: "ai_research",
+      });
+      const data = (await res.json()) as { added: number; skipped: number; total: number };
+      setAdded((s) => {
+        const next = new Set(s);
+        targets.forEach((p) => next.add(keyOf(p)));
+        return next;
+      });
+      setSelected((s) => {
+        const next = new Set(s);
+        targets.forEach((p) => next.delete(keyOf(p)));
+        return next;
+      });
+      refreshCrm();
+      toast({
+        title: `${data.added} added to the CRM tab`,
+        description: data.skipped > 0 ? `${data.skipped} were already in your CRM.` : `${data.added} new contact${data.added === 1 ? "" : "s"} saved.`,
+      });
+    } catch {
+      toast({ title: "Bulk add failed", description: "Please try again.", variant: "destructive" });
+    } finally {
+      setBulkAdding(false);
     }
   }
 
@@ -199,16 +266,53 @@ export default function LeadResearchAgent({ provider }: { provider?: string }) {
           <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
             <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${m.role === "user" ? "bg-[hsl(var(--primary))] text-white" : "bg-muted text-foreground"}`}>
               <p className="whitespace-pre-wrap leading-relaxed">{m.content}</p>
-              {m.people && m.people.length > 0 && (
+              {m.people && m.people.length > 0 && (() => {
+                const people = m.people;
+                const selectable = people.filter((pp) => !added.has(keyOf(pp)));
+                const selectedCount = selectable.filter((pp) => selected.has(keyOf(pp))).length;
+                const allSelected = selectable.length > 0 && selectedCount === selectable.length;
+                return (
                 <div className="mt-2 space-y-1.5">
-                  {m.people.map((p, j) => {
-                    const key = (p.email || p.fullName).toLowerCase();
+                  {people.length > 1 && (
+                    <div className="flex items-center justify-between gap-2 rounded-lg border bg-muted/40 px-2 py-1.5">
+                      <label className="flex cursor-pointer items-center gap-1.5 text-[11px] font-medium text-foreground">
+                        <input
+                          type="checkbox"
+                          className="size-3.5 accent-[hsl(var(--primary))]"
+                          checked={allSelected}
+                          disabled={selectable.length === 0}
+                          onChange={() => toggleSelectAll(people)}
+                        />
+                        Select all ({selectable.length})
+                      </label>
+                      <Button
+                        size="sm"
+                        className="h-7 gap-1 px-2 text-[11px]"
+                        disabled={selectedCount === 0 || bulkAdding}
+                        onClick={() => addSelected(people)}
+                      >
+                        {bulkAdding ? <Loader2 className="size-3 animate-spin" /> : <UserPlus className="size-3" />}
+                        Add {selectedCount > 0 ? `${selectedCount} ` : ""}to CRM
+                      </Button>
+                    </div>
+                  )}
+                  {people.map((p, j) => {
+                    const key = keyOf(p);
                     const isAdded = added.has(key);
                     const enrolledIn = enrolled.get(key);
                     const pickerOpen = enrollOpenFor === key;
                     return (
                       <div key={j} className="rounded-lg border bg-card px-2 py-1.5">
                         <div className="flex items-center gap-2">
+                          {!isAdded && (
+                            <input
+                              type="checkbox"
+                              className="size-3.5 shrink-0 accent-[hsl(var(--primary))]"
+                              checked={selected.has(key)}
+                              onChange={() => toggleSelect(p)}
+                              aria-label={`Select ${p.fullName}`}
+                            />
+                          )}
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-1.5">
                               <p className="truncate text-xs font-semibold text-foreground">{p.fullName}</p>
@@ -292,7 +396,8 @@ export default function LeadResearchAgent({ provider }: { provider?: string }) {
                     );
                   })}
                 </div>
-              )}
+                );
+              })()}
             </div>
           </div>
         ))}

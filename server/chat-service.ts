@@ -108,6 +108,16 @@ export async function callClaude(messages: Array<{ role: "user" | "assistant"; c
     return "Hey, seems like I'm having a quick tech moment 😅 Try WhatsApp or leave me a message below!";
   }
 
+  // The Anthropic API requires the conversation to START with a user message.
+  // Our chat widget seeds the thread with an assistant greeting, so without
+  // this the every request was a 400 and users always got the fallback. Drop
+  // empty turns and any leading assistant messages.
+  const clean = (messages || []).filter((m) => m && typeof m.content === "string" && m.content.trim());
+  while (clean.length && clean[0].role !== "user") clean.shift();
+  if (clean.length === 0) {
+    return "Hey! 👋 Dylan here — what can I help you with today?";
+  }
+
   try {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -117,10 +127,10 @@ export async function callClaude(messages: Array<{ role: "user" | "assistant"; c
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-5",
+        model: "claude-sonnet-4-6",
         max_tokens: 512,
         system: DYLAN_SYSTEM_PROMPT,
-        messages,
+        messages: clean,
       }),
       signal: AbortSignal.timeout(30000),
     });

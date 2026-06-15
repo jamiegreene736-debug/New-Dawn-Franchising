@@ -122,6 +122,15 @@ const STATEMENTS: string[] = [
   `ALTER TABLE drip_steps ADD COLUMN IF NOT EXISTS trigger_type text NOT NULL DEFAULT 'time'`,
   `ALTER TABLE drip_steps ADD COLUMN IF NOT EXISTS trigger_ref_step integer`,
   `ALTER TABLE drip_steps ADD COLUMN IF NOT EXISTS trigger_window_hours integer`,
+  // ─── Two-track outreach (broker referral pitch vs direct-to-client pitch) ──
+  // drip_campaigns carries which audience track its steps speak to; the bulk
+  // launcher and the seeded Grok campaigns both set it. Existing campaigns are
+  // broker outreach, so the backfill default is 'broker'.
+  `ALTER TABLE drip_campaigns ADD COLUMN IF NOT EXISTS audience_type text NOT NULL DEFAULT 'broker'`,
+  // outreach_leads carries which sequence track a lead is enrolled on, so the
+  // automated engine can run the broker OR the client variant for the same lead
+  // pool. Defaults to 'broker' to preserve existing behavior.
+  `ALTER TABLE outreach_leads ADD COLUMN IF NOT EXISTS sequence_track text NOT NULL DEFAULT 'broker'`,
 ];
 
 export async function ensureSchema(): Promise<void> {

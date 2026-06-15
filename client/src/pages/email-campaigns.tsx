@@ -42,6 +42,7 @@ interface Campaign {
   name: string;
   description: string | null;
   isActive: boolean;
+  audienceType?: "broker" | "client";
   createdAt: string;
   steps?: Step[];
 }
@@ -297,6 +298,9 @@ function EmailCampaignTab() {
   const [addStepType, setAddStepType] = useState<string>("email");
   const [showNewCampaign, setShowNewCampaign] = useState(false);
   const [newCampaignName, setNewCampaignName] = useState("");
+  // Audience track for a brand-new campaign: "broker" (referral-partner pitch)
+  // or "client" (direct-to-E-2-investor pitch). Defaults to broker (status quo).
+  const [newCampaignAudience, setNewCampaignAudience] = useState<"broker" | "client">("broker");
   const [showEnrollContacts, setShowEnrollContacts] = useState(false);
   const [selectedContacts, setSelectedContacts] = useState<Set<string>>(new Set());
   const [contactSearch, setContactSearch] = useState("");
@@ -631,14 +635,15 @@ function EmailCampaignTab() {
   });
 
   const createCampaignMutation = useMutation({
-    mutationFn: async (name: string) => {
-      const res = await apiRequest("POST", "/api/crm/campaigns", { name, isActive: true });
+    mutationFn: async ({ name, audienceType }: { name: string; audienceType: "broker" | "client" }) => {
+      const res = await apiRequest("POST", "/api/crm/campaigns", { name, isActive: true, audienceType });
       return res.json();
     },
     onSuccess: (c: Campaign) => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/campaigns"] });
       setShowNewCampaign(false);
       setNewCampaignName("");
+      setNewCampaignAudience("broker");
       setSelectedCampaign(c.id);
       setBuilderView("overview");
       toast({ title: "Campaign created", description: "Add your first step to start the sequence." });
@@ -826,12 +831,31 @@ function EmailCampaignTab() {
                       value={newCampaignName}
                       onChange={(e) => setNewCampaignName(e.target.value)}
                       placeholder="e.g. E-2 Attorney Outreach"
-                      onKeyDown={(e) => { if (e.key === "Enter" && newCampaignName.trim()) createCampaignMutation.mutate(newCampaignName.trim()); }}
+                      onKeyDown={(e) => { if (e.key === "Enter" && newCampaignName.trim()) createCampaignMutation.mutate({ name: newCampaignName.trim(), audienceType: newCampaignAudience }); }}
                     />
-                    <Button onClick={() => createCampaignMutation.mutate(newCampaignName.trim())} disabled={!newCampaignName.trim() || createCampaignMutation.isPending}>
+                    <Button onClick={() => createCampaignMutation.mutate({ name: newCampaignName.trim(), audienceType: newCampaignAudience })} disabled={!newCampaignName.trim() || createCampaignMutation.isPending}>
                       {createCampaignMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : "Create"}
                     </Button>
                     <Button variant="outline" onClick={() => setShowNewCampaign(false)}>Cancel</Button>
+                  </div>
+                  {/* Audience track — which version of the pitch this campaign sends */}
+                  <Label className="mt-3 block">Audience</Label>
+                  <div className="flex gap-2 mt-1">
+                    {([
+                      { value: "broker" as const, label: "Brokers", hint: "Referral-partner pitch" },
+                      { value: "client" as const, label: "Clients", hint: "Direct-to-investor pitch" },
+                    ]).map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        data-testid={`new-campaign-audience-${opt.value}`}
+                        onClick={() => setNewCampaignAudience(opt.value)}
+                        className={`flex-1 rounded-lg border px-3 py-2 text-left text-xs transition-colors ${newCampaignAudience === opt.value ? "border-[hsl(var(--primary))] bg-[hsl(var(--primary))]/5" : "border-muted hover:bg-muted/40"}`}
+                      >
+                        <span className="block font-semibold">{opt.label}</span>
+                        <span className="block text-muted-foreground">{opt.hint}</span>
+                      </button>
+                    ))}
                   </div>
                 </Card>
               )}
@@ -855,6 +879,9 @@ function EmailCampaignTab() {
                           <span className="font-semibold">{campaign.name}</span>
                           <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${campaign.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}>
                             {campaign.isActive ? "Active" : "Paused"}
+                          </span>
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${campaign.audienceType === "client" ? "bg-violet-100 text-violet-700" : "bg-blue-100 text-blue-700"}`}>
+                            {campaign.audienceType === "client" ? "Clients" : "Brokers"}
                           </span>
                         </div>
                         <div className="flex items-center gap-1">

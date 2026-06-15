@@ -316,11 +316,6 @@ function LeadDetail({ lead, onBack }: { lead: PartnerLead; onBack: () => void })
               <Badge className={STATUS_COLORS[currentLead.status] ?? "bg-gray-100 text-gray-600"}>
                 {currentLead.status}
               </Badge>
-              {currentLead.sequenceFlow && (
-                <Badge variant="outline" className="text-xs">
-                  {currentLead.sequenceFlow === "lob_enabled" ? "📬 Lob letter" : "📧 Email-only"}
-                </Badge>
-              )}
               {currentLead.subjectVariant && (
                 <Badge variant="outline" className="text-xs">Variant {currentLead.subjectVariant}</Badge>
               )}
@@ -567,13 +562,12 @@ export function PartnerOutreachSection() {
 
       {/* Sequence overview */}
       <div className="bg-gradient-to-r from-[#1a2a4a]/5 to-[#1a2a4a]/10 border border-[#1a2a4a]/10 rounded-xl p-5">
-        <h3 className="font-semibold text-[#1a2a4a] mb-3 text-sm uppercase tracking-wide">8-Step Sequence Overview</h3>
+        <h3 className="font-semibold text-[#1a2a4a] mb-3 text-sm uppercase tracking-wide">7-Step Sequence Overview</h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {[
             { day: 0, ch: "LinkedIn", touch: "Connection Request", icon: "🔗" },
             { day: 1, ch: "Email", touch: "Soft Intro", icon: "📧" },
             { day: 2, ch: "LinkedIn", touch: "DM (if connected)", icon: "💬" },
-            { day: 4, ch: "Letter", touch: "Lob Physical Letter", icon: "📬" },
             { day: 7, ch: "Email", touch: "Opportunity + Escrow", icon: "📧" },
             { day: 10, ch: "Email", touch: "Loom Video", icon: "🎬" },
             { day: 14, ch: "Email", touch: "Partnership + Fee", icon: "🤝" },
@@ -732,7 +726,6 @@ export function PartnerOutreachSection() {
                     {lead.sequenceStartedAt ? (
                       <span className={lead.sequencePaused ? "text-orange-500" : "text-blue-600"}>
                         {lead.sequencePaused ? "⏸ Paused" : "▶ Running"}
-                        {lead.sequenceFlow === "lob_enabled" ? " · Lob" : ""}
                       </span>
                     ) : (
                       <span className="text-gray-300">Not started</span>

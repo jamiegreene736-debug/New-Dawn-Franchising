@@ -819,10 +819,12 @@ Return JSON array of suggestion objects with fields: id (short string), title (s
     }
   });
 
-  // POST /api/leads/:id/sequence/start — initialize the sequence for a lead
+  // POST /api/leads/:id/sequence/start — initialize the sequence for a lead.
+  // Optional body { track: "broker" | "client" } selects which pitch to run.
   app.post("/api/leads/:id/sequence/start", requireAdmin, async (req: any, res: any) => {
     try {
-      await initializeSequence(req.params.id);
+      const track = req.body?.track === "client" ? "client" : req.body?.track === "broker" ? "broker" : undefined;
+      await initializeSequence(req.params.id, track);
       const events = await getLeadTimeline(req.params.id);
       res.json({ success: true, eventCount: events.length, events });
     } catch (e: any) {

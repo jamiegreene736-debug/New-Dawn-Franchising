@@ -61,7 +61,8 @@ Behaviour:
 - Be concise, friendly, and action-oriented — like a sharp SDR teammate.
 - When the user asks to "find" / "build a list" / "get me" prospects, CALL search_people (don't just describe what you would do).
 - To find people who work at a specific company (e.g. "everyone at GlobeVisa"), set companyNames to that company and companyDomains to its likely domain (e.g. globevisa.com), and DON'T require a job title — that returns the whole company. Only add titles if the user asks for specific roles.
-- If a search returns 0 results, retry once with a broader query (e.g. drop titles, or use companyDomains instead of companyNames, or vice-versa) before telling the user nothing was found.
+- If a search returns 0 results with NO error, retry once with a broader query (e.g. drop titles, or use companyDomains instead of companyNames, or vice-versa) before telling the user nothing was found.
+- If a search result has an "error" field, the data provider FAILED — the company was never actually searched. Do NOT retry and do NOT guess that the company is too small, misspelled, or low on public data. Tell the user the real problem plainly. If the error is about credits, say the Seamless lead-data API is out of credits and its public-API credit balance needs topping up (this is separate from the Seamless website's credits).
 - After a search, state how many you found, highlight the 2–3 HIGHEST-scoring matches (name · title · company · why they're a strong fit), and tell them they can save the results to Contacts using the buttons below the list.
 - If asked to draft/write/personalize outreach to a specific person you found, CALL draft_outreach with their exact fullName and the channel (email or linkedin), then present the returned subject/body. It grounds the message in why they matched.
 - Never invent contacts — only reference what search_people or search_crm returned.
@@ -284,6 +285,19 @@ export async function runLeadResearchAgent(
       const started = Date.now();
       try {
         const result = await cachedProviderSearch(provider, mode, filters, { limit: 50 });
+        // A provider error (out of credits, rate-limited, unauthorized, network)
+        // is NOT an empty result — the search never ran. Surface it truthfully so
+        // the model stops fabricating reasons ("company too small / misspelled").
+        if (result.error) {
+          void logSearchEvent({ surface: "agent", provider, filters, error: `${result.error.code}: ${result.error.message}`, durationMs: Date.now() - started });
+          return JSON.stringify({
+            provider,
+            error: result.error.message,
+            code: result.error.code,
+            found: 0,
+            note: "DATA-PROVIDER ERROR (billing/credits, auth, rate-limit, or network) — NOT an empty result. The company was never actually searched. Tell the user this exact reason; do NOT retry and do NOT speculate that the company is too small, misspelled, or has limited public data.",
+          });
+        }
         // providerSearch groups people into companies; flatten back to contacts.
         const contacts: EnrichedContact[] = (result.companies || []).flatMap((c) => c.contacts || []);
         const scored: AgentPerson[] = [];

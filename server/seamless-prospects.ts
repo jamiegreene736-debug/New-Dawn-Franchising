@@ -23,6 +23,7 @@ import {
   type SeamlessCompany,
   type SeamlessContactFilters,
   type SeamlessCompanyFilters,
+  type ProviderError,
 } from "./seamless-service";
 import { apolloSearchContacts, apolloSearchCompanies } from "./apollo-service";
 import { origamiSearchContacts, origamiSearchCompanies } from "./origami-service";
@@ -245,7 +246,12 @@ function personToContact(
 
 // ─── Shared grouping (provider-agnostic) ─────────────────────────────────────
 
-export type SearchResult = { companies: EnrichedCompany[]; totalContacts: number; enrichedCount: number; nextToken: string | null };
+export type SearchResult = { companies: EnrichedCompany[]; totalContacts: number; enrichedCount: number; nextToken: string | null; error?: ProviderError | null };
+
+/** Tag a provider error with which provider produced it (for honest messaging). */
+function withProvider(error: ProviderError | null | undefined, provider: ProviderId): ProviderError | null {
+  return error ? { ...error, provider } : null;
+}
 
 /** Group a normalised people list into EnrichedCompany[] tagged with the source provider. */
 function groupPeopleIntoCompanies(
@@ -335,8 +341,9 @@ export async function seamlessContactSearch(
   opts: { limit?: number; nextToken?: string | null } = {},
 ): Promise<SearchResult> {
   const limit = Math.min(opts.limit ?? 50, 100);
-  const { people, nextToken } = await seamlessSearchContacts(toContactFilters(filters, limit, opts.nextToken));
-  return groupPeopleIntoCompanies(people, filters, "Seamless.AI", nextToken);
+  const { people, nextToken, error } = await seamlessSearchContacts(toContactFilters(filters, limit, opts.nextToken));
+  const result = groupPeopleIntoCompanies(people, filters, "Seamless.AI", nextToken);
+  return { ...result, error: withProvider(error, "seamless") };
 }
 
 // ─── Company search (free) ──────────────────────────────────────────────────
@@ -346,8 +353,9 @@ export async function seamlessCompanySearch(
   opts: { limit?: number; nextToken?: string | null } = {},
 ): Promise<SearchResult> {
   const limit = Math.min(opts.limit ?? 50, 100);
-  const { companies: raw, nextToken } = await seamlessSearchCompanies(toCompanyFilters(filters, limit, opts.nextToken));
-  return mapCompanies(raw, filters, "Seamless.AI", nextToken);
+  const { companies: raw, nextToken, error } = await seamlessSearchCompanies(toCompanyFilters(filters, limit, opts.nextToken));
+  const result = mapCompanies(raw, filters, "Seamless.AI", nextToken);
+  return { ...result, error: withProvider(error, "seamless") };
 }
 
 // ─── Apollo.io (supplemental) ────────────────────────────────────────────────
@@ -357,8 +365,9 @@ export async function apolloContactSearch(
   opts: { limit?: number; nextToken?: string | null } = {},
 ): Promise<SearchResult> {
   const limit = Math.min(opts.limit ?? 50, 100);
-  const { people, nextToken } = await apolloSearchContacts(toContactFilters(filters, limit, opts.nextToken));
-  return groupPeopleIntoCompanies(people, filters, "Apollo.io", nextToken);
+  const { people, nextToken, error } = await apolloSearchContacts(toContactFilters(filters, limit, opts.nextToken));
+  const result = groupPeopleIntoCompanies(people, filters, "Apollo.io", nextToken);
+  return { ...result, error: withProvider(error, "apollo") };
 }
 
 export async function apolloCompanySearch(
@@ -366,8 +375,9 @@ export async function apolloCompanySearch(
   opts: { limit?: number; nextToken?: string | null } = {},
 ): Promise<SearchResult> {
   const limit = Math.min(opts.limit ?? 50, 100);
-  const { companies: raw, nextToken } = await apolloSearchCompanies(toCompanyFilters(filters, limit, opts.nextToken));
-  return mapCompanies(raw, filters, "Apollo.io", nextToken);
+  const { companies: raw, nextToken, error } = await apolloSearchCompanies(toCompanyFilters(filters, limit, opts.nextToken));
+  const result = mapCompanies(raw, filters, "Apollo.io", nextToken);
+  return { ...result, error: withProvider(error, "apollo") };
 }
 
 // ─── Origami (supplemental) ──────────────────────────────────────────────────
@@ -377,8 +387,9 @@ export async function origamiContactSearch(
   opts: { limit?: number; nextToken?: string | null } = {},
 ): Promise<SearchResult> {
   const limit = Math.min(opts.limit ?? 50, 100);
-  const { people, nextToken } = await origamiSearchContacts(toContactFilters(filters, limit, opts.nextToken));
-  return groupPeopleIntoCompanies(people, filters, "Origami", nextToken);
+  const { people, nextToken, error } = await origamiSearchContacts(toContactFilters(filters, limit, opts.nextToken));
+  const result = groupPeopleIntoCompanies(people, filters, "Origami", nextToken);
+  return { ...result, error: withProvider(error, "origami") };
 }
 
 export async function origamiCompanySearch(
@@ -386,8 +397,9 @@ export async function origamiCompanySearch(
   opts: { limit?: number; nextToken?: string | null } = {},
 ): Promise<SearchResult> {
   const limit = Math.min(opts.limit ?? 50, 100);
-  const { companies: raw, nextToken } = await origamiSearchCompanies(toCompanyFilters(filters, limit, opts.nextToken));
-  return mapCompanies(raw, filters, "Origami", nextToken);
+  const { companies: raw, nextToken, error } = await origamiSearchCompanies(toCompanyFilters(filters, limit, opts.nextToken));
+  const result = mapCompanies(raw, filters, "Origami", nextToken);
+  return { ...result, error: withProvider(error, "origami") };
 }
 
 // ─── Provider dispatch ───────────────────────────────────────────────────────

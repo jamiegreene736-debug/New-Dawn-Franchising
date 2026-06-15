@@ -32,9 +32,25 @@ import type {
   SeamlessCompany,
   SeamlessContactFilters,
   SeamlessCompanyFilters,
+  ProviderError,
 } from "./seamless-service";
 
 const FETCH_TIMEOUT_MS = 12000;
+
+/** Classify an Origami failure into a ProviderError (never swallowed). */
+function origamiHttpError(status: number): ProviderError {
+  if (status === 401 || status === 403) {
+    return { status, code: "unauthorized", message: "Origami rejected the API key (unauthorized). Check ORIGAMI_API_KEY." };
+  }
+  if (status === 429) {
+    return { status: 429, code: "rateLimited", message: "Origami rate limit reached. Try again shortly." };
+  }
+  return { status, code: "http", message: `Origami returned an error (HTTP ${status}).` };
+}
+
+function origamiNetworkError(): ProviderError {
+  return { status: 0, code: "network", message: "Couldn't reach Origami (network error, timeout, or unresolved host)." };
+}
 
 function getKey(): string | null {
   return process.env.ORIGAMI_API_KEY || null;
@@ -150,7 +166,7 @@ function mapPerson(raw: Loose): SeamlessPerson | null {
 async function origamiSearchRaw(
   filters: SeamlessContactFilters | SeamlessCompanyFilters,
   mode: "contacts" | "companies",
-): Promise<{ items: Loose[]; nextToken: string | null }> {
+): Promise<{ items: Loose[]; nextToken: string | null; error?: ProviderError | null }> {
   const key = getKey();
   if (!key) return { items: [], nextToken: null };
 
@@ -186,7 +202,11 @@ async function origamiSearchRaw(
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
-    if (!res.ok) return { items: [], nextToken: null };
+    if (!res.ok) {
+      const error = origamiHttpError(res.status);
+      console.warn(`[Origami] ${searchPath()} ${error.status} ${error.code}: ${error.message}`);
+      return { items: [], nextToken: null, error };
+    }
     const json = (await res.json()) as Loose;
     // Accept the array under any of the common envelope keys.
     const items =
@@ -203,7 +223,9 @@ async function origamiSearchRaw(
       null;
     return { items, nextToken };
   } catch {
-    return { items: [], nextToken: null };
+    const error = origamiNetworkError();
+    console.warn(`[Origami] ${searchPath()} ${error.code}: ${error.message}`);
+    return { items: [], nextToken: null, error };
   }
 }
 
@@ -211,16 +233,16 @@ async function origamiSearchRaw(
 
 export async function origamiSearchContacts(
   filters: SeamlessContactFilters,
-): Promise<{ people: SeamlessPerson[]; nextToken: string | null }> {
-  const { items, nextToken } = await origamiSearchRaw(filters, "contacts");
+): Promise<{ people: SeamlessPerson[]; nextToken: string | null; error?: ProviderError | null }> {
+  const { items, nextToken, error } = await origamiSearchRaw(filters, "contacts");
   const people = items.map(mapPerson).filter((p): p is SeamlessPerson => !!p);
-  return { people, nextToken };
+  return { people, nextToken, error: error ?? null };
 }
 
 export async function origamiSearchCompanies(
   filters: SeamlessCompanyFilters,
-): Promise<{ companies: SeamlessCompany[]; nextToken: string | null }> {
-  const { items, nextToken } = await origamiSearchRaw(filters, "companies");
+): Promise<{ companies: SeamlessCompany[]; nextToken: string | null; error?: ProviderError | null }> {
+  const { items, nextToken, error } = await origamiSearchRaw(filters, "companies");
   const companies: SeamlessCompany[] = items
     .map((raw): SeamlessCompany | null => {
       const name = str(raw, "name", "company", "company_name", "companyName");
@@ -252,7 +274,7 @@ export async function origamiSearchCompanies(
       };
     })
     .filter((c): c is SeamlessCompany => !!c);
-  return { companies, nextToken };
+  return { companies, nextToken, error: error ?? null };
 }
 
 // ─── Enrichment (POST /v1/contacts/enrich) ───────────────────────────────────

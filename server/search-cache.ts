@@ -62,8 +62,13 @@ export async function cachedProviderSearch(
     return { ...hit.value, cached: true };
   }
   const value = await providerSearch(provider, mode, filters, opts);
-  store.set(key, { value, expires: now + TTL_MS });
-  evictIfNeeded();
+  // Never cache a provider error (out-of-credits, rate-limit, network): it's
+  // transient, and caching it would keep masking real results for the full TTL
+  // even after the underlying issue (e.g. a credit top-up) is resolved.
+  if (!value.error) {
+    store.set(key, { value, expires: now + TTL_MS });
+    evictIfNeeded();
+  }
   return { ...value, cached: false };
 }
 

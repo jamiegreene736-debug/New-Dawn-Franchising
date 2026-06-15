@@ -177,8 +177,11 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
   const [postcardAddress, setPostcardAddress] = useState(client.address ?? "");
   const [waCheckResult, setWaCheckResult] = useState<{ onWhatsApp: boolean; waId?: string; error?: string } | null>(null);
   const [waChecking, setWaChecking] = useState(false);
-  const [wpResult, setWpResult] = useState<{ found: boolean; phone?: string; address?: string; matchQuality?: string } | null>(null);
-  const [wpLoading, setWpLoading] = useState(false);
+  const [verifyResult, setVerifyResult] = useState<{
+    email?: { result: string; status: string; score: number; disposable?: boolean; webmail?: boolean; configured?: boolean };
+    phone?: { valid: boolean; normalized: string; note: string };
+  } | null>(null);
+  const [verifyLoading, setVerifyLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const activitiesKey = [`/api/crm/clients/${client.id}/activities`];
@@ -456,49 +459,21 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
   const firstName = client.fullName.split(" ")[0];
   const lastName = client.fullName.split(" ").slice(1).join(" ") || "";
 
-  const runWhitepagesLookup = async () => {
-    if (!firstName || !lastName) return;
-    setWpLoading(true);
-    setWpResult(null);
+  const runVerifyContact = async () => {
+    if (!client.email && !client.phone) return;
+    setVerifyLoading(true);
+    setVerifyResult(null);
     try {
-      const res = await apiRequest("POST", "/api/crm/enrich/whitepages", {
-        firstName,
-        lastName,
+      const res = await apiRequest("POST", "/api/crm/verify-contact", {
         email: client.email ?? undefined,
+        phone: client.phone ?? undefined,
       });
-      const data = await res.json() as { found: boolean; phone?: string; address?: string; matchQuality?: string };
-      setWpResult(data);
-      if (!data.found) {
-        toast({ title: "Whitepages: no match found", description: "Try adding city/state to the client profile for a more specific search." });
-      }
+      const data = await res.json();
+      setVerifyResult(data);
     } catch {
-      toast({ title: "Whitepages lookup failed", variant: "destructive" });
+      toast({ title: "Verification failed", variant: "destructive" });
     } finally {
-      setWpLoading(false);
-    }
-  };
-
-  const applyWhitepagesPhone = async () => {
-    if (!wpResult?.phone) return;
-    try {
-      await apiRequest("PATCH", `/api/crm/clients/${client.id}`, { phone: wpResult.phone });
-      toast({ title: "Phone number saved" });
-      onRefresh();
-      setWpResult(prev => prev ? { ...prev, phone: undefined } : prev);
-    } catch {
-      toast({ title: "Failed to save phone", variant: "destructive" });
-    }
-  };
-
-  const applyWhitepagesAddress = async () => {
-    if (!wpResult?.address) return;
-    try {
-      await apiRequest("PATCH", `/api/crm/clients/${client.id}`, { address: wpResult.address });
-      toast({ title: "Address saved" });
-      onRefresh();
-      setWpResult(prev => prev ? { ...prev, address: undefined } : prev);
-    } catch {
-      toast({ title: "Failed to save address", variant: "destructive" });
+      setVerifyLoading(false);
     }
   };
 
@@ -597,50 +572,46 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
             <ProfileField label="Country" value={client.country} />
             <ProfileField label="Address" value={client.address} />
 
-            {/* Whitepages enrichment */}
+            {/* Contact verification (Hunter.io email verifier + phone format check) */}
             <div>
               <button
-                data-testid="button-whitepages-lookup"
-                onClick={runWhitepagesLookup}
-                disabled={wpLoading || !lastName}
+                data-testid="button-verify-contact"
+                onClick={runVerifyContact}
+                disabled={verifyLoading || (!client.email && !client.phone)}
                 className="flex items-center gap-1.5 text-[11px] font-medium text-blue-600 hover:text-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                {wpLoading ? <Loader2 className="size-3 animate-spin" /> : <Search className="size-3" />}
-                {wpLoading ? "Looking up…" : "Whitepages lookup"}
+                {verifyLoading ? <Loader2 className="size-3 animate-spin" /> : <Search className="size-3" />}
+                {verifyLoading ? "Verifying…" : "Verify email & phone"}
               </button>
-              {wpResult?.found && (
-                <div className="mt-2 space-y-1.5 rounded-md border bg-blue-50 dark:bg-blue-950/30 p-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-400">
-                    Found · {wpResult.matchQuality === "exact" ? "Exact match" : "Partial match"}
-                  </p>
-                  {wpResult.phone && !client.phone && (
-                    <div className="flex items-center justify-between gap-1">
-                      <span className="text-xs text-foreground truncate">{wpResult.phone}</span>
-                      <button
-                        data-testid="button-apply-wp-phone"
-                        onClick={applyWhitepagesPhone}
-                        className="shrink-0 text-[10px] font-semibold text-blue-600 hover:text-blue-800 border border-blue-300 rounded px-1.5 py-0.5"
-                      >Apply phone</button>
+              {verifyResult && (
+                <div className="mt-2 space-y-2 rounded-md border bg-muted/40 p-2">
+                  {verifyResult.email && (() => {
+                    const e = verifyResult.email!;
+                    const cls = e.result === "deliverable" ? "bg-green-100 text-green-700"
+                      : e.result === "risky" ? "bg-amber-100 text-amber-700"
+                      : e.result === "undeliverable" ? "bg-red-100 text-red-700"
+                      : "bg-gray-100 text-gray-600";
+                    return (
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-1.5">
+                          <Mail className="size-3 text-muted-foreground" />
+                          <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold capitalize ${cls}`}>{e.result}</span>
+                          {e.score != null && <span className="text-[10px] text-muted-foreground">score {e.score}/100</span>}
+                        </div>
+                        <p className="text-[10px] text-muted-foreground capitalize">
+                          {e.configured === false ? "Hunter.io API key not set" : `${e.status}${e.disposable ? " · disposable" : ""}${e.webmail ? " · webmail" : ""}`}
+                        </p>
+                      </div>
+                    );
+                  })()}
+                  {verifyResult.phone && (
+                    <div className="flex items-center gap-1.5">
+                      <Phone className="size-3 text-muted-foreground" />
+                      <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${verifyResult.phone.valid ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                        {verifyResult.phone.valid ? "Valid format" : "Invalid format"}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">{verifyResult.phone.note}</span>
                     </div>
-                  )}
-                  {wpResult.phone && client.phone && (
-                    <p className="text-[11px] text-muted-foreground">Phone already on file · {wpResult.phone}</p>
-                  )}
-                  {wpResult.address && !client.address && (
-                    <div className="flex items-start justify-between gap-1">
-                      <span className="text-xs text-foreground leading-tight">{wpResult.address}</span>
-                      <button
-                        data-testid="button-apply-wp-address"
-                        onClick={applyWhitepagesAddress}
-                        className="shrink-0 text-[10px] font-semibold text-blue-600 hover:text-blue-800 border border-blue-300 rounded px-1.5 py-0.5"
-                      >Apply</button>
-                    </div>
-                  )}
-                  {wpResult.address && client.address && (
-                    <p className="text-[11px] text-muted-foreground leading-tight">Address already on file</p>
-                  )}
-                  {!wpResult.phone && !wpResult.address && (
-                    <p className="text-[11px] text-muted-foreground">Record found but no phone/address returned.</p>
                   )}
                 </div>
               )}
@@ -2023,10 +1994,10 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
                     <h4 className="text-xs font-semibold text-blue-800 mb-2">Email Deliverability Checklist</h4>
                     <ul className="text-xs text-blue-700 space-y-1.5">
                       <li>✅ <strong>SPF</strong> — Automatic with Google Workspace (no action needed)</li>
-                      <li>🔲 <strong>DKIM</strong> — Enable in Google Workspace Admin → Apps → Google Workspace → Gmail → Authenticate email → Generate key → Add DNS TXT record</li>
+                      <li>✅ <strong>DKIM</strong> — Authenticated in Google Workspace (DNS TXT key published)</li>
                       <li>✅ <strong>DMARC</strong> — DNS TXT record active: <code className="bg-blue-100 px-1 rounded font-mono">v=DMARC1; p=none; rua=mailto:postmaster@newdawnfranchising.com</code></li>
                       <li>✅ <strong>Open tracking</strong> — Enabled via invisible pixel in every email</li>
-                      <li>🔲 <strong>Primary sender + inbox sync</strong> — Add <code className="bg-blue-100 px-1 rounded font-mono">GMAIL_APP_PASSWORD_FRANCHISING</code> to send from and two-way sync franchising@ (replies appear in this thread)</li>
+                      <li>✅ <strong>Primary sender + inbox sync</strong> — <code className="bg-blue-100 px-1 rounded font-mono">GMAIL_APP_PASSWORD_FRANCHISING</code> set; franchising@ sends + two-way reply sync active</li>
                     </ul>
                   </Card>
                 </div>

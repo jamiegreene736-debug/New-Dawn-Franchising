@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import SeamlessSearchPanel, { type LeadFilters, EMPTY_FILTERS, countActiveFilters } from "@/components/seamless-search-panel";
 import LeadResearchAgent from "@/components/lead-research-agent";
+import { BulkEnrichDialog } from "@/components/bulk-enrich-dialog";
 
 const US_STATES = [
   "Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut",
@@ -942,6 +943,10 @@ export default function ProspectFinder() {
   const [renameListName, setRenameListName] = useState("");
   const [openAddToList, setOpenAddToList] = useState<string | null>(null);
   const [selectedSavedProspect, setSelectedSavedProspect] = useState<SavedProspect | null>(null);
+  // Selection + bulk enrichment for the Saved List tab (separate from the
+  // search-results `selected` set above).
+  const [savedSelected, setSavedSelected] = useState<Set<string>>(new Set());
+  const [savedBulkEnrichOpen, setSavedBulkEnrichOpen] = useState(false);
   const newListInputRef = useRef<HTMLInputElement>(null);
   const [listPickerContact, setListPickerContact] = useState<EnrichedContact | null>(null);
   const [listPickerProspectId, setListPickerProspectId] = useState<string | null>(null);
@@ -2432,6 +2437,50 @@ export default function ProspectFinder() {
               )}
             </div>
 
+            {/* Bulk selection bar + Enrich */}
+            {filteredSaved.length > 0 && (
+              <div className="flex items-center gap-3 flex-wrap rounded-lg border bg-muted/30 px-3 py-2">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    data-testid="checkbox-select-all-saved"
+                    checked={filteredSaved.every((p) => savedSelected.has(p.id))}
+                    onChange={(e) => {
+                      setSavedSelected((prev) => {
+                        const next = new Set(prev);
+                        if (e.target.checked) filteredSaved.forEach((p) => next.add(p.id));
+                        else filteredSaved.forEach((p) => next.delete(p.id));
+                        return next;
+                      });
+                    }}
+                    className="size-4 rounded border-gray-300 accent-primary cursor-pointer"
+                  />
+                  <span className="text-xs text-muted-foreground">
+                    {savedSelected.size > 0 ? `${savedSelected.size} selected` : "Select all"}
+                  </span>
+                </label>
+                {savedSelected.size > 0 && (
+                  <>
+                    <button
+                      onClick={() => setSavedSelected(new Set())}
+                      className="text-xs text-primary underline hover:opacity-80"
+                    >
+                      Clear
+                    </button>
+                    <Button
+                      size="sm"
+                      data-testid="button-bulk-enrich-saved"
+                      className="ml-auto h-8 gap-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs"
+                      onClick={() => setSavedBulkEnrichOpen(true)}
+                      title="Find email, phone & LinkedIn for the selected contacts"
+                    >
+                      <Sparkles className="size-3.5" /> Enrich {savedSelected.size}
+                    </Button>
+                  </>
+                )}
+              </div>
+            )}
+
             {/* Cards */}
             {filteredSaved.length === 0 ? (
               <Card className="p-10 text-center">
@@ -2447,9 +2496,25 @@ export default function ProspectFinder() {
             ) : (
               <div className="space-y-2">
                 {filteredSaved.map((p) => (
-                    <Card key={p.id} className="p-3 cursor-pointer hover:bg-muted/30 transition-colors"
+                    <Card key={p.id} className={`p-3 cursor-pointer transition-colors ${savedSelected.has(p.id) ? "border-primary bg-primary/5" : "hover:bg-muted/30"}`}
                       onClick={() => setSelectedSavedProspect(p)}>
                       <div className="flex items-start gap-3">
+                        {/* Select checkbox */}
+                        <div className="shrink-0 pt-0.5" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            data-testid={`checkbox-saved-${p.id}`}
+                            checked={savedSelected.has(p.id)}
+                            onChange={(e) => {
+                              setSavedSelected((prev) => {
+                                const next = new Set(prev);
+                                if (e.target.checked) next.add(p.id); else next.delete(p.id);
+                                return next;
+                              });
+                            }}
+                            className="size-4 rounded border-gray-300 accent-primary cursor-pointer"
+                          />
+                        </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-medium text-sm">{p.name}</span>
@@ -2693,6 +2758,20 @@ export default function ProspectFinder() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* ── Bulk enrichment (Saved List) ── */}
+      <BulkEnrichDialog
+        open={savedBulkEnrichOpen}
+        onOpenChange={setSavedBulkEnrichOpen}
+        ids={Array.from(savedSelected)}
+        endpoint="/api/crm/prospects/bulk-enrich"
+        entityNoun="contact"
+        onComplete={() => {
+          queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects"] });
+          if (selectedListId) queryClient.invalidateQueries({ queryKey: ["/api/crm/prospect-lists", selectedListId, "members"] });
+          setSavedSelected(new Set());
+        }}
+      />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { formatPhone } from "@/lib/utils";
+import { CRM_TEMPLATE_GROUPS } from "@shared/crm-template-groups";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   X, Mail, Phone, MessageSquare, Mic, Send, Plus, Download,
@@ -96,7 +97,7 @@ interface DirectEmail {
 }
 
 interface SenderProfile { email: string; name: string; }
-interface EmailTpl { id: string; label: string; subject: string; bodyHtml: string; signatureRequest?: boolean; }
+interface EmailTpl { id: string; label: string; subject: string; bodyHtml: string; group?: string; signatureRequest?: boolean; }
 
 interface Activity {
   id: string;
@@ -128,7 +129,7 @@ interface SigRequest {
   signerIp: string | null;
 }
 
-interface Template { id: string; label: string; body?: string; script?: string; }
+interface Template { id: string; label: string; body?: string; script?: string; group?: string; }
 interface SmsMessage { id: string; direction: "inbound" | "outbound"; body: string; status: string; sentAt: string; }
 interface TwilioStatus { configured: boolean; smsReady: boolean; whatsappReady: boolean; }
 interface VoicemailStatus { configured: boolean; }
@@ -526,6 +527,28 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
     const text = (tmpl.body || tmpl.script || "").replace(/\{\{name\}\}/g, firstName);
     setter(text);
   };
+
+  const renderGroupedTemplateChips = (templates: Template[], setter: (v: string) => void) => (
+    <div className="space-y-3">
+      {CRM_TEMPLATE_GROUPS.map((group) => {
+        const items = templates.filter((t) => t.group === group);
+        if (!items.length) return null;
+        return (
+          <div key={group}>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">{group}</p>
+            <div className="flex flex-wrap gap-2">
+              {items.map((t) => (
+                <button key={t.id} onClick={() => applyTemplate(t, setter)}
+                  className="text-xs rounded-full border px-2.5 py-1 hover:bg-muted transition-colors text-left">
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
 
   // 10-day countdown helpers
   const fddSignedActivity = activities.find((a) => a.activityType === "document_signed" && (a.metadata as Record<string, unknown>)?.documentType === "fdd_receipt");
@@ -1653,14 +1676,7 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
                     <div className="space-y-3">
                       <div>
                         <label className="text-xs font-semibold text-muted-foreground mb-1 block">Quick Templates</label>
-                        <div className="flex flex-wrap gap-2">
-                          {smsTemplates.map((t) => (
-                            <button key={t.id} onClick={() => applyTemplate(t, setSmsMessage)}
-                              className="text-xs rounded-full border px-2.5 py-1 hover:bg-muted transition-colors">
-                              {t.label}
-                            </button>
-                          ))}
-                        </div>
+                        {renderGroupedTemplateChips(smsTemplates, setSmsMessage)}
                       </div>
                       <div>
                         <label className="text-xs font-semibold text-muted-foreground mb-1 block">
@@ -1801,14 +1817,7 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
 
                   <div>
                     <label className="text-xs font-semibold text-muted-foreground mb-1 block">Quick Templates</label>
-                    <div className="flex flex-wrap gap-2">
-                      {waTemplates.map((t) => (
-                        <button key={t.id} onClick={() => applyTemplate(t, setWaMessage)}
-                          className="text-xs rounded-full border px-2.5 py-1 hover:bg-muted transition-colors">
-                          {t.label}
-                        </button>
-                      ))}
-                    </div>
+                    {renderGroupedTemplateChips(waTemplates, setWaMessage)}
                   </div>
                   <div>
                     <label className="text-xs font-semibold text-muted-foreground mb-1 block">
@@ -1988,14 +1997,22 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
                             className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm appearance-none pr-8 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                           >
                             <option value="">— Blank / custom email —</option>
-                            {emailTemplates.map(t => (
-                              <option key={t.id} value={t.id}>{t.label}</option>
-                            ))}
+                            {CRM_TEMPLATE_GROUPS.map((group) => {
+                              const items = emailTemplates.filter((t) => t.group === group);
+                              if (!items.length) return null;
+                              return (
+                                <optgroup key={group} label={group}>
+                                  {items.map((t) => (
+                                    <option key={t.id} value={t.id}>{t.label}</option>
+                                  ))}
+                                </optgroup>
+                              );
+                            })}
                           </select>
                           <ChevronDown className="pointer-events-none absolute right-2.5 top-2.5 size-4 text-muted-foreground" />
                         </div>
                         <p className="text-[10px] text-muted-foreground mt-1">
-                          Templates use <code>{"{{name}}"}</code> and <code>{"{{senderName}}"}</code> placeholders, auto-filled on send.
+                          Pipeline: broker → investor → FDD & receipt → close. Uses <code>{"{{name}}"}</code> and <code>{"{{senderName}}"}</code> placeholders.
                         </p>
                       </div>
 

@@ -14,7 +14,7 @@
  * we're adding a prospect or just flagging search results as already-saved.
  */
 
-import { contacts as contactsTable } from "@shared/schema";
+import { contacts as contactsTable, crmClients as crmClientsTable } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, isNull, sql } from "drizzle-orm";
 import { calculateLeadScore } from "./lead-scoring";
@@ -154,6 +154,65 @@ export async function flagExistingContacts(
       out.push(!!(await findExistingContact(input)));
     } catch {
       out.push(false); // best-effort: never block a search on a lookup error
+    }
+  }
+  return out;
+}
+
+export interface CrmClientMatchInput {
+  fullName?: string | null;
+  email?: string | null;
+  companyName?: string | null;
+}
+
+/**
+ * Find an existing `crm_clients` row matching by a stable identity — email when
+ * present, else full name + company. Mirrors the `contacts` dedup so adding a
+ * Lead Research prospect "to the CRM" is idempotent: clicking Add twice (or
+ * across sessions) returns the existing client instead of inserting a duplicate.
+ */
+export async function findExistingCrmClient(
+  input: CrmClientMatchInput,
+): Promise<typeof crmClientsTable.$inferSelect | undefined> {
+  const email = (input.email || "").trim().toLowerCase();
+  if (email) {
+    const [row] = await db
+      .select()
+      .from(crmClientsTable)
+      .where(sql`lower(trim(${crmClientsTable.email})) = ${email}`);
+    return row;
+  }
+  // No email — match on full name + company so credit-less results still dedup.
+  const name = (input.fullName || "").trim();
+  if (!name) return undefined;
+  const company = (input.companyName || "").trim();
+  const [row] = await db
+    .select()
+    .from(crmClientsTable)
+    .where(
+      and(
+        sql`lower(trim(${crmClientsTable.fullName})) = ${name.toLowerCase()}`,
+        company
+          ? sql`lower(trim(coalesce(${crmClientsTable.companyName}, ''))) = ${company.toLowerCase()}`
+          : sql`coalesce(trim(${crmClientsTable.companyName}), '') = ''`,
+      ),
+    );
+  return row;
+}
+
+/**
+ * Batch version of {@link findExistingCrmClient}: true per input if it's already
+ * in the crm_clients pipeline. Used to badge Lead Research results "In CRM".
+ */
+export async function flagExistingClients(
+  inputs: CrmClientMatchInput[],
+): Promise<boolean[]> {
+  const out: boolean[] = [];
+  for (const input of inputs) {
+    try {
+      out.push(!!(await findExistingCrmClient(input)));
+    } catch {
+      out.push(false);
     }
   }
   return out;

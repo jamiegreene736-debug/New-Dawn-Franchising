@@ -21,7 +21,7 @@ import { scoreProspect, type ProspectIntel } from "./lead-intelligence";
 import { searchCrmContacts } from "./semantic-search";
 import { logSearchEvent } from "./search-telemetry";
 import { draftProspectOutreach } from "./outreach-drafter";
-import { flagExistingContacts } from "./contact-upsert";
+import { flagExistingContacts, flagExistingClients } from "./contact-upsert";
 import type { EnrichedContact } from "./prospect-enrichment";
 
 export interface AgentPerson {
@@ -358,7 +358,7 @@ export async function runLeadResearchAgent(
     // their Add button — instead of the user discovering it only when "Add"
     // reports "already exists". search_crm results are inherently in the CRM;
     // search_people results are checked against the contacts table here.
-    const toCheck = people.filter((p) => !p.inCrm);
+    let toCheck = people.filter((p) => !p.inCrm);
     if (toCheck.length) {
       try {
         const exists = await flagExistingContacts(
@@ -370,6 +370,20 @@ export async function runLeadResearchAgent(
         toCheck.forEach((p, i) => { if (exists[i]) p.inCrm = true; });
       } catch (e: any) {
         console.warn("[LeadResearchAgent] inCrm flagging failed:", e?.message || e);
+      }
+    }
+    // "Add to CRM" creates a crm_clients row (the main CRM tab), so also flag
+    // anyone already in that pipeline — otherwise the Add button would re-offer
+    // someone we already have and the dedup would silently skip them.
+    toCheck = people.filter((p) => !p.inCrm);
+    if (toCheck.length) {
+      try {
+        const exists = await flagExistingClients(
+          toCheck.map((p) => ({ fullName: p.fullName, email: p.email, companyName: p.companyName })),
+        );
+        toCheck.forEach((p, i) => { if (exists[i]) p.inCrm = true; });
+      } catch (e: any) {
+        console.warn("[LeadResearchAgent] crm_clients inCrm flagging failed:", e?.message || e);
       }
     }
 

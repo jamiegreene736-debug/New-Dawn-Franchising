@@ -53,11 +53,29 @@ const SUGGESTIONS = [
 // Stable per-person key used for selection / added tracking.
 const keyOf = (p: AgentPerson) => (p.email || p.fullName).toLowerCase();
 
-// Map an agent person onto the add-to-contacts payload shape.
+// Map an agent person onto the add-to-contacts payload shape (used by the
+// campaign-enrollment path, which still works off the `contacts` table).
 const toContactBody = (p: AgentPerson) => ({
   fullName: p.fullName, firstName: p.firstName, lastName: p.lastName,
   companyName: p.companyName || "", email: p.email, phone: p.phone,
   linkedinUrl: p.linkedinUrl, jobTitle: p.jobTitle, country: p.location, bio: null,
+});
+
+// Map an agent person onto the crm_clients payload shape — "Add to CRM" creates
+// a CRM client (the main CRM tab) so the lead gets the full profile (enrich,
+// email, SMS, documents…). Investor-only fields stay blank; leadSource + tag
+// mark it as Lead Research so it's filterable in the pipeline.
+const toClientBody = (p: AgentPerson) => ({
+  fullName: p.fullName,
+  email: p.email || "",
+  phone: p.phone || undefined,
+  country: p.location || undefined,
+  companyName: p.companyName || undefined,
+  profession: p.jobTitle || undefined,
+  linkedinUrl: p.linkedinUrl || undefined,
+  leadSource: "ai_research",
+  status: "new",
+  tags: ["lead-research"],
 });
 
 // A single agent turn returns up to this many unique people (mirrors the server's
@@ -179,11 +197,13 @@ export default function LeadResearchAgent({ provider }: { provider?: string }) {
       .catch(() => {});
   }, [provider]);
 
-  // After adding contact(s), refetch the CRM tab so they show up immediately.
-  // The contacts list query uses staleTime:Infinity, so without this it keeps
-  // serving a cached list and the new contact appears "missing" until refresh.
+  // After adding, refetch the CRM tab so new rows show up immediately. The lists
+  // use staleTime:Infinity, so without this they keep serving a cached list and
+  // the new lead appears "missing" until a manual refresh.
   function refreshCrm() {
-    queryClient.invalidateQueries({ queryKey: ["/api/contacts"] }); // CRM Contacts tab list
+    queryClient.invalidateQueries({ queryKey: ["/api/crm/clients"] }); // CRM tab list
+    queryClient.invalidateQueries({ queryKey: ["/api/crm/client-tags"] }); // tag filters
+    queryClient.invalidateQueries({ queryKey: ["/api/contacts"] }); // enrollment/contacts views
     queryClient.invalidateQueries({ queryKey: ["/api/crm/reports"] }); // dashboard counts
   }
 
@@ -244,23 +264,20 @@ export default function LeadResearchAgent({ provider }: { provider?: string }) {
     if (msg) void send(msg);
   }
 
-  async function addToContacts(p: AgentPerson) {
+  async function addToCrm(p: AgentPerson) {
     const key = keyOf(p);
     try {
-      await apiRequest("POST", "/api/crm/prospects/add-to-contacts", {
-        contact: toContactBody(p),
-        category: "ai_research",
-      });
+      await apiRequest("POST", "/api/crm/clients", toClientBody(p));
       setAdded((s) => new Set(s).add(key));
       refreshCrm();
-      toast({ title: "Added to Contacts", description: `${p.fullName} — find them in the CRM → Contacts tab.` });
+      toast({ title: "Added to CRM", description: `${p.fullName} is now in the CRM tab — open their profile to enrich or message them.` });
     } catch (err: any) {
       const m = String(err?.message || "");
-      if (m.includes("already exists")) {
+      if (m.includes("already exists") || m.includes("409")) {
         setAdded((s) => new Set(s).add(key));
-        toast({ title: "Already in Contacts", description: p.fullName });
+        toast({ title: "Already in CRM", description: p.fullName });
       } else {
-        toast({ title: "Couldn't add contact", description: p.fullName, variant: "destructive" });
+        toast({ title: "Couldn't add to CRM", description: p.fullName, variant: "destructive" });
       }
     }
   }
@@ -296,11 +313,12 @@ export default function LeadResearchAgent({ provider }: { provider?: string }) {
     }
     setBulkAdding(true);
     try {
-      const res = await apiRequest("POST", "/api/crm/prospects/add-to-contacts/bulk", {
+      const res = await apiRequest("POST", "/api/crm/clients/bulk-add", {
         contacts: targets.map(toContactBody),
-        category: "ai_research",
+        leadSource: "ai_research",
+        tags: ["lead-research"],
       });
-      const data = (await res.json()) as { added: number; skipped: number; total: number };
+      const data = (await res.json()) as { added: number; skipped: number };
       setAdded((s) => {
         const next = new Set(s);
         targets.forEach((p) => next.add(keyOf(p)));
@@ -313,8 +331,8 @@ export default function LeadResearchAgent({ provider }: { provider?: string }) {
       });
       refreshCrm();
       toast({
-        title: `${data.added} added to the CRM → Contacts tab`,
-        description: data.skipped > 0 ? `${data.skipped} were already in your Contacts.` : `${data.added} new contact${data.added === 1 ? "" : "s"} saved.`,
+        title: `${data.added} added to the CRM tab`,
+        description: data.skipped > 0 ? `${data.skipped} were already in your CRM.` : `${data.added} new lead${data.added === 1 ? "" : "s"} saved — open a profile to enrich or message.`,
       });
     } catch {
       toast({ title: "Bulk add failed", description: "Please try again.", variant: "destructive" });
@@ -451,7 +469,7 @@ export default function LeadResearchAgent({ provider }: { provider?: string }) {
                             </div>
                           </div>
                           <div className="flex shrink-0 items-center gap-1">
-                            <Button size="sm" variant={isAdded ? "outline" : "default"} className="h-7 gap-1 px-2 text-[11px]" disabled={isAdded} onClick={() => addToContacts(p)}>
+                            <Button size="sm" variant={isAdded ? "outline" : "default"} className="h-7 gap-1 px-2 text-[11px]" disabled={isAdded} onClick={() => addToCrm(p)}>
                               {isAdded ? <><Check className="size-3" /> {added.has(key) ? "Added" : "In CRM"}</> : <><UserPlus className="size-3" /> Add</>}
                             </Button>
                             {enrolledIn ? (

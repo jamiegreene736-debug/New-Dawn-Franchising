@@ -359,35 +359,39 @@ const shells: Record<string, PageShell> = {
   },
 
   "/territories": {
-    title: `Available Territories | El Paso, Texas | ${SITE}`,
+    title: `Where You Operate | Territories & Nationwide Verticals | ${SITE}`,
     description:
-      "New Dawn Franchising operates in El Paso, Texas with 300+ active property management contracts. Learn about available franchise territories and next steps.",
+      "Each New Dawn vertical has its own footprint: Property Management runs in defined local territories (El Paso, TX, with 300+ contracts), while Telecom and Insurance are recurring-revenue businesses that serve clients across the United States.",
     html: `
 <main>
-  <h1>El Paso, Texas</h1>
-  <p>Our franchise currently operates in El Paso, Texas with 300+ active management contracts in the network. A focused model for single-family long-term rental management, designed for repeatable operations and clear oversight.</p>
+  <h1>Where You Operate</h1>
+  <p>New Dawn is a multi-vertical franchise platform, and each vertical has its own geographic footprint. Property Management is a local, on-the-ground business that runs in defined territories. Telecom and Insurance are recurring-revenue businesses that are not tied to one city — they serve clients across the entire United States.</p>
 
   <section>
-    <h2>Why El Paso?</h2>
-    <ul>
-      <li>Strong and growing rental demand driven by military presence (Fort Bliss), UTEP enrollment, and cross-border population</li>
-      <li>Affordable housing stock creates a large pool of manageable single-family rentals</li>
-      <li>Landlord-friendly Texas market with clear eviction processes and low regulatory burden</li>
-      <li>300+ active management contracts already in the network — proven demand</li>
-      <li>Strategic border location attracting investors from Mexico and Latin America</li>
-    </ul>
+    <h2>Property Management — local territories (El Paso, Texas)</h2>
+    <p>Property management is an on-the-ground service business: you manage physical homes, coordinate local vendors, and serve property owners in a specific market. It runs in defined geographic territories, and our operations are established in El Paso, Texas with 300+ active management contracts in the network. Leasing, inspections, and maintenance happen on location, so the business is tied to a metro.</p>
   </section>
 
   <section>
-    <h2>Territory Details</h2>
-    <p>Each New Dawn franchise territory covers a defined geographic area within the El Paso metropolitan area. Our model focuses on single-family long-term rental management — typically 12-month leases — which provides stable, recurring revenue and manageable operations.</p>
-    <p>Initial operating target: approximately 10 long-term rental management contracts per territory representative, scaling with systems and staffing.</p>
+    <h2>Telecom (VoIP) — nationwide</h2>
+    <p>Telecom is a recurring-subscription business delivered over the internet and phone networks. It is not tied to a storefront or a single metro — subscribers can be located anywhere in the U.S., so the market is national rather than a fixed territory. You direct the business while centralized systems and teams handle provisioning, billing, and support.</p>
   </section>
 
   <section>
-    <h2>Availability &amp; Next Steps</h2>
-    <p>Our current operations are based in El Paso, Texas with 300+ contracts across the network. Contact us with your timeline and we'll share the current overview and available territory details.</p>
+    <h2>Insurance — nationwide</h2>
+    <p>Insurance is a renewal-driven business built on a book of clients and recurring premiums. Like telecom, it is not confined to a single metro — you build a nationwide book of business, subject to applicable state licensing. Licensed staff handle regulated activity under proper supervision while you direct the operation.</p>
+  </section>
+
+  <section>
+    <h2>Direct your business — and live where you choose</h2>
+    <p>Wherever your business operates, you direct it. New Dawn is headquartered in El Paso, Texas, and the Property Management operation runs there, but qualified E-2 owners can live elsewhere in the United States while maintaining ownership, financial control, and executive oversight. Telecom and Insurance add nationwide reach on top of that flexibility.</p>
+  </section>
+
+  <section>
+    <h2>Availability &amp; next steps</h2>
+    <p>Tell us your goals and timeline and we'll walk you through whether a local Property Management territory or a nationwide Telecom or Insurance business is the better fit — then send the FDD.</p>
     <address>
+      <p>${ADDR}</p>
       <p>Email: <a href="mailto:${EMAIL}">${EMAIL}</a></p>
       <p>Phone: <a href="tel:+13465979994">${PHONE}</a></p>
     </address>

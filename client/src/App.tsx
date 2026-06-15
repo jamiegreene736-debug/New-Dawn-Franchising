@@ -21,6 +21,8 @@ import BlogPostPage from "@/pages/blog-post";
 import ProcessPage from "@/pages/process";
 import MarketingPage from "@/pages/marketing";
 import RealEstatePage from "@/pages/real-estate";
+import TelecomPage from "@/pages/telecom";
+import PropertyManagementPage from "@/pages/property-management";
 import PrivacyPolicyPage from "@/pages/privacy-policy";
 import TermsPage from "@/pages/terms";
 
@@ -83,6 +85,8 @@ function Router() {
               <Route path="/process" component={ProcessPage} />
               <Route path="/marketing" component={MarketingPage} />
               <Route path="/real-estate" component={RealEstatePage} />
+              <Route path="/telecom" component={TelecomPage} />
+              <Route path="/property-management" component={PropertyManagementPage} />
               <Route path="/crm/contacts/:id" component={CrmContactProfilePage} />
               <Route path="/crm/contacts" component={CrmContactsPage} />
               <Route path="/crm/pipeline" component={CrmPipelinePage} />

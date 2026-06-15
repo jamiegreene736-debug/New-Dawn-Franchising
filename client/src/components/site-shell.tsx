@@ -41,22 +41,6 @@ function FacebookIcon({ className }: { className?: string }) {
   );
 }
 
-const NAV = [
-  { href: "/", label: "Home", id: "home" },
-  { href: "/about", label: "About", id: "about" },
-  { href: "/team", label: "Team", id: "team" },
-  { href: "/e2-visa-franchise", label: "E-2 Visa Franchise", id: "e2-visa-franchise" },
-  { href: "/e2-fit", label: "Why E-2?", id: "e2" },
-  { href: "/process", label: "Process", id: "process" },
-  { href: "/territories", label: "Territories", id: "territories" },
-  { href: "/marketing", label: "Marketing", id: "marketing" },
-  { href: "/real-estate", label: "Real Estate", id: "real-estate" },
-  { href: "/blog", label: "Blog", id: "blog" },
-  { href: "/quiz", label: "Quiz", id: "quiz" },
-  { href: "/brokers", label: "Referral Partners", id: "brokers" },
-  { href: "/contact", label: "Contact", id: "contact" },
-];
-
 type NavItem = { href: string; label: string; id: string };
 type NavGroup = { label: string; id: string; items: NavItem[] };
 type DesktopNavEntry = NavItem | NavGroup;
@@ -66,6 +50,8 @@ const DESKTOP_NAV: DesktopNavEntry[] = [
     label: "About", id: "about-group",
     items: [
       { href: "/about", label: "About Us", id: "about" },
+      { href: "/property-management", label: "Property Management", id: "property-management" },
+      { href: "/telecom", label: "Telecom (VoIP)", id: "telecom" },
       { href: "/team", label: "Our Team", id: "team" },
     ],
   },
@@ -92,6 +78,41 @@ const DESKTOP_NAV: DesktopNavEntry[] = [
 function isNavGroup(entry: DesktopNavEntry): entry is NavGroup {
   return "items" in entry;
 }
+
+// Mobile nav mirrors the desktop grouping so sub-items render nested (indented)
+// beneath their parent. Items not part of a group stay as top-level links.
+const MOBILE_NAV: DesktopNavEntry[] = [
+  { href: "/", label: "Home", id: "home" },
+  {
+    label: "About", id: "about-group",
+    items: [
+      { href: "/about", label: "About Us", id: "about" },
+      { href: "/property-management", label: "Property Management", id: "property-management" },
+      { href: "/telecom", label: "Telecom (VoIP)", id: "telecom" },
+      { href: "/team", label: "Our Team", id: "team" },
+    ],
+  },
+  {
+    label: "Franchise", id: "franchise-group",
+    items: [
+      { href: "/e2-visa-franchise", label: "E-2 Visa Franchise", id: "e2-visa-franchise" },
+      { href: "/e2-fit", label: "Why E-2?", id: "e2" },
+      { href: "/process", label: "Process", id: "process" },
+      { href: "/territories", label: "Territories", id: "territories" },
+    ],
+  },
+  {
+    label: "Services", id: "services-group",
+    items: [
+      { href: "/marketing", label: "Marketing", id: "marketing" },
+      { href: "/real-estate", label: "Real Estate", id: "real-estate" },
+    ],
+  },
+  { href: "/blog", label: "Blog", id: "blog" },
+  { href: "/quiz", label: "Quiz", id: "quiz" },
+  { href: "/brokers", label: "Referral Partners", id: "brokers" },
+  { href: "/contact", label: "Contact", id: "contact" },
+];
 
 const PORTALS = [
   {
@@ -220,6 +241,51 @@ function NavDropdown({ group, location: loc }: { group: NavGroup; location: stri
               {item.label}
             </Link>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MobileNavGroup({ group, location: loc }: { group: NavGroup; location: string }) {
+  const hasActiveChild = group.items.some((item) => loc === item.href);
+  const [open, setOpen] = useState(hasActiveChild);
+
+  return (
+    <div>
+      <button
+        type="button"
+        data-testid={`link-mobile-nav-${group.id}`}
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className={
+          "flex w-full items-center justify-between rounded-lg px-3 py-3 text-sm font-medium transition-colors hover:bg-black/[0.03] " +
+          (hasActiveChild ? "text-foreground" : "text-foreground/70 hover:text-foreground")
+        }
+      >
+        {group.label}
+        <ChevronDown className={`size-4 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="ml-3 flex flex-col border-l pl-2">
+          {group.items.map((item) => {
+            const isActive = loc === item.href;
+            return (
+              <Link
+                key={item.id}
+                data-testid={`link-mobile-nav-${item.id}`}
+                href={item.href}
+                className={
+                  "rounded-lg px-3 py-2.5 text-sm transition-colors hover:bg-black/[0.03] " +
+                  (isActive
+                    ? "bg-[hsl(var(--primary))]/5 text-[hsl(var(--primary))] font-medium"
+                    : "text-foreground/60 hover:text-foreground")
+                }
+              >
+                {item.label}
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>
@@ -749,13 +815,16 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <nav className="flex flex-col p-4 overflow-y-auto max-h-[calc(100vh-80px-180px)]">
-          {NAV.map((item) => {
-            const isActive = location === item.href;
+          {MOBILE_NAV.map((entry) => {
+            if (isNavGroup(entry)) {
+              return <MobileNavGroup key={entry.id} group={entry} location={location} />;
+            }
+            const isActive = location === entry.href;
             return (
               <Link
-                key={item.id}
-                data-testid={`link-mobile-nav-${item.id}`}
-                href={item.href}
+                key={entry.id}
+                data-testid={`link-mobile-nav-${entry.id}`}
+                href={entry.href}
                 className={
                   "rounded-lg px-3 py-3 text-sm font-medium transition-colors hover:bg-black/[0.03] " +
                   (isActive
@@ -763,7 +832,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                     : "text-foreground/70 hover:text-foreground")
                 }
               >
-                {item.label}
+                {entry.label}
               </Link>
             );
           })}

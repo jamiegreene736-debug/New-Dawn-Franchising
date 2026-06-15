@@ -2783,8 +2783,12 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
   //   • drip_sends            → every campaign touch (channel stamped per step)
   //   • contact_activities    → manual & inbound touches against attorney contacts
   //   • crm_client_activities → touches against investor-CRM clients
-  app.get("/api/crm/activity", requireAdminAuth, async (_req, res) => {
+  app.get("/api/crm/activity", requireAdminAuth, async (req, res) => {
     try {
+      // Optional scope: when a campaignId is supplied, the feed is limited to
+      // that campaign's sends (used by the per-campaign Activity tab). Without
+      // it, the feed is the global cross-channel timeline.
+      const campaignFilter = String(req.query.campaignId || "").trim();
       // activity_type → channel/direction. Anything unmapped falls back to "other".
       const ACT_MAP: Record<string, { channel: string; direction: "outbound" | "inbound" }> = {
         email_sent: { channel: "email", direction: "outbound" },
@@ -2838,11 +2842,12 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
       // touch belongs to (send → enrollment → campaign).
       const campaignNameById = new Map(allCampaigns.map((c) => [c.id, c.name]));
       const campaignByEnrollment = new Map(allEnrollments.map((e) => [e.id, campaignNameById.get(e.campaignId) || ""]));
+      const campaignIdByEnrollment = new Map(allEnrollments.map((e) => [e.id, e.campaignId]));
 
       const items: Array<{
         id: string; source: string; channel: string; direction: string;
         name: string; target: string; detail: string; status: string;
-        timestamp: string | null; campaignName?: string;
+        timestamp: string | null; campaignName?: string; campaignId?: string;
         opened?: boolean; openedAt?: string | null; openCount?: number;
         clicked?: boolean; clickedAt?: string | null; clickCount?: number;
       }> = [];
@@ -2865,6 +2870,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
           status,
           timestamp: (s.sentAt || s.createdAt) ? new Date(s.sentAt || s.createdAt).toISOString() : null,
           campaignName: campaignByEnrollment.get(s.enrollmentId) || "",
+          campaignId: campaignIdByEnrollment.get(s.enrollmentId) || "",
           opened,
           openedAt: s.openedAt ? new Date(s.openedAt).toISOString() : null,
           openCount: s.openCount ?? 0,
@@ -2912,13 +2918,20 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
         });
       }
 
-      items.sort((x, y) => {
+      // Scope to a single campaign when requested. Only campaign sends carry a
+      // campaignId; contact/client touches aren't campaign-attributable, so they
+      // are excluded from a campaign-scoped feed by design.
+      const scoped = campaignFilter
+        ? items.filter((i) => i.campaignId === campaignFilter)
+        : items;
+
+      scoped.sort((x, y) => {
         const tx = x.timestamp ? Date.parse(x.timestamp) : 0;
         const ty = y.timestamp ? Date.parse(y.timestamp) : 0;
         return ty - tx;
       });
 
-      res.json(items.slice(0, 500));
+      res.json(scoped.slice(0, 500));
     } catch (err) {
       console.error("[Activity] Failed to build feed:", err);
       res.status(500).json({ message: "Failed to fetch activity" });

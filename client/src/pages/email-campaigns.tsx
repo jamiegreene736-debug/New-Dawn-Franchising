@@ -136,6 +136,7 @@ interface ActivityItem {
   status: string;
   timestamp: string | null;
   campaignName?: string;
+  campaignId?: string;
   // Email engagement (campaign sends only)
   opened?: boolean;
   openedAt?: string | null;
@@ -375,8 +376,21 @@ function EmailCampaignTab() {
   }
   const hasActiveEnrollment = (schedule?.enrollments ?? []).some((e) => e.status === "active");
 
+  // When a campaign is open, the Activity tab is scoped to that campaign's
+  // sends; with no campaign selected it shows the global cross-channel feed.
   const { data: activity = [] } = useQuery<ActivityItem[]>({
-    queryKey: ["/api/crm/activity"],
+    queryKey: ["/api/crm/activity", selectedCampaign],
+    queryFn: async () => {
+      const url = selectedCampaign
+        ? `/api/crm/activity?campaignId=${encodeURIComponent(selectedCampaign)}`
+        : "/api/crm/activity";
+      const res = await fetch(url, { credentials: "include" });
+      // Mirror the shared getQueryFn: throw on error responses so the `[]`
+      // fallback holds. Otherwise an error JSON body becomes `activity` and the
+      // array consumers (activityStats, filters) crash the whole page.
+      if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+      return res.json();
+    },
   });
 
   const { data: prospects = [] } = useQuery<Prospect[]>({
@@ -1480,8 +1494,26 @@ function EmailCampaignTab() {
       {activeTab === "sends" && (
         <>
           <div className="mb-1">
-            <h3 className="text-lg font-semibold">Activity</h3>
-            <p className="text-xs text-muted-foreground">Every outreach touch across all channels — campaign sends, manual emails &amp; texts, calls, LinkedIn and inbound replies.</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-lg font-semibold">
+                {selectedCampaign ? `Activity — ${campaignDetail?.name ?? "this campaign"}` : "Activity"}
+              </h3>
+              {selectedCampaign && (
+                <button
+                  data-testid="btn-activity-show-all"
+                  onClick={() => setSelectedCampaign(null)}
+                  className="inline-flex items-center gap-1 rounded-full border border-input px-2.5 py-0.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+                  title="Clear the campaign filter and show activity across all channels"
+                >
+                  <X className="size-3" /> Show all activity
+                </button>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {selectedCampaign
+                ? "Every send from this campaign — opens, clicks and bounces. Show all activity to see replies and other channels."
+                : "Every outreach touch across all channels — campaign sends, manual emails & texts, calls, LinkedIn and inbound replies."}
+            </p>
           </div>
 
           <div className="grid grid-cols-3 sm:grid-cols-7 gap-2 my-4">
@@ -1565,7 +1597,11 @@ function EmailCampaignTab() {
             <Card className="p-8 text-center">
               <Clock className="mx-auto size-10 text-muted-foreground/30" />
               <p className="mt-3 text-sm text-muted-foreground">
-                {activity.length === 0 ? "No activity logged yet. Enroll prospects in a campaign or send a message to start the timeline." : "No activity matches your filter."}
+                {activity.length === 0
+                  ? (selectedCampaign
+                      ? "No activity for this campaign yet. Enroll prospects and send the first step to start the timeline, or choose “Show all activity” above."
+                      : "No activity logged yet. Enroll prospects in a campaign or send a message to start the timeline.")
+                  : "No activity matches your filter."}
               </p>
             </Card>
           ) : (

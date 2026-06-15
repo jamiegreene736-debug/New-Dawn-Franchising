@@ -7,6 +7,19 @@ const WEBSITE = "https://www.newdawnfranchising.com";
 
 const EMAIL_STYLE = `font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1a1a2e; line-height: 1.6;`;
 
+// Inject explicit spacing into the email HTML. Bare <p>/<ul>/<li>/<h3> tags
+// render "clumped" because email clients and the admin preview (Tailwind reset)
+// zero out default margins. Adding inline margins guarantees readable spacing
+// everywhere the body is shown or sent.
+function withSpacing(html: string): string {
+  return html
+    .replace(/<p>/g, '<p style="margin:0 0 16px 0;">')
+    .replace(/<ul>/g, '<ul style="margin:0 0 16px 0; padding-left:22px;">')
+    .replace(/<ol>/g, '<ol style="margin:0 0 16px 0; padding-left:22px;">')
+    .replace(/<li>/g, '<li style="margin:0 0 8px 0;">')
+    .replace(/<h3 style="([^"]*)">/g, '<h3 style="$1; margin:24px 0 10px 0; font-size:17px;">');
+}
+
 const GROK_STEPS = [
   {
     stepOrder: 1,
@@ -263,7 +276,24 @@ Talking points:
 export async function seedGrokCampaign() {
   try {
     const existing = await storage.getDripCampaigns();
-    if (existing.some((c) => c.name === GROK_CAMPAIGN_NAME)) {
+    const found = existing.find((c) => c.name === GROK_CAMPAIGN_NAME);
+
+    if (found) {
+      // Campaign already exists — re-sync each step's content (formatting) so
+      // improvements to the templates reach the already-seeded campaign without
+      // a manual DB edit. Matched by stepOrder.
+      const steps = await storage.getDripSteps(found.id);
+      let updated = 0;
+      for (const def of GROK_STEPS) {
+        const match = steps.find((s) => s.stepOrder === def.stepOrder);
+        if (!match) continue;
+        const body = withSpacing(def.bodyHtml);
+        if (match.bodyHtml !== body || match.subject !== def.subject) {
+          await storage.updateDripStep(match.id, { bodyHtml: body, subject: def.subject });
+          updated++;
+        }
+      }
+      if (updated > 0) console.log(`[Drip] "${GROK_CAMPAIGN_NAME}" re-synced ${updated} step(s) with improved formatting.`);
       return;
     }
 
@@ -283,7 +313,7 @@ export async function seedGrokCampaign() {
         stepName: step.stepName,
         priority: step.priority,
         subject: step.subject,
-        bodyHtml: step.bodyHtml,
+        bodyHtml: withSpacing(step.bodyHtml),
       });
     }
 

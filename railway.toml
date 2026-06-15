@@ -1,6 +1,11 @@
 [build]
 builder = "nixpacks"
-buildCommand = "npm install && npm run build"
+# Skip the Cypress / Playwright browser-binary downloads during install. Those
+# packages are test-only and their postinstall binary fetches will hard-fail the
+# whole `npm install` (and therefore the deploy) on networks that block the
+# download CDNs. The production server never needs the browser binaries. This
+# mirrors the guard the CI workflow uses.
+buildCommand = "CYPRESS_INSTALL_BINARY=0 PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm install --no-audit --no-fund && npm run build"
 
 [deploy]
 startCommand = "npm start"

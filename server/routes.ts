@@ -16,6 +16,7 @@ import { scheduleGmailSync, syncFranchisingInbox, getGmailSyncStatus, getGmailSy
 import { seedDefaultCampaign } from "./default-campaign";
 import { seedGrokCampaign } from "./grok-campaign";
 import { sendEmail, sendEmailFromSender, getTrackingPixelUrl, getAvailableSenders, CRM_EMAIL_TEMPLATES, cacheDylanCalendlyUrl } from "./email-service";
+import { isAutomatedOrBulkEmail, shouldShowInCrmEmailHistory } from "./crm-email-filter";
 import { generateFacebookPost } from "./facebook-generator";
 import { postToFacebook, getAutoPostStatus, setAutoPostEnabled, scheduleDailyFacebookPosting } from "./facebook-poster";
 import { registerContactRoutes } from "./contacts-routes";
@@ -1269,7 +1270,7 @@ export async function registerRoutes(
   app.get("/api/crm/clients/:id/emails", requireAdminAuth, async (req, res) => {
     try {
       const emails = await storage.getCrmDirectEmails(String(req.params.id) as string);
-      res.json(emails);
+      res.json(emails.filter(shouldShowInCrmEmailHistory));
     } catch (err) {
       res.status(500).json({ message: "Failed to fetch email history" });
     }
@@ -2636,7 +2637,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
       // "Re: Welcome to PR Newswire!") from the inbound activity feed. The inbox
       // sync filters these going forward; this also suppresses old rows.
       const looksAutomatedSubject = (s: string): boolean =>
-        /\b(welcome to|newsletter|unsubscribe|verify your|confirm your|password reset|your (receipt|invoice|statement)|notification|daily digest|out of office|automatic reply|do-?not-?reply|no-?reply)\b/i.test(s || "");
+        isAutomatedOrBulkEmail("", s || "");
 
       const [sends, contactActs, clientActs, allEnrollments, allCampaigns] = await Promise.all([
         storage.getAllDripSends(),

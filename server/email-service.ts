@@ -361,73 +361,159 @@ export interface EmailTemplate {
 }
 
 export const CRM_EMAIL_TEMPLATES: EmailTemplate[] = [
+  // ── Broker / Referral Partner ─────────────────────────────────────────────
   {
-    id: "initial_outreach",
-    label: "Initial Outreach",
-    subject: "Franchise Opportunity — New Dawn Franchising",
-    bodyHtml: `<p>Dear {{name}},</p>
-<p>My name is {{senderName}}, and I'm reaching out from <strong>New Dawn Franchising</strong>. We operate a proven property management franchise in El Paso, Texas, specifically designed for E-2 visa investors looking for a director-led, compliant US business.</p>
-<p>Our franchise offers:</p>
+    id: "broker_intro",
+    label: "Broker — Referral Partner Introduction",
+    subject: "E-2 franchise referral partnership — New Dawn Franchising",
+    bodyHtml: `<p>Hi {{name}},</p>
+<p>I'm {{senderName}} with <strong>New Dawn Franchising</strong>. We built a multi-vertical franchise platform specifically for <strong>E-2 Treaty Investor Visa</strong> applicants — and I wanted to introduce a referral opportunity that may be relevant for your clients.</p>
+<p>New Dawn offers three recurring-revenue franchise verticals investors can choose from:</p>
 <ul>
-  <li>A fully operational business from day one</li>
-  <li>Proprietary systems, branding, and training</li>
-  <li>Exclusive territory rights in El Paso, TX</li>
-  <li>Immigration attorney network and E-2 visa support</li>
+  <li><strong>Property Management</strong> — long-term rental operations with local execution teams</li>
+  <li><strong>Telecom</strong> — recurring-service operations with centralized systems and oversight dashboards</li>
+  <li><strong>Insurance</strong> — compliant supervision, client service, and recurring revenue</li>
 </ul>
-<p>I'd love to schedule a 30-minute call to learn more about your goals and answer any questions you may have. Would you be open to a brief conversation this week?</p>`,
+<p>The model is simple: <em>You Own It. You Direct It. We Run It.</em> Your client is the legal owner and executive director; our approved local teams handle day-to-day execution. Investment starts at <strong>$225,000</strong>, structured to support E-2 visa requirements.</p>
+<p>We offer competitive referral commissions, a dedicated broker portal, and full FDD documentation for every introduction. Would you be open to a 15-minute call to explore a partnership?</p>`,
+  },
+  {
+    id: "broker_followup",
+    label: "Broker — Follow-Up (Day 3–7)",
+    subject: "Quick follow-up — E-2 franchise option for your clients",
+    bodyHtml: `<p>Hi {{name}},</p>
+<p>I wanted to follow up on my note about <strong>New Dawn Franchising</strong>. I know your calendar is full, so I'll keep this brief.</p>
+<p>For immigration attorneys, business brokers, and wealth advisors, our platform solves a common client need: a <strong>real, operating U.S. business</strong> that meets E-2 substantiality requirements — without requiring the investor to run daily operations themselves.</p>
+<p>Highlights your clients typically care about:</p>
+<ul>
+  <li>Franchise investment from <strong>$225,000</strong> with financing options available</li>
+  <li>Proprietary owner dashboards and operational reporting across every vertical</li>
+  <li>In-house E-2 immigration, finance, real estate, and legal support</li>
+  <li>In-house buy-back pathway available after approximately 4 years</li>
+  <li>Investors can live anywhere in the U.S. while maintaining executive oversight</li>
+</ul>
+<p>Happy to send our FDD and investor overview, or jump on a short call whenever works for you.</p>`,
+  },
+  {
+    id: "broker_partnership",
+    label: "Broker — Referral Partnership Details",
+    subject: "Referral partnership details — New Dawn Franchising",
+    bodyHtml: `<p>Hi {{name}},</p>
+<p>Thank you for your interest in partnering with New Dawn Franchising. Here's a quick overview of how our <strong>Referring Broker Program</strong> works:</p>
+<ul>
+  <li><strong>Competitive referral commissions</strong> for qualified investor introductions</li>
+  <li><strong>Dedicated broker portal</strong> to track referrals and manage client progress</li>
+  <li><strong>Marketing materials</strong> and FDD support for your practice</li>
+  <li><strong>No exclusivity required</strong> — partner alongside your existing relationships</li>
+</ul>
+<p>When you refer a client, we handle discovery, FDD delivery, franchise agreement execution, and E-2 coordination — while keeping you informed at every milestone. Your client selects from Property Management, Telecom, or Insurance based on their goals and E-2 strategy.</p>
+<p>Would you like me to send the partnership agreement and commission schedule for review?</p>`,
+  },
+  {
+    id: "broker_referral_thanks",
+    label: "Broker — Thank You for Client Referral",
+    subject: "Thank you for the referral — {{name}}",
+    bodyHtml: `<p>Hi {{name}},</p>
+<p>Thank you for introducing your client to <strong>New Dawn Franchising</strong>. We truly value referral partners who trust us with their clients' E-2 investment journey.</p>
+<p>I've reached out to your client directly and will keep you updated as they move through our process:</p>
+<ol>
+  <li>Discovery call and vertical selection (Property Management, Telecom, or Insurance)</li>
+  <li>FDD delivery and 14-day review period</li>
+  <li>Franchise Agreement execution</li>
+  <li>E-2 visa application coordination</li>
+</ol>
+<p>You'll receive updates through the broker portal as milestones are reached. Please don't hesitate to reach out if you or your client have any questions along the way.</p>`,
+  },
+
+  // ── Investor — Intro & Discovery ────────────────────────────────────────
+  {
+    id: "investor_intro",
+    label: "Investor — E-2 Franchise Introduction",
+    subject: "E-2 visa franchise opportunity — New Dawn Franchising",
+    bodyHtml: `<p>Hi {{name}},</p>
+<p>I'm {{senderName}} with <strong>New Dawn Franchising</strong> — the first franchise platform built specifically for <strong>E-2 Treaty Investor Visa</strong> applicants.</p>
+<p>We offer three recurring-revenue franchise verticals:</p>
+<ul>
+  <li><strong>Property Management</strong></li>
+  <li><strong>Telecom</strong></li>
+  <li><strong>Insurance</strong></li>
+</ul>
+<p>The model: <em>You Own It. You Direct It. We Run It.</em> You are the legal owner and sole signatory on U.S. bank accounts. Approved local teams manage daily execution while you maintain executive control, review reports, and make key decisions — from anywhere in the United States.</p>
+<p>Franchise investment starts at <strong>$225,000</strong>, covering your franchise license, training, proprietary technology platform, and operational setup. Financing options are available through our affiliated lending partners.</p>
+<p>Would you have 15 minutes for an introductory call? I'm happy to send our FDD and walk you through which vertical is the strongest fit for your goals.</p>`,
+  },
+  {
+    id: "investor_broker_referred",
+    label: "Investor — Warm Intro (Broker Referred)",
+    subject: "Introduction from your advisor — New Dawn E-2 franchise",
+    bodyHtml: `<p>Hi {{name}},</p>
+<p>Your advisor connected us, and I wanted to reach out personally. I'm {{senderName}} with <strong>New Dawn Franchising</strong>.</p>
+<p>New Dawn is a multi-vertical franchisor built for E-2 investors. You choose from <strong>Property Management</strong>, <strong>Telecom</strong>, or <strong>Insurance</strong> — each structured with recurring revenue, documented operating systems, and the supervisory control USCIS expects.</p>
+<p>As the franchise owner, you direct the enterprise. Our local teams handle day-to-day operations. Investment starts at <strong>$225,000</strong>, and we provide in-house support across E-2 immigration, finance, real estate, and legal.</p>
+<p>I'd welcome a conversation to understand your timeline, citizenship, and investment goals — then walk you through the vertical that best fits your E-2 strategy. Would a 15-minute call this week work for you?</p>`,
+  },
+  {
+    id: "investor_discovery_invite",
+    label: "Investor — Schedule Discovery Call",
+    subject: "Let's find your best E-2 franchise fit — 15-minute call?",
+    bodyHtml: `<p>Hi {{name}},</p>
+<p>Thank you for your interest in <strong>New Dawn Franchising</strong>. The next step is a brief discovery call where we can:</p>
+<ul>
+  <li>Review your E-2 visa timeline and investment goals</li>
+  <li>Compare our three verticals — Property Management, Telecom, and Insurance</li>
+  <li>Walk through the $225,000 investment structure and financing options</li>
+  <li>Answer questions about owner oversight, local operations, and proprietary technology</li>
+</ul>
+<p>There's no commitment on this call — it's simply a chance to determine whether New Dawn is the right fit before we send the Franchise Disclosure Document (FDD).</p>
+<p>Please reply with a few times that work for you, or use the scheduling link in my signature to book directly.</p>`,
+  },
+  {
+    id: "investor_vertical_guide",
+    label: "Investor — Vertical Comparison Guide",
+    subject: "Property Management vs. Telecom vs. Insurance — which fits you?",
+    bodyHtml: `<p>Hi {{name}},</p>
+<p>One of the most common questions we hear: <em>which New Dawn vertical is right for me?</em></p>
+<p>Here's a quick comparison:</p>
+<ul>
+  <li><strong>Property Management</strong> — Long-term rental management with local execution teams and owner-level reporting. Strong fit for investors who want tangible, recurring revenue tied to real assets.</li>
+  <li><strong>Telecom</strong> — Recurring-service operations supported by centralized systems, sales workflows, and oversight dashboards. Strong fit for investors comfortable with technology-driven recurring revenue.</li>
+  <li><strong>Insurance</strong> — Compliant supervision, client service, and recurring revenue in the insurance sector. Strong fit for investors who value regulated, relationship-based business models.</li>
+</ul>
+<p>All three verticals share the same owner-director structure, proprietary technology, E-2 compliance framework, and local operations support. The FDD and discovery process help us compare options against your goals, market preferences, and operational comfort.</p>
+<p>Happy to walk through this on a call — which vertical initially interests you most?</p>`,
   },
   {
     id: "meeting_followup",
-    label: "Meeting Follow-Up",
-    subject: "Great speaking with you — Next steps",
-    bodyHtml: `<p>Dear {{name}},</p>
-<p>Thank you for taking the time to speak with me today. It was a pleasure learning more about your background and investment goals.</p>
-<p>As discussed, the next step is for me to send you our <strong>Franchise Disclosure Document (FDD)</strong>, which provides full transparency on our business, financials, and franchise terms. Federal law requires that you have 14 days to review the FDD before signing anything or making any payments — we welcome that time for you to review with an attorney.</p>
-<p>I will be in touch shortly with the FDD package. In the meantime, please don't hesitate to reach out with any questions.</p>
-<p>Looking forward to potentially welcoming you to the New Dawn family!</p>`,
+    label: "Investor — Post-Discovery Call Follow-Up",
+    subject: "Great speaking with you — next steps",
+    bodyHtml: `<p>Hi {{name}},</p>
+<p>Thank you for taking the time to speak with me today. I enjoyed learning more about your background, timeline, and E-2 goals.</p>
+<p>As discussed, the next step is for me to send your <strong>Franchise Disclosure Document (FDD)</strong>. The FDD provides full transparency on the franchise model, financials, investment structure, and terms for your chosen vertical.</p>
+<p><strong>Important:</strong> Under U.S. franchise law, you must have a minimum of <strong>14 calendar days</strong> to review the FDD before signing any agreement or making any payment. We encourage you to review it carefully with a franchise attorney.</p>
+<p>I'll be in touch shortly with the FDD package. In the meantime, please reach out with any questions.</p>`,
   },
+
+  // ── FDD & Legal Milestones ────────────────────────────────────────────────
   {
     id: "fdd_cover",
     label: "FDD Package Cover Email",
     subject: "Your Franchise Disclosure Document — New Dawn Franchising",
-    bodyHtml: `<p>Dear {{name}},</p>
+    bodyHtml: `<p>Hi {{name}},</p>
 <p>Please find attached your <strong>Franchise Disclosure Document (FDD)</strong> from New Dawn Franchising LLC.</p>
-<p><strong>Important — Please Read:</strong></p>
-<p>Under US franchise law (FTC Franchise Rule), you must have a minimum of <strong>14 calendar days</strong> to review this document before signing any agreement or making any payment. We encourage you to review it carefully and consult with a franchise attorney.</p>
-<p>The last page of the FDD is the <strong>FDD Receipt</strong>. You will receive a separate email with a secure link to sign this electronically. Signing the receipt simply acknowledges you received the document — it does not commit you to anything.</p>
-<p>Please feel free to send any questions my way. I'm happy to walk you through any section on a call.</p>`,
-  },
-  {
-    id: "waiting_period_checkin",
-    label: "14-Day Period Check-In",
-    subject: "Checking in — Any questions on the FDD?",
-    bodyHtml: `<p>Dear {{name}},</p>
-<p>I hope you've had a chance to begin reviewing the Franchise Disclosure Document. We're now midway through your 14-day review period, and I wanted to check in to see if you have any questions.</p>
-<p>This is a great time to speak with a franchise attorney if you haven't already. Once the 14-day period is complete, we can move forward with the Franchise Agreement and discuss next steps for your E-2 visa application.</p>
-<p>Don't hesitate to reach out — I'm here to make this process as smooth as possible for you.</p>`,
-  },
-  {
-    id: "wire_instructions",
-    label: "Wire Transfer Instructions",
-    subject: "Wire Transfer Instructions — Franchise Fee",
-    bodyHtml: `<p>Dear {{name}},</p>
-<p>Congratulations on completing your Franchise Agreement! We are excited to have you as part of the New Dawn Franchising family.</p>
-<p>Please find below the wire transfer instructions for your franchise fee. Once your wire is received and confirmed, we will send you a receipt and begin your onboarding immediately.</p>
-<div style="background:#f5f5f5;border:1px solid #ddd;border-radius:8px;padding:20px;margin:16px 0;">
-  <p style="margin:0;font-weight:bold;">Wire Transfer Details</p>
-  <p style="margin:8px 0 0;">Beneficiary: New Dawn Franchising LLC<br>
-  Bank: [Your Bank Name]<br>
-  Routing Number: [Routing Number]<br>
-  Account Number: [Account Number]<br>
-  Reference: [Your Full Name] — Franchise Fee</p>
-</div>
-<p><strong>Important:</strong> Please email us the wire confirmation number as soon as the transfer is initiated so we can track and confirm receipt promptly.</p>`,
+<p><strong>Please read before proceeding:</strong></p>
+<ul>
+  <li>Federal law requires a minimum of <strong>14 calendar days</strong> to review the FDD before signing any agreement or making any payment</li>
+  <li>We strongly recommend reviewing the FDD with a franchise attorney</li>
+  <li>The last page is the <strong>FDD Receipt</strong> — you'll receive a separate email with a secure link to sign electronically</li>
+  <li>Signing the receipt acknowledges receipt only; it does not commit you to anything</li>
+</ul>
+<p>The FDD covers all three verticals (Property Management, Telecom, and Insurance) so you can compare investment structures and make an informed decision. I'm happy to walk through any section on a call.</p>`,
   },
   {
     id: "fdd_receipt_request",
     label: "📋 FDD Receipt — Send Signature Request",
     subject: "Action Required: Please Sign Your FDD Receipt — New Dawn Franchising",
-    bodyHtml: `<p>Dear {{name}},</p>
+    bodyHtml: `<p>Hi {{name}},</p>
 <p>As part of the franchise disclosure process, we need you to electronically sign the <strong>FDD Receipt</strong> — the last page of the Franchise Disclosure Document.</p>
 <p>Signing the receipt simply <strong>acknowledges that you received the document</strong>. It does not commit you to anything, and does not start any payment or agreement obligation.</p>
 <p>You will receive a separate email momentarily with a secure, personalised link to review and sign the receipt electronically. The process takes less than 2 minutes.</p>
@@ -436,13 +522,112 @@ export const CRM_EMAIL_TEMPLATES: EmailTemplate[] = [
     signatureRequest: true,
   },
   {
+    id: "waiting_period_checkin",
+    label: "14-Day FDD Review Check-In",
+    subject: "Checking in — any questions on the FDD?",
+    bodyHtml: `<p>Hi {{name}},</p>
+<p>I hope you've had a chance to begin reviewing the Franchise Disclosure Document. We're now midway through your 14-day review period, and I wanted to check in.</p>
+<p>This is a good time to:</p>
+<ul>
+  <li>Consult with a franchise attorney if you haven't already</li>
+  <li>Confirm which vertical — Property Management, Telecom, or Insurance — is the strongest fit</li>
+  <li>Discuss financing options with our affiliated lending partners if needed</li>
+  <li>Prepare questions for our next call</li>
+</ul>
+<p>Once the 14-day period is complete, we can move forward with the Franchise Agreement and begin E-2 visa application coordination. I'm here to make this process as smooth as possible.</p>`,
+  },
+  {
+    id: "franchise_agreement_cover",
+    label: "Franchise Agreement Cover Email",
+    subject: "Your Franchise Agreement — New Dawn Franchising",
+    bodyHtml: `<p>Hi {{name}},</p>
+<p>Your 14-day FDD review period is complete. Please find attached your <strong>Franchise Agreement</strong> for the vertical you've selected.</p>
+<p>Before signing, please review the agreement carefully with your franchise attorney. Key items to confirm:</p>
+<ul>
+  <li>Franchise territory and vertical selection</li>
+  <li>Total investment amount and payment schedule</li>
+  <li>Owner oversight responsibilities and reporting structure</li>
+  <li>E-2 visa coordination timeline with our immigration partners</li>
+</ul>
+<p>You'll receive a separate email with a secure link to sign the agreement electronically. Once executed, we'll provide wire transfer instructions for your franchise fee and begin onboarding immediately.</p>
+<p>Congratulations on reaching this milestone — we're excited about the possibility of welcoming you to New Dawn Franchising.</p>`,
+  },
+
+  // ── Closing & Onboarding ──────────────────────────────────────────────────
+  {
+    id: "wire_instructions",
+    label: "Wire Transfer Instructions",
+    subject: "Wire transfer instructions — franchise fee",
+    bodyHtml: `<p>Hi {{name}},</p>
+<p>Congratulations on executing your Franchise Agreement! We are thrilled to welcome you to the New Dawn Franchising family.</p>
+<p>Please find the wire transfer instructions for your franchise fee below. Once your wire is received and confirmed, we will send a receipt and begin your onboarding immediately.</p>
+<div style="background:#f5f5f5;border:1px solid #ddd;border-radius:8px;padding:20px;margin:16px 0;">
+  <p style="margin:0;font-weight:bold;">Wire Transfer Details</p>
+  <p style="margin:8px 0 0;">Beneficiary: New Dawn Franchising LLC<br>
+  Bank: [Your Bank Name]<br>
+  Routing Number: [Routing Number]<br>
+  Account Number: [Account Number]<br>
+  Reference: {{name}} — Franchise Fee</p>
+</div>
+<p><strong>Important:</strong> Please email us the wire confirmation number as soon as the transfer is initiated so we can track and confirm receipt promptly. Investor funds are held in escrow by a third-party attorney and released per the terms in your FDD.</p>`,
+  },
+  {
+    id: "e2_visa_next_steps",
+    label: "E-2 Visa Application Next Steps",
+    subject: "E-2 visa next steps — your New Dawn franchise",
+    bodyHtml: `<p>Hi {{name}},</p>
+<p>Now that your franchise agreement is in place, here's how we coordinate your <strong>E-2 visa application</strong>:</p>
+<ol>
+  <li><strong>Business plan preparation</strong> — Our partner team (including Joorney Business Plans) prepares a USCIS-compliant business plan for your selected vertical</li>
+  <li><strong>Immigration attorney coordination</strong> — We connect you with experienced E-2 immigration counsel to file your petition</li>
+  <li><strong>Document package</strong> — Franchise agreement, FDD receipt, escrow documentation, and operational overview compiled for USCIS</li>
+  <li><strong>Owner oversight framework</strong> — Reporting structure and supervisory controls documented for your petition</li>
+</ol>
+<p>As the franchise owner, you maintain legal ownership, bank account signatory authority, and executive decision-making — exactly as the E-2 visa requires. Our local teams handle daily execution while you direct the enterprise.</p>
+<p>I'll schedule a coordination call with our immigration partners shortly. Please share your preferred timeline and current citizenship so we can plan accordingly.</p>`,
+  },
+  {
+    id: "closing_congratulations",
+    label: "Closing — Welcome to New Dawn",
+    subject: "Welcome to New Dawn Franchising — you're officially in!",
+    bodyHtml: `<p>Hi {{name}},</p>
+<p><strong>Congratulations!</strong> Your franchise fee has been received and your onboarding is officially underway. Welcome to New Dawn Franchising.</p>
+<p>Here's what happens next:</p>
+<ul>
+  <li><strong>Training & orientation</strong> — Franchise systems, proprietary technology platform, and owner dashboard walkthrough</li>
+  <li><strong>Operations setup</strong> — Local team assignment and territory launch for your selected vertical</li>
+  <li><strong>E-2 petition progress</strong> — Ongoing coordination with immigration counsel until visa approval</li>
+  <li><strong>Executive reporting</strong> — Owner dashboards, operational reports, and supervisory oversight tools activated</li>
+</ul>
+<p>You now own and direct a real, operating U.S. business — with the team and technology to support your E-2 journey from day one. Headquartered in El Paso, Texas, with the flexibility to live anywhere in the United States while maintaining executive control.</p>
+<p>We're honoured to have you as part of the New Dawn Franchising Group of Companies. Please don't hesitate to reach out at any point.</p>`,
+  },
+
+  // ── Nurture & Re-Engagement ───────────────────────────────────────────────
+  {
     id: "reengagement",
-    label: "Re-Engagement / Check-In",
-    subject: "Checking in — Still interested in E-2 franchise opportunity?",
-    bodyHtml: `<p>Dear {{name}},</p>
-<p>I hope this message finds you well. I wanted to check in as it's been a little while since we last connected.</p>
-<p>Our E-2 franchise opportunity in El Paso is still available, and we're continuing to see strong interest from investors in your region. If your timeline or situation has changed, I'd love to reconnect and see how we might be able to help.</p>
-<p>Even if now isn't the right time, I'm happy to answer any questions or provide any additional information that might be useful for your planning.</p>
-<p>Would you be open to a quick 15-minute call this week?</p>`,
+    label: "Re-Engagement Check-In",
+    subject: "Checking in — still exploring E-2 franchise options?",
+    bodyHtml: `<p>Hi {{name}},</p>
+<p>I wanted to check in — it's been a little while since we last connected, and I wanted to see how your E-2 planning is progressing.</p>
+<p>New Dawn Franchising continues to offer our multi-vertical platform — Property Management, Telecom, and Insurance — starting at <strong>$225,000</strong>, structured specifically for E-2 investors who want to own and direct a real U.S. business without managing daily operations themselves.</p>
+<p>If your timeline or situation has changed, I'd love to reconnect. Even if now isn't the right time, I'm happy to answer questions or send updated materials for your planning.</p>
+<p>Would a quick 15-minute call this week be helpful?</p>`,
+  },
+  {
+    id: "gentle_breakup",
+    label: "Final Check-In (Breakup Email)",
+    subject: "Last note from New Dawn — here if you need us",
+    bodyHtml: `<p>Hi {{name}},</p>
+<p>This will be my last email for now — I don't want to clutter your inbox.</p>
+<p>If you or any of your clients are ever looking for an <strong>E-2 qualifying franchise</strong> across Property Management, Telecom, or Insurance, please keep New Dawn Franchising in mind.</p>
+<p><strong>Quick recap:</strong></p>
+<ul>
+  <li>Investment from $225,000 with financing options</li>
+  <li>You own and direct; our teams run daily operations</li>
+  <li>Proprietary technology, in-house E-2 immigration support, and buy-back pathway</li>
+  <li>FDD available on request — franchising@newdawnfranchising.com</li>
+</ul>
+<p>Wishing you the best with your plans. My door is always open if timing changes.</p>`,
   },
 ];

@@ -61,6 +61,7 @@ const FOOTER_I18N = {
     rightsReserved: "All rights reserved.",
     privacy: "Privacy Policy",
     terms: "Terms & Conditions",
+    legal: "Legal & Disclaimers",
   },
   es: {
     groupPrefix: "Parte del ",
@@ -89,6 +90,7 @@ const FOOTER_I18N = {
     rightsReserved: "Todos los derechos reservados.",
     privacy: "Política de Privacidad",
     terms: "Términos y Condiciones",
+    legal: "Aviso Legal",
   },
   fr: {
     groupPrefix: "Membre du ",
@@ -117,6 +119,7 @@ const FOOTER_I18N = {
     rightsReserved: "Tous droits réservés.",
     privacy: "Politique de confidentialité",
     terms: "Conditions générales",
+    legal: "Mentions légales",
   },
   zh: {
     groupPrefix: "隶属于 ",
@@ -145,6 +148,7 @@ const FOOTER_I18N = {
     rightsReserved: "保留所有权利。",
     privacy: "隐私政策",
     terms: "条款与条件",
+    legal: "法律与免责声明",
   },
   ja: {
     groupPrefix: "",
@@ -173,6 +177,7 @@ const FOOTER_I18N = {
     rightsReserved: "無断複写・転載を禁じます。",
     privacy: "プライバシーポリシー",
     terms: "利用規約",
+    legal: "法的事項・免責事項",
   },
   ko: {
     groupPrefix: "",
@@ -201,6 +206,7 @@ const FOOTER_I18N = {
     rightsReserved: "모든 권리 보유.",
     privacy: "개인정보 처리방침",
     terms: "이용약관",
+    legal: "법적 고지 및 면책조항",
   },
   tr: {
     groupPrefix: "",
@@ -229,6 +235,7 @@ const FOOTER_I18N = {
     rightsReserved: "Tüm hakları saklıdır.",
     privacy: "Gizlilik Politikası",
     terms: "Şartlar ve Koşullar",
+    legal: "Yasal Uyarılar",
   },
 } as const;
 
@@ -270,6 +277,7 @@ const DESKTOP_NAV: DesktopNavEntry[] = [
     items: [
       { href: "/e2-visa-franchise", label: "E-2 Visa Franchise", id: "e2-visa-franchise" },
       { href: "/e2-fit", label: "Why E-2?", id: "e2" },
+      { href: "/e-2-visa-process", label: "E-2 Visa Process", id: "e2-process" },
       { href: "/process", label: "Process", id: "process" },
       { href: "/territories", label: "Territories", id: "territories" },
     ],
@@ -309,6 +317,7 @@ const MOBILE_NAV: DesktopNavEntry[] = [
     items: [
       { href: "/e2-visa-franchise", label: "E-2 Visa Franchise", id: "e2-visa-franchise" },
       { href: "/e2-fit", label: "Why E-2?", id: "e2" },
+      { href: "/e-2-visa-process", label: "E-2 Visa Process", id: "e2-process" },
       { href: "/process", label: "Process", id: "process" },
       { href: "/territories", label: "Territories", id: "territories" },
     ],
@@ -1188,6 +1197,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
               <span>&copy; {new Date().getFullYear()} New Dawn Franchising LLC. {t.rightsReserved}</span>
               <Link href="/privacy-policy" data-testid="link-footer-privacy" className="hover:text-muted-foreground transition-colors">{t.privacy}</Link>
               <Link href="/terms" data-testid="link-footer-terms" className="hover:text-muted-foreground transition-colors">{t.terms}</Link>
+              <Link href="/legal" data-testid="link-footer-legal" className="hover:text-muted-foreground transition-colors">{t.legal}</Link>
               <LanguageSwitcher className="ml-auto" />
             </div>
           </div>

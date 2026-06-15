@@ -95,11 +95,14 @@ export async function injectShell(html: string, pathname: string): Promise<strin
   // Drop the leftover "@replit" twitter:site handle entirely.
   html = html.replace(/\s*<meta\s+name="twitter:site"\s+content="[^"]*"\s*\/?>/, "");
 
-  // --- Canonical, og:url/site_name, and JSON-LD before </head> ---
+  // --- Canonical, og:url/site_name, hreflang alternates, and JSON-LD before </head> ---
   const headInsert = [
     `<link rel="canonical" href="${canonicalUrl}" />`,
     `<meta property="og:url" content="${canonicalUrl}" />`,
     `<meta property="og:site_name" content="New Dawn Franchising" />`,
+    ...localeAlternates(pathname).map(
+      (alt) => `<link rel="alternate" hreflang="${alt.hreflang}" href="${alt.href}" />`,
+    ),
     `<script type="application/ld+json">${renderJsonLd(buildGraph(pathname, shell, post, canonicalUrl))}</script>`,
   ].join("\n    ");
 
@@ -158,6 +161,38 @@ function buildGraph(
   }
 
   return graph;
+}
+
+/**
+ * Locale alternates for hreflang. The site serves English, Spanish (es), and is
+ * structured to add Traditional Chinese (zh-TW). Each group pairs the equivalent
+ * pages across locales; we only emit a tag for a locale whose page actually
+ * exists (so we never point crawlers at a 404). To add a Spanish or zh-TW
+ * equivalent for any page, add its path to the matching group below.
+ */
+type LocaleGroup = { en: string; es?: string; "zh-TW"?: string };
+
+const LOCALE_GROUPS: LocaleGroup[] = [
+  { en: "/", es: "/es" },
+  { en: "/property-management", es: "/es/property-management" },
+];
+
+function localeAlternates(pathname: string): { hreflang: string; href: string }[] {
+  const group = LOCALE_GROUPS.find(
+    (g) => g.en === pathname || g.es === pathname || g["zh-TW"] === pathname,
+  );
+  if (!group) return [];
+
+  const out: { hreflang: string; href: string }[] = [];
+  const push = (hreflang: string, path?: string) => {
+    if (path) out.push({ hreflang, href: `${SITE_URL}${path === "/" ? "" : path}` });
+  };
+  push("en", group.en);
+  push("es", group.es);
+  push("zh-TW", group["zh-TW"]);
+  // x-default points at the canonical English page.
+  push("x-default", group.en);
+  return out;
 }
 
 /** "/blog/some-slug" -> "some-slug"; null for "/blog" or "/blog/". */

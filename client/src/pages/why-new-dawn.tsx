@@ -14,7 +14,6 @@ import {
   MapPin,
   Megaphone,
   Phone,
-  Repeat,
   ShieldCheck,
   Sparkles,
   Users,
@@ -284,7 +283,7 @@ export default function WhyNewDawnPage() {
             </p>
             <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
               <Button data-testid="button-wnd-hero-fdd" className="gap-2" asChild>
-                <Link href="/contact">
+                <Link href="/request-fdd">
                   Request the FDD
                   <ArrowRight className="size-4" />
                 </Link>
@@ -580,24 +579,23 @@ export default function WhyNewDawnPage() {
         </div>
       </section>
 
-      {/* ── SECTION 6 — A defined long-term path ── */}
+      {/* ── SECTION 6 — Backed by the Group of Companies ── */}
       <section data-testid="section-wnd-path" className="border-b py-8 md:py-20">
         <div className="nh-container">
           <div className="mx-auto max-w-3xl">
-            <Card data-testid="card-wnd-buyback" className="nh-surface nh-noise border-card-border/80 p-6 md:p-8">
+            <Card data-testid="card-wnd-backing" className="nh-surface nh-noise border-card-border/80 p-6 md:p-8">
               <div className="flex items-start gap-4">
                 <div className="grid size-12 shrink-0 place-items-center rounded-xl border bg-[hsl(var(--primary))]/10">
-                  <Repeat className="size-6 text-[hsl(var(--primary))]" />
+                  <ShieldCheck className="size-6 text-[hsl(var(--primary))]" />
                 </div>
                 <div className="min-w-0">
-                  <SectionEyebrow>A defined long-term path</SectionEyebrow>
-                  <div className="mt-2 text-xl font-semibold">An in-house buy-back program after ~4 years</div>
+                  <SectionEyebrow>Owner control, fully backed</SectionEyebrow>
+                  <div className="mt-2 text-xl font-semibold">You stay in control — backed by the Group of Companies</div>
                   <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                    Ownership with New Dawn comes with a defined path for the next stage: an in-house buy-back program
-                    available after approximately four years, giving owners a structured option once they've established
-                    the business and met their goals.
-                    {/* TODO(client): any high-level framing of buy-back terms you want public;
-                        full terms live in the FDD. (Placeholder #2) */}
+                    You hold ownership control, bank-account authority, and final say over major decisions, hiring, and
+                    strategy from day one. Behind that control stands the New Dawn Franchising Group of Companies&trade; —
+                    in-house E-2 immigration, finance, legal, real estate, and operations teams who support the business
+                    you direct, so you are never left to figure it out alone.
                   </p>
                 </div>
               </div>
@@ -649,7 +647,7 @@ export default function WhyNewDawnPage() {
             </p>
             <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
               <Button data-testid="button-wnd-cta-fdd" className="gap-2" asChild>
-                <Link href="/contact">
+                <Link href="/request-fdd">
                   Request the FDD
                   <ArrowRight className="size-4" />
                 </Link>

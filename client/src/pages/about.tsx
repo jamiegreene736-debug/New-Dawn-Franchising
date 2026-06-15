@@ -1,4 +1,4 @@
-import { ArrowRight, Banknote, BookOpen, Building, Building2, Cpu, Flag, Gavel, Handshake, ShieldCheck, Wallet } from "lucide-react";
+import { ArrowRight, Banknote, BookOpen, Building, Building2, Cpu, Flag, Gavel, Handshake, MapPin, ShieldCheck, Users, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Link } from "wouter";
@@ -138,6 +138,68 @@ export default function AboutPage() {
         </div>
       </section>
 
+      <section data-testid="section-about-leadership" className="border-b py-8 md:py-20">
+        <div className="nh-container">
+          <div className="mx-auto max-w-3xl text-center">
+            <div className="text-xs font-semibold uppercase tracking-[0.22em] text-foreground/60">Leadership</div>
+            <h2 data-testid="about-leadership-title" className="mt-3 text-balance text-3xl font-semibold md:text-4xl">
+              The people behind New Dawn
+            </h2>
+            <p className="mt-3 text-pretty text-base leading-relaxed text-muted-foreground">
+              You're considering wiring six figures and relocating your family — you should know who you're working with.
+              Our leadership and founding members bring proven experience across franchising, real estate, financing, and
+              law, and direct a real operating organization headquartered in El Paso, Texas.
+            </p>
+          </div>
+
+          <div className="mx-auto mt-10 grid max-w-4xl gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {[
+              { name: "Chris Von Pohlot", title: "Managing Director", id: "cvp" },
+              { name: "Tom Meister", title: "Advisor · Founding Member", id: "tm" },
+              { name: "Kamal Obbad", title: "Advisor · Founding Member", id: "ko" },
+              { name: "Zachary Bohlender", title: "Advisor · Founding Member", id: "zb" },
+              { name: "Dylan Delaney", title: "Advisor · Founding Member", id: "dd" },
+              { name: "Kevin Hatch", title: "Advisor · Founding Member", id: "kh" },
+            ].map((p) => (
+              <Card key={p.id} data-testid={`card-about-leader-${p.id}`} className="nh-surface nh-noise border-card-border/80 p-6">
+                <div className="flex items-start gap-3">
+                  <div className="grid size-11 place-items-center rounded-xl border bg-white/70 shadow-sm backdrop-blur">
+                    <Users className="size-5 text-[hsl(var(--primary))]" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-base font-semibold" translate="no">{p.name}</div>
+                    <div className="mt-1 text-sm text-muted-foreground">{p.title}</div>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+
+          <div
+            data-testid="about-hq"
+            className="mx-auto mt-8 flex max-w-3xl items-start gap-3 rounded-2xl border bg-white/60 p-5 shadow-sm"
+          >
+            <MapPin className="mt-0.5 size-5 shrink-0 text-[hsl(var(--accent))]" />
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              <span className="font-medium text-foreground">Headquartered in El Paso, Texas.</span> Our offices are at{" "}
+              <a href={COMPANY.mapsUrl} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-foreground">
+                {COMPANY.addressFull}
+              </a>
+              . Qualified E-2 owners direct their franchise from here or from elsewhere in the United States.
+            </p>
+          </div>
+
+          <div className="mx-auto mt-6 max-w-3xl text-center">
+            <Button data-testid="button-about-leadership-team" variant="secondary" className="gap-2" asChild>
+              <Link href="/team">
+                See full team &amp; divisions
+                <ArrowRight className="size-4" />
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </section>
+
       <section data-testid="section-business-plans" className="border-b py-8 md:py-20">
         <div className="nh-container">
           <div className="mx-auto max-w-3xl text-center">
@@ -199,8 +261,9 @@ export default function AboutPage() {
                 <div>
                   <div className="text-sm font-semibold">Owner control</div>
                   <div className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                    Investors typically want direct control over their business and finances. Our model is built to support that,
-                    while removing the need to personally manage day-to-day operations.
+                    You direct the business and control its finances — ownership, bank accounts, and the key decisions stay with
+                    you, while our local teams handle daily execution. That substantive directing role is exactly what the E-2
+                    visa is built around.
                   </div>
                 </div>
               </div>

@@ -132,7 +132,7 @@ const OVERVIEW_SCENES = [
   {
     id: "unique",
     kicker: "Why New Dawn",
-    title: "Own a U.S. business. Skip the daily grind.",
+    title: "",
     copy: [
       "Built from the ground up for E-2 visa investors who want full ownership without running the show.",
       "You keep total oversight and direction. Our proprietary AI + ops team handles execution and growth.",
@@ -337,7 +337,7 @@ function HomepageVideoCard({ hero = false }: { hero?: boolean }) {
           </div>
 
           {/* Scene stage — one scene at a time; nothing overlaps the text */}
-          <div className="relative mt-4 grid min-h-[300px] place-items-center overflow-hidden rounded-2xl border border-white/15 bg-[radial-gradient(circle_at_20%_18%,rgba(255,255,255,0.16),transparent_42%),linear-gradient(135deg,rgba(255,255,255,0.10),rgba(0,0,0,0.18))] p-6 md:min-h-[340px] md:p-7 lg:min-h-[370px]">
+          <div className="relative mt-4 grid min-h-[210px] place-items-center overflow-hidden rounded-2xl border border-white/15 bg-[radial-gradient(circle_at_20%_18%,rgba(255,255,255,0.16),transparent_42%),linear-gradient(135deg,rgba(255,255,255,0.10),rgba(0,0,0,0.18))] p-5 md:min-h-[230px] md:p-6 lg:min-h-[250px]">
             <AnimatePresence mode="wait">
               <motion.div
                 key={scene.id}
@@ -353,9 +353,11 @@ function HomepageVideoCard({ hero = false }: { hero?: boolean }) {
                 <div className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-[hsl(var(--accent))]">
                   {scene.kicker}
                 </div>
-                <div className="mt-2 text-balance text-2xl font-semibold leading-tight md:text-3xl">
-                  {scene.title}
-                </div>
+                {scene.title && (
+                  <div className="mt-2 text-balance text-2xl font-semibold leading-tight md:text-3xl">
+                    {scene.title}
+                  </div>
+                )}
                 {Array.isArray(scene.copy) ? (
                   <div className="mt-3 max-w-lg space-y-2">
                     {scene.copy.map((line, i) => (
@@ -372,19 +374,19 @@ function HomepageVideoCard({ hero = false }: { hero?: boolean }) {
                 the scene title/copy below. */}
             {!isPlaying && (
               <div className="pointer-events-none absolute inset-0 z-10 bg-[hsl(var(--primary))]/25">
-                <div className="absolute inset-x-0 top-0 flex justify-center pt-5 md:pt-6">
-                  <div className="grid size-16 -translate-x-4 place-items-center rounded-full bg-white shadow-2xl ring-1 ring-black/5 transition duration-300 group-hover:scale-110 md:size-20 md:-translate-x-6">
-                    <span className="ml-1.5 block h-0 w-0 border-y-[14px] border-l-[22px] border-y-transparent border-l-red-600 md:border-y-[16px] md:border-l-[26px]" />
+                <div className="absolute left-0 top-0 flex pl-4 pt-4 md:pl-5 md:pt-5">
+                  <div className="grid size-14 place-items-center rounded-full bg-white shadow-2xl ring-1 ring-black/5 transition duration-300 group-hover:scale-110 md:size-16">
+                    <span className="ml-1 block h-0 w-0 border-y-[12px] border-l-[19px] border-y-transparent border-l-red-600 md:border-y-[13px] md:border-l-[21px]" />
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Playing: pause button fades in on hover, in the same top spot. */}
+            {/* Playing: pause button fades in on hover, in the same top-left spot. */}
             {isPlaying && (
-              <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center pt-5 opacity-0 transition-opacity duration-200 group-hover:opacity-100 md:pt-6">
-                <div className="grid size-16 -translate-x-4 place-items-center rounded-full bg-white shadow-2xl ring-1 ring-black/5 md:size-20 md:-translate-x-6">
-                  <Pause className="size-7 text-red-600 md:size-8" />
+              <div className="pointer-events-none absolute left-0 top-0 z-10 flex pl-4 pt-4 opacity-0 transition-opacity duration-200 group-hover:opacity-100 md:pl-5 md:pt-5">
+                <div className="grid size-14 place-items-center rounded-full bg-white shadow-2xl ring-1 ring-black/5 md:size-16">
+                  <Pause className="size-6 text-red-600 md:size-7" />
                 </div>
               </div>
             )}
@@ -630,11 +632,12 @@ export default function Home() {
           <div className="absolute inset-0 -z-10 opacity-60 nh-fine-grid" />
           <div className="nh-container py-5 md:py-8 lg:py-10">
             {/* Redesigned hero: clearer conversion path on the left, video as the visual anchor on the right. */}
-            <div className="grid items-start gap-8 lg:grid-cols-[0.8fr_1.2fr] xl:gap-12">
+            <div className="grid items-stretch gap-8 lg:grid-cols-[0.8fr_1.2fr] xl:gap-12">
               <motion.div
                 initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.65, ease: "easeOut" }}
+                className="flex flex-col"
               >
                 <div className="flex flex-wrap gap-2">
                   <Pill testId="pill-location">
@@ -719,7 +722,7 @@ export default function Home() {
                   </Button>
                 </div>
 
-                <p data-testid="text-fdd-credibility" className="mt-3 text-xs text-muted-foreground/70">
+                <p data-testid="text-fdd-credibility" className="mt-auto pt-4 text-xs text-muted-foreground/70">
                   Franchise Disclosure Document (FDD) available upon request. New Dawn Franchising is a registered franchisor.
                 </p>
               </motion.div>
@@ -728,7 +731,7 @@ export default function Home() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.7, ease: "easeOut", delay: 0.05 }}
-                className="relative order-first lg:order-none"
+                className="relative order-first flex flex-col lg:order-none"
               >
                 <HomepageVideoCard hero />
                 <div className="pointer-events-none absolute -inset-6 -z-10 rounded-[2.5rem] bg-gradient-to-tr from-[hsl(var(--accent))]/15 via-transparent to-[hsl(var(--primary))]/15 blur-2xl" />
@@ -768,7 +771,7 @@ export default function Home() {
                     </div>
                   ))}
                 </div>
-                <p className="mt-3 text-xs text-muted-foreground/70">
+                <p className="mt-auto pt-4 text-xs text-muted-foreground/70">
                   Structured investment with built-in investor protection. Full details provided in the Franchise Disclosure Document.
                 </p>
               </motion.div>

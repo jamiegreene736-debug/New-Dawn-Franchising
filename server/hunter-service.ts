@@ -41,6 +41,40 @@ export async function hunterFindEmail(
   } catch { return null; }
 }
 
+export interface HunterVerifyResult {
+  email: string;
+  result: string;   // deliverable | undeliverable | risky | unknown
+  status: string;   // valid | invalid | accept_all | webmail | disposable | unknown
+  score: number;    // 0-100 confidence
+  disposable: boolean;
+  webmail: boolean;
+  mxRecords: boolean;
+  smtpServer: boolean;
+}
+
+// Verify an email address with Hunter's email-verifier endpoint.
+export async function hunterVerifyEmail(email: string): Promise<HunterVerifyResult | null> {
+  if (!HUNTER_API_KEY) return null;
+  try {
+    const params = new URLSearchParams({ email, api_key: HUNTER_API_KEY });
+    const res = await fetch(`https://api.hunter.io/v2/email-verifier?${params}`);
+    if (!res.ok) return null;
+    const json = await res.json() as { data?: Record<string, any>; errors?: unknown[] };
+    if (json.errors?.length || !json.data) return null;
+    const d = json.data;
+    return {
+      email: String(d.email || email),
+      result: String(d.result || "unknown"),
+      status: String(d.status || "unknown"),
+      score: Number(d.score || 0),
+      disposable: !!d.disposable,
+      webmail: !!d.webmail,
+      mxRecords: !!d.mx_records,
+      smtpServer: !!d.smtp_server,
+    };
+  } catch { return null; }
+}
+
 export async function hunterDomainPattern(domain: string): Promise<string | null> {
   if (!HUNTER_API_KEY) return null;
 

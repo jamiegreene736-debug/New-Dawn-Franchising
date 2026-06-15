@@ -36,7 +36,7 @@ import heygenRouter from "./heygen-routes";
 import partnerRouter from "./partner-routes";
 import { processPartnerSequence } from "./partner-sequence-service";
 import { runDailyPreparation, runDailyBrief, pollForApprovalReply, runApprovalDeadlineCheck } from "./agent-service";
-import { hunterFindEmail, hunterDomainPattern, buildEmailFromPattern } from "./hunter-service";
+import { hunterFindEmail, hunterDomainPattern, buildEmailFromPattern, hunterVerifyEmail, getHunterStatus } from "./hunter-service";
 import { pollAllRenderingVideos, runHeygenPreparation } from "./heygen-service";
 import { heygenVideos, prospectLists } from "../shared/schema";
 import { eq, desc } from "drizzle-orm";
@@ -1746,6 +1746,35 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
     } catch (err: any) {
       console.error("[Whitepages endpoint] error:", err);
       res.status(500).json({ message: err.message || "Whitepages lookup failed" });
+    }
+  });
+
+  // Verify a contact's email (Hunter.io email-verifier) and phone (format check).
+  app.post("/api/crm/verify-contact", requireAdminAuth, async (req, res) => {
+    try {
+      const email = String(req.body?.email || "").trim();
+      const phone = String(req.body?.phone || "").trim();
+      const out: { email?: any; phone?: any } = {};
+
+      if (email) {
+        const v = await hunterVerifyEmail(email);
+        out.email = v
+          ? { ...v, configured: true }
+          : { result: "unknown", status: "unknown", score: 0, configured: getHunterStatus().configured };
+      }
+      if (phone) {
+        // Lightweight format/length check (E.164-ish). Not a live carrier lookup.
+        const digits = phone.replace(/[^\d]/g, "");
+        out.phone = {
+          valid: digits.length >= 10 && digits.length <= 15,
+          normalized: digits,
+          note: "Format check only — not a live carrier lookup.",
+        };
+      }
+      res.json(out);
+    } catch (err: any) {
+      console.error("[verify-contact] error:", err?.message || err);
+      res.status(500).json({ message: err?.message || "Verification failed" });
     }
   });
 

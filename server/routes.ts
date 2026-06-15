@@ -1188,17 +1188,20 @@ export async function registerRoutes(
 
   app.post("/api/crm/clients/bulk-add", requireAdminAuth, async (req, res) => {
     try {
-      const { contacts, tags } = req.body as { contacts: any[]; tags?: string[] };
+      const { contacts, tags, leadSource } = req.body as { contacts: any[]; tags?: string[]; leadSource?: string };
       if (!Array.isArray(contacts) || contacts.length === 0) {
         return res.status(400).json({ message: "contacts array is required" });
       }
+      const { findExistingCrmClient } = await import("./contact-upsert");
       const results = [];
+      let skipped = 0;
       for (const contact of contacts) {
         const data = insertCrmClientSchema.parse({
           fullName: contact.fullName || "Unknown",
-          email: contact.email || `unknown-${Date.now()}@placeholder.com`,
+          email: contact.email || "",
           phone: contact.phone || undefined,
-          leadSource: "prospect_finder",
+          country: contact.country || undefined,
+          leadSource: leadSource || "prospect_finder",
           companyName: contact.companyName || undefined,
           profession: contact.jobTitle || undefined,
           linkedinUrl: contact.linkedinUrl || undefined,
@@ -1206,10 +1209,18 @@ export async function registerRoutes(
           status: "new",
           tags: tags && tags.length > 0 ? tags : [],
         });
+        // Skip prospects already in the pipeline (email → name+company). Sequential
+        // inserts mean intra-batch duplicates also collapse to one row.
+        const existing = await findExistingCrmClient({
+          fullName: data.fullName,
+          email: data.email,
+          companyName: data.companyName,
+        });
+        if (existing) { skipped++; continue; }
         const created = await storage.createCrmClient(data);
         results.push(created);
       }
-      res.status(201).json({ added: results.length, clients: results });
+      res.status(201).json({ added: results.length, skipped, clients: results });
     } catch (err) {
       if (err instanceof ZodError) {
         res.status(400).json({ message: fromZodError(err).message });
@@ -1244,6 +1255,16 @@ export async function registerRoutes(
   app.post("/api/crm/clients", requireAdminAuth, async (req, res) => {
     try {
       const data = insertCrmClientSchema.parse(req.body);
+      // Dedup (email → name+company) so adding the same prospect twice — e.g.
+      // re-clicking "Add to CRM" in Lead Research — returns the existing client
+      // instead of inserting a duplicate. crm_clients has no UNIQUE constraint.
+      const { findExistingCrmClient } = await import("./contact-upsert");
+      const existing = await findExistingCrmClient({
+        fullName: data.fullName,
+        email: data.email,
+        companyName: data.companyName,
+      });
+      if (existing) return res.status(200).json(existing);
       const client = await storage.createCrmClient(data);
       res.status(201).json(client);
     } catch (err) {

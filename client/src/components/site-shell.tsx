@@ -44,6 +44,7 @@ function FacebookIcon({ className }: { className?: string }) {
 const NAV = [
   { href: "/", label: "Home", id: "home" },
   { href: "/about", label: "About", id: "about" },
+  { href: "/telecom", label: "Telecom (VoIP)", id: "telecom" },
   { href: "/team", label: "Team", id: "team" },
   { href: "/e2-visa-franchise", label: "E-2 Visa Franchise", id: "e2-visa-franchise" },
   { href: "/e2-fit", label: "Why E-2?", id: "e2" },
@@ -66,6 +67,7 @@ const DESKTOP_NAV: DesktopNavEntry[] = [
     label: "About", id: "about-group",
     items: [
       { href: "/about", label: "About Us", id: "about" },
+      { href: "/telecom", label: "Telecom (VoIP)", id: "telecom" },
       { href: "/team", label: "Our Team", id: "team" },
     ],
   },

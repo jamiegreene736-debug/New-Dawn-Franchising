@@ -1,28 +1,30 @@
+import { useEffect, useState } from "react";
 import {
   ArrowRight,
   BadgeCheck,
   Briefcase,
   Building2,
   CheckCircle2,
-  Cloud,
   Cpu,
   FileText,
-  GraduationCap,
   Handshake,
   Headphones,
-  Layers,
+  LayoutDashboard,
   LineChart,
-  Megaphone,
-  MessageSquare,
+  Mail,
+  MapPin,
   Network,
   Phone,
+  Plus,
   Repeat,
   Rocket,
   Server,
-  Settings,
   ShieldCheck,
+  Signal,
   TrendingUp,
   Users,
+  Wallet,
+  Wifi,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -32,154 +34,247 @@ const COMPANY = {
   email: "franchising@newdawnfranchising.com",
   phone: "(346) 597-9994",
   phoneTel: "+13465979994",
+  address: "2601 N Zaragoza Rd",
+  city: "El Paso, TX 79938",
+  addressFull: "2601 N Zaragoza Rd, El Paso, TX 79938",
 };
 
-// ─── Section 1 — Core services ────────────────────────────────────────────────
-const SERVICES = [
+const INVESTMENT_FROM = "$225,000";
+const CANONICAL_URL = "https://www.newdawnfranchising.com/telecom";
+
+// ─── SEO / metadata ───────────────────────────────────────────────────────────
+// The site is a JS-rendered React app with a single static index.html, so per-page
+// metadata is applied on the client here. (If/when the marketing pages move to
+// server- or pre-rendering, this same title/description/JSON-LD can be emitted at
+// build time so it is crawlable without executing JS.)
+const SEO = {
+  title:
+    "New Dawn Franchising | Telecom Franchise for E-2 Visa Investors — Recurring-Revenue Telecom | El Paso, TX",
+  description:
+    "E-2 visa telecom franchise. Own and direct a recurring-revenue U.S. telecom business while New Dawn's teams run daily operations. Investment from $225,000. FDD available upon request.",
+  ogImage: "https://www.newdawnfranchising.com/opengraph.jpg",
+};
+
+function setMeta(attr: "name" | "property", key: string, content: string) {
+  let el = document.head.querySelector<HTMLMetaElement>(`meta[${attr}="${key}"]`);
+  if (!el) {
+    el = document.createElement("meta");
+    el.setAttribute(attr, key);
+    document.head.appendChild(el);
+  }
+  el.setAttribute("content", content);
+}
+
+// ─── Section 9 — FAQ (also emitted as FAQPage JSON-LD for SEO) ─────────────────
+const FAQ_ITEMS = [
   {
-    icon: Cloud,
-    title: "Business VoIP / cloud phone systems (UCaaS)",
-    desc: "Unified Communications as a Service: business phone, voicemail, mobile and desktop apps, and collaboration tools delivered over the internet on a per-seat subscription.",
-    id: "ucaas",
+    id: "what-sells",
+    q: "What does the Telecom franchise actually sell?",
+    // TODO(client): confirm the final, plain-language service mix before publish —
+    // e.g. wireless/mobile plans, business internet & connectivity, hosted phone
+    // (VoIP/UCaaS) — sold under New Dawn's established carrier and provider
+    // agreements. Page copy and the FDD must not contradict. — see brief Placeholder #1 & FAQ #1.
+    a: "The franchise signs residential and business customers to ongoing service agreements — such as mobile and wireless plans, business internet and connectivity, and hosted phone systems (VoIP/UCaaS) — sold under New Dawn's established carrier and provider relationships.",
   },
   {
-    icon: Network,
-    title: "SIP trunking & connectivity",
-    desc: "The underlying voice capacity businesses use to make and receive calls, typically billed per concurrent call path plus usage.",
-    id: "sip",
+    id: "recurring",
+    q: "Where does the recurring revenue come from?",
+    a: "Each customer signs an ongoing service agreement. The franchise earns activation compensation up front and recurring residual income each month the customer stays active, so revenue builds as the base grows and renews.",
+  },
+  {
+    id: "day-to-day",
+    q: "Do I have to run the day-to-day myself?",
+    a: "No. You are the owner and director. Approved local teams handle daily execution while you maintain ownership control, bank-account oversight, and executive supervision through your owner dashboard.",
+  },
+  {
+    id: "e2-support",
+    q: "How does this support my E-2 visa?",
+    a: "It's a real, operating business that you own and direct, generates recurring revenue, and employs U.S. workers — characteristics that support a credible E-2 petition and produce an auditable record for renewals. New Dawn does not provide legal or immigration advice or guarantee any visa outcome.",
+  },
+  {
+    id: "live-anywhere",
+    q: "Can I live anywhere in the U.S.?",
+    a: "Yes. New Dawn is headquartered in El Paso, Texas, but qualified E-2 owners can live elsewhere in the United States while maintaining executive oversight.",
+  },
+  {
+    id: "investment",
+    q: "How much do I invest?",
+    a: "Telecom franchise investment starts at $225,000. The E-2 visa has no fixed minimum, but the investment must be substantial relative to the total cost of the business.",
+  },
+];
+
+// ─── Section 1 — The business at a glance (service mix) ───────────────────────
+// TODO(client): confirm the exact service mix and only name a specific carrier /
+// platform partner once it is approved in writing. — see brief Placeholder #1.
+const SERVICES = [
+  {
+    icon: Signal,
+    title: "Mobile & wireless plans",
+    desc: "Recurring residential and business mobile/wireless service activated under established carrier relationships.",
+    id: "wireless",
+  },
+  {
+    icon: Wifi,
+    title: "Business internet & connectivity",
+    desc: "Ongoing internet and connectivity service that companies depend on every day — billed on recurring terms.",
+    id: "internet",
   },
   {
     icon: Headphones,
-    title: "Contact center solutions (CCaaS)",
-    desc: "Higher-value seats for companies that run inbound and outbound calling operations.",
-    id: "ccaas",
+    title: "VoIP / hosted phone (UCaaS)",
+    desc: "Cloud business phone, voicemail, and collaboration delivered on a per-seat monthly subscription.",
+    id: "voip",
   },
   {
-    icon: MessageSquare,
-    title: "Business messaging & digital fax",
-    desc: "SMS / text, chat, and secure digital fax that integrate into existing workflows.",
-    id: "messaging",
+    icon: Network,
+    title: "Managed mobility & add-ons",
+    desc: "Device management, accessories, and add-on services layered onto the recurring base.",
+    id: "mobility",
   },
 ];
 
-// ─── Section 2 — Why recurring revenue matters to an investor ──────────────────
-const REVENUE_REASONS = [
-  {
-    icon: Repeat,
-    title: "Predictability",
-    desc: "Unlike a restaurant or retail store that starts from zero every morning, a telecom book of business renews automatically. Revenue is contracted, not hoped for.",
-    id: "predictability",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Stickiness",
-    desc: "Businesses rarely switch phone and communications providers casually — the switching friction is high, which supports strong customer retention.",
-    id: "stickiness",
-  },
-  {
-    icon: Layers,
-    title: "Scalability",
-    desc: "Adding the next customer costs far less than acquiring the first. Margins improve as the recurring base grows.",
-    id: "scalability",
-  },
-  {
-    icon: TrendingUp,
-    title: "Compounding value",
-    desc: "A company valued on recurring revenue becomes more valuable as that revenue base grows — which matters when you eventually want to demonstrate growth or exit.",
-    id: "compounding",
-  },
-];
-
-// ─── Section 3 — How the vertical maps to the E-2 requirements ─────────────────
-const E2_FIT = [
-  {
-    icon: BadgeCheck,
-    title: "Real and operating",
-    desc: "This is an active services business with paying customers and live contracts from day one of operation — not a passive or speculative holding.",
-    id: "real-operating",
-  },
-  {
-    icon: Settings,
-    title: "You develop and direct it",
-    desc: "As owner-operator you control hiring, customer strategy, vendor relationships, and growth. New Dawn provides operational support while you direct and develop the enterprise.",
-    id: "develop-direct",
-  },
-  {
-    icon: Briefcase,
-    title: "Substantial investment",
-    desc: "Your investment funds the operating company, its staffing, customer acquisition, and working capital — capital committed to a real, active enterprise.",
-    id: "substantial",
-  },
+// ─── Section 3 — We run it, you direct it ─────────────────────────────────────
+const RUN_IT = [
   {
     icon: Users,
-    title: "Not marginal — it creates jobs",
-    desc: "A recurring-revenue services business gives you a credible, scalable hiring story. Job creation and economic impact sit at the heart of a strong E-2 case.",
-    id: "not-marginal",
+    title: "Approved local teams",
+    // TODO(client): confirm the specific roles your operating teams cover
+    // (sales, onboarding, retention/customer service, field/install). — see brief Placeholder #4.
+    desc: "Day-to-day execution — sales, customer onboarding, retention and customer service — is handled by approved local teams.",
+    id: "teams",
+  },
+  {
+    icon: Cpu,
+    title: "Proprietary technology",
+    desc: "Sales workflows, customer communication, billing-support coordination, marketing, and lead generation that runs around the clock.",
+    id: "tech",
+  },
+  {
+    icon: LayoutDashboard,
+    title: "Owner dashboards",
+    desc: "Real-time visibility into sales, active subscribers, residual revenue, churn, and staffing — the information you use to supervise the team and make key decisions.",
+    id: "dashboards",
+  },
+  {
+    icon: Server,
+    title: "Centralized back-office",
+    desc: "Coordinates the carrier and provider relationships, compliance, and reporting so you keep executive focus.",
+    id: "back-office",
   },
 ];
 
-// ─── Section 4 — Roles a managed communications business creates ───────────────
+// ─── Section 4 — Roles a telecom operation creates ────────────────────────────
+// TODO(client): confirm roles and any defensible, FDD-backed headcount targets.
+// Keep qualitative unless the figure is supportable. — see brief Placeholder #4.
 const JOBS = [
   {
     icon: TrendingUp,
     title: "Sales & account development",
-    desc: "Acquiring new business customers and growing the recurring book.",
+    desc: "Signing new residential and business customers and growing the recurring book.",
     id: "sales",
   },
   {
     icon: Rocket,
-    title: "Customer onboarding & implementation",
-    desc: "Provisioning service and configuring systems for each new account.",
+    title: "Customer onboarding & account management",
+    desc: "Provisioning service and configuring accounts for each new customer.",
     id: "onboarding",
   },
   {
     icon: Headphones,
-    title: "Technical support & customer success",
-    desc: "The ongoing support that keeps recurring accounts renewing.",
-    id: "support",
+    title: "Customer service & retention",
+    desc: "The ongoing support that keeps recurring accounts active and renewing.",
+    id: "retention",
   },
   {
     icon: Briefcase,
     title: "Operations & administration",
-    desc: "Billing, vendor management, and back-office functions.",
+    desc: "Billing support, provider coordination, and back-office functions.",
     id: "operations",
   },
 ];
 
-// ─── Section 5 — Franchise support ────────────────────────────────────────────
-// TODO(client): confirm these against the actual New Dawn telecom support package /
-// FDD Item 11 obligations before publish. Page copy and the FDD must not contradict.
-const SUPPORT = [
+// ─── Section 5 — Why telecom works for E-2 investors ──────────────────────────
+const WHY_E2 = [
   {
-    icon: FileText,
-    title: "Established operating playbook & SOPs",
-    desc: "A documented way of running the business so you can operate with confidence from day one.",
-    id: "playbook",
+    icon: BadgeCheck,
+    title: "You own and direct a real operating business",
+    desc: "The foundation of a strong E-2 petition — an active enterprise with documented systems and supervisory control.",
+    id: "own-direct",
   },
   {
-    icon: Server,
-    title: "Vendor & infrastructure relationships",
-    desc: "Enterprise-grade carrier infrastructure through New Dawn's vendor relationships — so you don't build a carrier from scratch.",
-    id: "infrastructure",
+    icon: Repeat,
+    title: "Recurring revenue, not one-time sales",
+    desc: "Predictable monthly income that compounds as your base grows and renews.",
+    id: "recurring",
   },
   {
-    icon: GraduationCap,
-    title: "Onboarding, training & ongoing support",
-    desc: "Structured onboarding and continued operational support as your customer base grows.",
-    id: "training",
-  },
-  {
-    icon: Megaphone,
-    title: "Marketing & customer-acquisition support",
-    desc: "Tools and guidance to help you find and win business customers in your market.",
-    id: "marketing",
+    icon: Users,
+    title: "Creates U.S. jobs",
+    desc: "Helps demonstrate the enterprise is not marginal and contributes to the local economy.",
+    id: "jobs",
   },
   {
     icon: LineChart,
-    title: "Back-office, systems & CRM tooling",
-    desc: "Proprietary technology for pipeline, reporting, and the day-to-day operating cadence.",
-    id: "systems",
+    title: "Auditable management trail",
+    desc: "Owner dashboards and reporting create a clean record of your active oversight, supporting visa renewals.",
+    id: "audit",
   },
+  {
+    icon: ShieldCheck,
+    title: "Hands-off daily operations",
+    desc: "Approved teams run execution; you keep executive control while living anywhere in the United States.",
+    id: "hands-off",
+  },
+  {
+    icon: Cpu,
+    title: "Proprietary technology included",
+    desc: "Built for E-2 investor oversight, not off-the-shelf software.",
+    id: "tech",
+  },
+  {
+    icon: Wallet,
+    title: "In-house buy-back program",
+    desc: "Available after approximately 4 years, giving owners a defined path for the next stage.",
+    id: "buyback",
+  },
+  {
+    icon: Briefcase,
+    title: "Structured to meet E-2 capital requirements",
+    desc: `Franchise investment from ${INVESTMENT_FROM}, backed by in-house E-2 immigration, finance, and legal professionals.`,
+    id: "capital",
+  },
+];
+
+// ─── Section 6 — How it works ─────────────────────────────────────────────────
+const STEPS = [
+  {
+    title: "Invest in your telecom franchise",
+    desc: `Acquire your New Dawn Telecom franchise starting at ${INVESTMENT_FROM}. The structured investment is designed to meet E-2 visa capital requirements and gives you a real, operating business.`,
+    id: "invest",
+  },
+  {
+    title: "Apply for your E-2 visa",
+    desc: "Our partner immigration attorneys guide you through the application. You own and direct a legitimate U.S. telecom enterprise — the foundation of your petition.",
+    id: "apply",
+  },
+  {
+    title: "Local teams launch operations",
+    desc: "Approved operating teams handle sales, onboarding, and customer service while you oversee performance through your owner dashboard.",
+    id: "launch",
+  },
+  {
+    title: "Grow your recurring base",
+    desc: "As your subscriber base and residual income grow, you scale the team, build equity, and maintain executive control.",
+    id: "grow",
+  },
+];
+
+// ─── Section 8 — Is telecom the right vertical for you? ───────────────────────
+// TODO(client): confirm any additional investor-fit criteria you want surfaced. — see brief Placeholder #5.
+const FIT = [
+  "Want a recurring-revenue business with compounding monthly income",
+  "Are comfortable directing a sales-and-service operation",
+  "Value a technology-driven, dashboard-supervised model",
 ];
 
 function SectionEyebrow({ children }: { children: React.ReactNode }) {
@@ -188,7 +283,98 @@ function SectionEyebrow({ children }: { children: React.ReactNode }) {
   );
 }
 
+function E2Callout({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mx-auto mt-8 flex max-w-3xl items-start gap-3 rounded-2xl border border-[hsl(var(--accent))]/30 bg-[hsl(var(--accent))]/5 p-5">
+      <ShieldCheck className="mt-0.5 size-5 shrink-0 text-[hsl(var(--accent))]" />
+      <p className="text-sm leading-relaxed text-muted-foreground">{children}</p>
+    </div>
+  );
+}
+
+function FaqAccordion() {
+  const [open, setOpen] = useState<string | null>(FAQ_ITEMS[0].id);
+  return (
+    <div className="mx-auto mt-10 max-w-3xl space-y-2">
+      {FAQ_ITEMS.map((item) => {
+        const isOpen = open === item.id;
+        return (
+          <div key={item.id} data-testid={`telecom-faq-${item.id}`} className="overflow-hidden rounded-xl border bg-white/60">
+            <button
+              data-testid={`telecom-faq-question-${item.id}`}
+              onClick={() => setOpen(isOpen ? null : item.id)}
+              className="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left text-sm font-semibold text-foreground transition-colors hover:bg-black/[0.02]"
+              aria-expanded={isOpen}
+            >
+              <span>{item.q}</span>
+              <Plus className={`size-4 shrink-0 text-foreground/40 transition-transform ${isOpen ? "rotate-45" : ""}`} />
+            </button>
+            {isOpen && (
+              <div
+                data-testid={`telecom-faq-answer-${item.id}`}
+                className="border-t bg-white/40 px-4 py-3.5 text-sm leading-relaxed text-muted-foreground"
+              >
+                {item.a}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function TelecomPage() {
+  // Apply page-level metadata + FAQPage structured data on mount; restore on unmount.
+  useEffect(() => {
+    const prevTitle = document.title;
+    document.title = SEO.title;
+    setMeta("name", "description", SEO.description);
+    setMeta("property", "og:title", SEO.title);
+    setMeta("property", "og:description", SEO.description);
+    setMeta("property", "og:type", "website");
+    setMeta("property", "og:url", CANONICAL_URL);
+    setMeta("property", "og:image", SEO.ogImage);
+    setMeta("name", "twitter:card", "summary_large_image");
+    setMeta("name", "twitter:title", SEO.title);
+    setMeta("name", "twitter:description", SEO.description);
+    setMeta("name", "twitter:image", SEO.ogImage);
+
+    let canonical = document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]');
+    const createdCanonical = !canonical;
+    if (!canonical) {
+      canonical = document.createElement("link");
+      canonical.setAttribute("rel", "canonical");
+      document.head.appendChild(canonical);
+    }
+    const prevCanonicalHref = canonical.getAttribute("href");
+    canonical.setAttribute("href", CANONICAL_URL);
+
+    const ld = document.createElement("script");
+    ld.type = "application/ld+json";
+    ld.setAttribute("data-telecom-faq", "true");
+    ld.textContent = JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      mainEntity: FAQ_ITEMS.map((f) => ({
+        "@type": "Question",
+        name: f.q,
+        acceptedAnswer: { "@type": "Answer", text: f.a },
+      })),
+    });
+    document.head.appendChild(ld);
+
+    return () => {
+      document.title = prevTitle;
+      ld.remove();
+      if (createdCanonical) {
+        canonical?.remove();
+      } else if (prevCanonicalHref) {
+        canonical?.setAttribute("href", prevCanonicalHref);
+      }
+    };
+  }, []);
+
   return (
     <div data-testid="page-telecom" className="min-h-screen">
       {/* ── HERO ── */}
@@ -197,32 +383,32 @@ export default function TelecomPage() {
           <div className="mx-auto max-w-3xl text-center">
             <div className="mx-auto mb-4 inline-flex items-center gap-2 rounded-full border bg-white/60 px-3 py-1 text-[13px] font-medium text-foreground/80 shadow-sm backdrop-blur">
               <Cpu className="size-3.5 text-[hsl(var(--accent))]" />
-              One of three New Dawn verticals
+              About Us → Telecom · one of three New Dawn verticals
             </div>
             <h1
               data-testid="telecom-hero-title"
               className="text-balance text-4xl font-semibold tracking-tight md:text-5xl"
             >
-              Telecom — Own a Recurring-Revenue Business Communications Company in the U.S.
+              Telecom: Recurring Revenue You Direct, Operations We Run
             </h1>
             <p
               data-testid="telecom-hero-subtitle"
               className="mt-4 text-pretty text-base leading-relaxed text-muted-foreground md:text-lg"
             >
-              Cloud-based voice, messaging, and connectivity services that businesses pay for every month —
-              operated under your direction, built on enterprise-grade infrastructure, and structured to support a
-              strong E-2 Treaty Investor petition.
+              A real, operating U.S. telecom business built around recurring service contracts — structured so you own
+              and direct the enterprise while New Dawn's teams and technology handle daily execution, exactly as the E-2
+              visa requires.
             </p>
             <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-              <Button data-testid="button-telecom-hero-contact" className="gap-2" asChild>
+              <Button data-testid="button-telecom-hero-fdd" className="gap-2" asChild>
                 <Link href="/contact">
-                  Speak with our team
+                  Request the FDD
                   <ArrowRight className="size-4" />
                 </Link>
               </Button>
-              <Button data-testid="button-telecom-hero-e2" variant="secondary" className="gap-2" asChild>
-                <Link href="/e2-fit">
-                  See how the E-2 pathway works
+              <Button data-testid="button-telecom-hero-call" variant="secondary" className="gap-2" asChild>
+                <Link href="/contact">
+                  Schedule an Intro Call
                   <ArrowRight className="size-4" />
                 </Link>
               </Button>
@@ -231,18 +417,20 @@ export default function TelecomPage() {
         </div>
       </section>
 
-      {/* ── SECTION 1 — What this business actually is ── */}
-      <section data-testid="section-telecom-what" className="border-b bg-white/50 py-8 md:py-20">
+      {/* ── SECTION 1 — The business at a glance ── */}
+      <section data-testid="section-telecom-glance" className="border-b bg-white/50 py-8 md:py-20">
         <div className="nh-container">
           <div className="mx-auto max-w-3xl text-center">
-            <SectionEyebrow>What this business is</SectionEyebrow>
-            <h2 data-testid="telecom-what-title" className="mt-3 text-balance text-3xl font-semibold md:text-4xl">
-              Managed cloud communications for U.S. businesses
+            <SectionEyebrow>The business at a glance</SectionEyebrow>
+            <h2 data-testid="telecom-glance-title" className="mt-3 text-balance text-3xl font-semibold md:text-4xl">
+              A recurring-service telecom business
             </h2>
             <p className="mt-3 text-pretty text-base leading-relaxed text-muted-foreground">
-              The New Dawn telecom franchise places you at the center of one of the most durable corners of the modern
-              economy: the communications services that businesses cannot operate without. As the owner-operator, your
-              company delivers managed cloud communications to small and mid-sized businesses across the United States.
+              The New Dawn Telecom franchise signs residential and business customers to ongoing service agreements —
+              delivered through established carrier and provider relationships. The model is built on{" "}
+              <span className="font-medium text-foreground">recurring revenue</span>, not one-time sales: every customer
+              your franchise activates generates income month after month for as long as that customer stays on service,
+              supported by centralized systems, structured sales workflows, and owner-level oversight dashboards.
             </p>
           </div>
 
@@ -260,150 +448,136 @@ export default function TelecomPage() {
 
           <div className="mx-auto mt-8 max-w-3xl rounded-2xl border bg-white/60 p-6 text-center shadow-sm">
             <p className="text-sm leading-relaxed text-muted-foreground">
-              You are not building a phone network from scratch. The business operates on{" "}
-              {/* TODO(client): confirm the exact platform / wholesale / white-label relationship and only
-                  name a third party (e.g. a specific carrier/platform partner) once it is approved in writing.
-                  Until then keep the generic language below. — see brief Section 1. */}
-              enterprise-grade carrier infrastructure provided through New Dawn's vendor relationships — so your
-              company can focus on what creates value locally: acquiring business customers, onboarding and supporting
-              them, and growing a book of recurring accounts.
+              This is the trait that makes telecom well-suited to the E-2 visa: a genuine operating enterprise with
+              documented systems, staffing, supervisory control, and renewal-ready reporting — the characteristics that
+              support a credible E-2 business.
             </p>
           </div>
         </div>
       </section>
 
-      {/* ── SECTION 2 — The contracts / recurring revenue ── */}
+      {/* ── SECTION 2 — The contracts: where the revenue comes from ── */}
       <section data-testid="section-telecom-contracts" className="border-b py-8 md:py-20">
         <div className="nh-container">
           <div className="mx-auto max-w-3xl text-center">
             <SectionEyebrow>Where the revenue comes from</SectionEyebrow>
             <h2 data-testid="telecom-contracts-title" className="mt-3 text-balance text-3xl font-semibold md:text-4xl">
-              A contract-based, recurring-revenue business
+              Two layers of contracts, working together
             </h2>
             <p className="mt-3 text-pretty text-base leading-relaxed text-muted-foreground">
-              That single fact is what makes telecom attractive both as an investment and as the foundation of an E-2
-              petition. Your company holds two complementary types of agreements.
+              The Telecom vertical earns money through provider relationships upstream and customer service agreements
+              downstream.
             </p>
           </div>
 
           <div className="mx-auto mt-10 grid max-w-4xl gap-4 md:grid-cols-2">
-            <Card data-testid="card-telecom-contract-end-customer" className="nh-surface nh-noise border-card-border/80 p-6">
+            <Card data-testid="card-telecom-contract-upstream" className="nh-surface nh-noise border-card-border/80 p-6">
+              <div className="grid size-12 shrink-0 place-items-center rounded-xl border bg-[hsl(var(--primary))]/10">
+                <Handshake className="size-6 text-[hsl(var(--primary))]" />
+              </div>
+              <div className="mt-4 text-lg font-semibold">1. Provider / carrier agreements (upstream)</div>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                {/* TODO(client): confirm the exact upstream structure — authorized dealer vs. master
+                    agency vs. reseller — and whether any carrier is named. — see brief Placeholder #2. */}
+                New Dawn maintains the authorized relationships with the underlying carriers and service providers. Your
+                franchise sells under these established agreements, so you start with credible products and provisioning
+                on day one rather than building carrier relationships from scratch.
+              </p>
+            </Card>
+
+            <Card data-testid="card-telecom-contract-downstream" className="nh-surface nh-noise border-card-border/80 p-6">
               <div className="grid size-12 shrink-0 place-items-center rounded-xl border bg-[hsl(var(--primary))]/10">
                 <Repeat className="size-6 text-[hsl(var(--primary))]" />
               </div>
-              <div className="mt-4 text-lg font-semibold">1. End-customer service contracts</div>
+              <div className="mt-4 text-lg font-semibold">2. Customer service agreements (downstream)</div>
               <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                Businesses subscribe to your communications services on monthly or multi-year terms. Each account is a
-                recurring revenue stream:
+                Each customer your franchise signs enters a recurring service contract. The franchise earns:
               </p>
               <ul className="mt-3 space-y-2 text-sm leading-relaxed text-muted-foreground">
                 <li className="flex gap-2">
                   <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[hsl(var(--accent))]" />
-                  <span><span className="font-medium text-foreground">Subscription component</span> — predictable monthly recurring revenue (MRR), usually priced per user / seat.</span>
+                  <span><span className="font-medium text-foreground">Activation / upfront compensation</span> when a new customer is signed and provisioned.</span>
                 </li>
                 <li className="flex gap-2">
                   <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[hsl(var(--accent))]" />
-                  <span><span className="font-medium text-foreground">Usage component</span> — additional revenue from call volume, overage, and add-on services layered on top of the base subscription.</span>
+                  <span><span className="font-medium text-foreground">Recurring residual income</span> for every month the customer remains active — the core of the model.</span>
+                </li>
+                {/* TODO(client): confirm whether accessory / equipment / add-on margin applies, and
+                    add it here only if defensible. — see brief Placeholder #3. */}
+                <li className="flex gap-2">
+                  <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[hsl(var(--accent))]" />
+                  <span><span className="font-medium text-foreground">Add-on margin</span> where applicable, from accessories, equipment, and value-added services.</span>
                 </li>
               </ul>
             </Card>
-
-            <Card data-testid="card-telecom-contract-channel" className="nh-surface nh-noise border-card-border/80 p-6">
-              <div className="grid size-12 shrink-0 place-items-center rounded-xl border bg-[hsl(var(--primary))]/10">
-                <Handshake className="size-6 text-[hsl(var(--primary))]" />
-              </div>
-              <div className="mt-4 text-lg font-semibold">2. Channel & reseller relationships</div>
-              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                A portion of the business can be grown through Managed Service Providers (MSPs) and resellers who carry
-                the end-customer relationship while your company supplies the underlying service — an efficient way to
-                scale without proportionally scaling your own sales headcount.
-              </p>
-            </Card>
           </div>
 
-          {/* TODO(client, only if verified): representative pricing ranges, target ARPU, or typical
-              contract length may be inserted here. If published, the numbers must be defensible.
-              Until verified, the section stays qualitative — see brief Section 2. */}
+          <div className="mx-auto mt-8 max-w-3xl rounded-2xl border bg-white/60 p-6 text-center shadow-sm">
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              Because residual income compounds as the customer base grows and renews, the business builds a base of
+              predictable monthly cash flow over time rather than restarting from zero each month.
+            </p>
+          </div>
 
-          <div className="mx-auto mt-10 max-w-3xl text-center">
-            <h3 className="text-lg font-semibold">Why this structure matters to an investor</h3>
-          </div>
-          <div className="mx-auto mt-6 grid max-w-5xl gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {REVENUE_REASONS.map((r) => (
-              <Card key={r.id} data-testid={`card-telecom-revenue-${r.id}`} className="nh-surface nh-noise border-card-border/80 p-6">
-                <div className="grid size-10 shrink-0 place-items-center rounded-xl border bg-white/70 shadow-sm backdrop-blur">
-                  <r.icon className="size-5 text-[hsl(var(--accent))]" />
-                </div>
-                <div className="mt-4 text-base font-semibold">{r.title}</div>
-                <div className="mt-2 text-sm leading-relaxed text-muted-foreground">{r.desc}</div>
-              </Card>
-            ))}
-          </div>
+          <E2Callout>
+            <span className="font-medium text-foreground">Why this matters for E-2:</span> Recurring contractual revenue
+            demonstrates that the enterprise is real, active, and capable of generating more than a marginal living — and
+            it produces a clean, auditable record of ongoing business activity that supports visa renewals.
+          </E2Callout>
         </div>
       </section>
 
-      {/* ── SECTION 3 — Strong fit for E-2 ── */}
-      <section data-testid="section-telecom-e2-fit" className="border-b bg-white/50 py-8 md:py-20">
+      {/* ── SECTION 3 — We run it, you direct it ── */}
+      <section data-testid="section-telecom-direct" className="border-b bg-white/50 py-8 md:py-20">
         <div className="nh-container">
           <div className="mx-auto max-w-3xl text-center">
-            <SectionEyebrow>A strong fit for E-2 Treaty Investors</SectionEyebrow>
-            <h2 data-testid="telecom-e2-title" className="mt-3 text-balance text-3xl font-semibold md:text-4xl">
-              Built around what the E-2 visa actually requires
+            <SectionEyebrow>Own and direct</SectionEyebrow>
+            <h2 data-testid="telecom-direct-title" className="mt-3 text-balance text-3xl font-semibold md:text-4xl">
+              We run it, you direct it
             </h2>
             <p className="mt-3 text-pretty text-base leading-relaxed text-muted-foreground">
-              The E-2 Treaty Investor visa requires more than money. It requires a business that is real and operating,
-              an investment that is substantial and at risk, an investor who will develop and direct the enterprise, and
-              a business that is not marginal — one with the capacity to generate more than a minimal living, typically
-              by creating jobs and economic impact. The telecom vertical maps to each of these.
+              You are the owner and director of the business. New Dawn provides the operating infrastructure so you
+              maintain executive control without being buried in daily minutiae.
             </p>
           </div>
 
           <div className="mx-auto mt-10 grid max-w-5xl gap-4 sm:grid-cols-2">
-            {E2_FIT.map((f) => (
-              <Card key={f.id} data-testid={`card-telecom-e2-${f.id}`} className="nh-surface nh-noise border-card-border/80 p-6">
+            {RUN_IT.map((r) => (
+              <Card key={r.id} data-testid={`card-telecom-runit-${r.id}`} className="nh-surface nh-noise border-card-border/80 p-6">
                 <div className="flex items-start gap-4">
                   <div className="grid size-11 shrink-0 place-items-center rounded-xl border bg-white/70 shadow-sm backdrop-blur">
-                    <f.icon className="size-5 text-[hsl(var(--primary))]" />
+                    <r.icon className="size-5 text-[hsl(var(--primary))]" />
                   </div>
                   <div className="min-w-0">
-                    <div className="text-base font-semibold">{f.title}</div>
-                    <div className="mt-2 text-sm leading-relaxed text-muted-foreground">{f.desc}</div>
+                    <div className="text-base font-semibold">{r.title}</div>
+                    <div className="mt-2 text-sm leading-relaxed text-muted-foreground">{r.desc}</div>
                   </div>
                 </div>
               </Card>
             ))}
           </div>
 
-          {/* TODO(client): confirm the exact division of control between the franchisee and New Dawn so the
-              petition clearly shows the investor "directs and develops" (USCIS scrutinizes franchisor control),
-              and reference the package investment figure consistent with your FDD where appropriate. */}
-
-          {/* Compliance callout — approval is never guaranteed (DOS / USCIS decide). */}
-          <div
-            data-testid="telecom-e2-compliance-note"
-            className="mx-auto mt-8 flex max-w-3xl items-start gap-3 rounded-2xl border border-[hsl(var(--accent))]/30 bg-[hsl(var(--accent))]/5 p-5"
-          >
-            <ShieldCheck className="mt-0.5 size-5 shrink-0 text-[hsl(var(--accent))]" />
+          <div className="mx-auto mt-8 max-w-3xl rounded-2xl border bg-white/60 p-6 text-center shadow-sm">
             <p className="text-sm leading-relaxed text-muted-foreground">
-              Purchasing a franchise does not guarantee E-2 approval. Eligibility and approval are determined solely by
-              U.S. consular officers and USCIS based on each individual petition. The telecom vertical is structured to
-              support — never to guarantee — a strong E-2 case.
+              You set direction, review performance, approve key decisions, and maintain ownership and bank-account
+              control. The teams execute. This is the &ldquo;own and direct&rdquo; structure the E-2 visa is built
+              around.
             </p>
           </div>
         </div>
       </section>
 
-      {/* ── SECTION 4 — How the business creates U.S. jobs ── */}
+      {/* ── SECTION 4 — How it creates jobs ── */}
       <section data-testid="section-telecom-jobs" className="border-b py-8 md:py-20">
         <div className="nh-container">
           <div className="mx-auto max-w-3xl text-center">
             <SectionEyebrow>U.S. job creation</SectionEyebrow>
             <h2 data-testid="telecom-jobs-title" className="mt-3 text-balance text-3xl font-semibold md:text-4xl">
-              How the business creates American jobs
+              How it creates jobs
             </h2>
             <p className="mt-3 text-pretty text-base leading-relaxed text-muted-foreground">
-              E-2 petitions succeed in large part on the strength of their job-creation and economic-impact story. A
-              managed communications business creates real, ongoing American roles as it grows its customer base.
+              A New Dawn Telecom franchise is staffed to operate as a real business, which means it employs people in the
+              United States. As the subscriber base grows, the team grows with it.
             </p>
           </div>
 
@@ -419,70 +593,217 @@ export default function TelecomPage() {
             ))}
           </div>
 
-          <div className="mx-auto mt-8 max-w-3xl rounded-2xl border bg-white/60 p-6 text-center shadow-sm">
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              Because the business is recurring and scalable, headcount grows with the customer base — giving your
-              petition a defensible, multi-year hiring trajectory rather than a one-time spike.
-            </p>
-            {/* TODO(client): insert your projected hiring plan / headcount-by-year figures from your business plan
-                and financial model. They must be realistic and supportable — do NOT publish invented job numbers,
-                as USCIS and the consular officer will compare them to your actual plan. — see brief Section 4. */}
-          </div>
+          {/* TODO(client): if you have a defensible, FDD-backed headcount target (e.g. "a team of
+              X–Y employees within the first 24 months"), insert it here. Do NOT publish invented
+              job numbers — USCIS and the consular officer compare them to your actual plan. — see brief Placeholder #4. */}
+
+          <E2Callout>
+            <span className="font-medium text-foreground">Why this matters for E-2:</span> One of the central E-2
+            requirements is that the business not be &ldquo;marginal&rdquo; — it must do more than provide a minimal
+            living for the investor's family. A telecom operation that employs U.S. workers and generates recurring
+            revenue directly addresses this, contributing to the local economy and demonstrating the enterprise's real
+            economic impact.
+          </E2Callout>
         </div>
       </section>
 
-      {/* ── SECTION 5 — How New Dawn supports you ── */}
-      <section data-testid="section-telecom-support" className="border-b bg-white/50 py-8 md:py-20">
+      {/* ── SECTION 5 — Why telecom works for E-2 investors ── */}
+      <section data-testid="section-telecom-why" className="border-b bg-white/50 py-8 md:py-20">
         <div className="nh-container">
           <div className="mx-auto max-w-3xl text-center">
-            <SectionEyebrow>How New Dawn supports you</SectionEyebrow>
-            <h2 data-testid="telecom-support-title" className="mt-3 text-balance text-3xl font-semibold md:text-4xl">
-              You are not doing this alone
+            <SectionEyebrow>A strong fit for E-2 Treaty Investors</SectionEyebrow>
+            <h2 data-testid="telecom-why-title" className="mt-3 text-balance text-3xl font-semibold md:text-4xl">
+              Why telecom works for E-2 investors
             </h2>
-            <p className="mt-3 text-pretty text-base leading-relaxed text-muted-foreground">
-              New Dawn provides the franchise framework that lets an investor — including one new to the U.S. market and
-              to telecom — operate with confidence.
-            </p>
           </div>
 
-          <div className="mx-auto mt-10 grid max-w-5xl gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {SUPPORT.map((s) => (
-              <Card key={s.id} data-testid={`card-telecom-support-${s.id}`} className="nh-surface nh-noise border-card-border/80 p-6">
-                <div className="grid size-10 shrink-0 place-items-center rounded-xl border bg-white/70 shadow-sm backdrop-blur">
-                  <s.icon className="size-5 text-[hsl(var(--primary))]" />
+          <div className="mx-auto mt-10 grid max-w-5xl gap-4 sm:grid-cols-2">
+            {WHY_E2.map((f) => (
+              <Card key={f.id} data-testid={`card-telecom-why-${f.id}`} className="nh-surface nh-noise border-card-border/80 p-6">
+                <div className="flex items-start gap-4">
+                  <div className="grid size-11 shrink-0 place-items-center rounded-xl border bg-white/70 shadow-sm backdrop-blur">
+                    <f.icon className="size-5 text-[hsl(var(--primary))]" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-base font-semibold">{f.title}</div>
+                    <div className="mt-2 text-sm leading-relaxed text-muted-foreground">{f.desc}</div>
+                  </div>
                 </div>
-                <div className="mt-4 text-base font-semibold">{s.title}</div>
-                <div className="mt-2 text-sm leading-relaxed text-muted-foreground">{s.desc}</div>
+              </Card>
+            ))}
+          </div>
+
+          <p className="mx-auto mt-6 max-w-3xl text-center text-sm leading-relaxed text-muted-foreground">
+            Backed by in-house E-2 immigration, finance, and legal professionals, and part of the{" "}
+            <span translate="no">New Dawn Franchising Group of Companies&trade;</span>.
+          </p>
+        </div>
+      </section>
+
+      {/* ── SECTION 6 — How it works ── */}
+      <section data-testid="section-telecom-how" className="border-b py-8 md:py-20">
+        <div className="nh-container">
+          <div className="mx-auto max-w-3xl text-center">
+            <SectionEyebrow>The pathway</SectionEyebrow>
+            <h2 data-testid="telecom-how-title" className="mt-3 text-balance text-3xl font-semibold md:text-4xl">
+              How it works
+            </h2>
+          </div>
+
+          <div className="mx-auto mt-10 grid max-w-5xl gap-4 sm:grid-cols-2">
+            {STEPS.map((step, i) => (
+              <Card key={step.id} data-testid={`card-telecom-step-${step.id}`} className="nh-surface nh-noise border-card-border/80 p-6">
+                <div className="flex items-start gap-4">
+                  <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-[hsl(var(--primary))] text-base font-semibold text-white">
+                    {i + 1}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-base font-semibold">{step.title}</div>
+                    <div className="mt-2 text-sm leading-relaxed text-muted-foreground">{step.desc}</div>
+                  </div>
+                </div>
               </Card>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── SECTION 6 — Closing CTA ── */}
+      {/* ── SECTION 7 — Investment & buy-back ── */}
+      <section data-testid="section-telecom-investment" className="border-b bg-white/50 py-8 md:py-20">
+        <div className="nh-container">
+          <div className="mx-auto max-w-3xl text-center">
+            <SectionEyebrow>Investment &amp; buy-back</SectionEyebrow>
+            <h2 data-testid="telecom-investment-title" className="mt-3 text-balance text-3xl font-semibold md:text-4xl">
+              Structured to meet the E-2 investment requirement
+            </h2>
+          </div>
+
+          <div className="mx-auto mt-10 grid max-w-4xl gap-4 md:grid-cols-3">
+            <Card data-testid="card-telecom-invest-from" className="nh-surface nh-noise border-card-border/80 p-6">
+              <Wallet className="size-6 text-[hsl(var(--accent))]" />
+              <div className="mt-4 text-2xl font-semibold">{INVESTMENT_FROM}</div>
+              <div className="mt-1 text-sm font-medium text-foreground">Franchise investment from</div>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                Covers your franchise license, training, technology platform access, and operational setup. Financing
+                options are available through affiliated lending partners.
+              </p>
+            </Card>
+            <Card data-testid="card-telecom-invest-buyback" className="nh-surface nh-noise border-card-border/80 p-6">
+              <Repeat className="size-6 text-[hsl(var(--accent))]" />
+              <div className="mt-4 text-2xl font-semibold">~4 years</div>
+              <div className="mt-1 text-sm font-medium text-foreground">In-house buy-back program</div>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                An in-house buy-back program is available after approximately four years, giving owners a defined path
+                for the next stage.
+              </p>
+            </Card>
+            <Card data-testid="card-telecom-invest-fdd" className="nh-surface nh-noise border-card-border/80 p-6">
+              <FileText className="size-6 text-[hsl(var(--accent))]" />
+              <div className="mt-4 text-2xl font-semibold">FDD</div>
+              <div className="mt-1 text-sm font-medium text-foreground">Full details on request</div>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                The E-2 visa requires a substantial, at-risk investment in a U.S. business. Full details are provided in
+                the Franchise Disclosure Document.
+              </p>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* ── SECTION 8 — Is telecom the right vertical for you? ── */}
+      <section data-testid="section-telecom-fit" className="border-b py-8 md:py-20">
+        <div className="nh-container">
+          <div className="mx-auto max-w-3xl text-center">
+            <SectionEyebrow>Is it the right fit?</SectionEyebrow>
+            <h2 data-testid="telecom-fit-title" className="mt-3 text-balance text-3xl font-semibold md:text-4xl">
+              Is telecom the right vertical for you?
+            </h2>
+            <p className="mt-3 text-pretty text-base leading-relaxed text-muted-foreground">
+              Telecom tends to be the strongest fit for investors who:
+            </p>
+          </div>
+
+          <div className="mx-auto mt-8 max-w-2xl space-y-3">
+            {FIT.map((item) => (
+              <div key={item} className="flex items-start gap-3 rounded-xl border bg-white/60 p-4">
+                <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-[hsl(var(--accent))]" />
+                <span className="text-sm leading-relaxed text-foreground/90">{item}</span>
+              </div>
+            ))}
+          </div>
+
+          <p className="mx-auto mt-8 max-w-3xl text-center text-sm leading-relaxed text-muted-foreground">
+            During discovery, we compare Telecom against Property Management and Insurance based on your goals, market
+            fit, investment preferences, and E-2 strategy, and walk you through the strongest fit.
+          </p>
+        </div>
+      </section>
+
+      {/* ── SECTION 9 — FAQ ── */}
+      <section data-testid="section-telecom-faq" className="border-b bg-white/50 py-8 md:py-20">
+        <div className="nh-container">
+          <div className="mx-auto max-w-3xl text-center">
+            <SectionEyebrow>FAQ</SectionEyebrow>
+            <h2 data-testid="telecom-faq-title" className="mt-3 text-balance text-3xl font-semibold md:text-4xl">
+              Frequently asked questions
+            </h2>
+          </div>
+          <FaqAccordion />
+        </div>
+      </section>
+
+      {/* ── SECTION 10 — CTA / contact ── */}
       <section data-testid="section-telecom-cta" className="py-8 md:py-20">
         <div className="nh-container">
-          <div className="mx-auto max-w-2xl rounded-3xl border bg-white/60 p-8 text-center shadow-sm">
+          <div className="mx-auto max-w-3xl rounded-3xl border bg-white/60 p-8 text-center shadow-sm">
             <Building2 className="mx-auto size-10 text-[hsl(var(--accent))]" />
             <h2 data-testid="telecom-cta-title" className="mt-4 text-2xl font-semibold md:text-3xl">
-              Build a real U.S. business — and a real U.S. immigration foundation
+              Direct a recurring-revenue telecom business in the U.S.
             </h2>
             <p className="mt-3 text-sm leading-relaxed text-muted-foreground md:text-base">
-              The telecom vertical combines a durable, recurring-revenue business model with the job-creating,
-              owner-directed profile that supports a strong E-2 Treaty Investor petition. Talk with our team about
-              whether it's the right fit for you.
+              Request the FDD and schedule an intro call to see whether the Telecom vertical fits your E-2 goals.
             </p>
+
+            <div className="mx-auto mt-6 grid max-w-xl gap-3 text-left sm:grid-cols-3">
+              <a
+                data-testid="link-telecom-cta-address"
+                href="https://www.google.com/maps/search/?api=1&query=2601+N+Zaragoza+Rd+El+Paso+TX+79938"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-start gap-2 rounded-xl border bg-white/70 p-3 text-xs text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <MapPin className="mt-0.5 size-4 shrink-0 text-[hsl(var(--accent))]" />
+                <span>{COMPANY.addressFull}</span>
+              </a>
+              <a
+                data-testid="link-telecom-cta-phone"
+                href={`tel:${COMPANY.phoneTel}`}
+                className="flex items-start gap-2 rounded-xl border bg-white/70 p-3 text-xs text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <Phone className="mt-0.5 size-4 shrink-0 text-[hsl(var(--accent))]" />
+                <span>{COMPANY.phone}</span>
+              </a>
+              <a
+                data-testid="link-telecom-cta-email"
+                href={`mailto:${COMPANY.email}`}
+                className="flex items-start gap-2 rounded-xl border bg-white/70 p-3 text-xs text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <Mail className="mt-0.5 size-4 shrink-0 text-[hsl(var(--accent))]" />
+                <span className="break-all">{COMPANY.email}</span>
+              </a>
+            </div>
+
             <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-              <Button data-testid="button-telecom-cta-contact" className="gap-2" asChild>
+              <Button data-testid="button-telecom-cta-fdd" className="gap-2" asChild>
                 <Link href="/contact">
-                  Schedule a consultation
+                  Request the FDD
                   <ArrowRight className="size-4" />
                 </Link>
               </Button>
               <Button data-testid="button-telecom-cta-call" variant="secondary" className="gap-2" asChild>
                 <a href={`tel:${COMPANY.phoneTel}`}>
                   <Phone className="size-4" />
-                  Call {COMPANY.phone}
+                  Schedule an Intro Call
                 </a>
               </Button>
             </div>
@@ -498,13 +819,14 @@ export default function TelecomPage() {
               Important disclaimer
             </div>
             <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground/65">
-              This page is for informational purposes only and is not legal or immigration advice. New Dawn Franchising
-              is not a law firm and does not provide legal or immigration services. Eligibility for and approval of an
-              E-2 Treaty Investor visa is determined solely by the U.S. Department of State and/or U.S. Citizenship and
-              Immigration Services based on each applicant's individual circumstances; no outcome is guaranteed.
-              Prospective franchisees should consult independent qualified immigration counsel. This is not a franchise
-              offering. A franchise offering is made only by Franchise Disclosure Document. Financial and operational
-              results vary; nothing herein is a guarantee of revenue, profit, employment levels, or business success.
+              This page is for informational purposes only and is not an offer to sell or the solicitation of an offer
+              to buy a franchise. Franchises are offered solely through a Franchise Disclosure Document in compliance
+              with the FTC Franchise Rule and applicable state law, and only in states where New Dawn Franchising is
+              registered, exempt, or otherwise authorized. New Dawn Franchising does not provide legal or immigration
+              advice and does not guarantee any E-2 visa approval or any financial result. Eligibility for and approval
+              of an E-2 Treaty Investor visa is determined solely by the U.S. Department of State and/or U.S. Citizenship
+              and Immigration Services based on each applicant's individual circumstances. Prospective investors should
+              consult independent legal, immigration, and financial advisors.
             </p>
           </div>
         </div>

@@ -21,6 +21,7 @@ import { scoreProspect, type ProspectIntel } from "./lead-intelligence";
 import { searchCrmContacts } from "./semantic-search";
 import { logSearchEvent } from "./search-telemetry";
 import { draftProspectOutreach } from "./outreach-drafter";
+import { flagExistingContacts } from "./contact-upsert";
 import type { EnrichedContact } from "./prospect-enrichment";
 
 export interface AgentPerson {
@@ -349,13 +350,30 @@ export async function runLeadResearchAgent(
       convo.push({ role: "user", content: toolResults });
     }
 
-    return {
-      reply: reply || "Done.",
-      people: Array.from(foundByKey.values())
-        .sort((a, b) => b.intel.composite - a.intel.composite)
-        .slice(0, 60),
-      provider,
-    };
+    const people = Array.from(foundByKey.values())
+      .sort((a, b) => b.intel.composite - a.intel.composite)
+      .slice(0, 60);
+
+    // Flag people we ALREADY have so the UI can badge them "In CRM" and disable
+    // their Add button — instead of the user discovering it only when "Add"
+    // reports "already exists". search_crm results are inherently in the CRM;
+    // search_people results are checked against the contacts table here.
+    const toCheck = people.filter((p) => !p.inCrm);
+    if (toCheck.length) {
+      try {
+        const exists = await flagExistingContacts(
+          toCheck.map((p) => ({
+            fullName: p.fullName, firstName: p.firstName, lastName: p.lastName,
+            companyName: p.companyName, email: p.email, linkedinUrl: p.linkedinUrl,
+          })),
+        );
+        toCheck.forEach((p, i) => { if (exists[i]) p.inCrm = true; });
+      } catch (e: any) {
+        console.warn("[LeadResearchAgent] inCrm flagging failed:", e?.message || e);
+      }
+    }
+
+    return { reply: reply || "Done.", people, provider };
   } catch (err: any) {
     console.error("[LeadResearchAgent] error:", err?.message || err);
     return { reply: "Sorry — I hit a problem reaching the AI service. Please try again.", people: [], provider, error: err?.message };

@@ -1,8 +1,18 @@
 import { useState, useRef, useEffect } from "react";
-import { Sparkles, Send, Loader2, UserPlus, Check, Linkedin, Mail, Phone, Megaphone } from "lucide-react";
+import { Sparkles, Send, Loader2, UserPlus, Check, Linkedin, Mail, Phone, Megaphone, PenLine, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+
+interface ProspectIntel {
+  fitScore: number;
+  intentScore: number;
+  composite: number;
+  tier: "hot" | "warm" | "cool" | "low";
+  audience: "investor" | "partner" | "unknown";
+  reasons: string[];
+  explanation: string;
+}
 
 interface AgentPerson {
   fullName: string;
@@ -14,7 +24,17 @@ interface AgentPerson {
   phone: string | null;
   linkedinUrl: string | null;
   location: string | null;
+  intel?: ProspectIntel;
+  inCrm?: boolean;
 }
+
+const TIER_STYLE: Record<string, string> = {
+  hot: "border-red-200 bg-red-50 text-red-700",
+  warm: "border-amber-200 bg-amber-50 text-amber-700",
+  cool: "border-sky-200 bg-sky-50 text-sky-700",
+  low: "border-gray-200 bg-gray-50 text-gray-500",
+};
+const TIER_LABEL: Record<string, string> = { hot: "🔥 Hot", warm: "Warm", cool: "Cool", low: "Low fit" };
 
 interface ChatMsg {
   role: "user" | "assistant";
@@ -41,6 +61,8 @@ export default function LeadResearchAgent({ provider }: { provider?: string }) {
   const [enrollOpenFor, setEnrollOpenFor] = useState<string | null>(null);
   const [enrolling, setEnrolling] = useState<string | null>(null);
   const [enrolled, setEnrolled] = useState<Map<string, string>>(new Map());
+  const [drafting, setDrafting] = useState<string | null>(null);
+  const [drafts, setDrafts] = useState<Map<string, { channel: string; subject: string | null; body: string }>>(new Map());
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -122,6 +144,24 @@ export default function LeadResearchAgent({ provider }: { provider?: string }) {
     }
   }
 
+  async function draftOutreach(p: AgentPerson, channel: "email" | "linkedin") {
+    const key = (p.email || p.fullName).toLowerCase();
+    setDrafting(key);
+    try {
+      const res = await apiRequest("POST", "/api/crm/lead-research/draft-outreach", {
+        fullName: p.fullName, firstName: p.firstName, jobTitle: p.jobTitle,
+        companyName: p.companyName, country: p.location, channel,
+        audience: p.intel?.audience, reasons: p.intel?.reasons, explanation: p.intel?.explanation,
+      });
+      const d = await res.json() as { channel: string; subject: string | null; body: string };
+      setDrafts((m) => new Map(m).set(key, d));
+    } catch {
+      toast({ title: "Couldn't draft outreach", description: p.fullName, variant: "destructive" });
+    } finally {
+      setDrafting(null);
+    }
+  }
+
   async function enroll(p: AgentPerson, campaignId: string, campaignName: string) {
     const key = (p.email || p.fullName).toLowerCase();
     setEnrolling(key);
@@ -170,10 +210,23 @@ export default function LeadResearchAgent({ provider }: { provider?: string }) {
                       <div key={j} className="rounded-lg border bg-card px-2 py-1.5">
                         <div className="flex items-center gap-2">
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-xs font-semibold text-foreground">{p.fullName}</p>
+                            <div className="flex items-center gap-1.5">
+                              <p className="truncate text-xs font-semibold text-foreground">{p.fullName}</p>
+                              {p.intel && (
+                                <span className={`shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] font-semibold ${TIER_STYLE[p.intel.tier]}`} title={`Fit ${p.intel.fitScore} · Intent ${p.intel.intentScore}`}>
+                                  {TIER_LABEL[p.intel.tier]} {p.intel.composite}
+                                </span>
+                              )}
+                              {p.inCrm && <span className="shrink-0 rounded-full border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[9px] font-medium text-violet-700">In CRM</span>}
+                            </div>
                             <p className="truncate text-[11px] text-muted-foreground">
                               {[p.jobTitle, p.companyName].filter(Boolean).join(" · ") || p.location || "—"}
                             </p>
+                            {p.intel && p.intel.reasons.length > 0 && (
+                              <p className="mt-0.5 truncate text-[10px] text-muted-foreground/90" title={p.intel.reasons.join(" · ")}>
+                                Why: {p.intel.reasons.slice(0, 3).join(" · ")}
+                              </p>
+                            )}
                             <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
                               {p.email && <span className="inline-flex items-center gap-0.5"><Mail className="size-2.5" />{p.email}</span>}
                               {p.phone && <span className="inline-flex items-center gap-0.5"><Phone className="size-2.5" />{p.phone}</span>}
@@ -191,8 +244,32 @@ export default function LeadResearchAgent({ provider }: { provider?: string }) {
                                 {enrolling === key ? <Loader2 className="size-3 animate-spin" /> : <Megaphone className="size-3" />} Enroll
                               </Button>
                             )}
+                            <Button size="sm" variant="outline" className="h-7 gap-1 px-2 text-[11px]" disabled={drafting === key} onClick={() => draftOutreach(p, "email")} title="Draft a personalized email">
+                              {drafting === key ? <Loader2 className="size-3 animate-spin" /> : <PenLine className="size-3" />} Draft
+                            </Button>
                           </div>
                         </div>
+                        {drafts.has(key) && (() => {
+                          const d = drafts.get(key)!;
+                          const full = (d.subject ? `Subject: ${d.subject}\n\n` : "") + d.body;
+                          return (
+                            <div className="mt-1.5 rounded-md border bg-muted/40 p-2">
+                              <div className="mb-1 flex items-center justify-between">
+                                <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{d.channel === "linkedin" ? "LinkedIn message" : "Email draft"}</span>
+                                <div className="flex items-center gap-1">
+                                  <button onClick={() => draftOutreach(p, d.channel === "linkedin" ? "email" : "linkedin")} className="rounded px-1.5 py-0.5 text-[10px] text-muted-foreground hover:text-foreground" title="Switch channel">
+                                    {d.channel === "linkedin" ? "→ Email" : "→ LinkedIn"}
+                                  </button>
+                                  <button onClick={() => { navigator.clipboard?.writeText(full); toast({ title: "Copied draft" }); }} className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] text-muted-foreground hover:text-foreground" title="Copy">
+                                    <Copy className="size-2.5" /> Copy
+                                  </button>
+                                </div>
+                              </div>
+                              {d.subject && <p className="mb-1 text-[11px] font-medium text-foreground">{d.subject}</p>}
+                              <p className="whitespace-pre-wrap text-[11px] leading-relaxed text-foreground/90">{d.body}</p>
+                            </div>
+                          );
+                        })()}
                         {pickerOpen && !enrolledIn && (
                           <div className="mt-1.5 flex flex-wrap gap-1 border-t pt-1.5">
                             {campaigns.length === 0 ? (

@@ -131,6 +131,93 @@ const STATEMENTS: string[] = [
   // automated engine can run the broker OR the client variant for the same lead
   // pool. Defaults to 'broker' to preserve existing behavior.
   `ALTER TABLE outreach_leads ADD COLUMN IF NOT EXISTS sequence_track text NOT NULL DEFAULT 'broker'`,
+  // ─── AI search telemetry ─────────────────────────────────────────────────
+  // search_events records every AI/lead search so we can measure quality and
+  // tune scoring/prompts. Written fire-and-forget from the search routes.
+  `CREATE TABLE IF NOT EXISTS search_events (
+    id            varchar    PRIMARY KEY DEFAULT gen_random_uuid(),
+    surface       text       NOT NULL,
+    provider      text,
+    query         text,
+    filters       jsonb,
+    result_count  integer,
+    cached        boolean,
+    duration_ms   integer,
+    user_email    text,
+    error         text,
+    created_at    timestamp  NOT NULL DEFAULT now()
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_search_events_created ON search_events (created_at)`,
+  // ─── Semantic CRM search (pgvector) ──────────────────────────────────────
+  // Optional: enables "find contacts like this" semantic search over our own
+  // CRM. If the DB role can't CREATE EXTENSION, these statements are skipped
+  // (logged, non-fatal) and semantic-search.ts falls back to keyword ILIKE.
+  `CREATE EXTENSION IF NOT EXISTS vector`,
+  `ALTER TABLE contacts ADD COLUMN IF NOT EXISTS embedding vector(1536)`,
+  // ─── Buying-intent signals (Phase 2) ─────────────────────────────────────
+  // lead_signals stores detected intent events (news/relocation/visa-research/
+  // business-for-sale…) per contact, folded into ICP scoring. Written by the
+  // daily signal-ingestion cron and surfaced as "why now" on contact intel.
+  `CREATE TABLE IF NOT EXISTS lead_signals (
+    id           varchar    PRIMARY KEY DEFAULT gen_random_uuid(),
+    contact_id   varchar,
+    client_id    varchar,
+    signal_type  text       NOT NULL,
+    source       text       NOT NULL,
+    title        text       NOT NULL,
+    url          text,
+    snippet      text,
+    weight       integer    NOT NULL DEFAULT 0,
+    detected_at  timestamp  NOT NULL DEFAULT now(),
+    created_at   timestamp  NOT NULL DEFAULT now()
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_lead_signals_contact ON lead_signals (contact_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_lead_signals_detected ON lead_signals (detected_at)`,
+  // ─── Persisted ICP fit + intent scores (Phase 3) ─────────────────────────
+  // Computed by lead-intelligence + signals and refreshed nightly so the CRM
+  // can rank/segment stored contacts by ideal-customer fit, not just at search.
+  `ALTER TABLE contacts ADD COLUMN IF NOT EXISTS icp_score integer`,
+  `ALTER TABLE contacts ADD COLUMN IF NOT EXISTS icp_fit_score integer`,
+  `ALTER TABLE contacts ADD COLUMN IF NOT EXISTS icp_intent_score integer`,
+  `ALTER TABLE contacts ADD COLUMN IF NOT EXISTS icp_tier text`,
+  `ALTER TABLE contacts ADD COLUMN IF NOT EXISTS icp_audience text`,
+  `ALTER TABLE contacts ADD COLUMN IF NOT EXISTS icp_reasons text[]`,
+  `ALTER TABLE contacts ADD COLUMN IF NOT EXISTS icp_explanation text`,
+  `ALTER TABLE contacts ADD COLUMN IF NOT EXISTS icp_scored_at timestamp`,
+  // ─── Saved-search monitoring + digests (Phase 5) ─────────────────────────
+  // saved_searches persists a reusable ICP watchlist; the daily job re-runs each
+  // and records matches in saved_search_matches, surfacing only NEW ones.
+  `CREATE TABLE IF NOT EXISTS saved_searches (
+    id                 varchar    PRIMARY KEY DEFAULT gen_random_uuid(),
+    name               text       NOT NULL,
+    provider           text       NOT NULL DEFAULT 'seamless',
+    mode               text       NOT NULL DEFAULT 'contacts',
+    query              text,
+    filters            jsonb      NOT NULL DEFAULT '{}'::jsonb,
+    active             boolean    NOT NULL DEFAULT true,
+    created_by         text,
+    last_run_at        timestamp,
+    last_result_count  integer,
+    last_new_count     integer,
+    created_at         timestamp  NOT NULL DEFAULT now()
+  )`,
+  `CREATE TABLE IF NOT EXISTS saved_search_matches (
+    id               varchar    PRIMARY KEY DEFAULT gen_random_uuid(),
+    saved_search_id  varchar    NOT NULL,
+    contact_key      text       NOT NULL,
+    full_name        text       NOT NULL,
+    job_title        text,
+    company          text,
+    email            text,
+    country          text,
+    icp_score        integer    NOT NULL DEFAULT 0,
+    icp_tier         text,
+    reasons          text[],
+    first_seen_at    timestamp  NOT NULL DEFAULT now()
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_ss_matches_search ON saved_search_matches (saved_search_id)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_ss_matches_unique ON saved_search_matches (saved_search_id, contact_key)`,
+  `CREATE INDEX IF NOT EXISTS idx_ss_matches_seen ON saved_search_matches (first_seen_at)`,
 ];
 
 export async function ensureSchema(): Promise<void> {

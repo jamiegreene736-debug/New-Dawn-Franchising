@@ -54,6 +54,15 @@ export interface EnrichedContact {
   website?: string | null;       // company website (derived from domain)
   timeAtCompany?: string | null;           // human-readable tenure at current company (Seamless)
   startedAtCurrentCompany?: string | null; // ISO date the contact started at the company (Seamless)
+  // ICP fit + buying-intent scoring against New Dawn's ideal customer profile.
+  // Populated by lead-intelligence.scoreProspect; drives "why this matches" + ranking.
+  icpScore?: number;                 // 0-100 composite (fit + intent)
+  icpFitScore?: number;              // 0-100 ICP fit
+  icpIntentScore?: number;           // 0-100 buying intent
+  icpTier?: "hot" | "warm" | "cool" | "low";
+  icpAudience?: "investor" | "partner" | "unknown";
+  icpReasons?: string[];             // human-readable reasons
+  icpExplanation?: string;           // one-line "why this matches"
 }
 
 export interface EnrichedCompany {

@@ -78,6 +78,14 @@ interface EnrichedContact {
   website?: string | null;
   timeAtCompany?: string | null;           // human-readable tenure at current company (Seamless)
   startedAtCurrentCompany?: string | null; // ISO date the contact started at the company (Seamless)
+  // ICP fit + buying-intent scoring (lead-intelligence) — "why this matches".
+  icpScore?: number;
+  icpFitScore?: number;
+  icpIntentScore?: number;
+  icpTier?: "hot" | "warm" | "cool" | "low";
+  icpAudience?: "investor" | "partner" | "unknown";
+  icpReasons?: string[];
+  icpExplanation?: string;
 }
 
 interface EnrichedCompany {
@@ -190,6 +198,29 @@ function ScoreBadge({ score, tier, tierEmoji, tierLabel }: {
         <div className={`h-1 rounded-full transition-all ${c.bar}`} style={{ width: `${score}%` }} />
       </div>
     </div>
+  );
+}
+
+// ICP fit + buying-intent badge (New Dawn ideal-customer scoring). Complements
+// the provider's decision-maker ScoreBadge with a business-fit signal.
+function IcpBadge({ tier, score, fit, intent, audience }: {
+  tier: "hot" | "warm" | "cool" | "low"; score: number; fit: number; intent: number; audience?: string;
+}) {
+  const palette: Record<string, string> = {
+    hot:  "bg-red-50 text-red-700 border-red-200",
+    warm: "bg-amber-50 text-amber-700 border-amber-200",
+    cool: "bg-sky-50 text-sky-700 border-sky-200",
+    low:  "bg-gray-50 text-gray-500 border-gray-200",
+  };
+  const label: Record<string, string> = { hot: "🔥 Hot ICP", warm: "Warm ICP", cool: "Cool ICP", low: "Low ICP" };
+  const who = audience === "investor" ? "Investor" : audience === "partner" ? "Partner" : "";
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold ${palette[tier]}`}
+      title={`ICP fit ${fit}/100 · buying intent ${intent}/100${who ? ` · ${who.toLowerCase()}` : ""}`}
+    >
+      {label[tier]} {score}{who && <span className="font-normal opacity-70">· {who}</span>}
+    </span>
   );
 }
 
@@ -347,10 +378,18 @@ function ContactCard({
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-start gap-2 mb-0.5">
             <ScoreBadge score={score.total} tier={score.tier} tierEmoji={score.tierEmoji} tierLabel={score.tierLabel} />
+            {contact.icpTier && <IcpBadge tier={contact.icpTier} score={contact.icpScore ?? 0} fit={contact.icpFitScore ?? 0} intent={contact.icpIntentScore ?? 0} audience={contact.icpAudience} />}
             <span className="font-semibold text-sm">{contact.fullName}</span>
             {contact.jobTitle && <span className="text-xs text-muted-foreground">{contact.jobTitle}</span>}
             <SourceBadges sources={contact.sources} />
           </div>
+
+          {/* ICP "why this matches" line */}
+          {contact.icpReasons && contact.icpReasons.length > 0 && (
+            <p className="mb-1 text-[11px] text-muted-foreground" title={contact.icpReasons.join(" · ")}>
+              <span className="font-medium text-foreground/70">Why:</span> {contact.icpReasons.slice(0, 3).join(" · ")}
+            </p>
+          )}
 
           {/* Company context line */}
           {contact.companyName && (

@@ -70,6 +70,17 @@ import {
   type LeadSearchFilters,
   type ProviderId,
 } from "./seamless-prospects";
+import { cachedProviderSearch } from "./search-cache";
+import { logSearchEvent } from "./search-telemetry";
+import { searchCrmContacts } from "./semantic-search";
+import { runSignalIngestion, getSignalsForContact } from "./lead-signals";
+import { rescoreAllContactsIcp, rescoreContactIcp } from "./icp-rescore";
+import { draftProspectOutreach, type OutreachChannel } from "./outreach-drafter";
+import {
+  createSavedSearch, listSavedSearches, deleteSavedSearch, runSavedSearch,
+  runAllSavedSearches, getRecentDigest,
+} from "./saved-searches";
+import { getSearchAnalytics } from "./search-analytics";
 import { getProviderStatuses } from "./provider-credits";
 import { seedContactEnrichment } from "./people-finder";
 import { calculateDecisionMakerScore } from "./decision-maker-scorer";
@@ -91,7 +102,7 @@ import {
   getMeetings, getUpcomingMeetings, updateMeetingOutcome, handleMeetingBooked, classifyReplyIntent,
 } from "./meetings";
 import { generateWeeklyBrief } from "./strategy-brief";
-import { briefs, systemNotifications } from "@shared/schema";
+import { briefs, systemNotifications, contacts } from "@shared/schema";
 import { callClaude } from "./chat-service";
 
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "dylan@newdawnfranchising.com").toLowerCase().trim();
@@ -339,6 +350,22 @@ function scheduleAgentCrons() {
   cron.schedule("*/5 * * * *", () => {
     runScheduledJobs().catch(e => console.error("[ScheduledJobs Cron] Error:", e));
   });
+
+  // 5:00 AM CT — buying-intent signal ingestion (Phase 2), then re-score all
+  // contacts' ICP fit/intent (Phase 3) so the morning brief sees fresh signals.
+  cron.schedule("0 5 * * *", async () => {
+    console.log("[Signals Cron] Running daily intent-signal ingestion...");
+    try {
+      await runSignalIngestion(40);
+      await rescoreAllContactsIcp();
+      // Phase 5: re-run saved-search watchlists so fresh signals/scores surface
+      // new high-intent matches in the digest.
+      await runAllSavedSearches();
+    } catch (e) {
+      console.error("[Signals Cron] error:", e);
+    }
+  }, { timezone: "America/Chicago" });
+  console.log("Intent-signal ingestion + ICP re-scoring + saved-search monitoring scheduled: daily 5:00 AM CT");
 
   // ── Startup catchup — runs once 90s after the server starts ─────────────────
   // Handles the common case where the server restarts after scheduled cron times
@@ -1718,12 +1745,178 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
         return res.status(400).json({ message: "Add at least one filter or type what you're looking for." });
       }
 
-      const result = await providerSearch(provider, mode === "companies" ? "companies" : "contacts", appliedFilters, { nextToken });
+      const started = Date.now();
+      const result = await cachedProviderSearch(provider, mode === "companies" ? "companies" : "contacts", appliedFilters, { nextToken });
+
+      void logSearchEvent({
+        surface: "seamless-panel",
+        provider,
+        query: aiQuery?.trim() || null,
+        filters: appliedFilters,
+        resultCount: result.totalContacts ?? result.companies?.length ?? null,
+        cached: result.cached ?? null,
+        durationMs: Date.now() - started,
+        userEmail: req.session.adminId ?? null,
+      });
 
       res.json({ ...result, appliedFilters, provider });
     } catch (err: any) {
       console.error("Provider search error:", err);
       res.status(500).json({ message: err.message || "Provider search failed" });
+    }
+  });
+
+  // Semantic search over our OWN CRM contacts ("find people like this" /
+  // "who in our pipeline matches X"). Uses pgvector when available, otherwise
+  // a keyword fallback — see semantic-search.ts.
+  app.post("/api/crm/contacts/semantic-search", requireAdminAuth, async (req, res) => {
+    try {
+      const { query, limit } = req.body as { query?: string; limit?: number };
+      const q = (query || "").trim();
+      if (!q) return res.status(400).json({ message: "query required" });
+      const started = Date.now();
+      const matches = await searchCrmContacts(q, Math.min(Math.max(limit ?? 10, 1), 50));
+      void logSearchEvent({
+        surface: "crm-semantic",
+        query: q,
+        resultCount: matches.length,
+        durationMs: Date.now() - started,
+        userEmail: req.session.adminId ?? null,
+      });
+      res.json({ matches, matchType: matches[0]?.matchType ?? "keyword" });
+    } catch (err: any) {
+      console.error("CRM semantic search error:", err);
+      res.status(500).json({ message: err.message || "CRM search failed" });
+    }
+  });
+
+  // ICP intel for a single contact: persisted fit/intent score + the buying-intent
+  // signals behind it. ?refresh=1 re-scores on demand (Phase 3).
+  app.get("/api/crm/contacts/:id/intel", requireAdminAuth, async (req, res) => {
+    try {
+      const id = String(req.params.id);
+      if (req.query.refresh === "1") await rescoreContactIcp(id);
+      const [c] = await db.select().from(contacts).where(eq(contacts.id, id));
+      if (!c) return res.status(404).json({ message: "Contact not found" });
+      const signals = await getSignalsForContact(id);
+      res.json({
+        icp: {
+          score: c.icpScore ?? null, fitScore: c.icpFitScore ?? null, intentScore: c.icpIntentScore ?? null,
+          tier: c.icpTier ?? null, audience: c.icpAudience ?? null, reasons: c.icpReasons ?? [],
+          explanation: c.icpExplanation ?? null, scoredAt: c.icpScoredAt ?? null,
+        },
+        signals,
+      });
+    } catch (err: any) {
+      console.error("Contact intel error:", err);
+      res.status(500).json({ message: err.message || "Failed to load contact intel" });
+    }
+  });
+
+  // Phase 4: draft personalized outreach (email/LinkedIn) for a prospect,
+  // grounded in their ICP reasons + signals. Used by the "Draft" action on
+  // search results and contact cards.
+  app.post("/api/crm/lead-research/draft-outreach", requireAdminAuth, async (req, res) => {
+    try {
+      const b = req.body as {
+        fullName?: string; firstName?: string | null; jobTitle?: string | null;
+        companyName?: string | null; country?: string | null; channel?: OutreachChannel;
+        audience?: "investor" | "partner" | "unknown"; reasons?: string[]; explanation?: string | null;
+        contactId?: string | null;
+      };
+      if (!b.fullName || !b.fullName.trim()) return res.status(400).json({ message: "fullName required" });
+      // If tied to a stored contact, fold in its real buying-intent signals.
+      let signals: Array<{ title: string; snippet?: string | null }> | undefined;
+      if (b.contactId) {
+        const stored = await getSignalsForContact(b.contactId);
+        signals = stored.map((s) => ({ title: s.title, snippet: s.snippet }));
+      }
+      const draft = await draftProspectOutreach({
+        fullName: b.fullName.trim(),
+        firstName: b.firstName ?? null,
+        jobTitle: b.jobTitle ?? null,
+        companyName: b.companyName ?? null,
+        country: b.country ?? null,
+        channel: b.channel === "linkedin" ? "linkedin" : "email",
+        audience: b.audience,
+        reasons: b.reasons,
+        explanation: b.explanation ?? null,
+        signals,
+      });
+      res.json(draft);
+    } catch (err: any) {
+      console.error("Draft outreach error:", err);
+      res.status(500).json({ message: err.message || "Failed to draft outreach" });
+    }
+  });
+
+  // ─── Saved-search monitoring + digests (Phase 5) ────────────────────────────
+  app.get("/api/crm/saved-searches", requireAdminAuth, async (_req, res) => {
+    try {
+      res.json({ savedSearches: await listSavedSearches() });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to list saved searches" });
+    }
+  });
+
+  app.post("/api/crm/saved-searches", requireAdminAuth, async (req, res) => {
+    try {
+      const { name, provider, mode, query, filters } = req.body as {
+        name?: string; provider?: string; mode?: string; query?: string | null; filters?: LeadSearchFilters;
+      };
+      if (!name || !name.trim()) return res.status(400).json({ message: "name required" });
+      const hasCriteria = (query && query.trim()) || (filters && Object.values(filters).some((v) => (Array.isArray(v) ? v.length : !!v)));
+      if (!hasCriteria) return res.status(400).json({ message: "Provide a query or at least one filter to save." });
+      const saved = await createSavedSearch({ name, provider, mode, query, filters, createdBy: req.session.adminId ?? null });
+      res.json(saved);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to save search" });
+    }
+  });
+
+  app.delete("/api/crm/saved-searches/:id", requireAdminAuth, async (req, res) => {
+    try {
+      await deleteSavedSearch(String(req.params.id));
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to delete saved search" });
+    }
+  });
+
+  app.post("/api/crm/saved-searches/:id/run", requireAdminAuth, async (req, res) => {
+    try {
+      res.json(await runSavedSearch(String(req.params.id)));
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to run saved search" });
+    }
+  });
+
+  // Digest inbox: new high-intent matches across saved searches in the window.
+  app.get("/api/crm/saved-searches/digest", requireAdminAuth, async (req, res) => {
+    try {
+      const hours = Math.min(Math.max(parseInt(String(req.query.hours ?? "24"), 10) || 24, 1), 720);
+      res.json({ digest: await getRecentDigest(hours) });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to load digest" });
+    }
+  });
+
+  // Run all saved searches now (otherwise runs on the daily cron).
+  app.post("/api/crm/saved-searches/run-all", requireAdminAuth, async (_req, res) => {
+    try {
+      res.json(await runAllSavedSearches());
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to run saved searches" });
+    }
+  });
+
+  // AI-search analytics dashboard payload.
+  app.get("/api/crm/search-analytics", requireAdminAuth, async (req, res) => {
+    try {
+      const days = parseInt(String(req.query.days ?? "30"), 10) || 30;
+      res.json(await getSearchAnalytics(days));
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to load analytics" });
     }
   });
 

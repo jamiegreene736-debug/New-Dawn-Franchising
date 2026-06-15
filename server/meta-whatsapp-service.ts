@@ -22,6 +22,29 @@ function normalizePhone(to: string): string {
   return to.startsWith("+") ? to.slice(1) : to.replace(/\D/g, "");
 }
 
+// Turn a raw Meta Graph error into actionable guidance. By far the most common
+// WhatsApp misconfiguration is putting the WABA ID or App ID into
+// META_WHATSAPP_PHONE_NUMBER_ID — Meta then rejects the /{id}/messages POST with
+// code 100 / subcode 33 ("Object with ID '…' does not exist, cannot be loaded
+// due to missing permissions, or does not support this operation"). That raw
+// string is opaque, so we map it to the real cause + fix.
+function explainMetaError(err?: { message?: string; code?: number; error_subcode?: number }): string {
+  const raw = err?.message || "Unknown Meta API error";
+  const looksLikeBadPhoneId =
+    err?.code === 100 ||
+    err?.error_subcode === 33 ||
+    /does not exist|cannot be loaded|missing permissions|unsupported (get|post) request/i.test(raw);
+  if (looksLikeBadPhoneId) {
+    return (
+      `WhatsApp send rejected by Meta — META_WHATSAPP_PHONE_NUMBER_ID (${META_WA_PHONE_NUMBER_ID || "unset"}) ` +
+      `is not a usable Phone Number ID. Copy the "Phone number ID" from Meta → WhatsApp Manager → API Setup ` +
+      `(it is NOT the WhatsApp Business Account/WABA ID, the App ID, or the phone number itself), set it in ` +
+      `Railway, and make sure the access token is authorized for it. Original error: ${raw}`
+    );
+  }
+  return raw;
+}
+
 // ─── Free-form text (only valid in the 24-h customer service window) ──────────
 
 export async function sendWhatsAppMessage(
@@ -53,11 +76,11 @@ export async function sendWhatsAppMessage(
 
     const json = await res.json() as {
       messages?: { id: string }[];
-      error?: { message?: string; code?: number };
+      error?: { message?: string; code?: number; error_subcode?: number };
     };
 
     if (!res.ok) {
-      return { success: false, error: json.error?.message || `Meta API error ${res.status}` };
+      return { success: false, error: explainMetaError(json.error) || `Meta API error ${res.status}` };
     }
 
     return { success: true, id: json.messages?.[0]?.id };
@@ -111,11 +134,11 @@ export async function sendWhatsAppTemplate(
 
     const json = await res.json() as {
       messages?: { id: string }[];
-      error?: { message?: string; code?: number };
+      error?: { message?: string; code?: number; error_subcode?: number };
     };
 
     if (!res.ok) {
-      return { success: false, error: json.error?.message || `Meta API error ${res.status}` };
+      return { success: false, error: explainMetaError(json.error) || `Meta API error ${res.status}` };
     }
 
     return { success: true, id: json.messages?.[0]?.id };

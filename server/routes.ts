@@ -76,6 +76,11 @@ import { searchCrmContacts } from "./semantic-search";
 import { runSignalIngestion, getSignalsForContact } from "./lead-signals";
 import { rescoreAllContactsIcp, rescoreContactIcp } from "./icp-rescore";
 import { draftProspectOutreach, type OutreachChannel } from "./outreach-drafter";
+import {
+  createSavedSearch, listSavedSearches, deleteSavedSearch, runSavedSearch,
+  runAllSavedSearches, getRecentDigest,
+} from "./saved-searches";
+import { getSearchAnalytics } from "./search-analytics";
 import { getProviderStatuses } from "./provider-credits";
 import { seedContactEnrichment } from "./people-finder";
 import { calculateDecisionMakerScore } from "./decision-maker-scorer";
@@ -353,11 +358,14 @@ function scheduleAgentCrons() {
     try {
       await runSignalIngestion(40);
       await rescoreAllContactsIcp();
+      // Phase 5: re-run saved-search watchlists so fresh signals/scores surface
+      // new high-intent matches in the digest.
+      await runAllSavedSearches();
     } catch (e) {
       console.error("[Signals Cron] error:", e);
     }
   }, { timezone: "America/Chicago" });
-  console.log("Intent-signal ingestion + ICP re-scoring scheduled: daily 5:00 AM CT");
+  console.log("Intent-signal ingestion + ICP re-scoring + saved-search monitoring scheduled: daily 5:00 AM CT");
 
   // ── Startup catchup — runs once 90s after the server starts ─────────────────
   // Handles the common case where the server restarts after scheduled cron times
@@ -1837,6 +1845,76 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
     } catch (err: any) {
       console.error("Draft outreach error:", err);
       res.status(500).json({ message: err.message || "Failed to draft outreach" });
+    }
+  });
+
+  // ─── Saved-search monitoring + digests (Phase 5) ────────────────────────────
+  app.get("/api/crm/saved-searches", requireAdminAuth, async (_req, res) => {
+    try {
+      res.json({ savedSearches: await listSavedSearches() });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to list saved searches" });
+    }
+  });
+
+  app.post("/api/crm/saved-searches", requireAdminAuth, async (req, res) => {
+    try {
+      const { name, provider, mode, query, filters } = req.body as {
+        name?: string; provider?: string; mode?: string; query?: string | null; filters?: LeadSearchFilters;
+      };
+      if (!name || !name.trim()) return res.status(400).json({ message: "name required" });
+      const hasCriteria = (query && query.trim()) || (filters && Object.values(filters).some((v) => (Array.isArray(v) ? v.length : !!v)));
+      if (!hasCriteria) return res.status(400).json({ message: "Provide a query or at least one filter to save." });
+      const saved = await createSavedSearch({ name, provider, mode, query, filters, createdBy: req.session.adminId ?? null });
+      res.json(saved);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to save search" });
+    }
+  });
+
+  app.delete("/api/crm/saved-searches/:id", requireAdminAuth, async (req, res) => {
+    try {
+      await deleteSavedSearch(String(req.params.id));
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to delete saved search" });
+    }
+  });
+
+  app.post("/api/crm/saved-searches/:id/run", requireAdminAuth, async (req, res) => {
+    try {
+      res.json(await runSavedSearch(String(req.params.id)));
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to run saved search" });
+    }
+  });
+
+  // Digest inbox: new high-intent matches across saved searches in the window.
+  app.get("/api/crm/saved-searches/digest", requireAdminAuth, async (req, res) => {
+    try {
+      const hours = Math.min(Math.max(parseInt(String(req.query.hours ?? "24"), 10) || 24, 1), 720);
+      res.json({ digest: await getRecentDigest(hours) });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to load digest" });
+    }
+  });
+
+  // Run all saved searches now (otherwise runs on the daily cron).
+  app.post("/api/crm/saved-searches/run-all", requireAdminAuth, async (_req, res) => {
+    try {
+      res.json(await runAllSavedSearches());
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to run saved searches" });
+    }
+  });
+
+  // AI-search analytics dashboard payload.
+  app.get("/api/crm/search-analytics", requireAdminAuth, async (req, res) => {
+    try {
+      const days = parseInt(String(req.query.days ?? "30"), 10) || 30;
+      res.json(await getSearchAnalytics(days));
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to load analytics" });
     }
   });
 

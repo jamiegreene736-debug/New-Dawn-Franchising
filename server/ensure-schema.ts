@@ -184,6 +184,40 @@ const STATEMENTS: string[] = [
   `ALTER TABLE contacts ADD COLUMN IF NOT EXISTS icp_reasons text[]`,
   `ALTER TABLE contacts ADD COLUMN IF NOT EXISTS icp_explanation text`,
   `ALTER TABLE contacts ADD COLUMN IF NOT EXISTS icp_scored_at timestamp`,
+  // ─── Saved-search monitoring + digests (Phase 5) ─────────────────────────
+  // saved_searches persists a reusable ICP watchlist; the daily job re-runs each
+  // and records matches in saved_search_matches, surfacing only NEW ones.
+  `CREATE TABLE IF NOT EXISTS saved_searches (
+    id                 varchar    PRIMARY KEY DEFAULT gen_random_uuid(),
+    name               text       NOT NULL,
+    provider           text       NOT NULL DEFAULT 'seamless',
+    mode               text       NOT NULL DEFAULT 'contacts',
+    query              text,
+    filters            jsonb      NOT NULL DEFAULT '{}'::jsonb,
+    active             boolean    NOT NULL DEFAULT true,
+    created_by         text,
+    last_run_at        timestamp,
+    last_result_count  integer,
+    last_new_count     integer,
+    created_at         timestamp  NOT NULL DEFAULT now()
+  )`,
+  `CREATE TABLE IF NOT EXISTS saved_search_matches (
+    id               varchar    PRIMARY KEY DEFAULT gen_random_uuid(),
+    saved_search_id  varchar    NOT NULL,
+    contact_key      text       NOT NULL,
+    full_name        text       NOT NULL,
+    job_title        text,
+    company          text,
+    email            text,
+    country          text,
+    icp_score        integer    NOT NULL DEFAULT 0,
+    icp_tier         text,
+    reasons          text[],
+    first_seen_at    timestamp  NOT NULL DEFAULT now()
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_ss_matches_search ON saved_search_matches (saved_search_id)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_ss_matches_unique ON saved_search_matches (saved_search_id, contact_key)`,
+  `CREATE INDEX IF NOT EXISTS idx_ss_matches_seen ON saved_search_matches (first_seen_at)`,
 ];
 
 export async function ensureSchema(): Promise<void> {

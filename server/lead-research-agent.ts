@@ -49,6 +49,8 @@ You can take real actions through tools:
 Behaviour:
 - Be concise, friendly, and action-oriented — like a sharp SDR teammate.
 - When the user asks to "find" / "build a list" / "get me" prospects, CALL search_people (don't just describe what you would do).
+- To find people who work at a specific company (e.g. "everyone at GlobeVisa"), set companyNames to that company and companyDomains to its likely domain (e.g. globevisa.com), and DON'T require a job title — that returns the whole company. Only add titles if the user asks for specific roles.
+- If a search returns 0 results, retry once with a broader query (e.g. drop titles, or use companyDomains instead of companyNames, or vice-versa) before telling the user nothing was found.
 - After a search, state how many you found, name 2–3 examples (name · title · company), and tell them they can save the results to Contacts using the buttons below the list.
 - If asked to draft outreach, write the email/message directly in your reply (warm, non-salesy, signed "Dylan Delaney, New Dawn Franchising").
 - Never invent contacts — only reference what search_people returned.
@@ -76,16 +78,19 @@ const TOOLS = [
   {
     name: "search_people",
     description:
-      "Search lead-data providers for people/contacts matching the criteria and build a prospect list. Use whenever the user wants to find prospects or build a list.",
+      "Search lead-data providers for people/contacts matching the criteria and build a prospect list. Use whenever the user wants to find prospects or build a list. To find everyone at a specific company, set companyNames (and companyDomains if you can infer the domain) and leave titles empty.",
     input_schema: {
       type: "object",
       properties: {
+        companyNames: { type: "array", items: { type: "string" }, description: "Company/employer names, e.g. GlobeVisa. Use this to find people who work at a specific company." },
+        companyDomains: { type: "array", items: { type: "string" }, description: "Company website domains, e.g. globevisa.com. Infer from the company name when possible." },
         titles: { type: "array", items: { type: "string" }, description: "Job titles, e.g. CEO, Owner, Investor, Immigration Attorney" },
         seniorities: { type: "array", items: { type: "string" }, description: "e.g. C-Level, VP, Director, Manager" },
         countries: { type: "array", items: { type: "string" }, description: "Countries to target, e.g. United Kingdom, Germany, Japan" },
         states: { type: "array", items: { type: "string" }, description: "US states or regions" },
         industries: { type: "array", items: { type: "string" } },
         companySizes: { type: "array", items: { type: "string" } },
+        fullName: { type: "array", items: { type: "string" }, description: "Specific people by full name" },
         keywords: { type: "array", items: { type: "string" }, description: "Free-text signals/keywords" },
         mode: { type: "string", enum: ["contacts", "companies"], description: "Search people (contacts) or companies. Default contacts." },
       },
@@ -157,14 +162,26 @@ export async function runLeadResearchAgent(
   async function execTool(name: string, input: any): Promise<string> {
     if (name === "analyze_icp") return ICP_SUMMARY;
     if (name === "search_people") {
+      // Map the tool's friendly names onto the REAL LeadSearchFilters fields
+      // (jobTitle/contactCountry/companyName/…). Mismatched names here were the
+      // bug that made the agent return nothing.
+      const arr = (v: any): string[] | undefined =>
+        Array.isArray(v) ? v.map((x) => String(x || "").trim()).filter(Boolean) : undefined;
       const filters: LeadSearchFilters = {
-        titles: input?.titles, seniorities: input?.seniorities, countries: input?.countries,
-        states: input?.states, industries: input?.industries, companySizes: input?.companySizes,
-        keywords: Array.isArray(input?.keywords) ? input.keywords : undefined,
-      } as LeadSearchFilters;
+        jobTitle: arr(input?.titles),
+        seniority: arr(input?.seniorities),
+        contactCountry: arr(input?.countries),
+        contactState: arr(input?.states),
+        industry: arr(input?.industries),
+        companySize: arr(input?.companySizes),
+        companyName: arr(input?.companyNames),
+        companyDomain: arr(input?.companyDomains),
+        fullName: arr(input?.fullName),
+        keywords: arr(input?.keywords),
+      };
       const mode = input?.mode === "companies" ? "companies" : "contacts";
       try {
-        const result: any = await providerSearch(provider, mode, filters, { limit: 25 });
+        const result: any = await providerSearch(provider, mode, filters, { limit: 50 });
         const people: SeamlessPerson[] = result?.people || [];
         for (const p of people) {
           const key = (p.email || `${p.fullName}|${p.company}`).toLowerCase();

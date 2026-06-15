@@ -218,6 +218,27 @@ const STATEMENTS: string[] = [
   `CREATE INDEX IF NOT EXISTS idx_ss_matches_search ON saved_search_matches (saved_search_id)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_ss_matches_unique ON saved_search_matches (saved_search_id, contact_key)`,
   `CREATE INDEX IF NOT EXISTS idx_ss_matches_seen ON saved_search_matches (first_seen_at)`,
+  // ─── Guardrailed auto-pilot ──────────────────────────────────────────────
+  // A saved search can auto-draft outreach for high-confidence new matches. The
+  // drafts land in auto_outreach_queue as 'pending_approval' — they are NEVER
+  // auto-sent; a human approves each one.
+  `ALTER TABLE saved_searches ADD COLUMN IF NOT EXISTS auto_outreach boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE saved_searches ADD COLUMN IF NOT EXISTS auto_channel text NOT NULL DEFAULT 'email'`,
+  `ALTER TABLE saved_searches ADD COLUMN IF NOT EXISTS auto_min_score integer NOT NULL DEFAULT 70`,
+  `CREATE TABLE IF NOT EXISTS auto_outreach_queue (
+    id               varchar    PRIMARY KEY DEFAULT gen_random_uuid(),
+    saved_search_id  varchar,
+    contact_key      text       NOT NULL,
+    full_name        text       NOT NULL,
+    company          text,
+    channel          text       NOT NULL DEFAULT 'email',
+    subject          text,
+    body             text       NOT NULL,
+    icp_score        integer    NOT NULL DEFAULT 0,
+    status           text       NOT NULL DEFAULT 'pending_approval',
+    created_at       timestamp  NOT NULL DEFAULT now()
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_auto_queue_status ON auto_outreach_queue (status, created_at)`,
 ];
 
 export async function ensureSchema(): Promise<void> {

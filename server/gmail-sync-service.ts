@@ -12,6 +12,7 @@ import { ImapFlow } from "imapflow";
 import cron from "node-cron";
 import { storage } from "./storage";
 import { addToDnc } from "./agent-service";
+import { isAutomatedOrBulkEmail } from "./crm-email-filter";
 
 const FRANCHISING_EMAIL = "franchising@newdawnfranchising.com";
 
@@ -97,19 +98,6 @@ function extractBouncedRecipients(raw: string): string[] {
   return [...out];
 }
 
-// True for newsletters, service/welcome emails, notifications and auto-replies —
-// i.e. machine-sent bulk mail that shouldn't be logged as a personal "reply".
-// Genuine 1:1 replies from prospects carry none of these signals. `rawHead` is
-// the top of the raw message (headers); `fromAddr` is the lowercased sender.
-function isAutomatedOrBulk(rawHead: string, fromAddr: string): boolean {
-  if (/^(list-unsubscribe|list-id|precedence:\s*(bulk|list|junk)|auto-submitted:\s*(?!no)|x-auto-response-suppress|feedback-id):/im.test(rawHead)) {
-    return true;
-  }
-  const local = fromAddr.split("@")[0] || "";
-  return /^(no.?reply|do.?not.?reply|donotreply|notifications?|mailer|newsletter|news|bounce|postmaster|noreply|updates?|alerts?)$/i.test(local)
-    || /(via|notifications?|mailer|newsletter)@/i.test(fromAddr);
-}
-
 /**
  * Poll the franchising@ inbox once and import any new client replies.
  * No-ops (with a clear reason) when the app password isn't configured.
@@ -188,16 +176,16 @@ export async function syncFranchisingInbox(): Promise<SyncResult> {
           continue;
         }
 
+        const textPart = msg.bodyParts?.get("TEXT");
+        const bodyText = (textPart ? Buffer.from(textPart).toString("utf8") : "").replace(/\r\n/g, "\n").trim();
+
         // Skip newsletters / service welcome emails / notifications / auto-replies
         // (e.g. "Welcome to PR Newswire!") — these aren't personal replies and
         // shouldn't clutter the contact's timeline / Activity feed.
-        if (isAutomatedOrBulk(rawSource.slice(0, 8000), fromAddr)) {
+        if (isAutomatedOrBulkEmail(fromAddr, subject, rawSource.slice(0, 8000), bodyText)) {
           processedMessageIds.add(msgId);
           continue;
         }
-
-        const textPart = msg.bodyParts?.get("TEXT");
-        const bodyText = (textPart ? Buffer.from(textPart).toString("utf8") : "").replace(/\r\n/g, "\n").trim();
         const bodyHtml = `<pre style="white-space:pre-wrap;font-family:inherit;margin:0;">${escapeHtml(bodyText)}</pre>`;
         const preview = bodyText.slice(0, 240);
 

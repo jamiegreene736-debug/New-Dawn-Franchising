@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Sparkles, Send, Loader2, UserPlus, Check, Linkedin, Mail, Phone } from "lucide-react";
+import { Sparkles, Send, Loader2, UserPlus, Check, Linkedin, Mail, Phone, Megaphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -37,11 +37,44 @@ export default function LeadResearchAgent({ provider }: { provider?: string }) {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [added, setAdded] = useState<Set<string>>(new Set());
+  const [campaigns, setCampaigns] = useState<{ id: string; name: string }[]>([]);
+  const [enrollOpenFor, setEnrollOpenFor] = useState<string | null>(null);
+  const [enrolling, setEnrolling] = useState<string | null>(null);
+  const [enrolled, setEnrolled] = useState<Map<string, string>>(new Map());
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, loading]);
+
+  useEffect(() => {
+    apiRequest("GET", "/api/crm/campaigns")
+      .then((r) => r.json())
+      .then((rows: any[]) => setCampaigns((rows || []).map((c) => ({ id: c.id, name: c.name }))))
+      .catch(() => {});
+  }, []);
+
+  // Ensure the agent-found person exists as a CRM contact; returns the id.
+  async function ensureContact(p: AgentPerson): Promise<string | null> {
+    const body = {
+      contact: {
+        fullName: p.fullName, firstName: p.firstName, lastName: p.lastName,
+        companyName: p.companyName || "", email: p.email, phone: p.phone,
+        linkedinUrl: p.linkedinUrl, jobTitle: p.jobTitle, bio: null,
+        decisionMakerScore: 0, e2ViaBio: false, internationalBio: false,
+      },
+      category: "ai_research",
+    };
+    const res = await fetch("/api/crm/prospects/add-to-contacts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(body),
+    });
+    if (res.ok) return (await res.json())?.id ?? null;
+    if (res.status === 409) return (await res.json())?.existing?.id ?? null;
+    return null;
+  }
 
   async function send(text?: string) {
     const msg = (text ?? input).trim();
@@ -89,6 +122,28 @@ export default function LeadResearchAgent({ provider }: { provider?: string }) {
     }
   }
 
+  async function enroll(p: AgentPerson, campaignId: string, campaignName: string) {
+    const key = (p.email || p.fullName).toLowerCase();
+    setEnrolling(key);
+    try {
+      const contactId = await ensureContact(p);
+      if (!contactId) throw new Error("contact");
+      const res = await apiRequest("POST", "/api/crm/enrollments/from-contacts", {
+        campaignId,
+        contactIds: [`contact:${contactId}`],
+      });
+      await res.json();
+      setAdded((s) => new Set(s).add(key)); // it's now a contact too
+      setEnrolled((m) => new Map(m).set(key, campaignName));
+      setEnrollOpenFor(null);
+      toast({ title: "Enrolled", description: `${p.fullName} → ${campaignName}` });
+    } catch {
+      toast({ title: "Couldn't enroll", description: p.fullName, variant: "destructive" });
+    } finally {
+      setEnrolling(null);
+    }
+  }
+
   return (
     <div className="rounded-2xl border bg-card shadow-sm overflow-hidden">
       <div className="flex items-center gap-2 border-b bg-gradient-to-r from-[hsl(var(--primary))]/10 to-purple-500/10 px-4 py-3">
@@ -109,22 +164,53 @@ export default function LeadResearchAgent({ provider }: { provider?: string }) {
                   {m.people.map((p, j) => {
                     const key = (p.email || p.fullName).toLowerCase();
                     const isAdded = added.has(key);
+                    const enrolledIn = enrolled.get(key);
+                    const pickerOpen = enrollOpenFor === key;
                     return (
-                      <div key={j} className="flex items-center gap-2 rounded-lg border bg-card px-2 py-1.5">
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-xs font-semibold text-foreground">{p.fullName}</p>
-                          <p className="truncate text-[11px] text-muted-foreground">
-                            {[p.jobTitle, p.companyName].filter(Boolean).join(" · ") || p.location || "—"}
-                          </p>
-                          <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
-                            {p.email && <span className="inline-flex items-center gap-0.5"><Mail className="size-2.5" />{p.email}</span>}
-                            {p.phone && <span className="inline-flex items-center gap-0.5"><Phone className="size-2.5" />{p.phone}</span>}
-                            {p.linkedinUrl && <a href={p.linkedinUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-blue-600 hover:underline"><Linkedin className="size-2.5" />in</a>}
+                      <div key={j} className="rounded-lg border bg-card px-2 py-1.5">
+                        <div className="flex items-center gap-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-xs font-semibold text-foreground">{p.fullName}</p>
+                            <p className="truncate text-[11px] text-muted-foreground">
+                              {[p.jobTitle, p.companyName].filter(Boolean).join(" · ") || p.location || "—"}
+                            </p>
+                            <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
+                              {p.email && <span className="inline-flex items-center gap-0.5"><Mail className="size-2.5" />{p.email}</span>}
+                              {p.phone && <span className="inline-flex items-center gap-0.5"><Phone className="size-2.5" />{p.phone}</span>}
+                              {p.linkedinUrl && <a href={p.linkedinUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-blue-600 hover:underline"><Linkedin className="size-2.5" />in</a>}
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-1">
+                            <Button size="sm" variant={isAdded ? "outline" : "default"} className="h-7 gap-1 px-2 text-[11px]" disabled={isAdded} onClick={() => addToContacts(p)}>
+                              {isAdded ? <><Check className="size-3" /> Added</> : <><UserPlus className="size-3" /> Add</>}
+                            </Button>
+                            {enrolledIn ? (
+                              <span className="inline-flex items-center gap-0.5 rounded border border-green-200 bg-green-50 px-1.5 py-0.5 text-[10px] font-medium text-green-700"><Check className="size-2.5" /> Enrolled</span>
+                            ) : (
+                              <Button size="sm" variant="outline" className="h-7 gap-1 px-2 text-[11px]" disabled={campaigns.length === 0 || enrolling === key} onClick={() => setEnrollOpenFor(pickerOpen ? null : key)}>
+                                {enrolling === key ? <Loader2 className="size-3 animate-spin" /> : <Megaphone className="size-3" />} Enroll
+                              </Button>
+                            )}
                           </div>
                         </div>
-                        <Button size="sm" variant={isAdded ? "outline" : "default"} className="h-7 shrink-0 gap-1 px-2 text-[11px]" disabled={isAdded} onClick={() => addToContacts(p)}>
-                          {isAdded ? <><Check className="size-3" /> Added</> : <><UserPlus className="size-3" /> Add</>}
-                        </Button>
+                        {pickerOpen && !enrolledIn && (
+                          <div className="mt-1.5 flex flex-wrap gap-1 border-t pt-1.5">
+                            {campaigns.length === 0 ? (
+                              <span className="text-[10px] text-muted-foreground">No campaigns yet.</span>
+                            ) : (
+                              campaigns.map((c) => (
+                                <button
+                                  key={c.id}
+                                  onClick={() => enroll(p, c.id, c.name)}
+                                  disabled={enrolling === key}
+                                  className="rounded-full border border-input px-2 py-0.5 text-[10px] text-foreground hover:border-[hsl(var(--primary))] hover:text-[hsl(var(--primary))] disabled:opacity-50"
+                                >
+                                  {c.name}
+                                </button>
+                              ))
+                            )}
+                          </div>
+                        )}
                       </div>
                     );
                   })}

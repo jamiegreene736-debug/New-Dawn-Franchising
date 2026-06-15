@@ -11,7 +11,7 @@ import { generateBlogPost, scheduleWeeklyBlogGeneration } from "./blog-generator
 import { generateBrochurePDF } from "./brochure";
 import { generateBrokerAgreementPDF } from "./broker-agreement-pdf";
 import { searchProspects, SEARCH_CATEGORIES } from "./prospect-search";
-import { scheduleDripProcessing, processDripEmails, reprocessStep } from "./drip-processor";
+import { scheduleDripProcessing, processDripEmails, reprocessStep, fireClickReaction } from "./drip-processor";
 import { scheduleGmailSync, syncFranchisingInbox, getGmailSyncStatus, getGmailSyncLastResult } from "./gmail-sync-service";
 import { seedDefaultCampaign } from "./default-campaign";
 import { seedGrokCampaign } from "./grok-campaign";
@@ -2319,7 +2319,11 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
       if (id.startsWith("de_")) {
         await storage.recordDirectEmailClick(id);
       } else {
-        await storage.recordEmailClick(id);
+        const updated = await storage.recordEmailClick(id);
+        // First click = hot lead → create a call task + alert the team (once).
+        if (updated && (updated.clickCount ?? 0) === 1) {
+          fireClickReaction(updated).catch((e) => console.error("[ClickReaction]", e?.message || e));
+        }
       }
     } catch {
       // non-fatal — always still redirect the recipient

@@ -67,7 +67,7 @@ export interface IStorage {
   updateDripSend(id: string, data: Partial<DripSend>): Promise<DripSend>;
   deleteDripSend(id: string): Promise<void>;
   recordEmailOpen(sendId: string): Promise<DripSend | undefined>;
-  recordEmailClick(sendId: string): Promise<void>;
+  recordEmailClick(sendId: string): Promise<DripSend | undefined>;
   markDripSendBounced(recipientEmail: string, reason: string): Promise<DripSend | null>;
   getSmsCampaigns(): Promise<SmsCampaign[]>;
   createSmsCampaign(data: InsertSmsCampaign): Promise<SmsCampaign>;
@@ -507,15 +507,17 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async recordEmailClick(sendId: string): Promise<void> {
+  async recordEmailClick(sendId: string): Promise<DripSend | undefined> {
     // A click implies an open — set both so opens are never undercounted.
-    await db.update(dripSends)
+    const [updated] = await db.update(dripSends)
       .set({
         clickedAt: sql`COALESCE(${dripSends.clickedAt}, NOW())`,
         clickCount: sql`${dripSends.clickCount} + 1`,
         openedAt: sql`COALESCE(${dripSends.openedAt}, NOW())`,
       })
-      .where(eq(dripSends.id, sendId));
+      .where(eq(dripSends.id, sendId))
+      .returning();
+    return updated;
   }
 
   async markDripSendBounced(recipientEmail: string, reason: string): Promise<DripSend | null> {

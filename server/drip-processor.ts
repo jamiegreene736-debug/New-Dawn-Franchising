@@ -422,12 +422,94 @@ export async function reprocessStep(campaignId: string, stepId: string): Promise
   return result;
 }
 
+// ─── Parallel reaction: hot-lead alert + call task on first link click ───────
+// Fired from the click-tracking endpoint on the FIRST click of a drip send.
+export async function fireClickReaction(send: any): Promise<void> {
+  try {
+    const enrollment = send.enrollmentId ? await storage.getDripEnrollment(send.enrollmentId) : null;
+    const name = send.recipientName || enrollment?.prospectName || send.recipientEmail || "A contact";
+    if (enrollment?.prospectId) {
+      await storage.createContactTask({
+        prospectId: enrollment.prospectId,
+        title: `🔥 Call ${name} — clicked a link`,
+        subtitle: `High intent: clicked "${send.subject || "an email"}"`,
+        dueDate: new Date(),
+      } as any).catch(() => {});
+    }
+    await sendEmail(
+      "dylan@newdawnfranchising.com",
+      `🔥 ${name} clicked a link — call now`,
+      `<p><strong>${name}</strong> (${send.recipientEmail || "—"}) just clicked a link in "${send.subject || "your email"}". High intent — a call task has been created. Reach out now.</p>`,
+    ).catch(() => {});
+    console.log(`[ClickReaction] hot-lead task + alert for ${name}`);
+  } catch (e: any) {
+    console.error("[ClickReaction] failed:", e?.message || e);
+  }
+}
+
+// ─── Parallel reaction: re-send the first email if it wasn't opened ───────────
+// For each active campaign's first email step, if a contact's send is still
+// unopened after ~4 days (and we haven't already re-sent), send it once more
+// with a fresh subject. Idempotent: a second send for that step means done.
+export async function resendUnopenedFirstEmails(): Promise<void> {
+  const WAIT_MS = 96 * 3_600_000; // 4 days
+  try {
+    const campaigns = await storage.getDripCampaigns();
+    for (const c of campaigns as any[]) {
+      if (!c.isActive) continue;
+      const steps = await storage.getDripSteps(c.id);
+      const firstEmail = steps
+        .filter((s) => ["email", "manual_email"].includes((s.stepType || "email").toLowerCase()))
+        .sort((a, b) => a.stepOrder - b.stepOrder)[0];
+      if (!firstEmail) continue;
+
+      const enrollments = await storage.getActiveEnrollments(c.id);
+      for (const e of enrollments) {
+        if (e.status !== "active") continue;
+        const sends = (await storage.getDripSends(e.id)).filter((s) => s.stepId === firstEmail.id);
+        if (sends.length !== 1) continue; // 0 = not sent; >=2 = already re-sent
+        const s0 = sends[0];
+        if (s0.status !== "sent" || s0.openedAt) continue;
+        const sentAt = s0.sentAt ? new Date(s0.sentAt).getTime() : 0;
+        if (!sentAt || Date.now() - sentAt < WAIT_MS) continue;
+        if (await isOnDnc(e.prospectEmail)) continue;
+
+        const firstName = (e.prospectName || "").trim().split(/\s+/)[0] || "there";
+        const personalize = (str: string | null | undefined): string =>
+          (str || "")
+            .replace(/\[Contact First Name\]/gi, firstName)
+            .replace(/\{\{\s*firstName\s*\}\}/gi, firstName)
+            .replace(/\{\{\s*name\s*\}\}/gi, e.prospectName)
+            .replace(/\{\{\s*email\s*\}\}/gi, e.prospectEmail);
+        const newSubject = `Following up — ${personalize(firstEmail.subject)}`;
+        const send = await storage.createDripSend({
+          enrollmentId: e.id, stepId: firstEmail.id, channel: "email",
+          recipientEmail: e.prospectEmail, recipientName: e.prospectName,
+          subject: newSubject, status: "pending",
+        });
+        const trackingUrl = getTrackingPixelUrl(getBaseUrl(), send.id);
+        const r = await sendEmail(e.prospectEmail, newSubject, personalize(firstEmail.bodyHtml), trackingUrl);
+        if (r.success) {
+          await storage.updateDripSend(send.id, { status: "sent", sentAt: new Date() } as any);
+          console.log(`[Drip] No-open re-send → ${e.prospectEmail}`);
+        } else {
+          await storage.updateDripSend(send.id, { status: "failed", errorMessage: r.error } as any);
+        }
+        await sleep(1500);
+      }
+    }
+  } catch (e: any) {
+    console.error("[Drip] resendUnopenedFirstEmails error:", e?.message || e);
+  }
+}
+
 export function scheduleDripProcessing() {
   // Run hourly during business hours (8 AM–6 PM ET) — window check inside prevents off-hours sends
   // This ensures late-enrolling prospects don't have to wait until the next day
   cron.schedule("0 8-18 * * 1-5", () => {
     console.log("[Drip] Hourly window check — running drip processor...");
     processDripEmails();
+    resendUnopenedFirstEmails();
   }, { timezone: "America/New_York" });
 
   console.log("Drip email processing scheduled: Hourly Mon–Fri 8 AM–6 PM ET (optimal window gating active)");

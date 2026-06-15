@@ -135,6 +135,7 @@ interface ActivityItem {
   detail: string;
   status: string;
   timestamp: string | null;
+  campaignName?: string;
   // Email engagement (campaign sends only)
   opened?: boolean;
   openedAt?: string | null;
@@ -1596,16 +1597,24 @@ function EmailCampaignTab() {
                         </td>
                         <td className="py-2 px-3 font-medium">{item.name || "—"}</td>
                         <td className="py-2 px-3 text-muted-foreground max-w-44 truncate">{item.target || "—"}</td>
-                        <td className="py-2 px-3 max-w-72 truncate" title={item.source === "campaign" ? "Click to view the email that was sent" : item.detail}>
+                        <td className="py-2 px-3 max-w-72">
                           {item.source === "campaign" ? (
                             <button
                               data-testid={`view-email-${rawSendId}`}
                               onClick={() => setViewSendId(rawSendId)}
-                              className="text-left text-blue-600 hover:underline truncate max-w-full"
+                              className="block max-w-full truncate text-left text-blue-600 hover:underline"
+                              title="Click to view the email that was sent"
                             >
                               {item.detail || "(no subject)"}
                             </button>
-                          ) : (item.detail || "—")}
+                          ) : (
+                            <span className="block max-w-full truncate" title={item.detail}>{item.detail || "—"}</span>
+                          )}
+                          {item.campaignName && (
+                            <span className="mt-0.5 inline-flex items-center gap-1 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-600" title="Campaign">
+                              {item.campaignName}
+                            </span>
+                          )}
                         </td>
                         <td className="py-2 px-3">
                           <div className="flex flex-col items-start gap-1">

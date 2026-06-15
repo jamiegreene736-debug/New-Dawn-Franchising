@@ -59,6 +59,7 @@ export function configuredEnrichmentProviders(): Array<"seamless" | "apollo" | "
  */
 export async function enrichPersonAllProviders(
   identity: EnrichIdentity,
+  options?: { only?: Array<"seamless" | "apollo" | "origami"> },
 ): Promise<{ found: boolean; enrichment: PersonEnrichment; sources: string[] }> {
   const fullName = (identity.fullName || `${identity.firstName ?? ""} ${identity.lastName ?? ""}`).trim();
   const parts = fullName.split(/\s+/).filter(Boolean);
@@ -69,15 +70,21 @@ export async function enrichPersonAllProviders(
   const company = identity.company || undefined;
   const linkedinUrl = identity.linkedinUrl || undefined;
 
+  // When `only` is given, restrict to that subset of providers (e.g. the
+  // "Enrich via Seamless.AI" button passes ["seamless"]). Default: every
+  // configured provider.
+  const only = options?.only;
+  const wants = (p: "seamless" | "apollo" | "origami") => !only || only.includes(p);
+
   const [seamless, apollo, origami] = await Promise.all([
-    seamlessConfigured()
+    wants("seamless") && seamlessConfigured()
       ? seamlessEnrichByIdentity([
           { contactName: fullName || undefined, companyName: company, domain, email, liProfileUrl: linkedinUrl },
         ])
           .then((arr) => arr[0] || null)
           .catch(() => null)
       : Promise.resolve(null),
-    apolloConfigured()
+    wants("apollo") && apolloConfigured()
       ? apolloEnrichPerson({
           firstName,
           lastName,
@@ -88,7 +95,7 @@ export async function enrichPersonAllProviders(
           revealPhone: true,
         }).catch(() => null)
       : Promise.resolve(null),
-    origamiConfigured()
+    wants("origami") && origamiConfigured()
       ? origamiEnrichPerson({
           firstName,
           lastName,

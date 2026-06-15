@@ -37,9 +37,11 @@ import {
   Tag,
   Phone,
   Sparkles,
+  Contact,
 } from "lucide-react";
 import { CrmClientDetail } from "./crm-client-detail";
 import ProspectFinder from "./prospect-finder";
+import { ContactsManager } from "@/components/contacts-manager";
 import AiSearchInsights from "@/components/ai-search-insights";
 import EmailCampaigns from "./email-campaigns";
 import FacebookTab from "./facebook-tab";
@@ -874,7 +876,7 @@ export default function CrmPage() {
   const urlParams = new URLSearchParams(search);
   const urlTab = urlParams.get("tab") as "clients" | "prospects" | "emails" | "facebook" | "reports" | "api-status" | "franchisees" | "phone-calls" | null;
 
-  const [crmTab, setCrmTab] = useState<"clients" | "prospects" | "ai-insights" | "emails" | "facebook" | "reports" | "api-status" | "franchisees" | "phone-calls">(
+  const [crmTab, setCrmTab] = useState<"clients" | "prospects" | "contacts" | "ai-insights" | "emails" | "facebook" | "reports" | "api-status" | "franchisees" | "phone-calls">(
     urlTab || "clients"
   );
 
@@ -1099,6 +1101,13 @@ export default function CrmPage() {
               <Crosshair className="size-4" /> Lead Research
             </button>
             <button
+              data-testid="tab-crm-contacts"
+              className={`shrink-0 whitespace-nowrap px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${crmTab === "contacts" ? "border-[hsl(var(--primary))] text-[hsl(var(--primary))]" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+              onClick={() => setCrmTab("contacts")}
+            >
+              <Contact className="size-4" /> Contacts
+            </button>
+            <button
               data-testid="tab-crm-ai-insights"
               className={`shrink-0 whitespace-nowrap px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${crmTab === "ai-insights" ? "border-[hsl(var(--primary))] text-[hsl(var(--primary))]" : "border-transparent text-muted-foreground hover:text-foreground"}`}
               onClick={() => setCrmTab("ai-insights")}
@@ -1170,6 +1179,14 @@ export default function CrmPage() {
           <ProspectFinder />
         </div>
       </section>
+
+      {crmTab === "contacts" && (
+        <section className="py-6">
+          <div className="nh-container">
+            <ContactsManager />
+          </div>
+        </section>
+      )}
 
       {crmTab === "ai-insights" && (
         <section className="py-6">

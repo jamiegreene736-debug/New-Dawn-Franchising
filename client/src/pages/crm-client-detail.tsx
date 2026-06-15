@@ -501,12 +501,12 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
     setApolloLoading(true);
     setApolloResult(null);
     try {
-      const res = await apiRequest("POST", `/api/crm/clients/${client.id}/apollo-enrich`, {});
+      const res = await apiRequest("POST", `/api/crm/clients/${client.id}/enrich`, {});
       const data = await res.json();
       setApolloResult(data);
-      if (!data.found) toast({ title: "Apollo: no match found", description: "No public record matched this name/email." });
+      if (!data.found) toast({ title: "No match found", description: "No provider returned a record for this name/email." });
     } catch {
-      toast({ title: "Apollo enrichment failed", variant: "destructive" });
+      toast({ title: "Enrichment failed", variant: "destructive" });
     } finally {
       setApolloLoading(false);
     }
@@ -671,7 +671,7 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
                 className="flex items-center gap-1.5 text-[11px] font-medium text-purple-600 hover:text-purple-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {apolloLoading ? <Loader2 className="size-3 animate-spin" /> : <Sparkles className="size-3" />}
-                {apolloLoading ? "Enriching…" : "Enrich with Apollo"}
+                {apolloLoading ? "Enriching…" : "Enrich contact (Apollo + Origami)"}
               </button>
               {apolloResult?.found && apolloResult.enrichment && (() => {
                 const e = apolloResult.enrichment!;

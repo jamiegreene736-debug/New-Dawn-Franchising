@@ -4079,6 +4079,38 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
     }
   });
 
+  // Send an approved WhatsApp template to a client (compliant cold first-message).
+  app.post("/api/crm/clients/:id/whatsapp-template", requireAdminAuth, async (req, res) => {
+    try {
+      const client = await storage.getCrmClient(String(req.params.id));
+      if (!client) return res.status(404).json({ message: "Client not found" });
+      if (!client.phone) return res.status(400).json({ message: "Client has no phone number" });
+
+      const { templateName, languageCode = "en_US" } = req.body as {
+        templateName: string; languageCode?: string;
+      };
+      if (!templateName) return res.status(400).json({ message: "templateName is required" });
+
+      const firstName = client.fullName.split(" ")[0];
+      const result = await sendWhatsAppTemplate(client.phone, templateName, languageCode, [firstName]);
+
+      // Log the rendered template body so it shows in the conversation thread.
+      const tpl = WHATSAPP_TEMPLATES.find((t) => t.metaTemplateName === templateName);
+      const renderedBody = (tpl?.body || `[template: ${templateName}]`).replace(/\{\{name\}\}/g, firstName);
+
+      await storage.createCrmClientActivity({
+        clientId: client.id,
+        activityType: result.success ? "whatsapp_sent" : "whatsapp_failed",
+        metadata: { message: renderedBody, sid: result.id, error: result.error, template: templateName },
+      });
+
+      if (!result.success) return res.status(502).json({ message: result.error });
+      res.json({ success: true, sid: result.id });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to send WhatsApp template" });
+    }
+  });
+
   // ─── SMS Campaigns (blast) ────────────────────────────────────────────────
 
   app.get("/api/crm/sms-campaigns", requireAdminAuth, async (_req, res) => {

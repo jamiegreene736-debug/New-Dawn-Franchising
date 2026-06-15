@@ -132,7 +132,7 @@ interface SigRequest {
   signerIp: string | null;
 }
 
-interface Template { id: string; label: string; body?: string; script?: string; group?: string; }
+interface Template { id: string; label: string; body?: string; script?: string; group?: string; metaTemplateName?: string | null; requiresApproval?: boolean; languageCode?: string; }
 interface SmsMessage { id: string; direction: "inbound" | "outbound"; body: string; status: string; sentAt: string; }
 interface TwilioStatus { configured: boolean; smsReady: boolean; whatsappReady: boolean; }
 interface VoicemailStatus { configured: boolean; }
@@ -182,6 +182,7 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
   const [noteText, setNoteText] = useState("");
   const [smsMessage, setSmsMessage] = useState("");
   const [waMessage, setWaMessage] = useState("");
+  const [waTemplateName, setWaTemplateName] = useState("");
   const [linkedinNote, setLinkedinNote] = useState("");
   const [audioUrl, setAudioUrl] = useState("");
   const [verifyResult, setVerifyResult] = useState<{
@@ -391,6 +392,25 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
       toast({ title: "Reply saved to conversation" });
     },
     onError: (e: Error) => toast({ title: "Failed to save reply", description: e.message, variant: "destructive" }),
+  });
+
+  // Sends an approved Meta template through the Cloud API — the compliant way
+  // to reach a contact who hasn't messaged you in the last 24 hours.
+  const sendWaTemplateMutation = useMutation({
+    mutationFn: async () => {
+      const tpl = waTemplates.find((t) => t.metaTemplateName === waTemplateName);
+      const res = await apiRequest("POST", `/api/crm/clients/${client.id}/whatsapp-template`, {
+        templateName: waTemplateName,
+        languageCode: tpl?.languageCode || "en_US",
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: activitiesKey });
+      setWaTemplateName("");
+      toast({ title: "WhatsApp template sent" });
+    },
+    onError: (e: Error) => toast({ title: "Template send failed", description: e.message, variant: "destructive" }),
   });
 
   const logLinkedInMutation = useMutation({
@@ -1730,6 +1750,43 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
                       <strong>Open in WhatsApp</strong> launches the app and logs your message as sent. After they reply, paste it above and tap <strong>Log received reply</strong> to keep the full thread here.
                     </p>
                   </Card>
+
+                  {/* ── Approved template send (Cloud API, compliant cold outreach) ── */}
+                  {twilioStatus?.whatsappReady && (
+                    <Card className="p-4 space-y-3">
+                      <div>
+                        <h3 className="text-sm font-semibold">Send approved template</h3>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          For a first message to someone who hasn't replied in 24h, Meta requires an approved template. Sent via the Cloud API and logged below.
+                        </p>
+                      </div>
+                      <select
+                        value={waTemplateName}
+                        onChange={(e) => setWaTemplateName(e.target.value)}
+                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                      >
+                        <option value="">Select a template…</option>
+                        {waTemplates.filter((t) => t.metaTemplateName).map((t) => (
+                          <option key={t.id} value={t.metaTemplateName as string}>{t.label}</option>
+                        ))}
+                      </select>
+                      {waTemplateName && (
+                        <div className="rounded-md border bg-muted/30 p-3 text-xs whitespace-pre-wrap">
+                          {(waTemplates.find((t) => t.metaTemplateName === waTemplateName)?.body || "")
+                            .replace(/\{\{name\}\}/g, client.fullName.split(" ")[0])}
+                        </div>
+                      )}
+                      <Button disabled={!waTemplateName || !client.phone || sendWaTemplateMutation.isPending}
+                        onClick={() => sendWaTemplateMutation.mutate()} className="gap-2 bg-green-600 hover:bg-green-700">
+                        {sendWaTemplateMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+                        Send template
+                      </Button>
+                      <p className="text-xs text-muted-foreground">
+                        Template names must match those approved in{" "}
+                        <a href="https://business.facebook.com/wa/manage/message-templates/" target="_blank" rel="noopener noreferrer" className="underline">Meta WhatsApp Manager</a>.
+                      </p>
+                    </Card>
+                  )}
 
                   {/* ── Conversation thread (manual log) ── */}
                   <div>

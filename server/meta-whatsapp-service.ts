@@ -124,53 +124,9 @@ export async function sendWhatsAppTemplate(
   }
 }
 
-// ─── Check if a phone number is registered on WhatsApp ────────────────────────
-// Uses the Meta Contacts API. Returns true/false per number.
-
-export async function checkWhatsAppNumber(
-  phoneNumber: string
-): Promise<{ onWhatsApp: boolean; waId?: string; error?: string }> {
-  if (!META_WA_ACCESS_TOKEN)
-    return { onWhatsApp: false, error: "META_WHATSAPP_ACCESS_TOKEN not configured." };
-  if (!META_WA_PHONE_NUMBER_ID)
-    return { onWhatsApp: false, error: "META_WHATSAPP_PHONE_NUMBER_ID not configured." };
-
-  const phone = "+" + normalizePhone(phoneNumber);
-
-  try {
-    const res = await fetch(`${META_API_BASE}/${META_WA_PHONE_NUMBER_ID}/contacts`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${META_WA_ACCESS_TOKEN}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        contacts: [phone],
-      }),
-    });
-
-    const json = await res.json() as {
-      contacts?: Array<{ input: string; status: string; wa_id?: string }>;
-      error?: { message?: string; code?: number };
-    };
-
-    if (!res.ok) {
-      return { onWhatsApp: false, error: json.error?.message || `Meta API error ${res.status}` };
-    }
-
-    const contact = json.contacts?.[0];
-    if (!contact) return { onWhatsApp: false };
-
-    if (contact.status === "valid" && contact.wa_id) {
-      return { onWhatsApp: true, waId: contact.wa_id };
-    }
-
-    return { onWhatsApp: false };
-  } catch (err) {
-    return { onWhatsApp: false, error: err instanceof Error ? err.message : "Network error" };
-  }
-}
+// Note: there is intentionally no "check if a number is on WhatsApp" helper.
+// The Cloud API has no contacts/validation endpoint (that was On-Premises API
+// only), so such a check cannot be performed reliably.
 
 // ─── Pre-loaded template definitions ─────────────────────────────────────────
 // These match the templates you should create in Meta Business Manager.

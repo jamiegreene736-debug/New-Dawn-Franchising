@@ -23,6 +23,7 @@ const ACTIVITY_ICONS: Record<string, React.ReactNode> = {
   sms_sent: <MessageSquare className="size-4 text-teal-500" />,
   sms_failed: <MessageSquare className="size-4 text-red-500" />,
   whatsapp_sent: <MessageCircle className="size-4 text-green-600" />,
+  whatsapp_received: <MessageCircle className="size-4 text-emerald-500" />,
   whatsapp_failed: <MessageCircle className="size-4 text-red-500" />,
   voicemail_dropped: <Mic className="size-4 text-indigo-500" />,
   voicemail_failed: <Mic className="size-4 text-red-500" />,
@@ -41,7 +42,8 @@ function activityLabel(act: { activityType: string; metadata: unknown }): string
     case "email_opened": return `Email opened: ${m.subject || ""}`;
     case "sms_sent": return `SMS sent: "${String(m.message || "").slice(0, 60)}${String(m.message || "").length > 60 ? "…" : ""}"`;
     case "sms_failed": return `SMS failed: ${m.error || ""}`;
-    case "whatsapp_sent": return `WhatsApp sent: "${String(m.message || "").slice(0, 60)}…"`;
+    case "whatsapp_sent": return `WhatsApp ${m.manual ? "opened" : "sent"}: "${String(m.message || "").slice(0, 60)}…"`;
+    case "whatsapp_received": return `WhatsApp received: "${String(m.message || "").slice(0, 60)}…"`;
     case "whatsapp_failed": return `WhatsApp failed: ${m.error || ""}`;
     case "voicemail_dropped": return "Ringless voicemail dropped";
     case "voicemail_failed": return `Voicemail failed: ${m.error || ""}`;
@@ -130,7 +132,7 @@ interface SigRequest {
   signerIp: string | null;
 }
 
-interface Template { id: string; label: string; body?: string; script?: string; group?: string; }
+interface Template { id: string; label: string; body?: string; script?: string; group?: string; metaTemplateName?: string | null; requiresApproval?: boolean; languageCode?: string; }
 interface SmsMessage { id: string; direction: "inbound" | "outbound"; body: string; status: string; sentAt: string; }
 interface TwilioStatus { configured: boolean; smsReady: boolean; whatsappReady: boolean; }
 interface VoicemailStatus { configured: boolean; }
@@ -180,10 +182,9 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
   const [noteText, setNoteText] = useState("");
   const [smsMessage, setSmsMessage] = useState("");
   const [waMessage, setWaMessage] = useState("");
+  const [waTemplateName, setWaTemplateName] = useState("");
   const [linkedinNote, setLinkedinNote] = useState("");
   const [audioUrl, setAudioUrl] = useState("");
-  const [waCheckResult, setWaCheckResult] = useState<{ onWhatsApp: boolean; waId?: string; error?: string } | null>(null);
-  const [waChecking, setWaChecking] = useState(false);
   const [verifyResult, setVerifyResult] = useState<{
     email?: { result: string; status: string; score: number; disposable?: boolean; webmail?: boolean; configured?: boolean };
     phone?: { valid: boolean; normalized: string; note: string };
@@ -201,9 +202,12 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
   const docsKey = [`/api/crm/clients/${client.id}/documents`];
   const sigsKey = [`/api/crm/clients/${client.id}/signatures`];
 
-  const { data: activities = [] } = useQuery<Activity[]>({
+  const { data: activities = [], refetch: refetchActivities } = useQuery<Activity[]>({
     queryKey: activitiesKey,
     queryFn: async () => (await apiRequest("GET", `/api/crm/clients/${client.id}/activities`)).json(),
+    // Poll while the WhatsApp tab is open so inbound replies captured by the
+    // Meta webhook appear in the conversation thread without a manual refresh.
+    refetchInterval: tab === "whatsapp" ? 10000 : false,
   });
 
   const { data: documents = [] } = useQuery<Doc[]>({
@@ -340,17 +344,76 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
     onError: (e: Error) => toast({ title: "SMS failed", description: e.message, variant: "destructive" }),
   });
 
-  const waMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/crm/clients/${client.id}/whatsapp`, { message: waMessage });
+  // Logs the WhatsApp touch to the client timeline (the message itself is sent
+  // manually from the WhatsApp desktop app, not via an API).
+  const logWhatsAppMutation = useMutation({
+    mutationFn: async (message: string) => {
+      const res = await apiRequest("POST", `/api/crm/clients/${client.id}/activities`, {
+        activityType: "whatsapp_sent",
+        metadata: { message, manual: true },
+      });
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: activitiesKey }),
+  });
+
+  // Opens the WhatsApp desktop app on the user's Mac, pre-filled with the
+  // contact's number and the composed message, so the conversation continues
+  // natively in WhatsApp instead of going through the Meta Cloud API.
+  function openWhatsApp() {
+    if (!client.phone) return;
+    const digits = client.phone.replace(/\D/g, "");
+    // Assume a bare 10-digit number is US/Canada and prepend the country code.
+    const intl = digits.length === 10 ? `1${digits}` : digits;
+    const text = waMessage.trim().replace(/\{\{name\}\}/g, client.fullName.split(" ")[0]);
+    const url = `whatsapp://send?phone=${intl}${text ? `&text=${encodeURIComponent(text)}` : ""}`;
+
+    // Trigger the whatsapp:// protocol handler without navigating the page away.
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.click();
+
+    if (text) logWhatsAppMutation.mutate(text);
+    toast({ title: "Opening WhatsApp…", description: "Continue the conversation in the WhatsApp app." });
+    setWaMessage("");
+  }
+
+  // Saves a reply the contact sent you back into the conversation thread.
+  // Since the chat happens in the native app, inbound messages are logged
+  // manually here so the back-and-forth lives in the CRM record.
+  const logWhatsAppReceivedMutation = useMutation({
+    mutationFn: async (message: string) => {
+      const res = await apiRequest("POST", `/api/crm/clients/${client.id}/activities`, {
+        activityType: "whatsapp_received",
+        metadata: { message, manual: true },
+      });
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: activitiesKey });
       setWaMessage("");
-      toast({ title: "WhatsApp message sent" });
+      toast({ title: "Reply saved to conversation" });
     },
-    onError: (e: Error) => toast({ title: "WhatsApp failed", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => toast({ title: "Failed to save reply", description: e.message, variant: "destructive" }),
+  });
+
+  // Sends an approved Meta template through the Cloud API — the compliant way
+  // to reach a contact who hasn't messaged you in the last 24 hours.
+  const sendWaTemplateMutation = useMutation({
+    mutationFn: async () => {
+      const tpl = waTemplates.find((t) => t.metaTemplateName === waTemplateName);
+      const res = await apiRequest("POST", `/api/crm/clients/${client.id}/whatsapp-template`, {
+        templateName: waTemplateName,
+        languageCode: tpl?.languageCode || "en_US",
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: activitiesKey });
+      setWaTemplateName("");
+      toast({ title: "WhatsApp template sent" });
+    },
+    onError: (e: Error) => toast({ title: "Template send failed", description: e.message, variant: "destructive" }),
   });
 
   const logLinkedInMutation = useMutation({
@@ -1645,81 +1708,144 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
               {/* ── WhatsApp ── */}
               {tab === "whatsapp" && (
                 <div className="space-y-4">
-                  {!twilioStatus?.whatsappReady && (
-                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                      WhatsApp not configured. Add META_WHATSAPP_ACCESS_TOKEN and META_WHATSAPP_PHONE_NUMBER_ID in Secrets to enable WhatsApp via Meta Cloud API.
-                    </div>
-                  )}
                   {!client.phone && (
                     <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
                       This client has no phone number on file.
                     </div>
                   )}
 
-                  {/* ── WhatsApp number check ── */}
-                  {client.phone && twilioStatus?.whatsappReady && (
-                    <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-muted-foreground">Is this number on WhatsApp?</span>
-                        <button
-                          disabled={waChecking}
-                          onClick={async () => {
-                            setWaChecking(true);
-                            setWaCheckResult(null);
-                            try {
-                              const res = await apiRequest("POST", "/api/crm/whatsapp-check-number", { phone: client.phone });
-                              setWaCheckResult(await res.json());
-                            } catch {
-                              setWaCheckResult({ onWhatsApp: false, error: "Check failed" });
-                            } finally {
-                              setWaChecking(false);
-                            }
-                          }}
-                          className="text-xs rounded-full border px-2.5 py-1 bg-white hover:bg-muted transition-colors flex items-center gap-1 disabled:opacity-50"
-                        >
-                          {waChecking ? <Loader2 className="size-3 animate-spin" /> : <MessageCircle className="size-3" />}
-                          {waChecking ? "Checking…" : "Check"}
-                        </button>
+                  <div className="rounded-lg border border-green-100 bg-green-50/50 p-3 text-xs text-green-800 space-y-1">
+                    <p className="font-semibold">Opens in the WhatsApp app</p>
+                    <p>This launches the WhatsApp desktop app on your Mac for {formatPhone(client.phone) || "this contact"}, pre-filled with any message you compose below — so you can chat directly in WhatsApp. No API or template approval needed; just make sure WhatsApp Desktop is installed and signed in.</p>
+                  </div>
+
+                  <Card className="p-4 space-y-3">
+                    <h3 className="text-sm font-semibold">Compose</h3>
+                    <div>
+                      <label className="text-xs font-semibold text-muted-foreground mb-1 block">Quick Templates</label>
+                      {renderGroupedTemplateChips(waTemplates, setWaMessage)}
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-muted-foreground mb-1 block">
+                        Message to {formatPhone(client.phone) || "(no phone)"}
+                      </label>
+                      <textarea
+                        value={waMessage}
+                        onChange={(e) => setWaMessage(e.target.value)}
+                        rows={4}
+                        placeholder="Type a message to send, or paste a reply you received…"
+                        className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm resize-none"
+                      />
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button disabled={!client.phone}
+                        onClick={openWhatsApp} className="gap-2 bg-green-600 hover:bg-green-700">
+                        <MessageCircle className="size-4" />
+                        Open in WhatsApp
+                      </Button>
+                      <Button variant="outline" disabled={!waMessage.trim() || logWhatsAppReceivedMutation.isPending}
+                        onClick={() => logWhatsAppReceivedMutation.mutate(waMessage.trim())} className="gap-2">
+                        {logWhatsAppReceivedMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : <MessageCircle className="size-4" />}
+                        Log received reply
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      <strong>Open in WhatsApp</strong> launches the app and logs your message as sent. After they reply, paste it above and tap <strong>Log received reply</strong> to keep the full thread here.
+                    </p>
+                  </Card>
+
+                  {/* ── Approved template send (Cloud API, compliant cold outreach) ── */}
+                  {twilioStatus?.whatsappReady && (
+                    <Card className="p-4 space-y-3">
+                      <div>
+                        <h3 className="text-sm font-semibold">Send approved template</h3>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          For a first message to someone who hasn't replied in 24h, Meta requires an approved template. Sent via the Cloud API and logged below.
+                        </p>
                       </div>
-                      {waCheckResult !== null && (
-                        <div className={`text-xs rounded px-2 py-1 font-medium ${waCheckResult.onWhatsApp ? "bg-green-100 text-green-800" : "bg-red-50 text-red-700"}`}>
-                          {waCheckResult.onWhatsApp
-                            ? `✓ Registered on WhatsApp${waCheckResult.waId ? ` (ID: ${waCheckResult.waId})` : ""}`
-                            : `✗ Not on WhatsApp${waCheckResult.error ? ` — ${waCheckResult.error}` : ""}`}
+                      <select
+                        value={waTemplateName}
+                        onChange={(e) => setWaTemplateName(e.target.value)}
+                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                      >
+                        <option value="">Select a template…</option>
+                        {waTemplates.filter((t) => t.metaTemplateName).map((t) => (
+                          <option key={t.id} value={t.metaTemplateName as string}>{t.label}</option>
+                        ))}
+                      </select>
+                      {waTemplateName && (
+                        <div className="rounded-md border bg-muted/30 p-3 text-xs whitespace-pre-wrap">
+                          {(waTemplates.find((t) => t.metaTemplateName === waTemplateName)?.body || "")
+                            .replace(/\{\{name\}\}/g, client.fullName.split(" ")[0])}
                         </div>
                       )}
-                    </div>
+                      <Button disabled={!waTemplateName || !client.phone || sendWaTemplateMutation.isPending}
+                        onClick={() => sendWaTemplateMutation.mutate()} className="gap-2 bg-green-600 hover:bg-green-700">
+                        {sendWaTemplateMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+                        Send template
+                      </Button>
+                      <p className="text-xs text-muted-foreground">
+                        Template names must match those approved in{" "}
+                        <a href="https://business.facebook.com/wa/manage/message-templates/" target="_blank" rel="noopener noreferrer" className="underline">Meta WhatsApp Manager</a>.
+                      </p>
+                    </Card>
                   )}
 
-                  {/* ── Template guidance ── */}
-                  <div className="rounded-lg border border-blue-100 bg-blue-50/50 p-3 text-xs text-blue-800 space-y-1">
-                    <p className="font-semibold">First-time message?</p>
-                    <p>Meta requires an approved template for cold outreach. Use one of the template options below — they map to templates you submit in Meta Business Manager. Free-form text only works if they've messaged you within the last 24 hours.</p>
-                    <a href="https://business.facebook.com/wa/manage/message-templates/" target="_blank" rel="noopener noreferrer"
-                      className="underline font-medium">Submit templates in Meta Business Manager →</a>
-                  </div>
-
+                  {/* ── Conversation thread (manual log) ── */}
                   <div>
-                    <label className="text-xs font-semibold text-muted-foreground mb-1 block">Quick Templates</label>
-                    {renderGroupedTemplateChips(waTemplates, setWaMessage)}
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-sm font-semibold">WhatsApp Conversation</h3>
+                      <button onClick={() => refetchActivities()} className="text-xs text-muted-foreground hover:text-foreground">
+                        <RefreshCw className="size-3 inline mr-1" />Refresh
+                      </button>
+                    </div>
+                    <div className="rounded-lg border bg-muted/30 p-4 min-h-[200px] max-h-[420px] overflow-y-auto space-y-3">
+                      {(() => {
+                        const thread = activities
+                          .filter((a) => a.activityType === "whatsapp_sent" || a.activityType === "whatsapp_received" || a.activityType === "whatsapp_failed")
+                          .slice()
+                          .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+                        if (thread.length === 0) {
+                          return (
+                            <div className="flex flex-col items-center justify-center py-12 text-center">
+                              <MessageCircle className="size-10 text-muted-foreground/30 mb-2" />
+                              <p className="text-sm text-muted-foreground">No WhatsApp messages logged yet</p>
+                              <p className="text-xs text-muted-foreground mt-1">Messages you send and replies you log will appear here.</p>
+                            </div>
+                          );
+                        }
+                        return thread.map((a) => {
+                          const m = (a.metadata || {}) as Record<string, unknown>;
+                          const isInbound = a.activityType === "whatsapp_received";
+                          const failed = a.activityType === "whatsapp_failed";
+                          const body = String(m.message || m.error || "");
+                          return (
+                            <div key={a.id} className={`flex ${isInbound ? "justify-start" : "justify-end"}`}>
+                              <div className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm shadow-sm ${
+                                isInbound
+                                  ? "bg-white border border-border text-foreground"
+                                  : failed
+                                    ? "bg-red-50 border border-red-200 text-red-900"
+                                    : "bg-green-600 text-white"
+                              }`}>
+                                <p className="leading-relaxed whitespace-pre-wrap break-words">{body}</p>
+                                <p className={`text-[10px] mt-1.5 ${
+                                  isInbound ? "text-muted-foreground" : failed ? "text-red-600" : "text-white/70"
+                                }`}>
+                                  {isInbound ? client.fullName.split(" ")[0] : "You"}
+                                  {" · "}
+                                  {new Date(a.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                                  {" "}
+                                  {new Date(a.createdAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                                  {failed && " · Failed"}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        });
+                      })()}
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-xs font-semibold text-muted-foreground mb-1 block">
-                      WhatsApp to {formatPhone(client.phone) || "(no phone)"}
-                    </label>
-                    <textarea
-                      value={waMessage}
-                      onChange={(e) => setWaMessage(e.target.value)}
-                      rows={5}
-                      placeholder="Type your WhatsApp message…"
-                      className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm resize-none"
-                    />
-                  </div>
-                  <Button disabled={!waMessage.trim() || !client.phone || waMutation.isPending}
-                    onClick={() => waMutation.mutate()} className="gap-2 bg-green-600 hover:bg-green-700">
-                    {waMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : <MessageCircle className="size-4" />}
-                    Send WhatsApp
-                  </Button>
                 </div>
               )}
 

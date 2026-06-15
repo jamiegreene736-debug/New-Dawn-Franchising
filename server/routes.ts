@@ -3883,16 +3883,74 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
     res.json(WHATSAPP_TEMPLATES);
   });
 
-  // Check if a phone number is registered on WhatsApp
-  app.post("/api/crm/whatsapp-check-number", requireAdminAuth, async (req, res) => {
+  // ─── Meta WhatsApp Cloud API webhook ──────────────────────────────────────
+  // Receives inbound replies so the conversation logs automatically in the CRM.
+  // Configure in Meta App Dashboard → WhatsApp → Configuration:
+  //   Callback URL:  https://<your-domain>/api/webhooks/whatsapp
+  //   Verify token:  value of META_WHATSAPP_VERIFY_TOKEN
+  //   Subscribe to the "messages" field.
+
+  // GET — Meta's one-time verification handshake.
+  app.get("/api/webhooks/whatsapp", (req, res) => {
+    const verifyToken = process.env.META_WHATSAPP_VERIFY_TOKEN || "";
+    const mode = req.query["hub.mode"];
+    const token = req.query["hub.verify_token"];
+    const challenge = req.query["hub.challenge"];
+    if (mode === "subscribe" && verifyToken && token === verifyToken) {
+      return res.status(200).send(String(challenge ?? ""));
+    }
+    return res.sendStatus(403);
+  });
+
+  // POST — inbound messages and status updates.
+  app.post("/api/webhooks/whatsapp", async (req, res) => {
+    res.sendStatus(200); // acknowledge immediately so Meta doesn't retry
     try {
-      const { phone } = req.body as { phone: string };
-      if (!phone) return res.status(400).json({ error: "phone required" });
-      const { checkWhatsAppNumber } = await import("./meta-whatsapp-service");
-      const result = await checkWhatsAppNumber(phone);
-      res.json(result);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      const body = req.body as any;
+      if (body?.object !== "whatsapp_business_account") return;
+
+      for (const entry of body.entry || []) {
+        for (const change of entry.changes || []) {
+          if (change.field !== "messages") continue;
+          const value = change.value || {};
+          const contactName = value.contacts?.[0]?.profile?.name as string | undefined;
+
+          for (const message of value.messages || []) {
+            const from = String(message.from || "");
+            // Extract text across the common message types.
+            const text =
+              message.text?.body ??
+              message.button?.text ??
+              message.interactive?.button_reply?.title ??
+              message.interactive?.list_reply?.title ??
+              (message.type ? `[${message.type} message]` : "");
+            if (!from || !text) continue;
+
+            const allClients = await storage.getCrmClients();
+            const matched = allClients.find(
+              (c) => c.phone && phoneLast10(c.phone) === phoneLast10(from),
+            );
+            if (!matched) continue;
+
+            // Skip duplicates — Meta can deliver the same webhook more than once.
+            const acts = await storage.getCrmClientActivities(matched.id);
+            const msgId = String(message.id || "");
+            const already = acts.some((a) => {
+              const m = (a.metadata || {}) as Record<string, string>;
+              return msgId && m.messageId === msgId;
+            });
+            if (already) continue;
+
+            await storage.createCrmClientActivity({
+              clientId: matched.id,
+              activityType: "whatsapp_received",
+              metadata: { message: text, messageId: msgId, from, contactName },
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.error("[WhatsApp webhook]", err);
     }
   });
 
@@ -4005,6 +4063,38 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
       res.json({ success: true, sid: result.id });
     } catch (err) {
       res.status(500).json({ message: "Failed to send WhatsApp message" });
+    }
+  });
+
+  // Send an approved WhatsApp template to a client (compliant cold first-message).
+  app.post("/api/crm/clients/:id/whatsapp-template", requireAdminAuth, async (req, res) => {
+    try {
+      const client = await storage.getCrmClient(String(req.params.id));
+      if (!client) return res.status(404).json({ message: "Client not found" });
+      if (!client.phone) return res.status(400).json({ message: "Client has no phone number" });
+
+      const { templateName, languageCode = "en_US" } = req.body as {
+        templateName: string; languageCode?: string;
+      };
+      if (!templateName) return res.status(400).json({ message: "templateName is required" });
+
+      const firstName = client.fullName.split(" ")[0];
+      const result = await sendWhatsAppTemplate(client.phone, templateName, languageCode, [firstName]);
+
+      // Log the rendered template body so it shows in the conversation thread.
+      const tpl = WHATSAPP_TEMPLATES.find((t) => t.metaTemplateName === templateName);
+      const renderedBody = (tpl?.body || `[template: ${templateName}]`).replace(/\{\{name\}\}/g, firstName);
+
+      await storage.createCrmClientActivity({
+        clientId: client.id,
+        activityType: result.success ? "whatsapp_sent" : "whatsapp_failed",
+        metadata: { message: renderedBody, sid: result.id, error: result.error, template: templateName },
+      });
+
+      if (!result.success) return res.status(502).json({ message: result.error });
+      res.json({ success: true, sid: result.id });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to send WhatsApp template" });
     }
   });
 

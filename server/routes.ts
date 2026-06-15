@@ -1422,12 +1422,14 @@ The franchise model: "You Own It. You Direct It. We Run It."
 
 What's included in the franchise:
 - A real operating franchise model in Property Management, Telecom, or Insurance
-- A USCIS-compliant business plan (partnered with Joorney Business Plans)
 - Operational support by New Dawn's local teams
 - Escrow structure through the investor's selected escrow account
 - Escrow refund protection if the visa is denied twice, as detailed in the FDD and transaction documents
 - Internal buyback pathway and documentation support for future growth planning
 - Investor funds held in escrow by a third-party attorney — only released on visa approval
+
+What New Dawn does NOT provide (be accurate — never imply otherwise):
+- We do NOT write or provide the E-2 business plan. The investor uses their own business-plan writer — whoever they choose — or we can refer an experienced E-2 business-plan writer on request. Never say a business plan is "included" or that we prepare one.
 
 Additional paths: As the business grows, it can serve as a stepping stone to EB-5 (Green Card).
 
@@ -1443,7 +1445,7 @@ Immigration attorneys, business brokers, financial advisors, visa consultants, b
 
 Pitch to referral partners:
 - "I wanted to introduce a franchise option you could offer E-2 clients who need a compliant business"
-- Emphasise: escrow protection (safe for their clients to recommend), fully managed (no experience needed), USCIS-compliant business plan included, $225K meets the investment threshold
+- Emphasise: escrow protection (safe for their clients to recommend), fully managed (no experience needed), $225K meets the investment threshold (the client arranges their own E-2 business plan with any writer they choose; we can refer one if helpful)
 - Mention the referral fee arrangement
 - Make them the hero to their client — you solve a hard problem for them
 

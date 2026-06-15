@@ -16,6 +16,7 @@ import { cachedProviderSearch } from "./search-cache";
 import { parseNaturalLanguageToFilters, type LeadSearchFilters, type ProviderId } from "./seamless-prospects";
 import type { EnrichedContact } from "./prospect-enrichment";
 import { logSearchEvent } from "./search-telemetry";
+import { draftProspectOutreach, type OutreachChannel } from "./outreach-drafter";
 
 export interface SavedSearch {
   id: string;
@@ -29,6 +30,11 @@ export interface SavedSearch {
   lastRunAt: string | null;
   lastResultCount: number | null;
   lastNewCount: number | null;
+  // Guardrailed auto-pilot: auto-draft outreach for new matches at/above the
+  // score threshold (drafts queue for human approval; never auto-sent).
+  autoOutreach: boolean;
+  autoChannel: OutreachChannel;
+  autoMinScore: number;
   createdAt: string;
 }
 
@@ -38,25 +44,32 @@ function rowToSaved(r: any): SavedSearch {
     query: r.query ?? null, filters: (r.filters as LeadSearchFilters) || {},
     active: !!r.active, createdBy: r.createdBy ?? null,
     lastRunAt: r.lastRunAt ?? null, lastResultCount: r.lastResultCount ?? null,
-    lastNewCount: r.lastNewCount ?? null, createdAt: r.createdAt,
+    lastNewCount: r.lastNewCount ?? null,
+    autoOutreach: !!r.autoOutreach, autoChannel: r.autoChannel === "linkedin" ? "linkedin" : "email",
+    autoMinScore: r.autoMinScore ?? 70,
+    createdAt: r.createdAt,
   };
 }
 
 const COLS = `id, name, provider, mode, query, filters, active, created_by AS "createdBy",
   last_run_at AS "lastRunAt", last_result_count AS "lastResultCount",
-  last_new_count AS "lastNewCount", created_at AS "createdAt"`;
+  last_new_count AS "lastNewCount", auto_outreach AS "autoOutreach",
+  auto_channel AS "autoChannel", auto_min_score AS "autoMinScore", created_at AS "createdAt"`;
 
 export async function createSavedSearch(input: {
   name: string; provider?: string; mode?: string; query?: string | null;
   filters?: LeadSearchFilters; createdBy?: string | null;
+  autoOutreach?: boolean; autoChannel?: string; autoMinScore?: number;
 }): Promise<SavedSearch> {
   const provider: ProviderId = input.provider === "apollo" || input.provider === "origami" ? input.provider : "seamless";
   const mode = input.mode === "companies" ? "companies" : "contacts";
   const { rows } = await pool.query(
-    `INSERT INTO saved_searches (name, provider, mode, query, filters, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6) RETURNING ${COLS}`,
+    `INSERT INTO saved_searches (name, provider, mode, query, filters, created_by, auto_outreach, auto_channel, auto_min_score)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING ${COLS}`,
     [input.name.trim() || "Untitled search", provider, mode, input.query?.trim() || null,
-     JSON.stringify(input.filters || {}), input.createdBy ?? null],
+     JSON.stringify(input.filters || {}), input.createdBy ?? null,
+     !!input.autoOutreach, input.autoChannel === "linkedin" ? "linkedin" : "email",
+     Number.isFinite(input.autoMinScore) ? Math.max(0, Math.min(100, Number(input.autoMinScore))) : 70],
   );
   return rowToSaved(rows[0]);
 }
@@ -143,7 +156,58 @@ export async function runSavedSearch(id: string): Promise<{ total: number; newMa
     resultCount: matches.length, cached: result.cached ?? null, durationMs: Date.now() - started,
   });
 
+  // Guardrailed auto-pilot: for the strongest brand-new matches, auto-draft
+  // outreach and QUEUE it for human approval (capped to limit cost; never sent).
+  if (s.autoOutreach) {
+    const candidates = newMatches.filter((m) => m.icpScore >= s.autoMinScore).slice(0, 5);
+    for (const m of candidates) {
+      try {
+        const draft = await draftProspectOutreach({
+          fullName: m.fullName, jobTitle: m.jobTitle, companyName: m.company,
+          country: m.country, channel: s.autoChannel, reasons: m.reasons,
+        });
+        await pool.query(
+          `INSERT INTO auto_outreach_queue (saved_search_id, contact_key, full_name, company, channel, subject, body, icp_score)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+          [id, m.contactKey, m.fullName, m.company, draft.channel, draft.subject, draft.body, m.icpScore],
+        );
+      } catch (err: any) {
+        console.error("[saved-searches] auto-draft failed:", err?.message || err);
+      }
+    }
+  }
+
   return { total: matches.length, newMatches };
+}
+
+export interface QueuedOutreach {
+  id: string;
+  savedSearchId: string | null;
+  fullName: string;
+  company: string | null;
+  channel: string;
+  subject: string | null;
+  body: string;
+  icpScore: number;
+  status: string;
+  createdAt: string;
+}
+
+export async function getOutreachQueue(status = "pending_approval", limit = 50): Promise<QueuedOutreach[]> {
+  const { rows } = await pool.query(
+    `SELECT id, saved_search_id AS "savedSearchId", full_name AS "fullName", company, channel,
+            subject, body, icp_score AS "icpScore", status, created_at AS "createdAt"
+       FROM auto_outreach_queue
+      WHERE status = $1
+      ORDER BY icp_score DESC, created_at DESC
+      LIMIT ${Number(limit)}`,
+    [status],
+  );
+  return rows as QueuedOutreach[];
+}
+
+export async function setOutreachQueueStatus(id: string, status: "approved" | "dismissed"): Promise<void> {
+  await pool.query(`UPDATE auto_outreach_queue SET status = $2 WHERE id = $1`, [id, status]);
 }
 
 export interface DigestEntry {

@@ -51,6 +51,7 @@ const DESKTOP_NAV: DesktopNavEntry[] = [
     label: "About", id: "about-group",
     items: [
       { href: "/about", label: "About Us", id: "about" },
+      { href: "/why-new-dawn", label: "What Makes Us Different", id: "why-new-dawn" },
       { href: "/property-management", label: "Property Management", id: "property-management" },
       { href: "/telecom", label: "Telecom (VoIP)", id: "telecom" },
       { href: "/insurance", label: "Insurance", id: "insurance" },
@@ -89,6 +90,7 @@ const MOBILE_NAV: DesktopNavEntry[] = [
     label: "About", id: "about-group",
     items: [
       { href: "/about", label: "About Us", id: "about" },
+      { href: "/why-new-dawn", label: "What Makes Us Different", id: "why-new-dawn" },
       { href: "/property-management", label: "Property Management", id: "property-management" },
       { href: "/telecom", label: "Telecom (VoIP)", id: "telecom" },
       { href: "/insurance", label: "Insurance", id: "insurance" },

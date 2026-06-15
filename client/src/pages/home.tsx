@@ -176,11 +176,11 @@ const OVERVIEW_SCENES = [
     icon: Wallet,
   },
   {
-    id: "buyback",
-    kicker: "A built-in exit",
-    title: "In-house buy-back program",
-    copy: "A clear path to recover your investment, typically after about four years.",
-    icon: RefreshCw,
+    id: "control",
+    kicker: "Own it. Direct it.",
+    title: "You hold financial control",
+    copy: "You control the bank accounts, approve major decisions, and direct the business — the substantive role the E-2 visa requires.",
+    icon: Wallet,
   },
   {
     id: "team",
@@ -673,7 +673,12 @@ export default function Home() {
                   {FRANCHISE_VERTICALS.map((vertical) => {
                     const Icon = vertical.icon;
                     return (
-                      <div key={vertical.id} data-testid={`card-hero-vertical-${vertical.id}`} className="rounded-2xl border bg-white/70 p-3 shadow-sm backdrop-blur">
+                      <Link
+                        key={vertical.id}
+                        href={`/${vertical.id}`}
+                        data-testid={`card-hero-vertical-${vertical.id}`}
+                        className="group rounded-2xl border bg-white/70 p-3 shadow-sm backdrop-blur transition-colors hover:border-[hsl(var(--primary))]/40 hover:bg-white"
+                      >
                         <div className="flex items-center gap-2">
                           <span className="grid size-8 place-items-center rounded-full bg-[hsl(var(--primary))]/8">
                             <Icon className="size-4 text-[hsl(var(--primary))]" />
@@ -683,14 +688,17 @@ export default function Home() {
                         <p className="mt-2 hidden text-xs leading-snug text-muted-foreground lg:block">
                           {vertical.desc}
                         </p>
-                      </div>
+                        <span className="mt-2 hidden items-center gap-1 text-xs font-medium text-[hsl(var(--primary))] lg:inline-flex">
+                          Explore <ArrowRight className="size-3 transition-transform group-hover:translate-x-0.5" />
+                        </span>
+                      </Link>
                     );
                   })}
                 </div>
 
                 <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
                   <Button data-testid="button-hero-primary-fdd" size="lg" className="gap-2 bg-[hsl(var(--primary))] px-6 py-6 text-base shadow-xl shadow-[hsl(var(--primary))]/20 hover:bg-[hsl(var(--primary))]/92" asChild>
-                    <a href="/contact">
+                    <a href="/request-fdd">
                       Request Your Free FDD & Schedule a Call
                       <ArrowRight className="size-5" />
                     </a>
@@ -977,7 +985,7 @@ export default function Home() {
                 desc="The operating framework gives franchise owners domestic flexibility, with oversight systems designed so families can live where they choose in the United States."
               />
               <FeatureCard
-                testId="card-why-buyback"
+                testId="card-why-escrow"
                 icon={<RefreshCw className="size-5 text-[hsl(var(--accent))]" />}
                 title="Escrow-first investor protection"
                 desc="Investor capital is placed in escrow during setup, and New Dawn’s FDD explains the refund framework if a qualifying E-2 application is denied twice."
@@ -1232,16 +1240,16 @@ export default function Home() {
                 desc="Structure your franchise so your spouse holds the E-2 visa while you continue your current employment or work situation in the USA. Your family gets the visa, and you keep earning."
               />
               <FeatureCard
-                testId="card-inv-buyback"
+                testId="card-inv-control"
                 icon={<RotateCcw className="size-5 text-[hsl(var(--primary))]" />}
-                title="In-house buy-back program"
-                desc="Looking to exit in 4 years? Ask about our in-house buy-back program. Invest now, build your business, and when you're ready to move on, we have a program to help you recover your investment."
+                title="You stay in control"
+                desc="You hold ownership and bank-account control, approve the key decisions, and supervise performance — while our local teams handle daily execution. That's the substantive directing role the E-2 visa is built around."
               />
             </div>
 
             <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
               <Button data-testid="button-inv-cta" className="gap-2" asChild>
-                <Link href="/contact">
+                <Link href="/request-fdd">
                   Request franchise details
                   <ArrowRight className="size-4" />
                 </Link>
@@ -1469,11 +1477,6 @@ export default function Home() {
                   id: "eb5-path",
                 },
                 {
-                  q: "What is the in-house buy-back program?",
-                  a: "Looking to exit your franchise after a few years? Our in-house buy-back program gives you a path to recover your investment. Invest $225K, obtain your E-2 investor visa, live in the USA, build your business — and when you're ready (typically around 4 years), we can work with you on an exit. Contact us for full details.",
-                  id: "buyback-program",
-                },
-                {
                   q: "Can my spouse hold the E-2 visa instead of me?",
                   a: "Yes. If structured properly, your spouse can be the primary E-2 visa holder while you continue your current employment or work situation in the USA. This gives your family the visa benefits while you maintain your career. Talk to our team about how to structure this.",
                   id: "spouse-visa",
@@ -1604,7 +1607,7 @@ export default function Home() {
               </p>
               <div className="mt-6 flex flex-col gap-3 sm:flex-row">
                 <Button data-testid="button-contact-lead" className="gap-2" asChild>
-                  <a href="/contact">
+                  <a href="/request-fdd">
                     Request FDD & book a call
                     <ArrowRight className="size-4" />
                   </a>

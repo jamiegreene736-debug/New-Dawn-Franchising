@@ -60,6 +60,7 @@ const FOOTER_I18N = {
     rightsReserved: "All rights reserved.",
     privacy: "Privacy Policy",
     terms: "Terms & Conditions",
+    legal: "Legal & Disclaimers",
   },
   es: {
     groupPrefix: "Parte del ",
@@ -87,6 +88,7 @@ const FOOTER_I18N = {
     rightsReserved: "Todos los derechos reservados.",
     privacy: "Política de Privacidad",
     terms: "Términos y Condiciones",
+    legal: "Aviso Legal",
   },
 } as const;
 
@@ -125,6 +127,7 @@ const DESKTOP_NAV: DesktopNavEntry[] = [
     items: [
       { href: "/e2-visa-franchise", label: "E-2 Visa Franchise", id: "e2-visa-franchise" },
       { href: "/e2-fit", label: "Why E-2?", id: "e2" },
+      { href: "/e-2-visa-process", label: "E-2 Visa Process", id: "e2-process" },
       { href: "/process", label: "Process", id: "process" },
       { href: "/territories", label: "Territories", id: "territories" },
     ],
@@ -164,6 +167,7 @@ const MOBILE_NAV: DesktopNavEntry[] = [
     items: [
       { href: "/e2-visa-franchise", label: "E-2 Visa Franchise", id: "e2-visa-franchise" },
       { href: "/e2-fit", label: "Why E-2?", id: "e2" },
+      { href: "/e-2-visa-process", label: "E-2 Visa Process", id: "e2-process" },
       { href: "/process", label: "Process", id: "process" },
       { href: "/territories", label: "Territories", id: "territories" },
     ],
@@ -1043,6 +1047,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
               <span>&copy; {new Date().getFullYear()} New Dawn Franchising LLC. {t.rightsReserved}</span>
               <Link href="/privacy-policy" data-testid="link-footer-privacy" className="hover:text-muted-foreground transition-colors">{t.privacy}</Link>
               <Link href="/terms" data-testid="link-footer-terms" className="hover:text-muted-foreground transition-colors">{t.terms}</Link>
+              <Link href="/legal" data-testid="link-footer-legal" className="hover:text-muted-foreground transition-colors">{t.legal}</Link>
               <LanguageSwitcher className="ml-auto" />
             </div>
           </div>

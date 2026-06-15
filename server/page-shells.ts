@@ -62,7 +62,6 @@ const shells: Record<string, PageShell> = {
       <li>Proprietary technology powers every vertical</li>
       <li>Approved local teams handle day-to-day operations</li>
       <li>In-house E-2 immigration, finance, real estate, and legal professionals</li>
-      <li>In-house buy-back program available after approximately 4 years</li>
       <li>Headquartered in El Paso, Texas, with domestic geographic flexibility for owners</li>
       <li>Part of the New Dawn Franchising Group of Companies™</li>
     </ul>
@@ -521,6 +520,356 @@ const shells: Record<string, PageShell> = {
   <h1>Is New Dawn Franchising Right for You?</h1>
   <p>Take our short fit quiz to find out if New Dawn is the right E-2 visa franchise for your situation. Takes less than 2 minutes.</p>
   <p>We'll ask about your investment timeline, capital range, and goals to help you understand if our model aligns with your E-2 visa franchise investment plans.</p>
+</main>`,
+  },
+
+  "/property-management": {
+    title: `Property Management Franchise for E-2 Visa Investors — Long-Term Rentals | ${SITE}`,
+    description:
+      "E-2 visa property management franchise. Own and direct a recurring-revenue long-term rental management business while New Dawn's local teams run daily operations. Investment from $225,000. FDD available upon request.",
+    html: `
+<main>
+  <h1>Property Management: Recurring Revenue You Direct, Operations We Run</h1>
+  <p>The New Dawn Property Management franchise is a real, operating U.S. business that manages residential long-term rentals on behalf of property owners — handling leasing, rent collection, tenant relations, maintenance coordination, and owner reporting under ongoing management agreements. It is structured so you own and direct the enterprise while approved local teams handle daily execution, exactly as the E-2 visa requires.</p>
+
+  <section>
+    <h2>Where the recurring revenue comes from</h2>
+    <p>Each property owner signs an ongoing management agreement appointing your franchise to manage their rental. The franchise earns a recurring monthly management fee for every property under management, plus leasing/tenant-placement fees and, where applicable, renewal fees — so revenue compounds as the portfolio of doors under management grows and clients renew.</p>
+  </section>
+
+  <section>
+    <h2>You direct it; our teams run it</h2>
+    <p>You are the owner and director. You set direction, review performance, approve key decisions, and keep ownership and bank-account control. Approved local teams handle leasing, tenant relations, rent collection, and maintenance, supported by proprietary technology and owner dashboards that give you the information you use to supervise and decide.</p>
+  </section>
+
+  <section>
+    <h2>Why property management fits the E-2 visa</h2>
+    <ul>
+      <li>You own and direct a genuine operating business — the foundation of a strong E-2 petition.</li>
+      <li>Recurring monthly management fees that compound rather than restarting from zero.</li>
+      <li>Long-term (annual) leases mean steadier income and lower turnover than short-term rentals.</li>
+      <li>The business employs U.S. workers, helping demonstrate the enterprise is more than marginal.</li>
+      <li>Owner dashboards and reporting create an auditable record of your active oversight for renewals.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Investment overview</h2>
+    <p>Property Management franchise investment starts at $225,000, covering your franchise license, training, technology platform access, and operational setup. Financing options are available through affiliated lending partners. The E-2 visa requires a substantial, at-risk investment in a U.S. business; this vertical is structured to meet that requirement. Full details are in the Franchise Disclosure Document (FDD).</p>
+  </section>
+
+  <section>
+    <h2>Frequently Asked Questions</h2>
+    <h3>What does the Property Management franchise actually do?</h3>
+    <p>It manages residential long-term rentals on behalf of property owners — leasing, rent collection, tenant relations, maintenance coordination, and owner reporting — under ongoing management agreements.</p>
+    <h3>Do I have to run the day-to-day myself?</h3>
+    <p>No. You are the owner and director. Approved local teams handle daily execution while you maintain ownership control, bank-account oversight, and executive supervision through your owner dashboard.</p>
+    <h3>Is this long-term rentals or short-term/vacation rentals?</h3>
+    <p>Long-term rentals — annual leases with established tenants, which provide steadier monthly income and lower turnover.</p>
+    <h3>How much do I invest?</h3>
+    <p>Property Management franchise investment starts at $225,000. The E-2 visa has no fixed minimum, but the investment must be substantial relative to the total cost of the business.</p>
+  </section>
+
+  <section>
+    <h2>Request the FDD</h2>
+    <p>Contact us to request the FDD and schedule an intro call.</p>
+    <address>
+      <p>Phone: <a href="tel:+13465979994">${PHONE}</a></p>
+      <p>Email: <a href="mailto:${EMAIL}">${EMAIL}</a></p>
+    </address>
+  </section>
+</main>`,
+    faq: [
+      {
+        question: "What does the Property Management franchise actually do?",
+        answer:
+          "It manages residential long-term rentals on behalf of property owners — handling leasing, rent collection, tenant relations, maintenance coordination, and owner reporting — under ongoing management agreements.",
+      },
+      {
+        question: "Where does the recurring revenue come from?",
+        answer:
+          "Each property owner signs a management agreement. The franchise earns a recurring monthly management fee for every property under management, plus leasing fees when tenants are placed, so revenue builds as the portfolio grows and clients renew.",
+      },
+      {
+        question: "Do I have to run the day-to-day myself?",
+        answer:
+          "No. You are the owner and director. Approved local teams handle daily execution while you maintain ownership control, bank-account oversight, and executive supervision through your owner dashboard.",
+      },
+      {
+        question: "How much do I invest?",
+        answer:
+          "Property Management franchise investment starts at $225,000. The E-2 visa has no fixed minimum, but the investment must be substantial relative to the total cost of the business.",
+      },
+    ],
+  },
+
+  "/telecom": {
+    title: `Telecom (VoIP) Franchise for E-2 Visa Investors — Recurring Subscriptions | ${SITE}`,
+    description:
+      "E-2 visa telecom franchise. Own and direct a recurring-subscription VoIP/telecom business while New Dawn's teams and systems run daily operations. Investment from $225,000. FDD available upon request.",
+    html: `
+<main>
+  <h1>Telecom: A Recurring-Subscription Business You Direct</h1>
+  <p>The New Dawn Telecom franchise operates a recurring-service telecom/VoIP business — customers subscribe to ongoing communication services and are billed every month. It is structured so you own and direct the enterprise while centralized systems, sales workflows, and approved teams handle daily execution, exactly as the E-2 visa requires.</p>
+
+  <section>
+    <h2>Recurring subscription revenue</h2>
+    <p>Telecom revenue is subscription-based: each customer pays a recurring monthly fee for service. That single fact is what makes telecom attractive both as an investment and as the foundation of a credible E-2 business — predictable, compounding revenue across a growing subscriber base.</p>
+  </section>
+
+  <section>
+    <h2>You direct it; systems and teams run it</h2>
+    <p>You are the owner and director — you set strategy, approve key decisions, control the bank accounts, and supervise performance. Centralized billing, provisioning, customer-service workflows, and proprietary technology handle the day-to-day so you keep executive control without managing every ticket.</p>
+  </section>
+
+  <section>
+    <h2>Why telecom fits the E-2 visa</h2>
+    <ul>
+      <li>You own and direct a real, active enterprise — central to a strong E-2 petition.</li>
+      <li>Recurring monthly subscriptions provide substantial, non-marginal revenue.</li>
+      <li>The business employs U.S. workers and produces an auditable operating record for renewals.</li>
+      <li>Investment from $225,000, structured to meet the E-2 substantial, at-risk requirement.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Request the FDD</h2>
+    <p>Contact us to request the FDD and schedule an intro call.</p>
+    <address>
+      <p>Phone: <a href="tel:+13465979994">${PHONE}</a></p>
+      <p>Email: <a href="mailto:${EMAIL}">${EMAIL}</a></p>
+    </address>
+  </section>
+</main>`,
+  },
+
+  "/insurance": {
+    title: `Insurance Franchise for E-2 Visa Investors — Recurring Premiums & Renewals | ${SITE}`,
+    description:
+      "E-2 visa insurance franchise. Own and direct a recurring-revenue insurance operation built around compliant supervision, client service, and renewals while New Dawn's teams run daily operations. Investment from $225,000. FDD available upon request.",
+    html: `
+<main>
+  <h1>Insurance: Recurring Renewal Revenue You Direct</h1>
+  <p>The New Dawn Insurance franchise operates an insurance-sector business built around recurring premiums, policy renewals, and ongoing client service. It is structured so you own and direct the enterprise — with compliant supervision and licensed staff handling regulated activities — while approved teams run daily operations, exactly as the E-2 visa requires.</p>
+
+  <section>
+    <h2>Where the recurring revenue comes from</h2>
+    <p>Insurance is renewal-driven: policies generate commissions that recur as clients renew year after year. A growing book of business compounds, producing predictable revenue and the kind of ongoing activity that supports a credible E-2 case.</p>
+  </section>
+
+  <section>
+    <h2>You direct it; our teams run it</h2>
+    <p>You are the owner and director. You set direction, approve key decisions, control the bank accounts, and supervise the operation. Licensed producers and service staff handle regulated, day-to-day activity under proper supervision, supported by proprietary technology and owner reporting.</p>
+  </section>
+
+  <section>
+    <h2>Why insurance fits the E-2 visa</h2>
+    <ul>
+      <li>You own and direct a genuine operating business — the foundation of a strong E-2 petition.</li>
+      <li>Recurring premiums and renewals create substantial, non-marginal revenue.</li>
+      <li>The business employs U.S. workers and creates an auditable record for renewals.</li>
+      <li>Investment from $225,000, structured to meet the E-2 substantial, at-risk requirement.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Request the FDD</h2>
+    <p>Contact us to request the FDD and schedule an intro call.</p>
+    <address>
+      <p>Phone: <a href="tel:+13465979994">${PHONE}</a></p>
+      <p>Email: <a href="mailto:${EMAIL}">${EMAIL}</a></p>
+    </address>
+  </section>
+</main>`,
+  },
+
+  "/e-2-visa-process": {
+    title: `The E-2 Visa Process, Explained | Treaty Countries, Investment & Timeline | ${SITE}`,
+    description:
+      "An in-depth walkthrough of the E-2 Treaty Investor Visa: treaty countries, the substantial and at-risk investment requirement, the own-and-direct requirement, typical timeline, and the role of partner immigration attorneys. Learn how a New Dawn franchise fits.",
+    html: `
+<main>
+  <h1>The E-2 Treaty Investor Visa Process, Step by Step</h1>
+  <p>The E-2 Treaty Investor Visa lets nationals of treaty countries live and work in the United States based on a substantial investment in a U.S. business they own and direct. This guide walks through the core requirements — treaty countries, the substantial and at-risk investment, the own-and-direct requirement, marginality, and the typical timeline — and how a New Dawn franchise is structured to fit.</p>
+
+  <section>
+    <h2>Treaty countries</h2>
+    <p>The E-2 visa is available to nationals of countries that maintain a qualifying treaty of commerce and navigation with the United States — more than 80 countries. Examples include Mexico, Canada, Germany, Japan, South Korea, Spain, Italy, Turkey, Israel, Argentina, Colombia, the United Kingdom, and France. The list changes over time; confirm your country's current eligibility with a licensed immigration attorney.</p>
+  </section>
+
+  <section>
+    <h2>The substantial and at-risk investment requirement</h2>
+    <p>There is no fixed legal minimum, but the investment must be "substantial" relative to the total cost of the business and must be irrevocably committed and genuinely at commercial risk. A New Dawn franchise investment from $225,000 funds a real, operating U.S. business across Property Management, Telecom, or Insurance — capital placed at risk in an active enterprise.</p>
+  </section>
+
+  <section>
+    <h2>The "own and direct" requirement</h2>
+    <p>The investor must own at least 50% of the enterprise and develop and direct it. New Dawn's model is built around this: you hold ownership and bank-account control, approve the key decisions, and supervise performance, while approved local teams handle daily execution. That is a substantive directing role — not passive investment.</p>
+  </section>
+
+  <section>
+    <h2>More than a marginal enterprise</h2>
+    <p>The business must do more than earn a minimal living for you and your family. Recurring-revenue verticals that employ U.S. workers and generate ongoing activity directly address the non-marginality requirement.</p>
+  </section>
+
+  <section>
+    <h2>Typical timeline</h2>
+    <p>A typical path runs: discovery and FDD review, franchise agreement and investment, business plan preparation, filing the E-2 petition, and the consular interview or change of status. Most investors complete the process in roughly 4–8 months, varying by country and consulate. E-2 status is granted in increments (often 2–5 years) and is renewable while the business operates and you continue to direct it.</p>
+  </section>
+
+  <section>
+    <h2>The role of partner immigration attorneys</h2>
+    <p>New Dawn works alongside experienced immigration attorneys who prepare and file your E-2 petition. New Dawn Franchising is a franchisor, not a law firm, and does not provide legal or immigration advice; you retain your own licensed U.S. immigration counsel. Purchasing a franchise never guarantees a visa — eligibility and approval are determined solely by U.S. consular officers and USCIS.</p>
+  </section>
+
+  <section>
+    <h2>Frequently Asked Questions</h2>
+    <h3>Which countries are eligible for the E-2 visa?</h3>
+    <p>Nationals of 80+ treaty countries. Examples include Mexico, Canada, Germany, Japan, South Korea, Spain, Italy, Turkey, and Israel. Confirm your country's current eligibility with a licensed immigration attorney.</p>
+    <h3>How much do I need to invest?</h3>
+    <p>There is no fixed legal minimum; the investment must be substantial and at risk. New Dawn franchise investment starts at $225,000.</p>
+    <h3>Does buying a franchise guarantee the E-2 visa?</h3>
+    <p>No. A franchise can support a strong petition, but approval is decided solely by U.S. consular officers and USCIS.</p>
+    <h3>Can my spouse and children come with me?</h3>
+    <p>Yes. E-2 holders can bring a spouse and unmarried children under 21 as dependents, and spouses are eligible for U.S. work authorization.</p>
+    <h3>Can the E-2 lead to a green card?</h3>
+    <p>The E-2 itself is a nonimmigrant visa, but a growing business can become a pathway to the EB-5 immigrant investor program. This is not guaranteed and depends on your circumstances.</p>
+  </section>
+
+  <section>
+    <h2>Request the FDD</h2>
+    <p>Contact us to request the FDD and schedule an intro call.</p>
+    <address>
+      <p>Phone: <a href="tel:+13465979994">${PHONE}</a></p>
+      <p>Email: <a href="mailto:${EMAIL}">${EMAIL}</a></p>
+    </address>
+  </section>
+</main>`,
+    faq: [
+      {
+        question: "Which countries are eligible for the E-2 visa?",
+        answer:
+          "Nationals of 80+ treaty countries. Examples include Mexico, Canada, Germany, Japan, South Korea, Spain, Italy, Turkey, and Israel. Confirm your country's current eligibility with a licensed immigration attorney.",
+      },
+      {
+        question: "How much do I need to invest for the E-2 visa?",
+        answer:
+          "There is no fixed legal minimum; the investment must be substantial relative to the total cost of the business and genuinely at risk. New Dawn franchise investment starts at $225,000.",
+      },
+      {
+        question: "Does buying a franchise guarantee the E-2 visa?",
+        answer:
+          "No. A franchise can support a strong petition, but eligibility and approval are determined solely by U.S. consular officers and USCIS. New Dawn does not provide legal or immigration advice or guarantee any outcome.",
+      },
+      {
+        question: "Can my spouse and children come with me on the E-2 visa?",
+        answer:
+          "Yes. E-2 holders can bring a spouse and unmarried children under 21 as dependents, and spouses are eligible for U.S. work authorization.",
+      },
+      {
+        question: "Can the E-2 visa lead to a green card?",
+        answer:
+          "The E-2 itself is a nonimmigrant visa, but a growing business can become a pathway to the EB-5 immigrant investor program. This is not guaranteed and depends on your circumstances.",
+      },
+    ],
+  },
+
+  "/request-fdd": {
+    title: `Request the FDD | E-2 Visa Franchise Information | ${SITE}`,
+    description:
+      "Request the New Dawn Franchising Franchise Disclosure Document (FDD) and investor overview. Tell us your treaty country and vertical of interest — Property Management, Telecom, or Insurance — and we'll schedule an intro call.",
+    html: `
+<main>
+  <h1>Request the Franchise Disclosure Document (FDD)</h1>
+  <p>Request the New Dawn Franchising FDD and investor overview. Share your name, email, phone, nationality/treaty country, and which vertical interests you — Property Management, Telecom, or Insurance — and our team will follow up to schedule an intro call.</p>
+  <section>
+    <h2>What happens next</h2>
+    <ol>
+      <li>We send the FDD and investor overview.</li>
+      <li>We confirm your treaty country and timeline.</li>
+      <li>We schedule a short intro call and outline next steps.</li>
+    </ol>
+  </section>
+  <section>
+    <address>
+      <p>${ADDR}</p>
+      <p>Phone: <a href="tel:+13465979994">${PHONE}</a></p>
+      <p>Email: <a href="mailto:${EMAIL}">${EMAIL}</a></p>
+    </address>
+  </section>
+</main>`,
+  },
+
+  "/legal": {
+    title: `Legal & Disclaimers | Franchise Offering & Immigration | ${SITE}`,
+    description:
+      "New Dawn Franchising legal disclaimers: franchise-offering disclaimer (FTC Franchise Rule and state law) and immigration disclaimer. Information on this site is marketing material, not legal or immigration advice.",
+    html: `
+<main>
+  <h1>Legal &amp; Disclaimers</h1>
+  <section>
+    <h2>Franchise Offering Disclaimer</h2>
+    <p>This website is for general information only and is not an offer to sell, or a solicitation of an offer to buy, a franchise. A franchise is offered and sold only through a Franchise Disclosure Document (FDD) that complies with the FTC Franchise Rule (16 CFR Part 436) and applicable state franchise laws, and only in states where New Dawn Franchising is registered, exempt, or otherwise authorized. Any earnings or results described anywhere on this site are illustrative only and are not guarantees of future performance.</p>
+  </section>
+  <section>
+    <h2>Immigration Disclaimer</h2>
+    <p>New Dawn Franchising LLC is a franchisor, not a law firm. Nothing on this site is legal, immigration, tax, or financial advice, and no attorney-client relationship is created by using the site or contacting us. E-2 treaty investor visa information is general and educational; treaty country lists and immigration laws change over time. E-2 eligibility and approval are determined solely by the U.S. Department of State (consular officers) and USCIS, never by us, and a visa is never guaranteed. Retain your own licensed U.S. immigration attorney before making any decision.</p>
+  </section>
+  <section>
+    <h2>Marketing content notice</h2>
+    <p>Content on this site is marketing material and should be reviewed by qualified immigration and franchise counsel before being relied upon.</p>
+    <address>
+      <p>${ADDR}</p>
+      <p>Phone: <a href="tel:+13465979994">${PHONE}</a></p>
+      <p>Email: <a href="mailto:${EMAIL}">${EMAIL}</a></p>
+    </address>
+  </section>
+</main>`,
+  },
+
+  "/why-new-dawn": {
+    title: `What Makes New Dawn Different | E-2 Visa Franchise Platform | ${SITE}`,
+    description:
+      "What makes New Dawn Franchising different: a multi-vertical E-2 platform, owner control and oversight, proprietary technology, and the New Dawn Franchising Group of Companies. Investment from $225,000.",
+    html: `
+<main>
+  <h1>What Makes New Dawn Different</h1>
+  <p>New Dawn Franchising was designed from the ground up for the E-2 Treaty Investor Visa, across three recurring-revenue verticals — Property Management, Telecom, and Insurance. You own and direct a real U.S. business while our teams handle daily execution.</p>
+  <section>
+    <h2>Built around the E-2 investor</h2>
+    <ul>
+      <li>A multi-vertical platform — choose Property Management, Telecom, or Insurance.</li>
+      <li>Owner control and oversight: you keep ownership, bank-account control, and the key decisions.</li>
+      <li>Proprietary technology and owner dashboards built for E-2 investor oversight.</li>
+      <li>Backed by the New Dawn Franchising Group of Companies — real estate, financing, and legal teams.</li>
+      <li>Investment from $225,000, structured to meet E-2 requirements.</li>
+    </ul>
+  </section>
+</main>`,
+  },
+
+  "/es/property-management": {
+    title: `Franquicia de Administración de Propiedades para la Visa E-2 | ${SITE}`,
+    description:
+      "Franquicia de administración de propiedades para inversionistas de la visa E-2. Usted dirige el negocio y controla las finanzas; nuestros equipos locales manejan las operaciones diarias. Inversión desde $225,000.",
+    html: `
+<main lang="es">
+  <h1>Administración de Propiedades: Ingresos Recurrentes que Usted Dirige</h1>
+  <p>La franquicia de Administración de Propiedades de New Dawn es un negocio real y operativo en EE. UU. que administra alquileres residenciales a largo plazo en nombre de los propietarios. Está estructurada para que usted sea dueño y dirija la empresa —controlando las cuentas bancarias y las decisiones clave— mientras nuestros equipos locales manejan la ejecución diaria, tal como lo exige la visa E-2.</p>
+  <section>
+    <h2>De dónde provienen los ingresos recurrentes</h2>
+    <p>Cada propietario firma un contrato de administración continuo. La franquicia gana una tarifa de administración mensual recurrente por cada propiedad administrada, más tarifas de colocación de inquilinos, por lo que los ingresos se acumulan a medida que crece la cartera.</p>
+  </section>
+  <section>
+    <h2>Por qué encaja con la visa E-2</h2>
+    <ul>
+      <li>Usted es dueño y dirige un negocio operativo genuino.</li>
+      <li>Tarifas de administración mensuales recurrentes.</li>
+      <li>El negocio emplea a trabajadores en EE. UU.</li>
+      <li>Inversión desde $225,000, estructurada para los requisitos de la E-2.</li>
+    </ul>
+  </section>
+  <p>La información de esta página es material de marketing y no constituye asesoría legal ni migratoria.</p>
 </main>`,
   },
 };

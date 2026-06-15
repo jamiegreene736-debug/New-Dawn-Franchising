@@ -351,7 +351,8 @@ export default function TelecomPage() {
               Built around what the E-2 visa actually requires
             </h2>
             <p className="mt-3 text-pretty text-base leading-relaxed text-muted-foreground">
-              The E-2 Treaty Investor visa requires more than money. It requires a business that is real and operating,
+              <Link href="/e-2-visa-process" className="underline underline-offset-2 hover:text-foreground">The E-2 visa process</Link>{" "}
+              requires more than money. It requires a business that is real and operating,
               an investment that is substantial and at risk, an investor who will develop and direct the enterprise, and
               a business that is not marginal — one with the capacity to generate more than a minimal living, typically
               by creating jobs and economic impact. The telecom vertical maps to each of these.

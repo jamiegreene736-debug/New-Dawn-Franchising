@@ -195,9 +195,9 @@ const WHY = [
   },
   {
     icon: Settings,
-    title: "Hands-off daily operations",
-    desc: "Licensed local teams run regulated execution while you keep executive control, living anywhere in the United States.",
-    id: "hands-off",
+    title: "You direct; licensed teams execute",
+    desc: "Licensed local teams handle the regulated, day-to-day execution while you set strategy, approve key decisions, and supervise performance through your owner dashboard — executive control without the daily minutiae.",
+    id: "direct",
   },
   {
     icon: Gauge,
@@ -206,10 +206,10 @@ const WHY = [
     id: "technology",
   },
   {
-    icon: Handshake,
-    title: "In-house buy-back program",
-    desc: "Available after approximately four years, giving owners a defined path for the next stage.",
-    id: "buyback",
+    icon: ShieldCheck,
+    title: "You hold financial control",
+    desc: "You control the agency's bank accounts, approve major expenditures, and direct hiring and strategy — the substantive 'develop and direct' role the E-2 visa requires.",
+    id: "control",
   },
   {
     icon: Briefcase,
@@ -383,7 +383,7 @@ export default function InsurancePage() {
             </p>
             <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
               <Button data-testid="button-insurance-hero-fdd" className="gap-2" asChild>
-                <Link href="/contact">
+                <Link href="/request-fdd">
                   Request the FDD
                   <ArrowRight className="size-4" />
                 </Link>
@@ -621,9 +621,11 @@ export default function InsurancePage() {
               Why insurance works for E-2 investors
             </h2>
             <p className="mt-3 text-pretty text-base leading-relaxed text-muted-foreground">
-              The vertical maps to what the E-2 Treaty Investor visa actually requires — a real, operating, owner-
-              directed business that is substantial and not marginal. Backed by in-house E-2 immigration, finance, and
-              legal professionals, and part of the New Dawn Franchising Group of Companies&trade;.
+              The vertical maps to what{" "}
+              <Link href="/e-2-visa-process" className="underline underline-offset-2 hover:text-foreground">the E-2 visa process</Link>{" "}
+              actually requires — a real, operating, owner-directed business that is substantial and not marginal. Backed
+              by in-house E-2 immigration, finance, and legal professionals, and part of the New Dawn Franchising Group of
+              Companies&trade;.
             </p>
           </div>
 
@@ -686,11 +688,11 @@ export default function InsurancePage() {
         </div>
       </section>
 
-      {/* ── SECTION 7 — Investment & buy-back ── */}
+      {/* ── SECTION 7 — Investment ── */}
       <section data-testid="section-insurance-investment" className="border-b bg-white/50 py-8 md:py-20">
         <div className="nh-container">
           <div className="mx-auto max-w-3xl text-center">
-            <SectionEyebrow>Investment &amp; buy-back</SectionEyebrow>
+            <SectionEyebrow>Investment</SectionEyebrow>
             <h2 data-testid="insurance-investment-title" className="mt-3 text-balance text-3xl font-semibold md:text-4xl">
               A substantial, at-risk investment — structured for E-2
             </h2>
@@ -706,8 +708,7 @@ export default function InsurancePage() {
               <div className="text-base font-semibold">What it covers</div>
               <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                 Your franchise license, training, technology platform access, and operational setup. Financing options
-                are available through affiliated lending partners. An in-house buy-back program is available after
-                approximately four years, giving owners a defined path for the next stage.
+                are available through affiliated lending partners.
               </p>
             </Card>
           </div>
@@ -792,7 +793,7 @@ export default function InsurancePage() {
             </p>
             <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
               <Button data-testid="button-insurance-cta-fdd" className="gap-2" asChild>
-                <Link href="/contact">
+                <Link href="/request-fdd">
                   Request the FDD
                   <ArrowRight className="size-4" />
                 </Link>

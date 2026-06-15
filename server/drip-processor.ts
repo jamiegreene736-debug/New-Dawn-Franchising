@@ -2,7 +2,7 @@ import cron from "node-cron";
 import { storage } from "./storage";
 import { sendEmail, getTrackingPixelUrl } from "./email-service";
 import { sendSmsViaQuo } from "./quo-service";
-import { isOnDnc } from "./agent-service";
+import { isOnDnc, removeFromDnc } from "./agent-service";
 import {
   isOptimalEmailWindow,
   smartEmailDelay,
@@ -341,7 +341,15 @@ export async function reprocessStep(campaignId: string, stepId: string): Promise
         if (r.success) { await storage.updateDripSend(send.id, { status: "sent", sentAt: new Date() } as any); result.sent++; }
         else { await storage.updateDripSend(send.id, { status: "failed", errorMessage: r.error } as any); result.failed++; }
       } else {
-        if (await isOnDnc(enrollment.prospectEmail)) { result.skipped++; continue; }
+        // A manual reprocess is an explicit user action, so it overrides any
+        // prior suppression: lift the DNC entry and re-activate a stopped
+        // enrollment so the send goes out (and the campaign resumes).
+        if (await isOnDnc(enrollment.prospectEmail)) {
+          await removeFromDnc(enrollment.prospectEmail);
+        }
+        if (enrollment.status === "bounced" || enrollment.status === "paused") {
+          await storage.updateDripEnrollment(enrollment.id, { status: "active" } as any).catch(() => {});
+        }
         const send = await storage.createDripSend({
           enrollmentId: enrollment.id, stepId: step.id, channel: "email",
           recipientEmail: enrollment.prospectEmail, recipientName: enrollment.prospectName,

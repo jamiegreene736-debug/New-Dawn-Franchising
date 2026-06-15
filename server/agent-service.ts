@@ -79,6 +79,13 @@ export async function addToDnc(email?: string, phone?: string, domain?: string, 
   await db.insert(agentDnc).values({ email, phone, domain, reason });
 }
 
+// Lift suppression for an address — used when the user deliberately resends to
+// a contact (e.g. a manual "Reprocess"), so the address can receive mail again.
+export async function removeFromDnc(email?: string | null) {
+  if (!email) return;
+  await db.delete(agentDnc).where(eq(agentDnc.email, email));
+}
+
 // ─── Lead Score (AI) ────────────────────────────────────────────────────────
 
 async function scoreLeadWithAI(lead: any, settings: any): Promise<{ score: number; reasoning: string }> {

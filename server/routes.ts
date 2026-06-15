@@ -2638,16 +2638,23 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
       const looksAutomatedSubject = (s: string): boolean =>
         /\b(welcome to|newsletter|unsubscribe|verify your|confirm your|password reset|your (receipt|invoice|statement)|notification|daily digest|out of office|automatic reply|do-?not-?reply|no-?reply)\b/i.test(s || "");
 
-      const [sends, contactActs, clientActs] = await Promise.all([
+      const [sends, contactActs, clientActs, allEnrollments, allCampaigns] = await Promise.all([
         storage.getAllDripSends(),
         storage.getRecentContactActivities(400),
         storage.getRecentCrmClientActivities(400),
+        storage.getDripEnrollments(),
+        storage.getDripCampaigns(),
       ]);
+
+      // Map each send → its campaign name so the feed shows which campaign a
+      // touch belongs to (send → enrollment → campaign).
+      const campaignNameById = new Map(allCampaigns.map((c) => [c.id, c.name]));
+      const campaignByEnrollment = new Map(allEnrollments.map((e) => [e.id, campaignNameById.get(e.campaignId) || ""]));
 
       const items: Array<{
         id: string; source: string; channel: string; direction: string;
         name: string; target: string; detail: string; status: string;
-        timestamp: string | null;
+        timestamp: string | null; campaignName?: string;
         opened?: boolean; openedAt?: string | null; openCount?: number;
         clicked?: boolean; clickedAt?: string | null; clickCount?: number;
       }> = [];
@@ -2669,6 +2676,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
           detail: s.subject || s.errorMessage || "",
           status,
           timestamp: (s.sentAt || s.createdAt) ? new Date(s.sentAt || s.createdAt).toISOString() : null,
+          campaignName: campaignByEnrollment.get(s.enrollmentId) || "",
           opened,
           openedAt: s.openedAt ? new Date(s.openedAt).toISOString() : null,
           openCount: s.openCount ?? 0,

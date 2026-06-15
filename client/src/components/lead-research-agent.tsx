@@ -141,7 +141,7 @@ export default function LeadResearchAgent({ provider }: { provider?: string }) {
       });
       setAdded((s) => new Set(s).add(key));
       refreshCrm();
-      toast({ title: "Added to Contacts", description: `${p.fullName} is now in the CRM tab.` });
+      toast({ title: "Added to Contacts", description: `${p.fullName} — find them in the CRM → Contacts tab.` });
     } catch (err: any) {
       const m = String(err?.message || "");
       if (m.includes("already exists")) {
@@ -201,8 +201,8 @@ export default function LeadResearchAgent({ provider }: { provider?: string }) {
       });
       refreshCrm();
       toast({
-        title: `${data.added} added to the CRM tab`,
-        description: data.skipped > 0 ? `${data.skipped} were already in your CRM.` : `${data.added} new contact${data.added === 1 ? "" : "s"} saved.`,
+        title: `${data.added} added to the CRM → Contacts tab`,
+        description: data.skipped > 0 ? `${data.skipped} were already in your Contacts.` : `${data.added} new contact${data.added === 1 ? "" : "s"} saved.`,
       });
     } catch {
       toast({ title: "Bulk add failed", description: "Please try again.", variant: "destructive" });

@@ -260,26 +260,31 @@ type NavItem = { href: string; label: string; id: string };
 type NavGroup = { label: string; id: string; items: NavItem[] };
 type DesktopNavEntry = NavItem | NavGroup;
 
+// Top-level entries and the items inside each dropdown are kept in alphabetical
+// order by label. (Portals stays a separate trailing utility dropdown.)
 const DESKTOP_NAV: DesktopNavEntry[] = [
   {
     label: "About", id: "about-group",
     items: [
       { href: "/about", label: "About Us", id: "about" },
-      { href: "/why-new-dawn", label: "What Makes Us Different", id: "why-new-dawn" },
-      { href: "/property-management", label: "Property Management", id: "property-management" },
-      { href: "/telecom", label: "Telecom (VoIP)", id: "telecom" },
       { href: "/insurance", label: "Insurance", id: "insurance" },
       { href: "/team", label: "Our Team", id: "team" },
+      { href: "/property-management", label: "Property Management", id: "property-management" },
+      { href: "/telecom", label: "Telecom (VoIP)", id: "telecom" },
+      { href: "/why-new-dawn", label: "What Makes Us Different", id: "why-new-dawn" },
     ],
   },
+  { href: "/blog", label: "Blog", id: "blog" },
+  { href: "/contact", label: "Contact", id: "contact" },
   {
     label: "Franchise", id: "franchise-group",
     items: [
       { href: "/e2-visa-franchise", label: "E-2 Visa Franchise", id: "e2-visa-franchise" },
-      { href: "/e2-fit", label: "Why E-2?", id: "e2" },
       { href: "/e-2-visa-process", label: "E-2 Visa Process", id: "e2-process" },
       { href: "/process", label: "Process", id: "process" },
+      { href: "/request-fdd", label: "Request FDD", id: "request-fdd" },
       { href: "/territories", label: "Territories", id: "territories" },
+      { href: "/e2-fit", label: "Why E-2?", id: "e2" },
     ],
   },
   {
@@ -289,8 +294,6 @@ const DESKTOP_NAV: DesktopNavEntry[] = [
       { href: "/real-estate", label: "Real Estate", id: "real-estate" },
     ],
   },
-  { href: "/blog", label: "Blog", id: "blog" },
-  { href: "/contact", label: "Contact", id: "contact" },
 ];
 
 function isNavGroup(entry: DesktopNavEntry): entry is NavGroup {
@@ -299,29 +302,37 @@ function isNavGroup(entry: DesktopNavEntry): entry is NavGroup {
 
 // Mobile nav mirrors the desktop grouping so sub-items render nested (indented)
 // beneath their parent. Items not part of a group stay as top-level links.
+// Home stays first (conventional); every other entry — and the items inside each
+// group — is alphabetical by label, mirroring the desktop nav.
 const MOBILE_NAV: DesktopNavEntry[] = [
   { href: "/", label: "Home", id: "home" },
   {
     label: "About", id: "about-group",
     items: [
       { href: "/about", label: "About Us", id: "about" },
-      { href: "/why-new-dawn", label: "What Makes Us Different", id: "why-new-dawn" },
-      { href: "/property-management", label: "Property Management", id: "property-management" },
-      { href: "/telecom", label: "Telecom (VoIP)", id: "telecom" },
       { href: "/insurance", label: "Insurance", id: "insurance" },
       { href: "/team", label: "Our Team", id: "team" },
+      { href: "/property-management", label: "Property Management", id: "property-management" },
+      { href: "/telecom", label: "Telecom (VoIP)", id: "telecom" },
+      { href: "/why-new-dawn", label: "What Makes Us Different", id: "why-new-dawn" },
     ],
   },
+  { href: "/blog", label: "Blog", id: "blog" },
+  { href: "/contact", label: "Contact", id: "contact" },
   {
     label: "Franchise", id: "franchise-group",
     items: [
       { href: "/e2-visa-franchise", label: "E-2 Visa Franchise", id: "e2-visa-franchise" },
-      { href: "/e2-fit", label: "Why E-2?", id: "e2" },
       { href: "/e-2-visa-process", label: "E-2 Visa Process", id: "e2-process" },
       { href: "/process", label: "Process", id: "process" },
+      { href: "/request-fdd", label: "Request FDD", id: "request-fdd" },
       { href: "/territories", label: "Territories", id: "territories" },
+      { href: "/e2-fit", label: "Why E-2?", id: "e2" },
     ],
   },
+  { href: "/legal", label: "Legal & Disclaimers", id: "legal" },
+  { href: "/quiz", label: "Quiz", id: "quiz" },
+  { href: "/brokers", label: "Referral Partners", id: "brokers" },
   {
     label: "Services", id: "services-group",
     items: [
@@ -329,10 +340,6 @@ const MOBILE_NAV: DesktopNavEntry[] = [
       { href: "/real-estate", label: "Real Estate", id: "real-estate" },
     ],
   },
-  { href: "/blog", label: "Blog", id: "blog" },
-  { href: "/quiz", label: "Quiz", id: "quiz" },
-  { href: "/brokers", label: "Referral Partners", id: "brokers" },
-  { href: "/contact", label: "Contact", id: "contact" },
 ];
 
 const PORTALS = [
@@ -994,8 +1001,8 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
               <span>E-2 investor guidance</span>
             </span>
             <Button data-testid="button-top-cta" className="hidden gap-2 lg:inline-flex" asChild>
-              <Link href="/contact">
-                Request info
+              <Link href="/request-fdd">
+                Request FDD
                 <ArrowRight className="size-4" />
               </Link>
             </Button>
@@ -1083,8 +1090,8 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
             <span>E-2 investor guidance</span>
           </div>
           <Button data-testid="button-mobile-cta" className="w-full gap-2" asChild>
-            <Link href="/contact">
-              Request info
+            <Link href="/request-fdd">
+              Request FDD
               <ArrowRight className="size-4" />
             </Link>
           </Button>

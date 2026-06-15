@@ -50,6 +50,7 @@ const DESKTOP_NAV: DesktopNavEntry[] = [
     label: "About", id: "about-group",
     items: [
       { href: "/about", label: "About Us", id: "about" },
+      { href: "/property-management", label: "Property Management", id: "property-management" },
       { href: "/telecom", label: "Telecom (VoIP)", id: "telecom" },
       { href: "/team", label: "Our Team", id: "team" },
     ],
@@ -86,6 +87,7 @@ const MOBILE_NAV: DesktopNavEntry[] = [
     label: "About", id: "about-group",
     items: [
       { href: "/about", label: "About Us", id: "about" },
+      { href: "/property-management", label: "Property Management", id: "property-management" },
       { href: "/telecom", label: "Telecom (VoIP)", id: "telecom" },
       { href: "/team", label: "Our Team", id: "team" },
     ],

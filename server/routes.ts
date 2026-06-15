@@ -2885,15 +2885,20 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
         });
       }
 
-      // 2) Contact-level touches
-      for (const a of contactActs) {
+      // 2 & 3) Contact- and investor-CRM-client touches share one shape, so build
+      // each through a single helper we also reuse for the campaign-scoped
+      // by-email reply fetch below. Returns null when the touch is filtered out.
+      const buildPersonItem = (
+        source: "contact" | "client",
+        a: { id: string; activityType: string; metadata: any; createdAt: Date | null; name: string | null; email: string | null },
+      ) => {
         const map = ACT_MAP[a.activityType] || { channel: "other", direction: "outbound" as const };
         const detail = pick(a.metadata, "subject", "message", "note", "text", "summary", "body", "title")
           || humanize(a.activityType);
-        if (a.activityType === "email_received" && looksAutomatedSubject(detail)) continue;
-        items.push({
-          id: `contact-${a.id}`,
-          source: "contact",
+        if (a.activityType === "email_received" && looksAutomatedSubject(detail)) return null;
+        return {
+          id: `${source}-${a.id}`,
+          source,
           channel: map.channel,
           direction: map.direction,
           name: a.name || "",
@@ -2901,34 +2906,51 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
           detail,
           status: a.activityType.endsWith("_failed") ? "failed" : (map.direction === "inbound" ? "received" : "sent"),
           timestamp: a.createdAt ? new Date(a.createdAt).toISOString() : null,
-        });
-      }
+        };
+      };
 
-      // 3) Investor-CRM client touches
-      for (const a of clientActs) {
-        const map = ACT_MAP[a.activityType] || { channel: "other", direction: "outbound" as const };
-        const detail = pick(a.metadata, "subject", "message", "note", "text", "summary", "body", "title")
-          || humanize(a.activityType);
-        if (a.activityType === "email_received" && looksAutomatedSubject(detail)) continue;
-        items.push({
-          id: `client-${a.id}`,
-          source: "client",
-          channel: map.channel,
-          direction: map.direction,
-          name: a.name || "",
-          target: a.email || "",
-          detail,
-          status: a.activityType.endsWith("_failed") ? "failed" : (map.direction === "inbound" ? "received" : "sent"),
-          timestamp: a.createdAt ? new Date(a.createdAt).toISOString() : null,
-        });
-      }
+      for (const a of contactActs) { const it = buildPersonItem("contact", a); if (it) items.push(it); }
+      for (const a of clientActs) { const it = buildPersonItem("client", a); if (it) items.push(it); }
 
-      // Scope to a single campaign when requested. Only campaign sends carry a
-      // campaignId; contact/client touches aren't campaign-attributable, so they
-      // are excluded from a campaign-scoped feed by design.
-      const scoped = campaignFilter
-        ? items.filter((i) => i.campaignId === campaignFilter)
-        : items;
+      // Scope to a single campaign when requested. Campaign sends carry a
+      // campaignId directly. Inbound replies have no campaign link, so we
+      // attribute one to this campaign when the sender's email is an address the
+      // campaign actually sent to (a reply only belongs to a campaign that
+      // reached out — and this also avoids over-attributing to other campaigns
+      // the person merely happens to be enrolled in). Only message channels
+      // count, so a signed-document event (also "inbound") never leaks in.
+      let scoped = items;
+      if (campaignFilter) {
+        const REPLY_CHANNELS = new Set(["email", "sms", "whatsapp"]);
+        const sentToEmails = new Set(
+          items
+            .filter((i) => i.source === "campaign" && i.campaignId === campaignFilter)
+            .map((i) => (i.target || "").trim().toLowerCase())
+            .filter(Boolean),
+        );
+
+        // The global recent-activity windows may not include this campaign's
+        // older replies, so pull inbound touches for these emails directly
+        // (uncapped) and merge any not already present.
+        if (sentToEmails.size) {
+          const emails = Array.from(sentToEmails);
+          const [moreContact, moreClient] = await Promise.all([
+            storage.getInboundContactActivitiesByEmails(emails),
+            storage.getInboundCrmClientActivitiesByEmails(emails),
+          ]);
+          const seen = new Set(items.map((i) => i.id));
+          for (const a of moreContact) { const it = buildPersonItem("contact", a); if (it && !seen.has(it.id)) { items.push(it); seen.add(it.id); } }
+          for (const a of moreClient) { const it = buildPersonItem("client", a); if (it && !seen.has(it.id)) { items.push(it); seen.add(it.id); } }
+        }
+
+        scoped = items.filter((i) =>
+          i.source === "campaign"
+            ? i.campaignId === campaignFilter
+            : i.direction === "inbound" &&
+              REPLY_CHANNELS.has(i.channel) &&
+              sentToEmails.has((i.target || "").trim().toLowerCase()),
+        );
+      }
 
       scoped.sort((x, y) => {
         const tx = x.timestamp ? Date.parse(x.timestamp) : 0;
@@ -3538,17 +3560,41 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
         const matched = allClients.find(
           (c) => c.phone && phoneLast10(c.phone) === phoneLast10(fromNumber),
         );
-        if (!matched) return;
+        if (matched) {
+          const acts = await storage.getCrmClientActivities(matched.id);
+          const already = acts.some((a) => {
+            const m = (a.metadata || {}) as Record<string, string>;
+            return m.messageId === msgData.id || m.id === msgData.id;
+          });
+          if (already) return;
 
-        const acts = await storage.getCrmClientActivities(matched.id);
-        const already = acts.some((a) => {
+          await storage.createCrmClientActivity({
+            clientId: matched.id,
+            activityType: "sms_received",
+            metadata: {
+              message: body,
+              messageId: msgData.id,
+              from: fromNumber,
+              direction: "incoming",
+            },
+          });
+          return;
+        }
+
+        // Fallback: a cold prospect (e.g. a Seamless import enrolled in a
+        // campaign) replying by text, with no CRM client yet. Mirror them into
+        // Contacts and log it so the reply shows in the campaign Activity feed.
+        const prospect = await storage.getProspectByPhone(fromNumber);
+        if (!prospect) return;
+        const contact = await storage.findOrCreateContactForProspect(prospect);
+        const contactActs = await storage.getContactActivities(contact.id);
+        const dupe = contactActs.some((a) => {
           const m = (a.metadata || {}) as Record<string, string>;
           return m.messageId === msgData.id || m.id === msgData.id;
         });
-        if (already) return;
-
-        await storage.createCrmClientActivity({
-          clientId: matched.id,
+        if (dupe) return;
+        await storage.createContactActivity({
+          contactId: contact.id,
           activityType: "sms_received",
           metadata: {
             message: body,

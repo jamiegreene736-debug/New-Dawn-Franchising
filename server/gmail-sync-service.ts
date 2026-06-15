@@ -241,16 +241,41 @@ export async function syncFranchisingInbox(): Promise<SyncResult> {
           continue;
         }
 
-        // Fallback: attorney/partner contact by email → log as an activity.
-        const contactRow = await storage.getContactByEmail(fromAddr);
-        if (contactRow) {
+        // Log an inbound email reply once per Message-ID against a contact. The
+        // in-memory dedup resets on restart and the IMAP fetch re-scans 7 days,
+        // so guard at the DB layer too (matches the client + SMS reply paths).
+        const logContactReply = async (contactId: string) => {
+          const acts = await storage.getContactActivities(contactId);
+          if (acts.some((a) => ((a.metadata || {}) as any).messageId === msgId)) return false;
           await storage.createContactActivity({
-            contactId: contactRow.id,
+            contactId,
             activityType: "email_received",
             metadata: { subject, from: fromAddr, preview, messageId: msgId },
           });
+          return true;
+        };
+
+        // Fallback: attorney/partner contact by email → log as an activity.
+        const contactRow = await storage.getContactByEmail(fromAddr);
+        if (contactRow) {
+          if (await logContactReply(contactRow.id)) stored++;
           matched++;
-          stored++;
+        } else {
+          // Final fallback: a cold prospect (e.g. a Seamless import enrolled in a
+          // campaign) with no contact/client record yet. Mirror them into Contacts
+          // and log the reply so it surfaces in the campaign Activity feed.
+          // Wrapped best-effort so one bad row (e.g. a unique-email race) can't
+          // abort the rest of the inbox poll.
+          try {
+            const prospect = await storage.getProspectByEmail(fromAddr);
+            if (prospect) {
+              const contact = await storage.findOrCreateContactForProspect(prospect);
+              if (await logContactReply(contact.id)) stored++;
+              matched++;
+            }
+          } catch (err: any) {
+            console.error(`[GmailSync] prospect-mirror failed for ${fromAddr} (msg ${msgId}): ${err?.message || err}`);
+          }
         }
 
         processedMessageIds.add(msgId);

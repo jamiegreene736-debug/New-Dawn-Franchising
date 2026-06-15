@@ -337,7 +337,7 @@ function HomepageVideoCard({ hero = false }: { hero?: boolean }) {
           </div>
 
           {/* Scene stage — one scene at a time; nothing overlaps the text */}
-          <div className="relative mt-4 grid min-h-[210px] place-items-center overflow-hidden rounded-2xl border border-white/15 bg-[radial-gradient(circle_at_20%_18%,rgba(255,255,255,0.16),transparent_42%),linear-gradient(135deg,rgba(255,255,255,0.10),rgba(0,0,0,0.18))] p-5 md:min-h-[230px] md:p-6 lg:min-h-[250px]">
+          <div className="relative mt-3 grid min-h-[150px] place-items-center overflow-hidden rounded-2xl border border-white/15 bg-[radial-gradient(circle_at_20%_18%,rgba(255,255,255,0.16),transparent_42%),linear-gradient(135deg,rgba(255,255,255,0.10),rgba(0,0,0,0.18))] p-4 md:min-h-[165px] md:p-5 lg:min-h-[180px]">
             <AnimatePresence mode="wait">
               <motion.div
                 key={scene.id}
@@ -347,25 +347,25 @@ function HomepageVideoCard({ hero = false }: { hero?: boolean }) {
                 transition={{ duration: 0.4, ease: "easeOut" }}
                 className="flex flex-col items-center text-center"
               >
-                <div className="grid size-16 place-items-center rounded-2xl border border-white/25 bg-white/10 text-[hsl(var(--accent))] shadow-lg md:size-20">
-                  <SceneIcon className="size-8 md:size-10" />
+                <div className="grid size-11 place-items-center rounded-xl border border-white/25 bg-white/10 text-[hsl(var(--accent))] shadow-lg md:size-12">
+                  <SceneIcon className="size-5 md:size-6" />
                 </div>
-                <div className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-[hsl(var(--accent))]">
+                <div className="mt-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[hsl(var(--accent))]">
                   {scene.kicker}
                 </div>
                 {scene.title && (
-                  <div className="mt-2 text-balance text-2xl font-semibold leading-tight md:text-3xl">
+                  <div className="mt-1.5 text-balance text-xl font-semibold leading-tight md:text-2xl">
                     {scene.title}
                   </div>
                 )}
                 {Array.isArray(scene.copy) ? (
-                  <div className="mt-3 max-w-lg space-y-2">
+                  <div className="mt-2 max-w-lg space-y-1.5">
                     {scene.copy.map((line, i) => (
-                      <p key={i} className="text-pretty text-sm leading-relaxed text-white/80 md:text-base">{line}</p>
+                      <p key={i} className="text-pretty text-[13px] leading-relaxed text-white/80 md:text-sm">{line}</p>
                     ))}
                   </div>
                 ) : (
-                  <p className="mt-2 max-w-lg text-pretty text-sm leading-relaxed text-white/75 md:text-base">{scene.copy}</p>
+                  <p className="mt-2 max-w-lg text-pretty text-[13px] leading-relaxed text-white/75 md:text-sm">{scene.copy}</p>
                 )}
               </motion.div>
             </AnimatePresence>
@@ -393,7 +393,7 @@ function HomepageVideoCard({ hero = false }: { hero?: boolean }) {
           </div>
 
           {/* Scene indicator dots */}
-          <div className="relative mt-4 flex items-center justify-center gap-1.5">
+          <div className="relative mt-3 flex items-center justify-center gap-1.5">
             {OVERVIEW_SCENES.map((s, i) => (
               <span
                 key={s.id}
@@ -405,7 +405,7 @@ function HomepageVideoCard({ hero = false }: { hero?: boolean }) {
           </div>
 
           {/* Progress bar */}
-          <div className="relative mt-3 h-1.5 overflow-hidden rounded-full bg-white/15">
+          <div className="relative mt-2.5 h-1.5 overflow-hidden rounded-full bg-white/15">
             <div
               className="h-full rounded-full bg-[hsl(var(--accent))] transition-[width] duration-150 ease-linear"
               style={{ width: `${isPlaying || overall > 0 ? Math.min(100, overall * 100) : 4}%` }}

@@ -344,57 +344,21 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
     onError: (e: Error) => toast({ title: "SMS failed", description: e.message, variant: "destructive" }),
   });
 
-  // Logs the WhatsApp touch to the client timeline (the message itself is sent
-  // manually from the WhatsApp desktop app, not via an API).
-  const logWhatsAppMutation = useMutation({
-    mutationFn: async (message: string) => {
-      const res = await apiRequest("POST", `/api/crm/clients/${client.id}/activities`, {
-        activityType: "whatsapp_sent",
-        metadata: { message, manual: true },
-      });
-      return res.json();
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: activitiesKey }),
-  });
-
-  // Opens the WhatsApp desktop app on the user's Mac, pre-filled with the
-  // contact's number and the composed message, so the conversation continues
-  // natively in WhatsApp instead of going through the Meta Cloud API.
-  function openWhatsApp() {
-    if (!client.phone) return;
-    const digits = client.phone.replace(/\D/g, "");
-    // Assume a bare 10-digit number is US/Canada and prepend the country code.
-    const intl = digits.length === 10 ? `1${digits}` : digits;
-    const text = waMessage.trim().replace(/\{\{name\}\}/g, client.fullName.split(" ")[0]);
-    const url = `whatsapp://send?phone=${intl}${text ? `&text=${encodeURIComponent(text)}` : ""}`;
-
-    // Trigger the whatsapp:// protocol handler without navigating the page away.
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.click();
-
-    if (text) logWhatsAppMutation.mutate(text);
-    toast({ title: "Opening WhatsApp…", description: "Continue the conversation in the WhatsApp app." });
-    setWaMessage("");
-  }
-
-  // Saves a reply the contact sent you back into the conversation thread.
-  // Since the chat happens in the native app, inbound messages are logged
-  // manually here so the back-and-forth lives in the CRM record.
-  const logWhatsAppReceivedMutation = useMutation({
-    mutationFn: async (message: string) => {
-      const res = await apiRequest("POST", `/api/crm/clients/${client.id}/activities`, {
-        activityType: "whatsapp_received",
-        metadata: { message, manual: true },
-      });
+  // Sends a free-form WhatsApp message through the Meta Cloud API. Free-form
+  // only delivers within 24h of the contact's last inbound message; for a cold
+  // first contact use an approved template below.
+  const waMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/crm/clients/${client.id}/whatsapp`, { message: waMessage });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || "Send failed"); }
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: activitiesKey });
       setWaMessage("");
-      toast({ title: "Reply saved to conversation" });
+      toast({ title: "WhatsApp message sent" });
     },
-    onError: (e: Error) => toast({ title: "Failed to save reply", description: e.message, variant: "destructive" }),
+    onError: (e: Error) => toast({ title: "WhatsApp failed", description: e.message, variant: "destructive" }),
   });
 
   // Sends an approved Meta template through the Cloud API — the compliant way
@@ -1714,13 +1678,17 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
                     </div>
                   )}
 
-                  <div className="rounded-lg border border-green-100 bg-green-50/50 p-3 text-xs text-green-800 space-y-1">
-                    <p className="font-semibold">Opens in the WhatsApp app</p>
-                    <p>This launches the WhatsApp desktop app on your Mac for {formatPhone(client.phone) || "this contact"}, pre-filled with any message you compose below — so you can chat directly in WhatsApp. No API or template approval needed; just make sure WhatsApp Desktop is installed and signed in.</p>
-                  </div>
+                  {!twilioStatus?.whatsappReady && (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                      WhatsApp not configured. Add META_WHATSAPP_ACCESS_TOKEN and META_WHATSAPP_PHONE_NUMBER_ID in Secrets to enable WhatsApp via the Meta Cloud API.
+                    </div>
+                  )}
 
                   <Card className="p-4 space-y-3">
                     <h3 className="text-sm font-semibold">Compose</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Free-form messages only deliver within 24h of the contact's last reply. For a cold first contact, use an approved template below.
+                    </p>
                     <div>
                       <label className="text-xs font-semibold text-muted-foreground mb-1 block">Quick Templates</label>
                       {renderGroupedTemplateChips(waTemplates, setWaMessage)}
@@ -1733,25 +1701,15 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
                         value={waMessage}
                         onChange={(e) => setWaMessage(e.target.value)}
                         rows={4}
-                        placeholder="Type a message to send, or paste a reply you received…"
+                        placeholder="Type your WhatsApp message…"
                         className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm resize-none"
                       />
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Button disabled={!client.phone}
-                        onClick={openWhatsApp} className="gap-2 bg-green-600 hover:bg-green-700">
-                        <MessageCircle className="size-4" />
-                        Open in WhatsApp
-                      </Button>
-                      <Button variant="outline" disabled={!waMessage.trim() || logWhatsAppReceivedMutation.isPending}
-                        onClick={() => logWhatsAppReceivedMutation.mutate(waMessage.trim())} className="gap-2">
-                        {logWhatsAppReceivedMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : <MessageCircle className="size-4" />}
-                        Log received reply
-                      </Button>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      <strong>Open in WhatsApp</strong> launches the app and logs your message as sent. After they reply, paste it above and tap <strong>Log received reply</strong> to keep the full thread here.
-                    </p>
+                    <Button disabled={!waMessage.trim() || !client.phone || !twilioStatus?.whatsappReady || waMutation.isPending}
+                      onClick={() => waMutation.mutate()} className="gap-2 bg-green-600 hover:bg-green-700">
+                      {waMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+                      Send WhatsApp
+                    </Button>
                   </Card>
 
                   {/* ── Approved template send (Cloud API, compliant cold outreach) ── */}
@@ -1809,8 +1767,8 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
                           return (
                             <div className="flex flex-col items-center justify-center py-12 text-center">
                               <MessageCircle className="size-10 text-muted-foreground/30 mb-2" />
-                              <p className="text-sm text-muted-foreground">No WhatsApp messages logged yet</p>
-                              <p className="text-xs text-muted-foreground mt-1">Messages you send and replies you log will appear here.</p>
+                              <p className="text-sm text-muted-foreground">No WhatsApp messages yet</p>
+                              <p className="text-xs text-muted-foreground mt-1">Messages you send and replies received will appear here.</p>
                             </div>
                           );
                         }

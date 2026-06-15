@@ -78,7 +78,7 @@ import { rescoreAllContactsIcp, rescoreContactIcp } from "./icp-rescore";
 import { draftProspectOutreach, type OutreachChannel } from "./outreach-drafter";
 import {
   createSavedSearch, listSavedSearches, deleteSavedSearch, runSavedSearch,
-  runAllSavedSearches, getRecentDigest,
+  runAllSavedSearches, getRecentDigest, getOutreachQueue, setOutreachQueueStatus,
 } from "./saved-searches";
 import { getSearchAnalytics } from "./search-analytics";
 import { getProviderStatuses } from "./provider-credits";
@@ -1861,13 +1861,14 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
 
   app.post("/api/crm/saved-searches", requireAdminAuth, async (req, res) => {
     try {
-      const { name, provider, mode, query, filters } = req.body as {
+      const { name, provider, mode, query, filters, autoOutreach, autoChannel, autoMinScore } = req.body as {
         name?: string; provider?: string; mode?: string; query?: string | null; filters?: LeadSearchFilters;
+        autoOutreach?: boolean; autoChannel?: string; autoMinScore?: number;
       };
       if (!name || !name.trim()) return res.status(400).json({ message: "name required" });
       const hasCriteria = (query && query.trim()) || (filters && Object.values(filters).some((v) => (Array.isArray(v) ? v.length : !!v)));
       if (!hasCriteria) return res.status(400).json({ message: "Provide a query or at least one filter to save." });
-      const saved = await createSavedSearch({ name, provider, mode, query, filters, createdBy: req.session.adminId ?? null });
+      const saved = await createSavedSearch({ name, provider, mode, query, filters, autoOutreach, autoChannel, autoMinScore, createdBy: req.session.adminId ?? null });
       res.json(saved);
     } catch (err: any) {
       res.status(500).json({ message: err.message || "Failed to save search" });
@@ -1917,6 +1918,28 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
       res.json(await getSearchAnalytics(days));
     } catch (err: any) {
       res.status(500).json({ message: err.message || "Failed to load analytics" });
+    }
+  });
+
+  // Guardrailed auto-pilot: review the auto-drafted outreach queue (never sent
+  // automatically — a human approves or dismisses each draft).
+  app.get("/api/crm/auto-outreach/queue", requireAdminAuth, async (req, res) => {
+    try {
+      const status = String(req.query.status ?? "pending_approval");
+      res.json({ queue: await getOutreachQueue(status) });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to load outreach queue" });
+    }
+  });
+
+  app.post("/api/crm/auto-outreach/:id/:action", requireAdminAuth, async (req, res) => {
+    try {
+      const action = req.params.action === "approve" ? "approved" : req.params.action === "dismiss" ? "dismissed" : null;
+      if (!action) return res.status(400).json({ message: "action must be approve or dismiss" });
+      await setOutreachQueueStatus(String(req.params.id), action);
+      res.json({ ok: true, status: action });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to update queue item" });
     }
   });
 

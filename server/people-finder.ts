@@ -10,6 +10,7 @@ import { hunterFindEmail, hunterDomainPattern, buildEmailFromPattern } from "./h
 import { verifyEmailBatch } from "./zerobounce-service";
 import { lookupPhoneBatch, type PhoneType } from "./twilio-lookup";
 import { fetchPeopleFromPdl, enrichGapsViaPdl, pdlLevelToSeniority, type PdlPerson } from "./pdl-service";
+import { apolloEnrichPerson, apolloConfigured } from "./apollo-service";
 import { enrichPeopleFromWhitepages } from "./whitepages-service";
 import { seamlessFindPeople, seamlessEnrichByIdentity, type SeamlessPerson } from "./seamless-service";
 
@@ -1525,6 +1526,38 @@ async function enrichGapsFromPdl(people: FoundPerson[], domain: string): Promise
   } catch { /* ignore — PDL enrichment is best-effort */ }
 }
 
+// ─── Phase 4.85: Apollo gap enrichment ───────────────────────────────────────
+// For any person still missing an email or phone, ask Apollo's Enrichment
+// (People Match) API to fill it by name + domain. Bounded to keep credit use
+// predictable. Best-effort — never throws into the pipeline.
+async function enrichGapsFromApollo(people: FoundPerson[], domain: string): Promise<void> {
+  if (!apolloConfigured() || !domain) return;
+  const gaps = people.filter((p) => (!p.email || !p.phone) && p.firstName && p.lastName).slice(0, 15);
+  for (const person of gaps) {
+    try {
+      const a = await apolloEnrichPerson({
+        firstName: person.firstName,
+        lastName: person.lastName,
+        domain,
+        revealPhone: true,
+      });
+      if (!a) continue;
+      let used = false;
+      if (!person.email && a.email) {
+        person.email = a.email;
+        person.emailConfidence = (a.emailStatus || "").toLowerCase() === "verified" ? 90 : 75;
+        person.emailStatus = (a.emailStatus || "").toLowerCase() === "verified" ? "valid" : "unverified";
+        used = true;
+      }
+      if (!person.phone && a.phone) { person.phone = a.phone; used = true; }
+      if (!person.linkedinUrl && a.linkedinUrl) { person.linkedinUrl = a.linkedinUrl; used = true; }
+      if (!person.jobTitle && a.jobTitle) { person.jobTitle = a.jobTitle; used = true; }
+      if (!person.country && a.country) person.country = a.country;
+      if (used && !person.sources.includes("apollo")) person.sources.push("apollo");
+    } catch { /* best-effort */ }
+  }
+}
+
 // ─── Main export ─────────────────────────────────────────────────────────────
 
 export async function findAllPeopleAtCompany(
@@ -1662,6 +1695,10 @@ export async function findAllPeopleAtCompany(
   // Phase 4.8: PDL gap enrichment — fill missing emails/LinkedIn/phone for any
   // contacts still lacking them (especially international people)
   await enrichGapsFromPdl(valid, domain);
+
+  // Phase 4.85: Apollo gap enrichment — fill any remaining missing email/phone/
+  // LinkedIn for found people via Apollo's Enrichment (People Match) API.
+  await enrichGapsFromApollo(valid, domain);
 
   // Phase 4.6: Country-based WhatsApp probability for anyone not yet scored
   // (catches people where Twilio lookup was skipped due to batching caps,

@@ -182,6 +182,11 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
     phone?: { valid: boolean; normalized: string; note: string };
   } | null>(null);
   const [verifyLoading, setVerifyLoading] = useState(false);
+  const [apolloLoading, setApolloLoading] = useState(false);
+  const [apolloResult, setApolloResult] = useState<{
+    found: boolean;
+    enrichment?: { email?: string | null; phone?: string | null; jobTitle?: string | null; company?: string | null; linkedinUrl?: string | null; city?: string | null; state?: string | null; country?: string | null };
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const activitiesKey = [`/api/crm/clients/${client.id}/activities`];
@@ -477,6 +482,31 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
     }
   };
 
+  const runApolloEnrich = async () => {
+    setApolloLoading(true);
+    setApolloResult(null);
+    try {
+      const res = await apiRequest("POST", `/api/crm/clients/${client.id}/apollo-enrich`, {});
+      const data = await res.json();
+      setApolloResult(data);
+      if (!data.found) toast({ title: "Apollo: no match found", description: "No public record matched this name/email." });
+    } catch {
+      toast({ title: "Apollo enrichment failed", variant: "destructive" });
+    } finally {
+      setApolloLoading(false);
+    }
+  };
+
+  const applyApolloField = async (patch: Record<string, string>) => {
+    try {
+      await apiRequest("PATCH", `/api/crm/clients/${client.id}`, patch);
+      toast({ title: "Saved to contact" });
+      onRefresh();
+    } catch {
+      toast({ title: "Failed to save", variant: "destructive" });
+    }
+  };
+
   const applyTemplate = (tmpl: Template, setter: (v: string) => void) => {
     const text = (tmpl.body || tmpl.script || "").replace(/\{\{name\}\}/g, firstName);
     setter(text);
@@ -615,6 +645,56 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
                   )}
                 </div>
               )}
+            </div>
+
+            {/* Apollo.io profile enrichment */}
+            <div>
+              <button
+                data-testid="button-apollo-enrich"
+                onClick={runApolloEnrich}
+                disabled={apolloLoading}
+                className="flex items-center gap-1.5 text-[11px] font-medium text-purple-600 hover:text-purple-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {apolloLoading ? <Loader2 className="size-3 animate-spin" /> : <Sparkles className="size-3" />}
+                {apolloLoading ? "Enriching…" : "Enrich with Apollo"}
+              </button>
+              {apolloResult?.found && apolloResult.enrichment && (() => {
+                const e = apolloResult.enrichment!;
+                const loc = [e.city, e.state, e.country].filter(Boolean).join(", ");
+                const ApplyBtn = ({ onClick }: { onClick: () => void }) => (
+                  <button onClick={onClick} className="shrink-0 rounded border border-purple-300 px-1.5 py-0.5 text-[10px] font-semibold text-purple-600 hover:text-purple-800">Apply</button>
+                );
+                return (
+                  <div className="mt-2 space-y-1.5 rounded-md border border-purple-200 bg-purple-50 p-2 text-xs">
+                    {e.jobTitle && <p className="text-foreground"><span className="font-semibold">Title:</span> {e.jobTitle}</p>}
+                    {e.company && <p className="text-foreground"><span className="font-semibold">Company:</span> {e.company}</p>}
+                    {e.email && (
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="truncate text-foreground">{e.email}</span>
+                        {!client.email && <ApplyBtn onClick={() => applyApolloField({ email: e.email! })} />}
+                      </div>
+                    )}
+                    {e.phone && (
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-foreground">{e.phone}</span>
+                        {!client.phone && <ApplyBtn onClick={() => applyApolloField({ phone: e.phone! })} />}
+                      </div>
+                    )}
+                    {e.linkedinUrl && (
+                      <div className="flex items-center justify-between gap-1">
+                        <a href={e.linkedinUrl} target="_blank" rel="noopener noreferrer" className="truncate text-blue-600 hover:underline">LinkedIn profile</a>
+                        {!client.linkedinUrl && <ApplyBtn onClick={() => applyApolloField({ linkedinUrl: e.linkedinUrl! })} />}
+                      </div>
+                    )}
+                    {loc && (
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-foreground">{loc}</span>
+                        {!client.address && <ApplyBtn onClick={() => applyApolloField({ address: loc })} />}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
             {client.lastContactedAt && (

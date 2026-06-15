@@ -56,7 +56,17 @@ interface Step {
   stepType?: string;
   stepName?: string | null;
   priority?: string | null;
+  triggerType?: string | null;
+  triggerRefStep?: number | null;
+  triggerWindowHours?: number | null;
 }
+
+const TRIGGER_LABELS: Record<string, string> = {
+  email_opened: "On open",
+  link_clicked: "On click",
+  not_opened: "If not opened",
+  engaged: "When engaged",
+};
 
 interface CampaignStats {
   overview: {
@@ -991,6 +1001,12 @@ function EmailCampaignTab() {
                                         <div className="flex items-center gap-2">
                                           <span className="font-medium text-sm">{step.stepName || meta.label}</span>
                                           {step.priority && step.priority !== "None" && <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">{step.priority}</span>}
+                                          {step.triggerType && step.triggerType !== "time" && (
+                                            <span className="inline-flex items-center gap-0.5 rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-medium text-violet-700" title="Automation trigger">
+                                              <Zap className="size-2.5" />
+                                              {TRIGGER_LABELS[step.triggerType] || "Triggered"}
+                                            </span>
+                                          )}
                                         </div>
                                         {channel !== "task" && step.subject && <div className="text-xs text-muted-foreground truncate">{step.subject}</div>}
                                         <div className="mt-0.5 text-xs text-muted-foreground line-clamp-1">
@@ -1815,6 +1831,9 @@ function StepEditorModal({
     priority: step?.priority || "None",
     subject: step?.subject || "",
     bodyHtml: step?.bodyHtml || "",
+    triggerType: step?.triggerType || "time",
+    triggerRefStep: step?.triggerRefStep ?? null,
+    triggerWindowHours: step?.triggerWindowHours ?? null,
   });
   const [mode, setMode] = useState<"template" | "ai">("template");
 
@@ -1861,6 +1880,56 @@ function StepEditorModal({
               {PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}
             </select>
           </div>
+        </div>
+
+        {/* ── Automation trigger ── */}
+        <div className="mt-4 rounded-lg border bg-muted/30 p-3">
+          <Label className="flex items-center gap-1.5 text-xs font-semibold"><Zap className="size-3.5 text-[hsl(var(--primary))]" /> When this step fires</Label>
+          <div className="mt-2 grid gap-3 sm:grid-cols-3">
+            <select
+              data-testid="step-trigger-type"
+              value={form.triggerType}
+              onChange={(e) => setForm({ ...form, triggerType: e.target.value })}
+              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring sm:col-span-1"
+            >
+              <option value="time">On its day (time delay)</option>
+              <option value="email_opened">When a prior email is opened</option>
+              <option value="link_clicked">When a prior email link is clicked</option>
+              <option value="not_opened">If a prior email isn't opened</option>
+              <option value="engaged">When engaged (opened 3+ emails)</option>
+            </select>
+            {form.triggerType !== "time" && form.triggerType !== "engaged" && (
+              <>
+                <div>
+                  <Input
+                    data-testid="step-trigger-ref"
+                    type="number"
+                    min={1}
+                    placeholder="Watch step # (blank = previous)"
+                    value={form.triggerRefStep ?? ""}
+                    onChange={(e) => setForm({ ...form, triggerRefStep: e.target.value ? parseInt(e.target.value) : null })}
+                  />
+                </div>
+                <div>
+                  <Input
+                    data-testid="step-trigger-window"
+                    type="number"
+                    min={1}
+                    placeholder={form.triggerType === "not_opened" ? "Wait hours (default 120)" : "Give up after hours (120)"}
+                    value={form.triggerWindowHours ?? ""}
+                    onChange={(e) => setForm({ ...form, triggerWindowHours: e.target.value ? parseInt(e.target.value) : null })}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+          <p className="mt-1.5 text-[11px] text-muted-foreground">
+            {form.triggerType === "time" && "Fires on its scheduled day after enrollment."}
+            {form.triggerType === "email_opened" && "Fires as soon as the watched email is opened (skips if unopened past the window)."}
+            {form.triggerType === "link_clicked" && "Fires when a link in the watched email is clicked."}
+            {form.triggerType === "not_opened" && "Fires only if the watched email is NOT opened after the wait window — e.g. a re-send."}
+            {form.triggerType === "engaged" && "Fires once the contact has opened 3+ of your emails."}
+          </p>
         </div>
 
         {(isEmail || isSms) && (
@@ -1933,6 +2002,9 @@ function StepEditorModal({
               priority: form.priority,
               subject: form.subject,
               bodyHtml: form.bodyHtml,
+              triggerType: form.triggerType,
+              triggerRefStep: form.triggerType === "time" || form.triggerType === "engaged" ? null : (form.triggerRefStep ?? null),
+              triggerWindowHours: form.triggerType === "time" || form.triggerType === "engaged" ? null : (form.triggerWindowHours ?? null),
             })}
             disabled={isPending || !canSave}
           >

@@ -61,6 +61,11 @@ Suggested note (300 chars max):
     stepType: "sms",
     stepName: "Day 1 SMS — Quick Intro",
     priority: "Low",
+    // Trigger: fire as soon as they OPEN the intro email (#2) — strike while
+    // interest is hot. Skips if unopened after 48h.
+    triggerType: "email_opened",
+    triggerRefStep: 2,
+    triggerWindowHours: 48,
     subject: "New Dawn E-2 intro",
     bodyHtml: `Hi {{name}}, Dylan from New Dawn Franchising. Just emailed about our E-2 franchise platform — clients choose PM, Insurance, or Telecom contracts ($225K), direct the business while we run ops, and can live anywhere in the U.S. Worth a look? ${WEBSITE}`,
   },
@@ -156,6 +161,11 @@ Suggested message:
     stepType: "call",
     stepName: "Call — Referral Partnership Discussion",
     priority: "High",
+    // Trigger: create the call task when they OPEN the referral-fee email (#7)
+    // — they saw the money, so it's the right moment to call.
+    triggerType: "email_opened",
+    triggerRefStep: 7,
+    triggerWindowHours: 120,
     subject: "",
     bodyHtml: `Call {{name}} to discuss the New Dawn broker referral partnership.
 
@@ -288,8 +298,16 @@ export async function seedGrokCampaign() {
         const match = steps.find((s) => s.stepOrder === def.stepOrder);
         if (!match) continue;
         const body = withSpacing(def.bodyHtml);
-        if (match.bodyHtml !== body || match.subject !== def.subject) {
-          await storage.updateDripStep(match.id, { bodyHtml: body, subject: def.subject });
+        const triggerType = (def as any).triggerType ?? "time";
+        const triggerRefStep = (def as any).triggerRefStep ?? null;
+        const triggerWindowHours = (def as any).triggerWindowHours ?? null;
+        if (
+          match.bodyHtml !== body || match.subject !== def.subject ||
+          (match as any).triggerType !== triggerType ||
+          (match as any).triggerRefStep !== triggerRefStep ||
+          (match as any).triggerWindowHours !== triggerWindowHours
+        ) {
+          await storage.updateDripStep(match.id, { bodyHtml: body, subject: def.subject, triggerType, triggerRefStep, triggerWindowHours } as any);
           updated++;
         }
       }
@@ -314,7 +332,10 @@ export async function seedGrokCampaign() {
         priority: step.priority,
         subject: step.subject,
         bodyHtml: withSpacing(step.bodyHtml),
-      });
+        triggerType: (step as any).triggerType ?? "time",
+        triggerRefStep: (step as any).triggerRefStep ?? null,
+        triggerWindowHours: (step as any).triggerWindowHours ?? null,
+      } as any);
     }
 
     console.log(`[Drip] "${GROK_CAMPAIGN_NAME}" created with ${GROK_STEPS.length} steps.`);

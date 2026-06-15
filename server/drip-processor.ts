@@ -15,6 +15,50 @@ import {
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
+type StepReady = "send" | "wait" | "skip";
+
+// Decide whether a step is ready to fire for an enrollment. "time" steps use the
+// classic delayDays gate; behavioural steps watch a prior step's send for an
+// open/click and fire (or skip after a window) accordingly.
+function evaluateTrigger(step: any, steps: any[], enrolledAt: Date, sends: any[], now: Date, force: boolean): StepReady {
+  const tt = (step.triggerType || "time").toLowerCase();
+
+  if (tt === "time") {
+    if (force) return "send";
+    const days = Math.floor((now.getTime() - enrolledAt.getTime()) / 86_400_000);
+    return days >= (step.delayDays || 0) ? "send" : "wait";
+  }
+
+  // "engaged" = opened several emails overall — escalation trigger.
+  if (tt === "engaged") {
+    return sends.filter((s) => s.openedAt).length >= 3 ? "send" : "wait";
+  }
+
+  // Signal triggers watch a reference send (a prior step). Default to the
+  // immediately previous step when no explicit ref is set.
+  const idx = steps.findIndex((s) => s.id === step.id);
+  const refOrder = step.triggerRefStep ?? steps[idx - 1]?.stepOrder;
+  const refStep = refOrder != null ? steps.find((s) => s.stepOrder === refOrder) : undefined;
+  const refSend = refStep ? sends.find((s) => s.stepId === refStep.id) : undefined;
+  const sentAt = refSend?.sentAt ? new Date(refSend.sentAt).getTime() : null;
+  if (!refSend || !sentAt) return idx === 0 ? "send" : "wait";
+
+  const windowMs = (step.triggerWindowHours ?? 120) * 3_600_000;
+  const elapsed = now.getTime() - sentAt;
+
+  switch (tt) {
+    case "email_opened":
+      return refSend.openedAt ? "send" : elapsed >= windowMs ? "skip" : "wait";
+    case "link_clicked":
+      return refSend.clickedAt ? "send" : elapsed >= windowMs ? "skip" : "wait";
+    case "not_opened":
+      if (refSend.openedAt) return "skip";
+      return elapsed >= windowMs ? "send" : "wait";
+    default:
+      return "send";
+  }
+}
+
 function getBaseUrl(): string {
   // This URL is embedded into recipients' emails as the open-pixel and
   // click-redirect host, so it MUST be publicly reachable from their inbox.
@@ -142,8 +186,15 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
       const now = new Date();
       const daysSinceEnrollment = Math.floor((now.getTime() - enrolledAt.getTime()) / (1000 * 60 * 60 * 24));
 
-      if (daysSinceEnrollment >= step.delayDays) {
-        const existingSends = await storage.getDripSends(enrollment.id);
+      const existingSends = await storage.getDripSends(enrollment.id);
+      const ready = evaluateTrigger(step, steps, enrolledAt, existingSends, now, !!force);
+      if (ready === "wait") continue;
+      if (ready === "skip") {
+        await storage.updateDripEnrollment(enrollment.id, { currentStep: currentStepIndex + 1 } as any);
+        console.log(`[Drip] Trigger not met within window — skipping step ${currentStepIndex + 1} for ${enrollment.prospectName}`);
+        continue;
+      }
+      {
         const alreadySent = existingSends.some(s => s.stepId === step.id);
         if (alreadySent) {
           await storage.updateDripEnrollment(enrollment.id, {

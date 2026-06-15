@@ -42,6 +42,7 @@ import { runLeadResearchAgent } from "./lead-research-agent";
 import {
   enrichPersonAllProviders,
   anyEnrichmentProviderConfigured,
+  configuredEnrichmentProviders,
   mapWithConcurrency,
   summarizeBulk,
   BULK_ENRICH_MAX_PER_REQUEST,
@@ -2074,19 +2075,36 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
   // decides what to apply. Never auto-overwrites existing data.
   app.post("/api/crm/clients/:id/enrich", requireAdminAuth, async (req, res) => {
     try {
-      if (!anyEnrichmentProviderConfigured()) {
-        return res.status(503).json({ message: "No enrichment provider configured (set SEAMLESS_API_KEY, APOLLO_API_KEY and/or ORIGAMI_API_KEY)." });
+      // Optional `providers` filter — e.g. the "Enrich via Seamless.AI" button
+      // sends ["seamless"] to hit only that vendor. Omitted ⇒ every provider.
+      const requested = Array.isArray(req.body?.providers)
+        ? (req.body.providers as unknown[]).filter(
+            (p): p is "seamless" | "apollo" | "origami" =>
+              p === "seamless" || p === "apollo" || p === "origami",
+          )
+        : null;
+      const active = configuredEnrichmentProviders();
+      const toRun = requested ? active.filter((p) => requested.includes(p)) : active;
+      if (toRun.length === 0) {
+        return res.status(503).json({
+          message: requested
+            ? `Requested enrichment provider(s) not configured: ${requested.join(", ")}.`
+            : "No enrichment provider configured (set SEAMLESS_API_KEY, APOLLO_API_KEY and/or ORIGAMI_API_KEY).",
+        });
       }
       const client = await storage.getCrmClient(String(req.params.id));
       if (!client) return res.status(404).json({ message: "Client not found" });
 
-      const { found, enrichment, sources } = await enrichPersonAllProviders({
-        fullName: client.fullName,
-        email: client.email,
-        company: client.companyName,
-        domain: (client.email || "").split("@")[1],
-        linkedinUrl: client.linkedinUrl,
-      });
+      const { found, enrichment, sources } = await enrichPersonAllProviders(
+        {
+          fullName: client.fullName,
+          email: client.email,
+          company: client.companyName,
+          domain: (client.email || "").split("@")[1],
+          linkedinUrl: client.linkedinUrl,
+        },
+        { only: toRun },
+      );
       if (!found) return res.json({ found: false });
       res.json({ found: true, enrichment, sources });
     } catch (err: any) {

@@ -7,7 +7,7 @@ import {
   Trash2, FileText, Loader2, CheckCircle2, Circle, ExternalLink,
   Linkedin, Globe, ChevronDown, RefreshCw, Clock, Paperclip,
   PhoneCall, MessageCircle, PenLine, Timer, AlertTriangle, Sparkles,
-  Zap, Check, Search, Megaphone, Copy, Users, UserRound,
+  Zap, Check, Search, Megaphone, Copy, Users, UserRound, Database,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -191,10 +191,13 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
   } | null>(null);
   const [verifyLoading, setVerifyLoading] = useState(false);
   const [apolloLoading, setApolloLoading] = useState(false);
-  const [apolloResult, setApolloResult] = useState<{
+  type EnrichResult = {
     found: boolean;
     enrichment?: { email?: string | null; phone?: string | null; jobTitle?: string | null; company?: string | null; linkedinUrl?: string | null; city?: string | null; state?: string | null; country?: string | null };
-  } | null>(null);
+  } | null;
+  const [apolloResult, setApolloResult] = useState<EnrichResult>(null);
+  const [seamlessLoading, setSeamlessLoading] = useState(false);
+  const [seamlessResult, setSeamlessResult] = useState<EnrichResult>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const smsBottomRef = useRef<HTMLDivElement>(null);
 
@@ -528,6 +531,24 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
     }
   };
 
+  // Reveal email/phone via Seamless.AI only. Works off identity (name + company
+  // + LinkedIn) — no existing email required — so it can enrich contacts added
+  // from Lead Research, which arrive without contact details.
+  const runSeamlessEnrich = async () => {
+    setSeamlessLoading(true);
+    setSeamlessResult(null);
+    try {
+      const res = await apiRequest("POST", `/api/crm/clients/${client.id}/enrich`, { providers: ["seamless"] });
+      const data = await res.json();
+      setSeamlessResult(data);
+      if (!data.found) toast({ title: "No match found", description: "Seamless.AI returned no record for this name/company." });
+    } catch {
+      toast({ title: "Seamless enrichment failed", variant: "destructive" });
+    } finally {
+      setSeamlessLoading(false);
+    }
+  };
+
   const applyApolloField = async (patch: Record<string, string>) => {
     try {
       await apiRequest("PATCH", `/api/crm/clients/${client.id}`, patch);
@@ -536,6 +557,53 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
     } catch {
       toast({ title: "Failed to save", variant: "destructive" });
     }
+  };
+
+  // Shared result panel for the enrichment buttons. Shows each revealed field
+  // with an "Apply" button that fills it only when the contact's own field is
+  // still empty (enrichment never overwrites existing data). `accent` colours
+  // the panel so the all-providers vs Seamless-only results stay distinct.
+  const renderEnrichPanel = (result: EnrichResult, accent: "purple" | "teal") => {
+    if (!result?.found || !result.enrichment) return null;
+    const e = result.enrichment;
+    const loc = [e.city, e.state, e.country].filter(Boolean).join(", ");
+    const panelCls = accent === "purple" ? "border-purple-200 bg-purple-50" : "border-teal-200 bg-teal-50";
+    const applyCls = accent === "purple"
+      ? "border-purple-300 text-purple-600 hover:text-purple-800"
+      : "border-teal-300 text-teal-600 hover:text-teal-800";
+    const ApplyBtn = ({ onClick }: { onClick: () => void }) => (
+      <button onClick={onClick} className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-semibold ${applyCls}`}>Apply</button>
+    );
+    return (
+      <div className={`mt-2 space-y-1.5 rounded-md border p-2 text-xs ${panelCls}`}>
+        {e.jobTitle && <p className="text-foreground"><span className="font-semibold">Title:</span> {e.jobTitle}</p>}
+        {e.company && <p className="text-foreground"><span className="font-semibold">Company:</span> {e.company}</p>}
+        {e.email && (
+          <div className="flex items-center justify-between gap-1">
+            <span className="truncate text-foreground">{e.email}</span>
+            {!client.email && <ApplyBtn onClick={() => applyApolloField({ email: e.email! })} />}
+          </div>
+        )}
+        {e.phone && (
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-foreground">{e.phone}</span>
+            {!client.phone && <ApplyBtn onClick={() => applyApolloField({ phone: e.phone! })} />}
+          </div>
+        )}
+        {e.linkedinUrl && (
+          <div className="flex items-center justify-between gap-1">
+            <a href={e.linkedinUrl} target="_blank" rel="noopener noreferrer" className="truncate text-blue-600 hover:underline">LinkedIn profile</a>
+            {!client.linkedinUrl && <ApplyBtn onClick={() => applyApolloField({ linkedinUrl: e.linkedinUrl! })} />}
+          </div>
+        )}
+        {loc && (
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-foreground">{loc}</span>
+            {!client.address && <ApplyBtn onClick={() => applyApolloField({ address: loc })} />}
+          </div>
+        )}
+      </div>
+    );
   };
 
   const applyTemplate = (tmpl: Template, setter: (v: string) => void) => {
@@ -699,54 +767,34 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
               )}
             </div>
 
-            {/* Apollo.io profile enrichment */}
-            <div>
-              <button
-                data-testid="button-apollo-enrich"
-                onClick={runApolloEnrich}
-                disabled={apolloLoading}
-                className="flex items-center gap-1.5 text-[11px] font-medium text-purple-600 hover:text-purple-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {apolloLoading ? <Loader2 className="size-3 animate-spin" /> : <Sparkles className="size-3" />}
-                {apolloLoading ? "Enriching…" : "Enrich contact (Apollo + Origami)"}
-              </button>
-              {apolloResult?.found && apolloResult.enrichment && (() => {
-                const e = apolloResult.enrichment!;
-                const loc = [e.city, e.state, e.country].filter(Boolean).join(", ");
-                const ApplyBtn = ({ onClick }: { onClick: () => void }) => (
-                  <button onClick={onClick} className="shrink-0 rounded border border-purple-300 px-1.5 py-0.5 text-[10px] font-semibold text-purple-600 hover:text-purple-800">Apply</button>
-                );
-                return (
-                  <div className="mt-2 space-y-1.5 rounded-md border border-purple-200 bg-purple-50 p-2 text-xs">
-                    {e.jobTitle && <p className="text-foreground"><span className="font-semibold">Title:</span> {e.jobTitle}</p>}
-                    {e.company && <p className="text-foreground"><span className="font-semibold">Company:</span> {e.company}</p>}
-                    {e.email && (
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="truncate text-foreground">{e.email}</span>
-                        {!client.email && <ApplyBtn onClick={() => applyApolloField({ email: e.email! })} />}
-                      </div>
-                    )}
-                    {e.phone && (
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="text-foreground">{e.phone}</span>
-                        {!client.phone && <ApplyBtn onClick={() => applyApolloField({ phone: e.phone! })} />}
-                      </div>
-                    )}
-                    {e.linkedinUrl && (
-                      <div className="flex items-center justify-between gap-1">
-                        <a href={e.linkedinUrl} target="_blank" rel="noopener noreferrer" className="truncate text-blue-600 hover:underline">LinkedIn profile</a>
-                        {!client.linkedinUrl && <ApplyBtn onClick={() => applyApolloField({ linkedinUrl: e.linkedinUrl! })} />}
-                      </div>
-                    )}
-                    {loc && (
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="text-foreground">{loc}</span>
-                        {!client.address && <ApplyBtn onClick={() => applyApolloField({ address: loc })} />}
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
+            {/* Contact enrichment — all providers, then Seamless.AI on its own */}
+            <div className="space-y-2">
+              <div>
+                <button
+                  data-testid="button-apollo-enrich"
+                  onClick={runApolloEnrich}
+                  disabled={apolloLoading}
+                  className="flex items-center gap-1.5 text-[11px] font-medium text-purple-600 hover:text-purple-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {apolloLoading ? <Loader2 className="size-3 animate-spin" /> : <Sparkles className="size-3" />}
+                  {apolloLoading ? "Enriching…" : "Enrich contact (all providers)"}
+                </button>
+                {renderEnrichPanel(apolloResult, "purple")}
+              </div>
+
+              {/* Seamless.AI only — reveals email/phone from name + company + LinkedIn */}
+              <div>
+                <button
+                  data-testid="button-seamless-enrich"
+                  onClick={runSeamlessEnrich}
+                  disabled={seamlessLoading}
+                  className="flex items-center gap-1.5 text-[11px] font-medium text-teal-600 hover:text-teal-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {seamlessLoading ? <Loader2 className="size-3 animate-spin" /> : <Database className="size-3" />}
+                  {seamlessLoading ? "Revealing…" : "Enrich via Seamless.AI"}
+                </button>
+                {renderEnrichPanel(seamlessResult, "teal")}
+              </div>
             </div>
 
             {client.lastContactedAt && (

@@ -107,6 +107,9 @@ function useZhSeo() {
     addLink("alternate", `${SITE}/es`, "es");
     addLink("alternate", `${SITE}/fr`, "fr");
     addLink("alternate", `${SITE}/zh`, "zh");
+    addLink("alternate", `${SITE}/ja`, "ja");
+    addLink("alternate", `${SITE}/ko`, "ko");
+    addLink("alternate", `${SITE}/tr`, "tr");
     addLink("alternate", `${SITE}/`, "x-default");
 
     return () => {

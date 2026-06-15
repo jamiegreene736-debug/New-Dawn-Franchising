@@ -5,12 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// French (fr) investor landing page.
+// Korean (ko) investor landing page.
 //
 // ⚠️  FIRST-PASS TRANSLATION — NEEDS NATIVE-SPEAKER REVIEW BEFORE PROMOTION.
-// Solid working draft of the English value proposition; have a native French
-// speaker (ideally familiar with the E-2 investor audience) review before this
-// page is featured in outreach/ads.
+// South Korea is a perennial top-3 E-2 country, so this is a high-value locale —
+// but have a native Korean speaker review the copy (and especially the legal
+// disclaimer) before featuring it in outreach/ads.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const SITE = "https://www.newdawnfranchising.com";
@@ -25,59 +25,59 @@ const COMPANY = {
 };
 
 const SEO = {
-  title: "New Dawn Franchising | Franchises pour les investisseurs du visa E-2",
+  title: "New Dawn Franchising | E-2 비자 투자자를 위한 프랜차이즈",
   description:
-    "Franchiseur multisectoriel pour les investisseurs du visa E-2. Choisissez parmi trois franchises à revenus récurrents — Gestion immobilière, Télécommunications (VoIP) ou Assurance. Vous dirigez l'entreprise ; nos équipes gèrent les opérations quotidiennes. FDD disponible sur demande.",
-  canonical: `${SITE}/fr`,
+    "E-2 비자 투자자를 위한 다업종 프랜차이즈 본사. 반복 수익형 세 가지 프랜차이즈(부동산 관리, 통신(VoIP), 보험) 중에서 선택하세요. 귀하가 사업을 이끌고 재무를 관리하며, 저희 팀이 일상 운영을 담당합니다. FDD는 요청 시 제공됩니다.",
+  canonical: `${SITE}/ko`,
 };
 
 const VERTICALS = [
   {
     icon: <Building2 className="size-5 text-primary" />,
-    title: "Gestion immobilière",
-    desc: "Revenus récurrents issus des honoraires de gestion locative. Notre équipe gère les locataires, l'entretien et les encaissements pendant que vous supervisez l'entreprise.",
+    title: "부동산 관리",
+    desc: "임대 관리 수수료를 통한 반복 수익. 저희 팀이 임차인, 유지보수, 수금을 담당하고 귀하는 사업을 감독합니다.",
   },
   {
     icon: <Cpu className="size-5 text-primary" />,
-    title: "Télécommunications (VoIP)",
-    desc: "Services de téléphonie d'entreprise dans le cloud avec facturation mensuelle récurrente. Une catégorie en croissance, avec des clients commerciaux de long terme.",
+    title: "통신(VoIP)",
+    desc: "기업용 클라우드 전화 서비스. 매월 반복 청구되며, 장기 비즈니스 고객을 보유한 성장 분야입니다.",
   },
   {
     icon: <ShieldCheck className="size-5 text-primary" />,
-    title: "Assurance",
-    desc: "Une agence d'assurance avec des commissions de renouvellement récurrentes. Constituez un portefeuille de polices qui génère des revenus année après année.",
+    title: "보험",
+    desc: "반복적인 갱신 수수료를 받는 보험 대리점. 해마다 수익을 창출하는 보험 포트폴리오를 구축하세요.",
   },
 ];
 
 const BENEFITS = [
   {
     icon: <Banknote className="size-5 text-primary" />,
-    title: "Modèle de revenus récurrents",
-    desc: "Les trois franchises reposent sur des revenus mensuels ou de renouvellement, et non sur des ventes ponctuelles.",
+    title: "반복 수익 모델",
+    desc: "세 가지 프랜차이즈 모두 일회성 판매가 아닌 월간 또는 갱신 수익을 기반으로 합니다.",
   },
   {
     icon: <Handshake className="size-5 text-primary" />,
-    title: "Nos équipes gèrent l'entreprise",
-    desc: "Vous dirigez la franchise et contrôlez vos finances ; nos équipes s'occupent des opérations quotidiennes.",
+    title: "저희 팀이 사업을 운영합니다",
+    desc: "귀하가 프랜차이즈를 이끌고 재무를 관리하며, 저희 팀이 일상 운영을 담당합니다.",
   },
   {
     icon: <MapPin className="size-5 text-primary" />,
-    title: "Territoires protégés",
-    desc: "Exploitez un territoire défini, soutenu par notre technologie et notre expérience.",
+    title: "보호된 지역",
+    desc: "저희의 기술과 경험을 바탕으로 지정된 지역에서 사업을 운영합니다.",
   },
   {
     icon: <FileText className="size-5 text-primary" />,
-    title: "FDD disponible sur demande",
-    desc: "Le Document d'information sur la franchise (FDD) est disponible lorsque vous êtes prêt à l'examiner.",
+    title: "FDD 요청 시 제공",
+    desc: "프랜차이즈 공개 문서(FDD)는 검토할 준비가 되면 제공해 드립니다.",
   },
 ];
 
-function useFrSeo() {
+function useKoSeo() {
   useEffect(() => {
     const prevTitle = document.title;
     const prevLang = document.documentElement.lang;
     document.title = SEO.title;
-    document.documentElement.lang = "fr";
+    document.documentElement.lang = "ko";
 
     const created: HTMLElement[] = [];
 
@@ -119,44 +119,43 @@ function useFrSeo() {
   }, []);
 }
 
-export default function FrPage() {
-  useFrSeo();
+export default function KoPage() {
+  useKoSeo();
 
   return (
-    <div data-testid="page-fr" lang="fr" className="min-h-screen">
+    <div data-testid="page-ko" lang="ko" className="min-h-screen">
       {/* Hero */}
-      <section data-testid="section-fr-hero" className="border-b">
+      <section data-testid="section-ko-hero" className="border-b">
         <div className="nh-container py-16 md:py-24">
           <div className="mx-auto max-w-3xl text-center">
             <span className="inline-flex items-center rounded-full border bg-white/60 px-3 py-1 text-xs font-medium text-foreground/70">
-              Franchises pour les investisseurs du visa E-2
+              E-2 비자 투자자를 위한 프랜차이즈
             </span>
             <h1 className="mt-5 text-balance text-4xl font-semibold tracking-tight md:text-5xl">
-              Devenez propriétaire d'une franchise aux États-Unis avec le visa E-2
+              E-2 비자로 미국에서 프랜차이즈를 소유하세요
             </h1>
             <p className="mt-5 text-pretty text-base leading-relaxed text-muted-foreground md:text-lg">
-              <span translate="no">New Dawn Franchising</span> est un franchiseur multisectoriel pour
-              les investisseurs du visa E-2. Choisissez parmi trois franchises à revenus récurrents
-              — Gestion immobilière, Télécommunications (VoIP) ou Assurance. Vous dirigez l'entreprise
-              et contrôlez vos finances ; nos équipes gèrent les opérations quotidiennes.
+              <span translate="no">New Dawn Franchising</span> 은 E-2 비자 투자자를 위한 다업종 프랜차이즈 본사입니다.
+              반복 수익형 세 가지 프랜차이즈(부동산 관리, 통신(VoIP), 보험) 중에서 선택할 수 있습니다.
+              귀하가 사업을 이끌고 재무를 관리하며, 저희 팀이 일상 운영을 담당합니다.
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-              <Button data-testid="button-fr-contact" className="gap-2" asChild>
+              <Button data-testid="button-ko-contact" className="gap-2" asChild>
                 <Link href="/contact">
-                  Demander des informations
+                  자료 요청
                   <ArrowRight className="size-4" />
                 </Link>
               </Button>
-              <Button data-testid="button-fr-calendly" variant="secondary" className="gap-2" asChild>
+              <Button data-testid="button-ko-calendly" variant="secondary" className="gap-2" asChild>
                 <a href={CALENDLY} target="_blank" rel="noopener noreferrer">
-                  Planifier un appel
+                  상담 예약
                 </a>
               </Button>
             </div>
             <p className="mt-4 text-xs text-muted-foreground/70">
-              Vous préférez lire en anglais ?{" "}
+              영어로 보시겠어요?{" "}
               <Link href="/" className="underline underline-offset-2 hover:text-foreground" translate="no">
-                Voir le site en English
+                English 사이트 보기
               </Link>
             </p>
           </div>
@@ -164,15 +163,13 @@ export default function FrPage() {
       </section>
 
       {/* Verticals */}
-      <section data-testid="section-fr-verticals" className="border-b">
+      <section data-testid="section-ko-verticals" className="border-b">
         <div className="nh-container py-16">
           <div className="mx-auto max-w-3xl text-center">
             <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">
-              Trois franchises. Un modèle de revenus récurrents.
+              세 가지 프랜차이즈, 하나의 반복 수익 모델.
             </h2>
-            <p className="mt-3 text-muted-foreground">
-              Choisissez le secteur qui correspond le mieux à vos objectifs d'investisseur.
-            </p>
+            <p className="mt-3 text-muted-foreground">투자 목표에 가장 적합한 분야를 선택하세요.</p>
           </div>
           <div className="mt-10 grid gap-6 md:grid-cols-3">
             {VERTICALS.map((v) => (
@@ -189,11 +186,11 @@ export default function FrPage() {
       </section>
 
       {/* Benefits */}
-      <section data-testid="section-fr-benefits" className="border-b">
+      <section data-testid="section-ko-benefits" className="border-b">
         <div className="nh-container py-16">
           <div className="mx-auto max-w-3xl text-center">
             <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">
-              Pourquoi <span translate="no">New Dawn Franchising</span> ?
+              왜 <span translate="no">New Dawn Franchising</span> 인가요?
             </h2>
           </div>
           <div className="mx-auto mt-10 grid max-w-4xl gap-6 md:grid-cols-2">
@@ -213,20 +210,19 @@ export default function FrPage() {
       </section>
 
       {/* CTA */}
-      <section data-testid="section-fr-cta">
+      <section data-testid="section-ko-cta">
         <div className="nh-container py-16">
           <div className="mx-auto max-w-3xl rounded-2xl border bg-white/60 p-8 text-center md:p-12">
             <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">
-              Parlons de votre parcours avec le visa E-2
+              귀하의 E-2 비자 여정에 대해 이야기해 보세요
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
-              Parlez-nous de vos objectifs et nous vous expliquerons le fonctionnement du modèle de
-              franchise. Nous accompagnons des investisseurs du monde entier et nous parlons français.
+              목표를 알려주시면 프랜차이즈 모델의 작동 방식을 설명해 드립니다. 저희는 전 세계 투자자를 지원합니다.
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-              <Button data-testid="button-fr-cta-contact" className="gap-2" asChild>
+              <Button data-testid="button-ko-cta-contact" className="gap-2" asChild>
                 <Link href="/contact">
-                  Demander des informations
+                  자료 요청
                   <ArrowRight className="size-4" />
                 </Link>
               </Button>
@@ -239,7 +235,7 @@ export default function FrPage() {
               <Button variant="secondary" className="gap-2" asChild>
                 <a href={`mailto:${COMPANY.email}`}>
                   <Mail className="size-4" />
-                  Écrivez-nous
+                  이메일 보내기
                 </a>
               </Button>
             </div>
@@ -254,16 +250,13 @@ export default function FrPage() {
             </a>
 
             <p className="mx-auto mt-8 max-w-2xl text-[11px] leading-relaxed text-muted-foreground/60">
-              Ces informations sont fournies à titre général et éducatif uniquement ; elles ne
-              constituent pas une offre de vente d'une franchise ni un conseil juridique,
-              d'immigration, fiscal ou financier. Une franchise est proposée et vendue uniquement au
-              moyen d'un Document d'information sur la franchise (FDD). L'admissibilité et l'approbation
-              du visa E-2 relèvent uniquement du gouvernement des États-Unis et ne sont jamais
-              garanties. Consultez l'avis juridique complet dans nos{" "}
+              본 정보는 일반적이고 교육적인 목적으로만 제공되며, 프랜차이즈 판매 제안이 아니며 법률·이민·세무·재무 자문도 아닙니다.
+              프랜차이즈는 프랜차이즈 공개 문서(FDD)를 통해서만 제공 및 판매됩니다. E-2 비자의 자격과 승인은 오직 미국 정부가 결정하며 결코 보장되지 않습니다.
+              전체 법적 고지는 당사의{" "}
               <Link href="/terms" className="underline underline-offset-2 hover:text-muted-foreground">
-                Conditions générales
+                이용약관
               </Link>
-              .
+              을 참조하십시오.
             </p>
           </div>
         </div>

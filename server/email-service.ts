@@ -597,7 +597,7 @@ export const CRM_EMAIL_TEMPLATES: EmailTemplate[] = [
     bodyHtml: `<p>Hi {{name}},</p>
 <p>Now that your franchise agreement is in place, here's how we coordinate your <strong>E-2 visa application</strong>:</p>
 <ol>
-  <li><strong>Business plan preparation</strong> — Our partner team (including Joorney Business Plans) prepares a USCIS-compliant business plan for your selected vertical</li>
+  <li><strong>Business plan preparation</strong> — You work with a business plan writer of your choice to prepare your USCIS-compliant E-2 business plan; if you'd like, we can refer an experienced E-2 business plan writer</li>
   <li><strong>Immigration attorney coordination</strong> — We connect you with experienced E-2 immigration counsel to file your petition</li>
   <li><strong>Document package</strong> — Franchise agreement, FDD receipt, escrow documentation, and operational overview compiled for USCIS</li>
   <li><strong>Owner oversight framework</strong> — Reporting structure and supervisory controls documented for your petition</li>

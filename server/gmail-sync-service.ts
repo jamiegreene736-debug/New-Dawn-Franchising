@@ -13,6 +13,7 @@ import cron from "node-cron";
 import { storage } from "./storage";
 import { addToDnc } from "./agent-service";
 import { isAutomatedOrBulkEmail } from "./crm-email-filter";
+import { sendEmail } from "./email-service";
 
 const FRANCHISING_EMAIL = "franchising@newdawnfranchising.com";
 
@@ -188,6 +189,28 @@ export async function syncFranchisingInbox(): Promise<SyncResult> {
         }
         const bodyHtml = `<pre style="white-space:pre-wrap;font-family:inherit;margin:0;">${escapeHtml(bodyText)}</pre>`;
         const preview = bodyText.slice(0, 240);
+
+        // Reply automation: a personal reply pauses any active campaign for this
+        // person (so we stop drip-blasting someone who answered) and alerts the
+        // team to take it over. Idempotent — only acts on still-active enrollments.
+        try {
+          const enrolls = await storage.getDripEnrollmentsByEmail(fromAddr);
+          const active = enrolls.filter((e) => e.status === "active");
+          for (const e of active) {
+            await storage.updateDripEnrollment(e.id, { status: "replied" } as any);
+          }
+          if (active.length > 0) {
+            console.log(`[GmailSync] reply from ${fromAddr} — paused ${active.length} active enrollment(s)`);
+            try {
+              await sendEmail(
+                "dylan@newdawnfranchising.com",
+                `Reply from ${fromName} — campaign paused`,
+                `<p><strong>${escapeHtml(fromName)}</strong> (${escapeHtml(fromAddr)}) just replied — their campaign has been paused so they get a personal response.</p><p><strong>Subject:</strong> ${escapeHtml(subject)}</p><p><strong>Message:</strong></p>${bodyHtml}`,
+                undefined,
+              );
+            } catch { /* alert is best-effort */ }
+          }
+        } catch { /* best-effort */ }
 
         // Primary match: investor CRM client by email.
         const clientRow = await storage.getCrmClientByEmail(fromAddr);

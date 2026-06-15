@@ -297,6 +297,16 @@ export const dripSteps = pgTable("drip_steps", {
   // content for every step type (email HTML, SMS text, or task instructions).
   subject: text("subject").notNull(),
   bodyHtml: text("body_html").notNull(),
+  // ── Automation triggers ──
+  // How this step fires: "time" (delayDays, default) or a behavioural signal —
+  // "email_opened" | "link_clicked" | "not_opened" | "engaged". Signal steps
+  // watch a prior step's send (triggerRefStep = that step's stepOrder; null =
+  // the immediately previous step). triggerWindowHours bounds the wait: for
+  // not_opened it's how long to wait before firing; for opened/clicked it's how
+  // long to wait for the signal before skipping the step.
+  triggerType: text("trigger_type").notNull().default("time"),
+  triggerRefStep: integer("trigger_ref_step"),
+  triggerWindowHours: integer("trigger_window_hours"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

@@ -118,6 +118,10 @@ const STATEMENTS: string[] = [
   `ALTER TABLE drip_sends ADD COLUMN IF NOT EXISTS channel text NOT NULL DEFAULT 'email'`,
   `ALTER TABLE crm_direct_emails ADD COLUMN IF NOT EXISTS clicked_at timestamp`,
   `ALTER TABLE crm_direct_emails ADD COLUMN IF NOT EXISTS click_count integer NOT NULL DEFAULT 0`,
+  // Automation triggers on campaign steps
+  `ALTER TABLE drip_steps ADD COLUMN IF NOT EXISTS trigger_type text NOT NULL DEFAULT 'time'`,
+  `ALTER TABLE drip_steps ADD COLUMN IF NOT EXISTS trigger_ref_step integer`,
+  `ALTER TABLE drip_steps ADD COLUMN IF NOT EXISTS trigger_window_hours integer`,
 ];
 
 export async function ensureSchema(): Promise<void> {

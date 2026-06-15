@@ -38,9 +38,15 @@ import partnerRouter from "./partner-routes";
 import { processPartnerSequence } from "./partner-sequence-service";
 import { runDailyPreparation, runDailyBrief, pollForApprovalReply, runApprovalDeadlineCheck } from "./agent-service";
 import { hunterFindEmail, hunterDomainPattern, buildEmailFromPattern, hunterVerifyEmail, getHunterStatus } from "./hunter-service";
-import { apolloEnrichPerson, apolloConfigured } from "./apollo-service";
-import { origamiEnrichPerson, origamiConfigured } from "./origami-service";
 import { runLeadResearchAgent } from "./lead-research-agent";
+import {
+  enrichPersonAllProviders,
+  anyEnrichmentProviderConfigured,
+  mapWithConcurrency,
+  summarizeBulk,
+  BULK_ENRICH_MAX_PER_REQUEST,
+  type BulkEnrichResult,
+} from "./bulk-enrich";
 import { pollAllRenderingVideos, runHeygenPreparation } from "./heygen-service";
 import { heygenVideos, prospectLists } from "../shared/schema";
 import { eq, desc } from "drizzle-orm";
@@ -1802,51 +1808,132 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
     }
   });
 
-  // Enrich a single CRM client via the configured providers (Apollo + Origami).
-  // Merges results (first non-empty value per field) and returns the best
-  // email/phone/title/company/LinkedIn/location — the user decides what to apply.
-  // Never auto-overwrites existing data.
+  // Enrich a single CRM client via every connected provider (Seamless.AI +
+  // Apollo.io + Origami). Merges results (first non-empty value per field) and
+  // returns the best email/phone/title/company/LinkedIn/location — the user
+  // decides what to apply. Never auto-overwrites existing data.
   app.post("/api/crm/clients/:id/enrich", requireAdminAuth, async (req, res) => {
     try {
-      if (!apolloConfigured() && !origamiConfigured()) {
-        return res.status(503).json({ message: "No enrichment provider configured (set APOLLO_API_KEY and/or ORIGAMI_API_KEY)." });
+      if (!anyEnrichmentProviderConfigured()) {
+        return res.status(503).json({ message: "No enrichment provider configured (set SEAMLESS_API_KEY, APOLLO_API_KEY and/or ORIGAMI_API_KEY)." });
       }
       const client = await storage.getCrmClient(String(req.params.id));
       if (!client) return res.status(404).json({ message: "Client not found" });
 
-      const parts = (client.fullName || "").trim().split(/\s+/);
-      const firstName = parts[0] || "";
-      const lastName = parts.slice(1).join(" ");
-      const domain = (client.email || "").split("@")[1] || undefined;
-      const args = { firstName, lastName, email: client.email || undefined, domain };
-
-      const [apollo, origami] = await Promise.all([
-        apolloConfigured() ? apolloEnrichPerson({ ...args, revealPhone: true }) : Promise.resolve(null),
-        origamiConfigured() ? origamiEnrichPerson(args) : Promise.resolve(null),
-      ]);
-
-      const sources: string[] = [];
-      if (apollo) sources.push("apollo");
-      if (origami) sources.push("origami");
-      if (!apollo && !origami) return res.json({ found: false });
-
-      // Merge field-by-field, Apollo first then Origami.
-      const pickField = (k: "email" | "phone" | "jobTitle" | "company" | "linkedinUrl" | "city" | "state" | "country") =>
-        (apollo as any)?.[k] || (origami as any)?.[k] || null;
-      const enrichment = {
-        email: pickField("email"),
-        phone: pickField("phone"),
-        jobTitle: pickField("jobTitle"),
-        company: pickField("company"),
-        linkedinUrl: pickField("linkedinUrl"),
-        city: pickField("city"),
-        state: pickField("state"),
-        country: pickField("country"),
-      };
+      const { found, enrichment, sources } = await enrichPersonAllProviders({
+        fullName: client.fullName,
+        email: client.email,
+        company: client.companyName,
+        domain: (client.email || "").split("@")[1],
+        linkedinUrl: client.linkedinUrl,
+      });
+      if (!found) return res.json({ found: false });
       res.json({ found: true, enrichment, sources });
     } catch (err: any) {
       console.error("[enrich] error:", err?.message || err);
       res.status(500).json({ message: err?.message || "Enrichment failed" });
+    }
+  });
+
+  // ─── Bulk contact enrichment ────────────────────────────────────────────────
+  // Enrich many selected records at once via Seamless.AI + Apollo.io + Origami.
+  // Only EMPTY fields are filled — existing data is never overwritten. Capped at
+  // BULK_ENRICH_MAX_PER_REQUEST per call (the client chunks larger selections).
+
+  // Bulk-enrich selected CRM clients.
+  app.post("/api/crm/clients/bulk-enrich", requireAdminAuth, async (req, res) => {
+    try {
+      if (!anyEnrichmentProviderConfigured()) {
+        return res.status(503).json({ message: "No enrichment provider configured (set SEAMLESS_API_KEY, APOLLO_API_KEY and/or ORIGAMI_API_KEY)." });
+      }
+      const rawIds = Array.isArray(req.body?.ids) ? (req.body.ids as string[]) : [];
+      if (rawIds.length === 0) return res.status(400).json({ message: "ids array required" });
+      const ids = rawIds.slice(0, BULK_ENRICH_MAX_PER_REQUEST);
+
+      const results: BulkEnrichResult[] = await mapWithConcurrency(ids, 6, async (id) => {
+        const client = await storage.getCrmClient(id);
+        if (!client) return { id, found: false, filled: [], sources: [] };
+
+        const { found, enrichment, sources } = await enrichPersonAllProviders({
+          fullName: client.fullName,
+          email: client.email,
+          company: client.companyName,
+          domain: (client.email || "").split("@")[1],
+          linkedinUrl: client.linkedinUrl,
+        });
+        if (!found) return { id, name: client.fullName, found: false, filled: [], sources };
+
+        const loc = [enrichment.city, enrichment.state, enrichment.country].filter(Boolean).join(", ");
+        const patch: Record<string, string> = {};
+        const filled: string[] = [];
+        if (enrichment.phone && !client.phone) { patch.phone = enrichment.phone; filled.push("phone"); }
+        if (enrichment.linkedinUrl && !client.linkedinUrl) { patch.linkedinUrl = enrichment.linkedinUrl; filled.push("linkedin"); }
+        if (enrichment.company && !client.companyName) { patch.companyName = enrichment.company; filled.push("company"); }
+        if (enrichment.jobTitle && !client.profession) { patch.profession = enrichment.jobTitle; filled.push("title"); }
+        if (enrichment.country && !client.country) { patch.country = enrichment.country; filled.push("country"); }
+        if (loc && !client.address) { patch.address = loc; filled.push("address"); }
+        // email is required (never blank) so it is left untouched here.
+
+        if (Object.keys(patch).length > 0) await storage.updateCrmClient(id, patch as any);
+        return { id, name: client.fullName, found: true, filled, sources };
+      });
+
+      res.json({ results, summary: summarizeBulk(results), totalRequested: rawIds.length });
+    } catch (err: any) {
+      console.error("[bulk-enrich clients] error:", err?.message || err);
+      res.status(500).json({ message: err?.message || "Bulk enrichment failed" });
+    }
+  });
+
+  // Bulk-enrich selected saved prospects.
+  app.post("/api/crm/prospects/bulk-enrich", requireAdminAuth, async (req, res) => {
+    try {
+      if (!anyEnrichmentProviderConfigured()) {
+        return res.status(503).json({ message: "No enrichment provider configured (set SEAMLESS_API_KEY, APOLLO_API_KEY and/or ORIGAMI_API_KEY)." });
+      }
+      const rawIds = Array.isArray(req.body?.ids) ? (req.body.ids as string[]) : [];
+      if (rawIds.length === 0) return res.status(400).json({ message: "ids array required" });
+      const ids = rawIds.slice(0, BULK_ENRICH_MAX_PER_REQUEST);
+
+      const results: BulkEnrichResult[] = await mapWithConcurrency(ids, 6, async (id) => {
+        const p = await storage.getProspect(id);
+        if (!p) return { id, found: false, filled: [], sources: [] };
+
+        const websiteDomain = p.website
+          ? p.website.replace(/^https?:\/\//, "").replace(/\/.*$/, "")
+          : "";
+        const domain = websiteDomain || (p.email || "").split("@")[1] || undefined;
+        const existingLinkedin = p.sourceUrl && p.sourceUrl.includes("linkedin") ? p.sourceUrl : undefined;
+
+        const { found, enrichment, sources } = await enrichPersonAllProviders({
+          fullName: p.name,
+          email: p.email,
+          company: p.company,
+          domain,
+          linkedinUrl: existingLinkedin,
+        });
+        if (!found) return { id, name: p.name, found: false, filled: [], sources };
+
+        const patch: Record<string, string> = {};
+        const filled: string[] = [];
+        if (enrichment.email && !p.email) { patch.email = enrichment.email; filled.push("email"); }
+        if (enrichment.phone && !p.phone) { patch.phone = enrichment.phone; filled.push("phone"); }
+        if (enrichment.company && !p.company) { patch.company = enrichment.company; filled.push("company"); }
+        if (enrichment.domain && !p.website) { patch.website = `https://${enrichment.domain}`; filled.push("website"); }
+        if (enrichment.linkedinUrl && !existingLinkedin) { patch.sourceUrl = enrichment.linkedinUrl; filled.push("linkedin"); }
+        if (enrichment.jobTitle && !p.notes) {
+          patch.notes = enrichment.company ? `${enrichment.jobTitle} at ${enrichment.company}` : enrichment.jobTitle;
+          filled.push("title");
+        }
+
+        if (Object.keys(patch).length > 0) await storage.updateProspect(id, patch as any);
+        return { id, name: p.name, found: true, filled, sources };
+      });
+
+      res.json({ results, summary: summarizeBulk(results), totalRequested: rawIds.length });
+    } catch (err: any) {
+      console.error("[bulk-enrich prospects] error:", err?.message || err);
+      res.status(500).json({ message: err?.message || "Bulk enrichment failed" });
     }
   });
 

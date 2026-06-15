@@ -36,6 +36,7 @@ import {
   BookOpen,
   Tag,
   Phone,
+  Sparkles,
 } from "lucide-react";
 import { CrmClientDetail } from "./crm-client-detail";
 import ProspectFinder from "./prospect-finder";
@@ -43,6 +44,7 @@ import EmailCampaigns from "./email-campaigns";
 import FacebookTab from "./facebook-tab";
 import PhoneCallsTab from "./phone-calls-tab";
 import { CrmPlaybook } from "./crm-playbook";
+import { BulkEnrichDialog } from "@/components/bulk-enrich-dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -862,6 +864,7 @@ export default function CrmPage() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterTag, setFilterTag] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkEnrichOpen, setBulkEnrichOpen] = useState(false);
   const [bulkTagInput, setBulkTagInput] = useState("");
   const [bulkTagMode, setBulkTagMode] = useState<"merge" | "replace">("merge");
   const [editingTagsId, setEditingTagsId] = useState<string | null>(null);
@@ -1374,6 +1377,15 @@ export default function CrmPage() {
                   >
                     Deselect all
                   </button>
+                  <Button
+                    size="sm"
+                    data-testid="button-bulk-enrich"
+                    className="h-8 gap-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs"
+                    onClick={() => setBulkEnrichOpen(true)}
+                    title="Find email, phone & LinkedIn for the selected clients"
+                  >
+                    <Sparkles className="size-3.5" /> Enrich
+                  </Button>
                   <div className="flex items-center gap-2 ml-auto flex-wrap">
                     <select
                       value={bulkTagMode}
@@ -1651,6 +1663,18 @@ export default function CrmPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <BulkEnrichDialog
+        open={bulkEnrichOpen}
+        onOpenChange={setBulkEnrichOpen}
+        ids={Array.from(selectedIds)}
+        endpoint="/api/crm/clients/bulk-enrich"
+        entityNoun="client"
+        onComplete={() => {
+          queryClient.invalidateQueries({ queryKey: ["/api/crm/clients"] });
+          setSelectedIds(new Set());
+        }}
+      />
     </div>
   );
 }

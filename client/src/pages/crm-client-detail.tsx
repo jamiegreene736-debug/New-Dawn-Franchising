@@ -23,6 +23,7 @@ const ACTIVITY_ICONS: Record<string, React.ReactNode> = {
   sms_sent: <MessageSquare className="size-4 text-teal-500" />,
   sms_failed: <MessageSquare className="size-4 text-red-500" />,
   whatsapp_sent: <MessageCircle className="size-4 text-green-600" />,
+  whatsapp_received: <MessageCircle className="size-4 text-emerald-500" />,
   whatsapp_failed: <MessageCircle className="size-4 text-red-500" />,
   voicemail_dropped: <Mic className="size-4 text-indigo-500" />,
   voicemail_failed: <Mic className="size-4 text-red-500" />,
@@ -42,6 +43,7 @@ function activityLabel(act: { activityType: string; metadata: unknown }): string
     case "sms_sent": return `SMS sent: "${String(m.message || "").slice(0, 60)}${String(m.message || "").length > 60 ? "…" : ""}"`;
     case "sms_failed": return `SMS failed: ${m.error || ""}`;
     case "whatsapp_sent": return `WhatsApp ${m.manual ? "opened" : "sent"}: "${String(m.message || "").slice(0, 60)}…"`;
+    case "whatsapp_received": return `WhatsApp received: "${String(m.message || "").slice(0, 60)}…"`;
     case "whatsapp_failed": return `WhatsApp failed: ${m.error || ""}`;
     case "voicemail_dropped": return "Ringless voicemail dropped";
     case "voicemail_failed": return `Voicemail failed: ${m.error || ""}`;
@@ -371,6 +373,25 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
     toast({ title: "Opening WhatsApp…", description: "Continue the conversation in the WhatsApp app." });
     setWaMessage("");
   }
+
+  // Saves a reply the contact sent you back into the conversation thread.
+  // Since the chat happens in the native app, inbound messages are logged
+  // manually here so the back-and-forth lives in the CRM record.
+  const logWhatsAppReceivedMutation = useMutation({
+    mutationFn: async (message: string) => {
+      const res = await apiRequest("POST", `/api/crm/clients/${client.id}/activities`, {
+        activityType: "whatsapp_received",
+        metadata: { message, manual: true },
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: activitiesKey });
+      setWaMessage("");
+      toast({ title: "Reply saved to conversation" });
+    },
+    onError: (e: Error) => toast({ title: "Failed to save reply", description: e.message, variant: "destructive" }),
+  });
 
   const logLinkedInMutation = useMutation({
     mutationFn: async () => {
@@ -1675,27 +1696,91 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
                     <p>This launches the WhatsApp desktop app on your Mac for {formatPhone(client.phone) || "this contact"}, pre-filled with any message you compose below — so you can chat directly in WhatsApp. No API or template approval needed; just make sure WhatsApp Desktop is installed and signed in.</p>
                   </div>
 
+                  <Card className="p-4 space-y-3">
+                    <h3 className="text-sm font-semibold">Compose</h3>
+                    <div>
+                      <label className="text-xs font-semibold text-muted-foreground mb-1 block">Quick Templates</label>
+                      {renderGroupedTemplateChips(waTemplates, setWaMessage)}
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-muted-foreground mb-1 block">
+                        Message to {formatPhone(client.phone) || "(no phone)"}
+                      </label>
+                      <textarea
+                        value={waMessage}
+                        onChange={(e) => setWaMessage(e.target.value)}
+                        rows={4}
+                        placeholder="Type a message to send, or paste a reply you received…"
+                        className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm resize-none"
+                      />
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button disabled={!client.phone}
+                        onClick={openWhatsApp} className="gap-2 bg-green-600 hover:bg-green-700">
+                        <MessageCircle className="size-4" />
+                        Open in WhatsApp
+                      </Button>
+                      <Button variant="outline" disabled={!waMessage.trim() || logWhatsAppReceivedMutation.isPending}
+                        onClick={() => logWhatsAppReceivedMutation.mutate(waMessage.trim())} className="gap-2">
+                        {logWhatsAppReceivedMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : <MessageCircle className="size-4" />}
+                        Log received reply
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      <strong>Open in WhatsApp</strong> launches the app and logs your message as sent. After they reply, paste it above and tap <strong>Log received reply</strong> to keep the full thread here.
+                    </p>
+                  </Card>
+
+                  {/* ── Conversation thread (manual log) ── */}
                   <div>
-                    <label className="text-xs font-semibold text-muted-foreground mb-1 block">Quick Templates</label>
-                    {renderGroupedTemplateChips(waTemplates, setWaMessage)}
+                    <h3 className="text-sm font-semibold mb-3">WhatsApp Conversation</h3>
+                    <div className="rounded-lg border bg-muted/30 p-4 min-h-[200px] max-h-[420px] overflow-y-auto space-y-3">
+                      {(() => {
+                        const thread = activities
+                          .filter((a) => a.activityType === "whatsapp_sent" || a.activityType === "whatsapp_received" || a.activityType === "whatsapp_failed")
+                          .slice()
+                          .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+                        if (thread.length === 0) {
+                          return (
+                            <div className="flex flex-col items-center justify-center py-12 text-center">
+                              <MessageCircle className="size-10 text-muted-foreground/30 mb-2" />
+                              <p className="text-sm text-muted-foreground">No WhatsApp messages logged yet</p>
+                              <p className="text-xs text-muted-foreground mt-1">Messages you send and replies you log will appear here.</p>
+                            </div>
+                          );
+                        }
+                        return thread.map((a) => {
+                          const m = (a.metadata || {}) as Record<string, unknown>;
+                          const isInbound = a.activityType === "whatsapp_received";
+                          const failed = a.activityType === "whatsapp_failed";
+                          const body = String(m.message || m.error || "");
+                          return (
+                            <div key={a.id} className={`flex ${isInbound ? "justify-start" : "justify-end"}`}>
+                              <div className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm shadow-sm ${
+                                isInbound
+                                  ? "bg-white border border-border text-foreground"
+                                  : failed
+                                    ? "bg-red-50 border border-red-200 text-red-900"
+                                    : "bg-green-600 text-white"
+                              }`}>
+                                <p className="leading-relaxed whitespace-pre-wrap break-words">{body}</p>
+                                <p className={`text-[10px] mt-1.5 ${
+                                  isInbound ? "text-muted-foreground" : failed ? "text-red-600" : "text-white/70"
+                                }`}>
+                                  {isInbound ? client.fullName.split(" ")[0] : "You"}
+                                  {" · "}
+                                  {new Date(a.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                                  {" "}
+                                  {new Date(a.createdAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                                  {failed && " · Failed"}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        });
+                      })()}
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-xs font-semibold text-muted-foreground mb-1 block">
-                      Message to {formatPhone(client.phone) || "(no phone)"}
-                    </label>
-                    <textarea
-                      value={waMessage}
-                      onChange={(e) => setWaMessage(e.target.value)}
-                      rows={5}
-                      placeholder="Optional — type a message to pre-fill in WhatsApp…"
-                      className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm resize-none"
-                    />
-                  </div>
-                  <Button disabled={!client.phone}
-                    onClick={openWhatsApp} className="gap-2 bg-green-600 hover:bg-green-700">
-                    <MessageCircle className="size-4" />
-                    Open in WhatsApp
-                  </Button>
                 </div>
               )}
 

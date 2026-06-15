@@ -1557,7 +1557,7 @@ function EmailCampaignTab() {
             </div>
             <p className="text-xs text-muted-foreground">
               {selectedCampaign
-                ? "Every send from this campaign — opens, clicks and bounces. Show all activity to see replies and other channels."
+                ? "Sends for this campaign — opens, clicks and bounces — plus inbound replies from people this campaign contacted. Show all activity to see other campaigns and channels."
                 : "Every outreach touch across all channels — campaign sends, manual emails & texts, calls, LinkedIn and inbound replies."}
             </p>
           </div>
@@ -1645,7 +1645,7 @@ function EmailCampaignTab() {
               <p className="mt-3 text-sm text-muted-foreground">
                 {activity.length === 0
                   ? (selectedCampaign
-                      ? "No activity for this campaign yet. Enroll prospects and send the first step to start the timeline, or choose “Show all activity” above."
+                      ? "No activity for this campaign yet. Once you send the first step, sends and any replies will appear here. Or choose “Show all activity” above."
                       : "No activity logged yet. Enroll prospects in a campaign or send a message to start the timeline.")
                   : "No activity matches your filter."}
               </p>

@@ -28,11 +28,14 @@ export interface IStorage {
   deleteCrmClient(id: string): Promise<void>;
   getProspects(): Promise<Prospect[]>;
   getProspect(id: string): Promise<Prospect | undefined>;
+  getProspectByEmail(email: string): Promise<Prospect | undefined>;
+  getProspectByPhone(phone: string): Promise<Prospect | undefined>;
   updateProspect(id: string, data: Partial<Prospect>): Promise<Prospect | undefined>;
   getProspectsByLocation(category: string, location: string): Promise<Prospect[]>;
   createProspect(prospect: InsertProspect): Promise<Prospect>;
   findOrCreateProspectForContact(contact: Contact): Promise<Prospect>;
   findOrCreateProspectForClient(client: CrmClient): Promise<Prospect>;
+  findOrCreateContactForProspect(prospect: Prospect): Promise<Contact>;
   createProspects(prospectList: InsertProspect[]): Promise<Prospect[]>;
   deleteProspect(id: string): Promise<void>;
   deleteProspectsByLocation(category: string, location: string): Promise<void>;
@@ -241,6 +244,24 @@ export class DatabaseStorage implements IStorage {
 
   async getProspect(id: string): Promise<Prospect | undefined> {
     const [p] = await db.select().from(prospects).where(eq(prospects.id, id)).limit(1);
+    return p;
+  }
+
+  async getProspectByEmail(email: string): Promise<Prospect | undefined> {
+    if (!email) return undefined;
+    const [p] = await db.select().from(prospects)
+      .where(sql`lower(${prospects.email}) = ${email.toLowerCase()}`).limit(1);
+    return p;
+  }
+
+  async getProspectByPhone(phone: string): Promise<Prospect | undefined> {
+    const last10 = (phone || "").replace(/\D/g, "").slice(-10);
+    if (last10.length < 10) return undefined;
+    // Exact last-10 match (not a suffix LIKE, which would also match a longer
+    // number sharing the trailing digits), consistent with phoneLast10 elsewhere.
+    const [p] = await db.select().from(prospects)
+      .where(sql`right(regexp_replace(coalesce(${prospects.phone}, ''), '[^0-9]', '', 'g'), 10) = ${last10}`)
+      .limit(1);
     return p;
   }
 
@@ -680,8 +701,57 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getContactByEmail(email: string): Promise<Contact | undefined> {
-    const [c] = await db.select().from(contacts).where(eq(contacts.email, email));
+    // Case-insensitive: emails are matched lower-cased everywhere (inbox sync
+    // lowercases the sender), so a verbatim-cased stored address still resolves.
+    const [c] = await db.select().from(contacts)
+      .where(sql`lower(${contacts.email}) = ${(email || "").toLowerCase()}`).limit(1);
     return c;
+  }
+
+  // Mirror a prospect into a CRM contact (the reverse of findOrCreateProspectForContact)
+  // so an inbound reply from a cold prospect can be logged + surfaced in the
+  // campaign Activity feed. Idempotent: matches an existing contact by email first.
+  async findOrCreateContactForProspect(prospect: Prospect): Promise<Contact> {
+    const email = prospect.email?.trim().toLowerCase() || null;
+    if (email) {
+      const [byEmail] = await db.select().from(contacts)
+        .where(sql`lower(${contacts.email}) = ${email}`).limit(1);
+      if (byEmail) return byEmail;
+    }
+    // Phone-only prospects have no unique email key — NULL emails are all
+    // distinct under the UNIQUE index, so without a phone match we'd create a
+    // fresh contact (and duplicate its reply) on every inbound SMS. Dedupe on
+    // the normalized last-10 phone instead.
+    const last10 = (prospect.phone || "").replace(/\D/g, "").slice(-10);
+    if (!email && last10.length === 10) {
+      const [byPhone] = await db.select().from(contacts)
+        .where(sql`right(regexp_replace(coalesce(${contacts.phone}, ''), '[^0-9]', '', 'g'), 10) = ${last10}`)
+        .limit(1);
+      if (byPhone) return byPhone;
+    }
+    const parts = (prospect.name || "").trim().split(/\s+/).filter(Boolean);
+    const firstName = parts[0] || prospect.name?.trim() || "Unknown";
+    const lastName = parts.slice(1).join(" ");
+    try {
+      return await this.createContact({
+        firstName,
+        lastName,
+        email, // store lower-cased so the case-sensitive UNIQUE(email) index lines up with our lookups
+        phone: prospect.phone ?? null,
+        firmName: prospect.company ?? null,
+        websiteUrl: prospect.website ?? null,
+        source: prospect.source || "prospect-reply",
+        status: "new",
+      } as InsertContact);
+    } catch (e: any) {
+      // Lost a concurrent insert race on the unique email — return the winner.
+      if (email && e?.code === "23505") {
+        const [byEmail] = await db.select().from(contacts)
+          .where(sql`lower(${contacts.email}) = ${email}`).limit(1);
+        if (byEmail) return byEmail;
+      }
+      throw e;
+    }
   }
 
   async createContact(data: InsertContact & { leadScore?: number }): Promise<Contact> {
@@ -789,6 +859,75 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(crmClients, eq(crmClientActivities.clientId, crmClients.id))
       .orderBy(desc(crmClientActivities.createdAt))
       .limit(limit);
+  }
+
+  // Inbound reply/received touches for a set of emails (case-insensitive), with
+  // no global recency cap. Powers the per-campaign Activity feed so a campaign's
+  // replies are complete even when older than the global "recent activity" window.
+  private static readonly INBOUND_REPLY_TYPES = [
+    "email_received", "email_reply", "sms_received", "whatsapp_received",
+  ];
+
+  async getInboundContactActivitiesByEmails(emails: string[]): Promise<Array<{
+    id: string; contactId: string; activityType: string; metadata: any;
+    createdAt: Date; name: string | null; email: string | null;
+  }>> {
+    const lower = Array.from(new Set(emails.map((e) => (e || "").trim().toLowerCase()).filter(Boolean)));
+    if (lower.length === 0) return [];
+    const rows = await db
+      .select({
+        id: contactActivities.id,
+        contactId: contactActivities.contactId,
+        activityType: contactActivities.activityType,
+        metadata: contactActivities.metadata,
+        createdAt: contactActivities.createdAt,
+        firstName: contacts.firstName,
+        lastName: contacts.lastName,
+        email: contacts.email,
+      })
+      .from(contactActivities)
+      .innerJoin(contacts, eq(contactActivities.contactId, contacts.id))
+      .where(and(
+        inArray(contactActivities.activityType, DatabaseStorage.INBOUND_REPLY_TYPES),
+        inArray(sql`lower(${contacts.email})`, lower),
+      ))
+      .orderBy(desc(contactActivities.createdAt))
+      .limit(1000);
+    return rows.map((r) => ({
+      id: r.id,
+      contactId: r.contactId,
+      activityType: r.activityType,
+      metadata: r.metadata,
+      createdAt: r.createdAt,
+      name: [r.firstName, r.lastName].filter(Boolean).join(" ") || null,
+      email: r.email,
+    }));
+  }
+
+  async getInboundCrmClientActivitiesByEmails(emails: string[]): Promise<Array<{
+    id: string; clientId: string; activityType: string; metadata: any;
+    createdAt: Date; name: string | null; email: string | null;
+  }>> {
+    const lower = Array.from(new Set(emails.map((e) => (e || "").trim().toLowerCase()).filter(Boolean)));
+    if (lower.length === 0) return [];
+    return db
+      .select({
+        id: crmClientActivities.id,
+        clientId: crmClientActivities.clientId,
+        activityType: crmClientActivities.activityType,
+        metadata: crmClientActivities.metadata,
+        createdAt: crmClientActivities.createdAt,
+        name: crmClients.fullName,
+        email: crmClients.email,
+      })
+      .from(crmClientActivities)
+      .innerJoin(crmClients, eq(crmClientActivities.clientId, crmClients.id))
+      .where(and(
+        inArray(crmClientActivities.activityType, DatabaseStorage.INBOUND_REPLY_TYPES),
+        inArray(sql`lower(${crmClients.email})`, lower),
+      ))
+      .orderBy(desc(crmClientActivities.createdAt))
+      .limit(1000);
   }
 
   // ─── Contact Tasks ────────────────────────────────────────────────────────

@@ -57,6 +57,80 @@ export async function sendSmsViaQuo(
 }
 
 // Fetch the phone numbers available on the Quo account (useful for setup verification)
+export function normalizePhoneE164(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  if (phone.trim().startsWith("+")) return `+${digits}`;
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+  return digits ? `+${digits}` : phone;
+}
+
+export function phoneLast10(phone: string): string {
+  return phone.replace(/\D/g, "").slice(-10);
+}
+
+export interface SmsConversationMessage {
+  id: string;
+  direction: "inbound" | "outbound";
+  body: string;
+  status: string;
+  sentAt: string;
+}
+
+/** Pull the full SMS thread with a contact from Quo/OpenPhone. */
+export async function fetchSmsConversation(phone: string): Promise<SmsConversationMessage[]> {
+  if (!QUO_API_KEY || !QUO_PHONE_NUMBER_ID) return [];
+
+  const participant = normalizePhoneE164(phone);
+  const out: SmsConversationMessage[] = [];
+  let pageToken: string | null = null;
+
+  try {
+    for (let page = 0; page < 5; page++) {
+      const url = new URL(`${QUO_API_BASE}/messages`);
+      url.searchParams.set("phoneNumberId", QUO_PHONE_NUMBER_ID);
+      url.searchParams.set("participants", participant);
+      url.searchParams.set("maxResults", "100");
+      if (pageToken) url.searchParams.set("pageToken", pageToken);
+
+      const res = await fetch(url.toString(), {
+        headers: { Authorization: QUO_API_KEY },
+      });
+      if (!res.ok) break;
+
+      const json = await res.json() as {
+        data?: Array<{
+          id: string;
+          text?: string;
+          direction?: string;
+          status?: string;
+          createdAt?: string;
+        }>;
+        nextPageToken?: string | null;
+      };
+
+      for (const msg of json.data || []) {
+        if (!msg.text) continue;
+        out.push({
+          id: msg.id,
+          direction: msg.direction === "incoming" ? "inbound" : "outbound",
+          body: msg.text,
+          status: msg.status || "sent",
+          sentAt: msg.createdAt || new Date().toISOString(),
+        });
+      }
+
+      pageToken = json.nextPageToken ?? null;
+      if (!pageToken) break;
+    }
+  } catch {
+    return [];
+  }
+
+  out.sort((a, b) => Date.parse(a.sentAt) - Date.parse(b.sentAt));
+  return out;
+}
+
 export async function listQuoPhoneNumbers(): Promise<{ id: string; formattedNumber: string; name: string }[]> {
   if (!QUO_API_KEY) return [];
   try {

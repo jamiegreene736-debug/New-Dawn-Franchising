@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { formatPhone } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -129,6 +129,7 @@ interface SigRequest {
 }
 
 interface Template { id: string; label: string; body?: string; script?: string; }
+interface SmsMessage { id: string; direction: "inbound" | "outbound"; body: string; status: string; sentAt: string; }
 interface TwilioStatus { configured: boolean; smsReady: boolean; whatsappReady: boolean; }
 interface VoicemailStatus { configured: boolean; }
 
@@ -183,6 +184,7 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
   } | null>(null);
   const [verifyLoading, setVerifyLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const smsBottomRef = useRef<HTMLDivElement>(null);
 
   const activitiesKey = [`/api/crm/clients/${client.id}/activities`];
   const docsKey = [`/api/crm/clients/${client.id}/documents`];
@@ -269,6 +271,18 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
     queryFn: async () => (await apiRequest("GET", "/api/crm/voicemail-status")).json(),
   });
 
+  const smsHistoryKey = [`/api/crm/clients/${client.id}/sms`];
+  const { data: smsHistory = [], refetch: refetchSmsHistory, isLoading: smsHistoryLoading } = useQuery<SmsMessage[]>({
+    queryKey: smsHistoryKey,
+    queryFn: async () => (await apiRequest("GET", `/api/crm/clients/${client.id}/sms`)).json(),
+    enabled: tab === "sms",
+    refetchInterval: tab === "sms" ? 15000 : false,
+  });
+
+  useEffect(() => {
+    if (tab === "sms") smsBottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [tab, smsHistory.length]);
+
   const { data: smsTemplates = [] } = useQuery<Template[]>({
     queryKey: ["/api/crm/sms-templates"],
     queryFn: async () => (await apiRequest("GET", "/api/crm/sms-templates")).json(),
@@ -308,6 +322,7 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: activitiesKey });
+      refetchSmsHistory();
       setSmsMessage("");
       toast({ title: "SMS sent" });
     },
@@ -1541,7 +1556,7 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
 
               {/* ── SMS ── */}
               {tab === "sms" && (
-                <div className="space-y-4">
+                <div className="space-y-5">
                   {!twilioStatus?.smsReady && (
                     <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
                       SMS not configured. Add QUO_API_KEY and QUO_PHONE_NUMBER_ID in Secrets to enable SMS via Quo.
@@ -1552,35 +1567,98 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
                       This client has no phone number on file.
                     </div>
                   )}
+
+                  <Card className="p-4">
+                    <h3 className="text-sm font-semibold mb-3">Compose SMS</h3>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-xs font-semibold text-muted-foreground mb-1 block">Quick Templates</label>
+                        <div className="flex flex-wrap gap-2">
+                          {smsTemplates.map((t) => (
+                            <button key={t.id} onClick={() => applyTemplate(t, setSmsMessage)}
+                              className="text-xs rounded-full border px-2.5 py-1 hover:bg-muted transition-colors">
+                              {t.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-muted-foreground mb-1 block">
+                          Message to {formatPhone(client.phone) || "(no phone)"}
+                        </label>
+                        <textarea
+                          data-testid="input-sms-body"
+                          value={smsMessage}
+                          onChange={(e) => setSmsMessage(e.target.value)}
+                          rows={4}
+                          placeholder="Type your SMS message…"
+                          className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm resize-none"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">{smsMessage.length} chars · {Math.ceil(smsMessage.length / 160) || 0} segment{Math.ceil(smsMessage.length / 160) !== 1 ? "s" : ""}</p>
+                      </div>
+                      <Button disabled={!smsMessage.trim() || !client.phone || smsMutation.isPending}
+                        data-testid="button-send-sms"
+                        onClick={() => smsMutation.mutate()} className="gap-2">
+                        {smsMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+                        Send SMS
+                      </Button>
+                    </div>
+                  </Card>
+
                   <div>
-                    <label className="text-xs font-semibold text-muted-foreground mb-1 block">Quick Templates</label>
-                    <div className="flex flex-wrap gap-2">
-                      {smsTemplates.map((t) => (
-                        <button key={t.id} onClick={() => applyTemplate(t, setSmsMessage)}
-                          className="text-xs rounded-full border px-2.5 py-1 hover:bg-muted transition-colors">
-                          {t.label}
-                        </button>
-                      ))}
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-sm font-semibold">SMS Conversation</h3>
+                      <button onClick={() => refetchSmsHistory()} className="text-xs text-muted-foreground hover:text-foreground">
+                        <RefreshCw className="size-3 inline mr-1" />Refresh
+                      </button>
+                    </div>
+                    <div
+                      data-testid="sms-conversation-thread"
+                      className="rounded-lg border bg-muted/30 p-4 min-h-[280px] max-h-[420px] overflow-y-auto space-y-3"
+                    >
+                      {smsHistoryLoading ? (
+                        <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
+                          <Loader2 className="size-4 animate-spin mr-2" />Loading messages…
+                        </div>
+                      ) : smsHistory.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-12 text-center">
+                          <MessageSquare className="size-10 text-muted-foreground/30 mb-2" />
+                          <p className="text-sm text-muted-foreground">No SMS messages yet</p>
+                          <p className="text-xs text-muted-foreground mt-1">Sent and received texts with this contact will appear here.</p>
+                        </div>
+                      ) : (
+                        smsHistory.map((msg) => {
+                          const isInbound = msg.direction === "inbound";
+                          const failed = msg.status === "failed";
+                          return (
+                            <div key={msg.id} className={`flex ${isInbound ? "justify-start" : "justify-end"}`}>
+                              <div className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm shadow-sm ${
+                                isInbound
+                                  ? "bg-white border border-border text-foreground"
+                                  : failed
+                                    ? "bg-red-50 border border-red-200 text-red-900"
+                                    : "bg-[hsl(var(--primary))] text-white"
+                              }`}>
+                                <p className="leading-relaxed whitespace-pre-wrap break-words">{msg.body}</p>
+                                <p className={`text-[10px] mt-1.5 ${
+                                  isInbound ? "text-muted-foreground" : failed ? "text-red-600" : "text-white/70"
+                                }`}>
+                                  {isInbound ? client.fullName.split(" ")[0] : "You"}
+                                  {" · "}
+                                  {new Date(msg.sentAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                                  {" "}
+                                  {new Date(msg.sentAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                                  {failed && " · Failed to send"}
+                                  {!failed && !isInbound && msg.status === "delivered" && " · Delivered"}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                      <div ref={smsBottomRef} />
                     </div>
                   </div>
-                  <div>
-                    <label className="text-xs font-semibold text-muted-foreground mb-1 block">
-                      Message to {formatPhone(client.phone) || "(no phone)"}
-                    </label>
-                    <textarea
-                      value={smsMessage}
-                      onChange={(e) => setSmsMessage(e.target.value)}
-                      rows={4}
-                      placeholder="Type your SMS message…"
-                      className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm resize-none"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">{smsMessage.length} chars · {Math.ceil(smsMessage.length / 160)} segment{Math.ceil(smsMessage.length / 160) !== 1 ? "s" : ""}</p>
-                  </div>
-                  <Button disabled={!smsMessage.trim() || !client.phone || smsMutation.isPending}
-                    onClick={() => smsMutation.mutate()} className="gap-2">
-                    {smsMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
-                    Send SMS
-                  </Button>
                 </div>
               )}
 

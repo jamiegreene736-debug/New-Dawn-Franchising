@@ -13,6 +13,9 @@ import AboutPage from "@/pages/about";
 import EsPage from "@/pages/es";
 import FrPage from "@/pages/fr";
 import ZhPage from "@/pages/zh";
+import JaPage from "@/pages/ja";
+import KoPage from "@/pages/ko";
+import TrPage from "@/pages/tr";
 import E2FitPage from "@/pages/e2-fit";
 import E2VisaFranchisePage from "@/pages/e2-visa-franchise";
 import TerritoriesPage from "@/pages/territories";
@@ -81,6 +84,9 @@ function Router() {
               <Route path="/es" component={EsPage} />
               <Route path="/fr" component={FrPage} />
               <Route path="/zh" component={ZhPage} />
+              <Route path="/ja" component={JaPage} />
+              <Route path="/ko" component={KoPage} />
+              <Route path="/tr" component={TrPage} />
               <Route path="/e2-fit" component={E2FitPage} />
               <Route path="/e2-visa-franchise" component={E2VisaFranchisePage} />
               <Route path="/territories" component={TerritoriesPage} />

@@ -146,12 +146,96 @@ const FOOTER_I18N = {
     privacy: "隐私政策",
     terms: "条款与条件",
   },
+  ja: {
+    groupPrefix: "",
+    groupSuffix: " の一員 —— 自社技術と数十年の経験",
+    outreachLine: "世界中の投資家をサポートしています —— 日本語対応可能",
+    outreachLang: "ja",
+    followFacebook: "Facebook でフォローする",
+    stayUpdated: "最新情報を受け取る",
+    newsletterDesc:
+      "最新のフランチャイズ情報、E-2ビザの最新動向、業界インサイトをメールでお届けします。",
+    newsletterPlaceholder: "メールアドレスを入力",
+    subscribe: "登録",
+    newsletterSuccess: "登録が完了しました！最新情報をお届けします。",
+    requestInfo: "資料を請求する",
+    legalHeading: "法的免責事項",
+    disclaimerLead:
+      "本ウェブサイトは一般的な情報提供のみを目的としており、フランチャイズの販売の申し出ではなく、法律・移民・税務・財務に関する助言でもありません。",
+    disclaimerParagraphs: [
+      "本サイトの情報は一般的な情報提供および教育目的でのみ提供されており、フランチャイズの販売の申し出、または購入の申し込みの勧誘ではありません。フランチャイズは、米国連邦取引委員会（FTC）のフランチャイズ規則（16 CFR 第436部）および適用される州のフランチャイズ法に準拠したフランチャイズ開示書類（FDD）を通じてのみ提供・販売されます。一部の州ではフランチャイズの提供および販売が規制されており、登録または届出が義務付けられています。New Dawn Franchising は、当社が登録済みまたは免除されている州においてのみ、かつ適用される販売前の登録・届出・開示要件を満たし、法律で定められたとおりに FDD を交付した後にのみ、フランチャイズを提供または販売します。",
+      "New Dawn Franchising LLC はフランチャイザーであり、法律事務所ではありません。本サイトのいかなる内容も法律・移民・税務・財務に関する助言を構成するものではなく、本サイトの利用または当社への連絡によって弁護士・依頼者関係やその他の専門的関係が生じることはありません。当社は移民サービスを提供せず、お客様の法人設立も行いません——それはお客様ご自身の弁護士が行います。E-2条約投資家ビザに関する情報は一般的かつ教育的なものです。移民法および条約締約国は時とともに変化します。E-2ビザの適格性と承認は米国政府（国務省の領事官、および在留資格の変更・延長については USCIS）のみが決定するものであり、当社が決定することは決してなく、ビザが保証されることもありません。",
+      "投資または移民に関する決定を行う前に、お客様ご自身の米国認可の移民弁護士、ならびに有資格の税務および財務アドバイザーに依頼し、独立したデューデリジェンスを実施してください。情報は「現状有姿」で提供され、不完全または古くなっている可能性があり、その正確性または完全性について当社は一切保証しません。収入、利益、成果、業績に関する数値はすべて例示にすぎず、将来の成果を保証するものではありません。個々の結果は異なります。",
+    ] as readonly string[],
+    seeFullPrefix: "完全な開示事項については当社の",
+    seeFullSuffix: "をご覧ください。",
+    termsLabel: "利用規約",
+    rightsReserved: "無断複写・転載を禁じます。",
+    privacy: "プライバシーポリシー",
+    terms: "利用規約",
+  },
+  ko: {
+    groupPrefix: "",
+    groupSuffix: " 의 일원 —— 자체 기술과 수십 년의 경험",
+    outreachLine: "전 세계 투자자를 지원합니다 —— 한국어 상담 가능",
+    outreachLang: "ko",
+    followFacebook: "Facebook에서 팔로우하기",
+    stayUpdated: "최신 소식 받기",
+    newsletterDesc:
+      "최신 프랜차이즈 소식, E-2 비자 업데이트, 업계 인사이트를 이메일로 받아보세요.",
+    newsletterPlaceholder: "이메일 주소를 입력하세요",
+    subscribe: "구독",
+    newsletterSuccess: "구독이 완료되었습니다! 최신 소식을 전해 드리겠습니다.",
+    requestInfo: "자료 요청",
+    legalHeading: "법적 고지",
+    disclaimerLead:
+      "본 웹사이트는 일반적인 정보 제공만을 목적으로 하며, 프랜차이즈 판매 제안이 아니며 법률·이민·세무·재무 자문도 아닙니다.",
+    disclaimerParagraphs: [
+      "본 사이트의 정보는 일반적인 정보 제공 및 교육 목적으로만 제공되며, 프랜차이즈를 판매하기 위한 제안이나 구매 제안의 권유가 아닙니다. 프랜차이즈는 미국 연방거래위원회(FTC) 프랜차이즈 규칙(16 CFR Part 436) 및 적용 가능한 주 프랜차이즈 법률을 준수하는 프랜차이즈 공개 문서(FDD)를 통해서만 제공 및 판매됩니다. 일부 주는 프랜차이즈의 제공 및 판매를 규제하며 등록 또는 신고를 요구합니다. New Dawn Franchising은 당사가 등록되어 있거나 면제된 주에서만, 그리고 적용 가능한 판매 전 등록·신고·공개 요건을 충족하고 법률에 따라 FDD를 전달한 후에만 프랜차이즈를 제공하거나 판매합니다.",
+      "New Dawn Franchising LLC은 프랜차이즈 본사이며 법률 사무소가 아닙니다. 본 사이트의 어떠한 내용도 법률·이민·세무·재무 자문을 구성하지 않으며, 사이트 이용이나 당사와의 연락으로 변호사-의뢰인 관계 또는 기타 전문적 관계가 형성되지 않습니다. 당사는 이민 서비스를 제공하지 않으며 귀하의 법인을 설립하지 않습니다——이는 귀하 자신의 변호사가 수행합니다. E-2 조약 투자자 비자 정보는 일반적이고 교육적인 내용이며, 이민법과 조약 체결국은 시간이 지남에 따라 변경됩니다. E-2 비자의 자격과 승인은 오직 미국 정부(국무부 영사관, 신분 변경 또는 연장의 경우 USCIS)가 결정하며, 당사가 결정하지 않고, 비자는 결코 보장되지 않습니다.",
+      "투자 또는 이민 관련 결정을 내리기 전에 귀하 자신의 미국 면허 이민 변호사와 자격을 갖춘 세무 및 재무 고문을 선임하고 독립적인 실사를 수행해야 합니다. 정보는 '있는 그대로' 제공되며, 불완전하거나 오래되었을 수 있고, 당사는 그 정확성이나 완전성에 대해 어떠한 보증도 하지 않습니다. 모든 소득, 수익, 결과 또는 실적 수치는 예시일 뿐이며 미래 결과를 보장하지 않습니다. 개별 결과는 다를 수 있습니다.",
+    ] as readonly string[],
+    seeFullPrefix: "전체 공개 사항은 당사의 ",
+    seeFullSuffix: "을 참조하십시오.",
+    termsLabel: "이용약관",
+    rightsReserved: "모든 권리 보유.",
+    privacy: "개인정보 처리방침",
+    terms: "이용약관",
+  },
+  tr: {
+    groupPrefix: "",
+    groupSuffix: " bünyesindedir —— özel teknoloji, onlarca yıllık deneyim",
+    outreachLine: "Dünyanın her yerinden yatırımcılara hizmet veriyoruz —— Türkçe konuşuyoruz",
+    outreachLang: "tr",
+    followFacebook: "Bizi Facebook'ta takip edin",
+    stayUpdated: "Güncel kalın",
+    newsletterDesc:
+      "En son franchise haberlerini, E-2 vizesi güncellemelerini ve sektör analizlerini e-postanıza alın.",
+    newsletterPlaceholder: "E-posta adresinizi girin",
+    subscribe: "Abone ol",
+    newsletterSuccess: "Kaydınız alındı! Sizi en son haberlerle güncel tutacağız.",
+    requestInfo: "Bilgi isteyin",
+    legalHeading: "Yasal Uyarı",
+    disclaimerLead:
+      "Bu web sitesi yalnızca genel bilgilendirme amaçlıdır — bir franchise satış teklifi değildir ve hukuki, göçmenlik, vergi veya mali danışmanlık niteliği taşımaz.",
+    disclaimerParagraphs: [
+      "Bu sitedeki bilgiler yalnızca genel bilgilendirme ve eğitim amacıyla sağlanmaktadır ve bir franchise satışı teklifi ya da satın alma teklifi daveti değildir. Bir franchise yalnızca, FTC Franchise Kuralı'na (16 CFR Bölüm 436) ve geçerli eyalet franchise yasalarına uygun bir Franchise Açıklama Belgesi (FDD) aracılığıyla sunulur ve satılır. Bazı eyaletler franchise sunumunu ve satışını düzenler ve kayıt veya bildirim gerektirir; New Dawn Franchising, yalnızca kayıtlı veya muaf olduğumuz eyaletlerde ve yalnızca geçerli satış öncesi kayıt, bildirim ve açıklama gerekliliklerini karşıladıktan ve yasaların gerektirdiği şekilde FDD'yi teslim ettikten sonra bir franchise sunar veya satar.",
+      "New Dawn Franchising LLC bir franchise verendir, bir hukuk bürosu değildir. Bu sitedeki hiçbir şey hukuki, göçmenlik, vergi veya mali danışmanlık niteliği taşımaz ve sitenin kullanılması veya bizimle iletişime geçilmesi avukat-müvekkil ilişkisi ya da başka bir profesyonel ilişki oluşturmaz. Göçmenlik hizmetleri sunmuyoruz ve tüzel kişiliğinizi kurmuyoruz — bunu kendi avukatınız yapar. E-2 anlaşmalı yatırımcı vizesi bilgileri geneldir ve eğitim amaçlıdır; göçmenlik yasaları ve anlaşmalı ülkeler zamanla değişir. E-2 vizesi uygunluğu ve onayı yalnızca ABD hükümeti (Dışişleri Bakanlığı konsolosluk memurları ve statü değişikliği veya uzatması için USCIS) tarafından belirlenir, asla bizim tarafımızdan değil ve bir vize asla garanti edilmez.",
+      "Herhangi bir yatırım veya göçmenlikle ilgili karar vermeden önce, kendi ABD lisanslı göçmenlik avukatınıza ve nitelikli vergi ve mali danışmanlarınıza başvurmalı ve kendi bağımsız durum tespitinizi yapmalısınız. Bilgiler \"olduğu gibi\" sağlanır, eksik veya güncel olmayabilir ve doğruluğu veya eksiksizliği konusunda hiçbir garanti vermeyiz. Tüm gelir, kazanç, sonuç veya performans rakamları yalnızca örnektir ve gelecekteki sonuçların garantisi değildir; bireysel sonuçlar değişir.",
+    ] as readonly string[],
+    seeFullPrefix: "Tüm açıklamalar için ",
+    seeFullSuffix: " belgemize bakın.",
+    termsLabel: "Şartlar ve Koşullar",
+    rightsReserved: "Tüm hakları saklıdır.",
+    privacy: "Gizlilik Politikası",
+    terms: "Şartlar ve Koşullar",
+  },
 } as const;
 
 type FooterCopy = (typeof FOOTER_I18N)[keyof typeof FOOTER_I18N];
 
 function localeFromPath(path: string): keyof typeof FOOTER_I18N {
-  for (const code of ["es", "fr", "zh"] as const) {
+  for (const code of ["es", "fr", "zh", "ja", "ko", "tr"] as const) {
     if (path === `/${code}` || path.startsWith(`/${code}/`)) return code;
   }
   return "en";

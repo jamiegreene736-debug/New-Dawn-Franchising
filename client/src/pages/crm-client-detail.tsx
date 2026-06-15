@@ -202,9 +202,12 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
   const docsKey = [`/api/crm/clients/${client.id}/documents`];
   const sigsKey = [`/api/crm/clients/${client.id}/signatures`];
 
-  const { data: activities = [] } = useQuery<Activity[]>({
+  const { data: activities = [], refetch: refetchActivities } = useQuery<Activity[]>({
     queryKey: activitiesKey,
     queryFn: async () => (await apiRequest("GET", `/api/crm/clients/${client.id}/activities`)).json(),
+    // Poll while the WhatsApp tab is open so inbound replies captured by the
+    // Meta webhook appear in the conversation thread without a manual refresh.
+    refetchInterval: tab === "whatsapp" ? 10000 : false,
   });
 
   const { data: documents = [] } = useQuery<Doc[]>({
@@ -1790,7 +1793,12 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
 
                   {/* ── Conversation thread (manual log) ── */}
                   <div>
-                    <h3 className="text-sm font-semibold mb-3">WhatsApp Conversation</h3>
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-sm font-semibold">WhatsApp Conversation</h3>
+                      <button onClick={() => refetchActivities()} className="text-xs text-muted-foreground hover:text-foreground">
+                        <RefreshCw className="size-3 inline mr-1" />Refresh
+                      </button>
+                    </div>
                     <div className="rounded-lg border bg-muted/30 p-4 min-h-[200px] max-h-[420px] overflow-y-auto space-y-3">
                       {(() => {
                         const thread = activities

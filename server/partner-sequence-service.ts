@@ -3,12 +3,12 @@
  * 8-touch sequence for professional partners: immigration attorneys, wealth managers,
  * business advisors, E-2 consultants, immigration consultants, and other professionals.
  *
- * Channels: LinkedIn · Email · Lob (physical letter) — NO SMS, WhatsApp, or HeyGen
+ * Channels: LinkedIn · Email — NO SMS, WhatsApp, or HeyGen. (Lob physical
+ * letters were retired; legacy Lob events are neutralized at execution time.)
  *
  * Step 1  Day  0  LinkedIn Connection Request
  * Step 2  Day  1  Email 1 — Soft Intro
  * Step 3  Day  2  LinkedIn DM (if linkedin_connected)
- * Step 4  Day  4  Lob Premium Letter (if lob_enabled)
  * Step 5  Day  7  Email 2 — Opportunity + Escrow
  * Step 6  Day 10  Email 3 — Loom Video Email
  * Step 7  Day 14  Email 4 — Partnership Structure (fee reveal)
@@ -57,16 +57,15 @@ async function callClaude(system: string, user: string, maxTokens = 800): Promis
 
 interface EventDef {
   day: number;
-  channel: "email" | "linkedin" | "lob";
+  channel: "email" | "linkedin";
   touchName: string;
-  condition?: "lob_enabled" | "linkedin_connected" | "no_reply";
+  condition?: "linkedin_connected" | "no_reply";
 }
 
 const SEQUENCE_EVENTS: EventDef[] = [
   { day:  0, channel: "linkedin", touchName: "Step 1 — LinkedIn Connection Request" },
   { day:  1, channel: "email",    touchName: "Step 2 — Email 1: Soft Intro" },
   { day:  2, channel: "linkedin", touchName: "Step 3 — LinkedIn DM",            condition: "linkedin_connected" },
-  { day:  4, channel: "lob",      touchName: "Step 4 — Lob Premium Letter",     condition: "lob_enabled" },
   { day:  7, channel: "email",    touchName: "Step 5 — Email 2: Opportunity + Escrow" },
   { day: 10, channel: "email",    touchName: "Step 6 — Email 3: Loom Video" },
   { day: 14, channel: "email",    touchName: "Step 7 — Email 4: Partnership Structure" },
@@ -87,8 +86,8 @@ export async function initializePartnerSequence(leadId: string): Promise<void> {
   if (!lead) throw new Error("Partner lead not found: " + leadId);
   if (lead.sequenceStartedAt) return;
 
-  const hasAddress = !!(lead.mailingAddress && lead.mailingAddress.trim().length > 10);
-  const flow = hasAddress ? "lob_enabled" : "standard";
+  // Postcards/letters retired — every partner lead runs the standard (no-Lob) flow.
+  const flow = "standard";
   const variant = ["A", "B", "C"][Math.floor(Math.random() * 3)];
 
   const now = new Date();
@@ -420,9 +419,9 @@ async function executeEvent(event: PartnerSequenceEvent, lead: PartnerLead): Pro
   const flow: string = meta.flow ?? lead.sequenceFlow ?? "standard";
   const firstName = lead.fullName.split(" ")[0];
 
-  // Evaluate conditions
-  if (condition === "lob_enabled" && flow !== "lob_enabled") {
-    await markEvent(event.id, "skipped", { notes: "No mailing address — skipping Lob touch", executedAt: new Date() });
+  // Postcards retired: neutralize any legacy scheduled Lob events / conditions.
+  if (event.channel === "lob" || condition === "lob_enabled") {
+    await markEvent(event.id, "skipped", { notes: "Postcard/letter step retired (Lob removed)", executedAt: new Date() });
     return;
   }
   if (condition === "linkedin_connected" && !lead.linkedinConnected) {
@@ -472,20 +471,6 @@ async function executeEvent(event: PartnerSequenceEvent, lead: PartnerLead): Pro
     const label = isConnection ? "🔗 Partner LinkedIn Connection" : "💬 Partner LinkedIn DM";
     const smsBody = `${label} queued for ${lead.fullName}${lead.company ? ` · ${lead.company}` : ""}\n\nMessage: "${msg.slice(0, 140)}"\n\nLinkedIn: ${lead.linkedinUrl ?? "no URL"}\n\nTap to confirm you sent it:\n${approvalUrl}`;
     await sendAgentSms("outreach", smsBody, { triggerType: "partner_linkedin_queue" }).catch(() => {});
-    return;
-  }
-
-  // ─── Lob Letter ──────────────────────────────────────────────────────────
-  if (event.channel === "lob") {
-    const { sendPartnerLetter } = await import("./lob-service") as any;
-    const result = await sendPartnerLetter(lead);
-    await markEvent(event.id, result.success ? "sent" : "failed", {
-      notes: result.success
-        ? `Partner letter dispatched via Lob${result.demoMode ? " (demo mode)" : ""}. ID: ${result.lobId}. Address: ${lead.mailingAddress}`
-        : `Lob error: ${result.error}`,
-      metadata: { ...meta, lobId: result.lobId } as any,
-      executedAt: new Date(),
-    });
     return;
   }
 

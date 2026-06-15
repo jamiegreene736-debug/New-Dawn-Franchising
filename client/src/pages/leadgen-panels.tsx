@@ -135,8 +135,9 @@ function LeadProfileDrawer({ leadId, onClose }: { leadId: string; onClose: () =>
   });
 
   const startSequenceMutation = useMutation({
-    mutationFn: () => api(`/api/leads/${leadId}/sequence/start`, { method: "POST" }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: [`/api/leads/${leadId}`] }); refetchTimeline(); toast({ title: "Sequence started!", description: `${lead?.fullName}'s 11-touch sequence is now live.` }); },
+    mutationFn: (track: "broker" | "client" = "broker") =>
+      api(`/api/leads/${leadId}/sequence/start`, { method: "POST", body: JSON.stringify({ track }) }),
+    onSuccess: (_d, track) => { qc.invalidateQueries({ queryKey: [`/api/leads/${leadId}`] }); refetchTimeline(); toast({ title: "Sequence started!", description: `${lead?.fullName}'s ${track === "client" ? "client" : "broker"} sequence is now live.` }); },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
@@ -318,7 +319,7 @@ function LeadProfileDrawer({ leadId, onClose }: { leadId: string; onClose: () =>
             <SequenceTimelineTab
               lead={lead}
               events={timelineEvents}
-              onStart={() => startSequenceMutation.mutate()}
+              onStart={(track) => startSequenceMutation.mutate(track)}
               onPause={() => pauseSequenceMutation.mutate()}
               onCancel={() => cancelSequenceMutation.mutate()}
               onLinkedInConnected={() => linkedInConnectedMutation.mutate()}
@@ -333,7 +334,7 @@ function LeadProfileDrawer({ leadId, onClose }: { leadId: string; onClose: () =>
               events={timelineEvents}
               leadId={leadId}
               onTriggered={() => { refetchTimeline(); qc.invalidateQueries({ queryKey: [`/api/leads/${leadId}`] }); }}
-              onStart={() => startSequenceMutation.mutate()}
+              onStart={(track) => startSequenceMutation.mutate(track)}
               isStarting={startSequenceMutation.isPending}
             />
           )}
@@ -382,10 +383,11 @@ function ManualOverrideTab({ lead, events, leadId, onTriggered, onStart, isStart
   events: SequenceEvent[];
   leadId: string;
   onTriggered: () => void;
-  onStart: () => void;
+  onStart: (track: "broker" | "client") => void;
   isStarting: boolean;
 }) {
   const { toast } = useToast();
+  const [startTrack, setStartTrack] = useState<"broker" | "client">("broker");
   const [confirming, setConfirming] = useState<string | null>(null); // eventId being confirmed
   const [triggering, setTriggering] = useState<string | null>(null); // eventId being sent
   const [results, setResults] = useState<Record<string, { success: boolean; message: string }>>({});
@@ -438,18 +440,31 @@ function ManualOverrideTab({ lead, events, leadId, onTriggered, onStart, isStart
           <Activity className="w-8 h-8 text-[#1a2a4a]/40 mx-auto mb-3" />
           <p className="font-semibold text-gray-800 mb-1">11-Touch Broker Sequence</p>
           <p className="text-xs text-gray-500 mb-1 max-w-xs mx-auto">
-            6 channels over 21 days — Email, SMS, WhatsApp, LinkedIn, {lead.mailingAddress ? "Lob physical mail" : "HeyGen AI video"}, and more.
+            5 channels over 21 days — Email, SMS, WhatsApp, LinkedIn, HeyGen AI video, and more.
           </p>
           <p className="text-xs text-gray-400 mb-4">
             Start the sequence to unlock all steps, then use <strong>Send Now</strong> on any individual step to fire it immediately.
           </p>
-          <div className="flex items-center justify-center gap-2 mb-3">
-            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${lead.mailingAddress ? "bg-orange-100 text-orange-700" : "bg-purple-100 text-purple-700"}`}>
-              {lead.mailingAddress ? "📬 Lob Flow (has mailing address)" : "🎬 HeyGen Flow (AI video)"}
-            </span>
+          <div className="flex items-center justify-center gap-1.5 mb-3">
+            <button
+              type="button"
+              data-testid="seq-track-broker"
+              onClick={() => setStartTrack("broker")}
+              className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${startTrack === "broker" ? "bg-blue-100 text-blue-700 border-blue-300" : "bg-white text-gray-500 border-gray-200"}`}
+            >
+              Brokers
+            </button>
+            <button
+              type="button"
+              data-testid="seq-track-client"
+              onClick={() => setStartTrack("client")}
+              className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${startTrack === "client" ? "bg-violet-100 text-violet-700 border-violet-300" : "bg-white text-gray-500 border-gray-200"}`}
+            >
+              Clients
+            </button>
           </div>
-          <Button onClick={onStart} disabled={isStarting} className="bg-[#1a2a4a] hover:bg-[#1a2a4a]/90 text-white gap-2">
-            {isStarting ? <><Loader2 className="w-4 h-4 animate-spin" />Starting…</> : <><Play className="w-4 h-4" />Start Sequence &amp; View Steps</>}
+          <Button onClick={() => onStart(startTrack)} disabled={isStarting} className="bg-[#1a2a4a] hover:bg-[#1a2a4a]/90 text-white gap-2">
+            {isStarting ? <><Loader2 className="w-4 h-4 animate-spin" />Starting…</> : <><Play className="w-4 h-4" />Start {startTrack === "client" ? "Client" : "Broker"} Sequence</>}
           </Button>
         </div>
       </div>
@@ -578,7 +593,7 @@ const SEQ_CHANNEL_ICONS: Record<string, { icon: any; label: string; color: strin
 function SequenceTimelineTab({ lead, events, onStart, onPause, onCancel, onLinkedInConnected, isStarting }: {
   lead: OutreachLead;
   events: SequenceEvent[];
-  onStart: () => void;
+  onStart: (track: "broker" | "client") => void;
   onPause: () => void;
   onCancel: () => void;
   onLinkedInConnected: () => void;
@@ -586,6 +601,7 @@ function SequenceTimelineTab({ lead, events, onStart, onPause, onCancel, onLinke
 }) {
   const hasSequence = !!lead.sequenceStartedAt;
   const isPaused = lead.sequencePaused;
+  const [startTrack, setStartTrack] = useState<"broker" | "client">("broker");
 
   const completedCount = events.filter(e => ["sent","opened","clicked","replied"].includes(e.status)).length;
   const failedCount = events.filter(e => e.status === "failed").length;
@@ -599,15 +615,26 @@ function SequenceTimelineTab({ lead, events, onStart, onPause, onCancel, onLinke
           <Activity className="w-8 h-8 text-blue-400 mx-auto mb-2" />
           <p className="font-semibold text-gray-800 mb-1">11-Touch Broker Sequence</p>
           <p className="text-xs text-gray-500 mb-4 max-w-xs mx-auto">
-            6 channels over 21 days — Email, SMS, WhatsApp, LinkedIn, {lead.mailingAddress ? "Lob physical mail" : "HeyGen AI video"}, and more.
+            5 channels over 21 days — Email, SMS, WhatsApp, LinkedIn, HeyGen AI video, and more.
           </p>
-          <div className="text-xs text-gray-500 mb-4">
-            Flow: <span className={`font-semibold px-2 py-0.5 rounded-full ${lead.mailingAddress ? "bg-orange-100 text-orange-700" : "bg-purple-100 text-purple-700"}`}>
-              {lead.mailingAddress ? "📬 Lob Enabled (physical mail)" : "🎬 HeyGen Flow (AI video)"}
-            </span>
+          <div className="flex items-center justify-center gap-1.5 mb-4">
+            <button
+              type="button"
+              onClick={() => setStartTrack("broker")}
+              className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${startTrack === "broker" ? "bg-blue-100 text-blue-700 border-blue-300" : "bg-white text-gray-500 border-gray-200"}`}
+            >
+              Brokers
+            </button>
+            <button
+              type="button"
+              onClick={() => setStartTrack("client")}
+              className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${startTrack === "client" ? "bg-violet-100 text-violet-700 border-violet-300" : "bg-white text-gray-500 border-gray-200"}`}
+            >
+              Clients
+            </button>
           </div>
-          <Button onClick={onStart} disabled={isStarting} className="gap-2">
-            {isStarting ? <><Loader2 className="w-4 h-4 animate-spin" />Starting...</> : <><Play className="w-4 h-4" />Start Sequence</>}
+          <Button onClick={() => onStart(startTrack)} disabled={isStarting} className="gap-2">
+            {isStarting ? <><Loader2 className="w-4 h-4 animate-spin" />Starting...</> : <><Play className="w-4 h-4" />Start {startTrack === "client" ? "Client" : "Broker"} Sequence</>}
           </Button>
         </div>
       ) : (
@@ -619,7 +646,7 @@ function SequenceTimelineTab({ lead, events, onStart, onPause, onCancel, onLinke
               </p>
               <p className="text-xs text-gray-600">
                 Started {new Date(lead.sequenceStartedAt!).toLocaleDateString()} ·
-                Flow: <span className="font-medium">{lead.sequenceFlow === "lob_enabled" ? "Lob Mail" : "HeyGen Video"}</span>
+                Track: <span className="font-medium capitalize">{(lead as any).sequenceTrack === "client" ? "Client" : "Broker"}</span>
               </p>
               {isPaused && lead.sequencePausedReason && (
                 <p className="text-xs text-amber-700 mt-0.5">{lead.sequencePausedReason}</p>

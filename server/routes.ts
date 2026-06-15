@@ -2414,9 +2414,10 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
 
   app.post("/api/crm/campaigns", requireAdminAuth, async (req, res) => {
     try {
-      const { name, description, isActive, steps } = req.body;
+      const { name, description, isActive, steps, audienceType } = req.body;
       if (!name) return res.status(400).json({ message: "Campaign name is required" });
-      const campaign = await storage.createDripCampaign({ name, description, isActive: isActive ?? true });
+      const track = audienceType === "client" ? "client" : "broker";
+      const campaign = await storage.createDripCampaign({ name, description, isActive: isActive ?? true, audienceType: track } as any);
       if (Array.isArray(steps)) {
         for (const step of steps) {
           await storage.createDripStep({
@@ -2463,7 +2464,8 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
         name: `Copy of ${src.name}`,
         description: src.description,
         isActive: false,
-      });
+        audienceType: (src as any).audienceType ?? "broker",
+      } as any);
       for (const s of steps) {
         await storage.createDripStep({
           campaignId: copy.id,

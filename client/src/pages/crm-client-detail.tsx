@@ -7,13 +7,14 @@ import {
   Trash2, FileText, Loader2, CheckCircle2, Circle, ExternalLink,
   Linkedin, Globe, ChevronDown, RefreshCw, Clock, Paperclip,
   PhoneCall, MessageCircle, PenLine, Timer, AlertTriangle, Sparkles,
-  Printer, Zap, Check, Search, Megaphone, Copy,
+  Zap, Check, Search, Megaphone, Copy, Users, UserRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { getTrackSteps, renderTrackText, type TrackId } from "@shared/campaign-tracks";
 
 const ACTIVITY_ICONS: Record<string, React.ReactNode> = {
   email_sent: <Mail className="size-4 text-blue-500" />,
@@ -134,7 +135,7 @@ interface SmsMessage { id: string; direction: "inbound" | "outbound"; body: stri
 interface TwilioStatus { configured: boolean; smsReady: boolean; whatsappReady: boolean; }
 interface VoicemailStatus { configured: boolean; }
 
-type Tab = "override" | "campaigns" | "email" | "sms" | "whatsapp" | "voicemail" | "documents" | "signing" | "linkedin" | "postcard";
+type Tab = "override" | "campaigns" | "email" | "sms" | "whatsapp" | "voicemail" | "documents" | "signing" | "linkedin";
 
 interface ClientCampaignStep {
   stepOrder: number;
@@ -171,12 +172,16 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
   const [overrideCompose, setOverrideCompose] = useState<{ subject: string; body: string; sender: string }>({ subject: "", body: "", sender: "" });
   const [overrideSending, setOverrideSending] = useState(false);
   const [overrideGenerating, setOverrideGenerating] = useState(false);
+  // Which Send-now track to use for this contact: "client" (direct-to-investor
+  // pitch) or "broker" (referral-partner pitch). CRM contacts are investors, so
+  // default to the client track; the operator can flip to the broker track for
+  // referral partners.
+  const [overrideTrack, setOverrideTrack] = useState<TrackId>("client");
   const [noteText, setNoteText] = useState("");
   const [smsMessage, setSmsMessage] = useState("");
   const [waMessage, setWaMessage] = useState("");
   const [linkedinNote, setLinkedinNote] = useState("");
   const [audioUrl, setAudioUrl] = useState("");
-  const [postcardAddress, setPostcardAddress] = useState(client.address ?? "");
   const [waCheckResult, setWaCheckResult] = useState<{ onWhatsApp: boolean; waId?: string; error?: string } | null>(null);
   const [waChecking, setWaChecking] = useState(false);
   const [verifyResult, setVerifyResult] = useState<{
@@ -377,23 +382,6 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
     onError: (e: Error) => toast({ title: "Voicemail failed", description: e.message, variant: "destructive" }),
   });
 
-  const postcardMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/crm/clients/${client.id}/postcard`, { address: postcardAddress });
-      return res.json();
-    },
-    onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: activitiesKey });
-      toast({
-        title: data.demoMode ? "Postcard queued (demo mode)" : "Postcard submitted to Lob!",
-        description: data.demoMode
-          ? "Add a LOB_API_KEY secret to send real postcards."
-          : `Lob ID: ${data.lobId} — arrives in ~5 business days.`,
-      });
-    },
-    onError: (e: Error) => toast({ title: "Postcard failed", description: e.message, variant: "destructive" }),
-  });
-
   const deleteDocMutation = useMutation({
     mutationFn: async (docId: string) => {
       await apiRequest("DELETE", `/api/crm/documents/${docId}`);
@@ -566,7 +554,6 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
     { key: "sms", label: "SMS", icon: <MessageSquare className="size-3.5" /> },
     { key: "whatsapp", label: "WhatsApp", icon: <MessageCircle className="size-3.5" /> },
     { key: "voicemail", label: "Voicemail", icon: <Mic className="size-3.5" /> },
-    { key: "postcard", label: "Postcard", icon: <Printer className="size-3.5" /> },
     { key: "documents", label: "Documents", icon: <Paperclip className="size-3.5" /> },
   ];
 
@@ -895,11 +882,9 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
 
               {/* ── Manual Override / Send Now ── */}
               {tab === "override" && (() => {
-                const autoStep = (type: string) => activities.find(a => a.activityType === type);
                 const manualStep = (id: string) =>
                   activities.find(a => a.activityType === "playbook_step" && (a.metadata as Record<string,string>)?.step === id);
 
-                const CALENDLY = "https://calendly.com/dylan-newdawnfranchising";
                 const fromEmail = senderProfiles[0]?.email || "dylan@newdawnfranchising.com";
 
                 interface OverrideStep {
@@ -917,170 +902,41 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
                   autoDetect?: () => Activity | undefined;
                 }
 
-                const STEPS: OverrideStep[] = [
-                  {
-                    id: "d0_linkedin",
-                    day: "Day 0",
-                    channel: "LinkedIn Connection Request",
-                    icon: <Linkedin className="size-4" />,
-                    iconBg: "bg-sky-50",
-                    iconColor: "text-sky-600",
-                    description: "Send a personalised connection request on LinkedIn to open the relationship.",
-                    sendType: "manual",
-                    defaultBody: `Hi ${firstName} — I came across your work and wanted to connect. I'm with New Dawn Franchising, built specifically for E-2 Treaty Investor Visa candidates who want to own a U.S. business without running the day-to-day. Would love to connect.`,
-                  },
-                  {
-                    id: "d1_email",
-                    day: "Day 1",
-                    channel: "Touch 1 — Soft Intro Email",
-                    icon: <Mail className="size-4" />,
-                    iconBg: "bg-blue-50",
-                    iconColor: "text-blue-600",
-                    description: "First email — warm, non-salesy intro to the E-2 franchise opportunity.",
-                    sendType: "email",
-                    defaultSubject: "Franchise Investment Opportunity — E-2 Visa Pathway",
-                    defaultBody: `Hi ${firstName},\n\nI wanted to reach out about an exciting franchise investment opportunity based in El Paso, Texas. Our model has helped dozens of international investors secure their E-2 visa and build a thriving business in the US.\n\nRecognized by Forbes 30 Under 30 — and all client funds are held in escrow with a full refund if the visa is denied.\n\nWould love to share more in a quick 20-minute call: ${CALENDLY}\n\nLooking forward to connecting,\nDylan Delaney\nNew Dawn Franchising`,
-                    autoDetect: () => activities.find(a => a.activityType === "email_sent" && (a.metadata as any)?.step === "d1_email"),
-                  },
-                  {
-                    id: "d1_sms",
-                    day: "Day 1",
-                    channel: "SMS — Email Open Trigger",
-                    icon: <MessageSquare className="size-4" />,
-                    iconBg: "bg-green-50",
-                    iconColor: "text-green-600",
-                    description: "If the Day 1 email was opened within 24 hours, fire this SMS to strike while interest is hot.",
-                    condition: "If: email opened < 24 hrs",
-                    sendType: "sms",
-                    defaultBody: `Hi ${firstName}, Dylan from New Dawn Franchising — just wanted to make sure my email came through. Happy to hop on a quick call: ${CALENDLY}`,
-                  },
-                  {
-                    id: "d1_lob",
-                    day: "Day 1",
-                    channel: "Lob Postcard",
-                    icon: <Printer className="size-4" />,
-                    iconBg: "bg-amber-50",
-                    iconColor: "text-amber-600",
-                    description: "Submit a branded postcard via Lob (physical mail) — arrives in ~5 days.",
-                    condition: "If: mailing address on file",
-                    sendType: "manual",
-                    defaultBody: "",
-                  },
-                  {
-                    id: "d3_email",
-                    day: "Day 3",
-                    channel: "Touch 2 — Credibility & Social Proof",
-                    icon: <Mail className="size-4" />,
-                    iconBg: "bg-blue-50",
-                    iconColor: "text-blue-600",
-                    description: "Second email — share success stories, investor testimonials, and key differentiators.",
-                    sendType: "email",
-                    defaultSubject: "Real investors, real results — New Dawn Franchising",
-                    defaultBody: `Hi ${firstName},\n\nFollowing up from my earlier note. Wanted to share a quick snapshot of what our investors have achieved:\n\n• E-2 visa approved in under 6 months\n• Full-service franchise support (training, marketing, operations)\n• Average ROI in Year 1: 22%\n\nWe work exclusively with E-2 visa investors, so the entire model is built around what immigration attorneys and investors need to succeed.\n\nHappy to send over our investor overview deck — just say the word, or book a call here: ${CALENDLY}\n\nBest,\nDylan Delaney\nNew Dawn Franchising`,
-                    autoDetect: () => activities.find(a => a.activityType === "email_sent" && (a.metadata as any)?.step === "d3_email"),
-                  },
-                  {
-                    id: "d3_linkedin",
-                    day: "Day 3",
-                    channel: "LinkedIn DM",
-                    icon: <Linkedin className="size-4" />,
-                    iconBg: "bg-sky-50",
-                    iconColor: "text-sky-600",
-                    description: "If they accepted the Day 0 connection request, send a short LinkedIn DM.",
-                    condition: "If: LinkedIn connected",
-                    sendType: "manual",
-                    defaultBody: `Hi ${firstName} — thanks for connecting! I sent you an email too so it doesn't get buried. We built New Dawn for E-2 candidates: a qualifying U.S. business they direct while our team runs daily ops, and they can live anywhere in the U.S. Happy to share a quick overview if it's useful for anyone in your pipeline.`,
-                  },
-                  {
-                    id: "d5_heygen",
-                    day: "Day 5",
-                    channel: "HeyGen AI Video Email",
-                    icon: <Zap className="size-4" />,
-                    iconBg: "bg-purple-50",
-                    iconColor: "text-purple-600",
-                    description: "Send a personalised AI avatar video email via HeyGen (no mailing address flow only).",
-                    condition: "If: no mailing address",
-                    sendType: "manual",
-                    defaultBody: "",
-                  },
-                  {
-                    id: "d7_email",
-                    day: "Day 7",
-                    channel: "Touch 3 — Referral Fee Reveal",
-                    icon: <Mail className="size-4" />,
-                    iconBg: "bg-blue-50",
-                    iconColor: "text-blue-600",
-                    description: "Third email — reveal the referral fee structure to appeal to immigration attorneys and brokers.",
-                    sendType: "email",
-                    defaultSubject: `${firstName}, here's what we pay for referrals`,
-                    defaultBody: `Hi ${firstName},\n\nI wanted to share something I don't always lead with: we pay a generous referral fee to immigration attorneys and financial advisors who send us investors.\n\nIf you work with clients exploring the E-2 visa, this could be a meaningful additional revenue stream for your practice — and a genuine value-add for your clients.\n\nOur franchise was built specifically around E-2 investors. Every client gets:\n• Escrow-protected investment\n• Full visa support documentation\n• Operations and training included\n\nWorth 15 minutes? Book here: ${CALENDLY}\n\nDylan Delaney\nNew Dawn Franchising`,
-                    autoDetect: () => activities.find(a => a.activityType === "email_sent" && (a.metadata as any)?.step === "d7_email"),
-                  },
-                  {
-                    id: "d7_sms",
-                    day: "Day 7",
-                    channel: "SMS — Email Open Trigger",
-                    icon: <MessageSquare className="size-4" />,
-                    iconBg: "bg-green-50",
-                    iconColor: "text-green-600",
-                    description: "If the Day 7 referral email was opened within 4 hours, send this SMS follow-up.",
-                    condition: "If: email opened < 4 hrs",
-                    sendType: "sms",
-                    defaultBody: `Hi ${firstName}, Dylan from New Dawn Franchising. Sent you an email about our referral program — did it land okay? Happy to chat: ${CALENDLY}`,
-                  },
-                  {
-                    id: "d7_lob",
-                    day: "Day 7",
-                    channel: "Lob Premium Letter",
-                    icon: <Printer className="size-4" />,
-                    iconBg: "bg-amber-50",
-                    iconColor: "text-amber-600",
-                    description: "Send a premium printed letter via Lob for leads with a mailing address.",
-                    condition: "If: mailing address on file",
-                    sendType: "manual",
-                    defaultBody: "",
-                  },
-                  {
-                    id: "d10_whatsapp",
-                    day: "Day 10",
-                    channel: "WhatsApp Follow-Up",
-                    icon: <MessageCircle className="size-4" />,
-                    iconBg: "bg-emerald-50",
-                    iconColor: "text-emerald-600",
-                    description: "WhatsApp message if they haven't replied on any channel yet.",
-                    condition: "If: no reply on any channel",
-                    sendType: "whatsapp",
-                    defaultBody: `Hi ${firstName}! 👋 Dylan here from New Dawn Franchising. I've sent a couple of emails about our E-2 visa franchise opportunity — I know inboxes get busy. Even a 10-minute call would be great: ${CALENDLY}`,
-                    autoDetect: () => autoStep("whatsapp_sent"),
-                  },
-                  {
-                    id: "d14_email",
-                    day: "Day 14",
-                    channel: "Case Study Email",
-                    icon: <Mail className="size-4" />,
-                    iconBg: "bg-violet-50",
-                    iconColor: "text-violet-600",
-                    description: "Deep-dive case study for HeyGen flow leads who haven't replied yet.",
-                    condition: "If: no mailing address (HeyGen flow)",
-                    sendType: "email",
-                    defaultSubject: "How Omar got his E-2 visa through New Dawn Franchising",
-                    defaultBody: `Hi ${firstName},\n\nI wanted to share a quick case study before I close the loop.\n\nOmar, an Egyptian investor, came to us after two failed E-2 attempts. Within 5 months of working with New Dawn:\n\n✅ Visa approved\n✅ Franchise opened in El Paso\n✅ $180K in Year 1 revenue\n\nThe key difference: our franchise is purpose-built for E-2 applicants. We handle the business plan, documentation, and attorney coordination.\n\nIf this resonates, I'd love to connect: ${CALENDLY}\n\nDylan Delaney\nNew Dawn Franchising`,
-                    autoDetect: () => activities.find(a => a.activityType === "email_sent" && (a.metadata as any)?.step === "d14_email"),
-                  },
-                  {
-                    id: "d21_email",
-                    day: "Day 21",
-                    channel: "Final Breakup Email",
-                    icon: <Mail className="size-4" />,
-                    iconBg: "bg-rose-50",
-                    iconColor: "text-rose-600",
-                    description: "Last email in the sequence — short, respectful, leaves the door open.",
-                    sendType: "email",
-                    defaultSubject: `Closing the loop, ${firstName}`,
-                    defaultBody: `Hi ${firstName},\n\nI've reached out a few times about our E-2 franchise opportunity and I don't want to keep interrupting your inbox.\n\nIf the timing isn't right — totally understood. If you'd ever like to revisit, my calendar is always open: ${CALENDLY}\n\nWishing you and your clients the very best.\n\nDylan Delaney\nNew Dawn Franchising`,
-                    autoDetect: () => activities.find(a => a.activityType === "email_sent" && (a.metadata as any)?.step === "d21_email"),
-                  },
-                ];
+                const STEP_ICONS: Record<string, { icon: React.ReactNode; iconBg: string; iconColor: string }> = {
+                  email: { icon: <Mail className="size-4" />, iconBg: "bg-blue-50", iconColor: "text-blue-600" },
+                  sms: { icon: <MessageSquare className="size-4" />, iconBg: "bg-green-50", iconColor: "text-green-600" },
+                  linkedin_connect: { icon: <Linkedin className="size-4" />, iconBg: "bg-sky-50", iconColor: "text-sky-600" },
+                  linkedin_message: { icon: <Linkedin className="size-4" />, iconBg: "bg-sky-50", iconColor: "text-sky-600" },
+                  call: { icon: <PhoneCall className="size-4" />, iconBg: "bg-violet-50", iconColor: "text-violet-600" },
+                };
+                const STEP_DESCRIPTIONS: Record<string, string> = {
+                  email: "Email — review the draft and send when it looks right.",
+                  sms: "Quick SMS nudge.",
+                  linkedin_connect: "Send a personalised LinkedIn connection request.",
+                  linkedin_message: "Send a short LinkedIn DM (if connected).",
+                  call: "Call task — talking points are in the note.",
+                };
+                const sendTypeForStep = (t: string): OverrideStep["sendType"] =>
+                  t === "email" ? "email" : t === "sms" ? "sms" : "manual";
+
+                // Send-now steps come from the shared two-track content module so the
+                // override emails stay in sync with the seeded "Grok Campaign" drips.
+                // There are no postcard steps in either track.
+                const STEPS: OverrideStep[] = getTrackSteps(overrideTrack).map((st) => {
+                  const ic = STEP_ICONS[st.stepType] ?? STEP_ICONS.email;
+                  return {
+                    id: `${overrideTrack}_s${st.stepOrder}_${st.stepType}`,
+                    day: `Day ${st.delayDays}`,
+                    channel: st.stepName,
+                    icon: ic.icon,
+                    iconBg: ic.iconBg,
+                    iconColor: ic.iconColor,
+                    description: STEP_DESCRIPTIONS[st.stepType] ?? "",
+                    sendType: sendTypeForStep(st.stepType),
+                    defaultSubject: st.subject || undefined,
+                    defaultBody: renderTrackText(st.bodyText, firstName),
+                  };
+                });
 
                 const isDone = (s: OverrideStep) => {
                   if (s.autoDetect) { const act = s.autoDetect(); if (act) return { done: true, at: new Date(act.createdAt) }; }
@@ -1167,6 +1023,34 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
 
                 return (
                   <div className="space-y-3">
+                    {/* Audience track selector — Client (direct-to-investor) vs Broker (referral partner) */}
+                    <div className="rounded-xl border border-muted bg-muted/30 p-2.5">
+                      <span className="text-xs font-semibold">Who are you writing to?</span>
+                      <div className="grid grid-cols-2 gap-1.5 mt-1.5">
+                        <button
+                          type="button"
+                          data-testid="track-client"
+                          onClick={() => { setOverrideTrack("client"); setOverrideExpanded(null); setOverrideCompose({ subject: "", body: "", sender: "" }); }}
+                          className={`flex items-center justify-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors ${overrideTrack === "client" ? "border-[hsl(var(--primary)/0.5)] bg-[hsl(var(--primary)/0.08)] text-foreground" : "border-muted bg-card text-muted-foreground hover:bg-muted/50"}`}
+                        >
+                          <UserRound className="size-3.5" /> Client
+                        </button>
+                        <button
+                          type="button"
+                          data-testid="track-broker"
+                          onClick={() => { setOverrideTrack("broker"); setOverrideExpanded(null); setOverrideCompose({ subject: "", body: "", sender: "" }); }}
+                          className={`flex items-center justify-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors ${overrideTrack === "broker" ? "border-[hsl(var(--primary)/0.5)] bg-[hsl(var(--primary)/0.08)] text-foreground" : "border-muted bg-card text-muted-foreground hover:bg-muted/50"}`}
+                        >
+                          <Users className="size-3.5" /> Broker
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mt-1.5 leading-snug">
+                        {overrideTrack === "client"
+                          ? "Direct-to-investor pitch — sells the E-2 franchise to the candidate. No referral-fee language."
+                          : "Referral-partner pitch — for attorneys, consultants & brokers who refer their clients (mentions the $28,125 referral fee)."}
+                      </p>
+                    </div>
+
                     {/* Header */}
                     <div className="flex items-center justify-between">
                       <div>
@@ -1881,66 +1765,6 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
                     {voicemailMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : <Mic className="size-4" />}
                     Drop Voicemail
                   </Button>
-                </div>
-              )}
-
-              {/* ── Postcard ── */}
-              {tab === "postcard" && (
-                <div className="space-y-4">
-                  {/* Info banner */}
-                  <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 text-sm text-blue-800">
-                    <p className="font-semibold mb-1">Lob Physical Postcard</p>
-                    <p>Submits a branded 4×6 postcard via Lob's print-and-mail API. Typically arrives in <strong>5–7 business days</strong>. Includes your New Dawn branding, E-2 visa pitch, and Calendly booking link on the back.</p>
-                  </div>
-
-                  {/* Address field */}
-                  <div>
-                    <label className="text-xs font-semibold text-muted-foreground mb-1 block">Mailing Address</label>
-                    <Input
-                      data-testid="input-postcard-address"
-                      placeholder="123 Main St, City, ST 00000"
-                      value={postcardAddress}
-                      onChange={(e) => setPostcardAddress(e.target.value)}
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">Format: street, city, state zip — e.g. <em>456 Oak Ave, Dallas, TX 75201</em></p>
-                    {!client.address && (
-                      <p className="text-xs text-amber-600 mt-1">No address saved on this contact yet. Enter one above to proceed.</p>
-                    )}
-                  </div>
-
-                  {/* Postcard preview */}
-                  <div className="rounded-lg border overflow-hidden text-xs">
-                    <div className="bg-slate-900 text-white p-4 text-center">
-                      <p className="text-[10px] uppercase tracking-widest text-slate-400 mb-1">E-2 Visa Investment Opportunity</p>
-                      <p className="font-black text-base leading-snug">Own a U.S. Business.<br/>Secure Your E-2 Visa.</p>
-                      <p className="text-slate-400 mt-1 text-[11px]">A proven $225K franchise pathway in El Paso, Texas.</p>
-                    </div>
-                    <div className="bg-white p-4 text-slate-800 space-y-2">
-                      <p className="text-[11px] text-slate-500">Dear {client.fullName.split(" ")[0]},</p>
-                      <p className="text-[11px]">New Dawn Franchising specializes in E-2 visa compliant property management franchises in Texas.</p>
-                      <ul className="text-[11px] space-y-0.5">
-                        <li>✅ $225K minimum — fully E-2 compliant</li>
-                        <li>✅ Funds held in escrow — full refund if visa denied</li>
-                        <li>✅ Forbes 30 Under 30 leadership</li>
-                      </ul>
-                      <p className="text-[11px] text-blue-700 font-medium">calendly.com/dylan-newdawnfranchising</p>
-                    </div>
-                  </div>
-
-                  {/* Send button */}
-                  <Button
-                    data-testid="button-send-postcard"
-                    disabled={!postcardAddress.trim() || postcardMutation.isPending}
-                    onClick={() => postcardMutation.mutate()}
-                    className="gap-2"
-                  >
-                    {postcardMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : <Printer className="size-4" />}
-                    Send Postcard via Lob
-                  </Button>
-
-                  <p className="text-xs text-muted-foreground">
-                    Requires a <code className="font-mono">LOB_API_KEY</code> secret. Without it, the send is logged in demo mode but nothing is physically mailed.
-                  </p>
                 </div>
               )}
 

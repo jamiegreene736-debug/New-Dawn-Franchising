@@ -2,18 +2,21 @@
  * Broker Outreach Sequence Service
  * Manages the expanded omnichannel sequence for broker leads (more steps, earlier value + explicit commission follow-ups).
  *
+ * Runs in two variants selected at init: the BROKER track (referral-partner
+ * pitch) and the CLIENT track (direct-to-investor pitch, no referral-fee
+ * language). Postcards (Lob) were retired — the channel is gone from new
+ * sequences and legacy Lob events are neutralized at execution time.
+ *
  * Sequence:
  *   Day  0 — LinkedIn connection request
  *   Day  1 — Email Touch 1 (soft intro)
  *   Day  1 — SMS trigger (if email opened <24hr)
- *   Day  1 — Lob postcard (if tag=lob_enabled)
  *   Day  2 — LinkedIn DM (if connected)
  *   Day  3 — Email Touch 2 (credibility + social proof)
- *   Day  4 — Email Touch 2b — The Referral Opportunity for Brokers (early earnings teaser)
+ *   Day  4 — Email Touch 2b (early value teaser)
  *   Day  5 — HeyGen video email (if tag=heygen_flow)
- *   Day  7 — Email Touch 3 (referral fee reveal — average commission of 12.5% of $225,000)
+ *   Day  7 — Email Touch 3 (the key offer for the track)
  *   Day  7 — SMS trigger (if email opened <4hr)
- *   Day  7 — Lob premium letter (if tag=lob_enabled)
  *   Day  9 — Email Touch 4 — Real client outcomes (sooner proof)
  *   Day 10 — WhatsApp (if no reply on any channel)
  *   Day 14 — Email Touch 5 — Case Study Email (if tag=heygen_flow)
@@ -28,9 +31,9 @@ import {
 } from "@shared/schema";
 import { eq, and, lte, inArray, sql, or } from "drizzle-orm";
 import { sendAgentSms } from "./agent-sms-service";
-import { sendBrokerPostcard, sendBrokerLetter } from "./lob-service";
 import { sendEmailFromSender } from "./email-service";
 import { randomUUID } from "crypto";
+import type { TrackId } from "@shared/campaign-tracks";
 
 // ─── Claude helper ────────────────────────────────────────────────────────────
 
@@ -93,23 +96,21 @@ function trackingPixel(token: string): string {
 
 interface EventDef {
   day: number;
-  channel: "email" | "sms" | "whatsapp" | "linkedin" | "lob" | "heygen";
+  channel: "email" | "sms" | "whatsapp" | "linkedin" | "heygen";
   touchName: string;
-  condition?: "lob_enabled" | "heygen_flow" | "linkedin_connected" | "sms_trigger_1" | "sms_trigger_7" | "no_reply";
+  condition?: "heygen_flow" | "linkedin_connected" | "sms_trigger_1" | "sms_trigger_7" | "no_reply";
 }
 
 const SEQUENCE_EVENTS: EventDef[] = [
   { day: 0,  channel: "linkedin",  touchName: "Day 0 — LinkedIn Connection Request" },
   { day: 1,  channel: "email",     touchName: "Touch 1 — Soft Intro Email" },
   { day: 1,  channel: "sms",       touchName: "Day 1 SMS — Email Open Trigger", condition: "sms_trigger_1" },
-  { day: 1,  channel: "lob",       touchName: "Day 1 — Lob Postcard",            condition: "lob_enabled" },
   { day: 2,  channel: "linkedin",  touchName: "Day 2 — LinkedIn DM",              condition: "linkedin_connected" },
   { day: 3,  channel: "email",     touchName: "Touch 2 — Credibility & Social Proof" },
   { day: 4,  channel: "email",     touchName: "Touch 2b — The Referral Opportunity for Brokers" },
   { day: 5,  channel: "heygen",    touchName: "Day 5 — HeyGen AI Video Email",    condition: "heygen_flow" },
   { day: 7,  channel: "email",     touchName: "Touch 3 — Referral Fee Reveal" },
   { day: 7,  channel: "sms",       touchName: "Day 7 SMS — Email Open Trigger",  condition: "sms_trigger_7" },
-  { day: 7,  channel: "lob",       touchName: "Day 7 — Lob Premium Letter",      condition: "lob_enabled" },
   { day: 9,  channel: "email",     touchName: "Touch 4 — Real client outcomes" },
   { day: 10, channel: "whatsapp",  touchName: "Day 10 — WhatsApp Follow-Up",     condition: "no_reply" },
   { day: 14, channel: "email",     touchName: "Day 14 — Case Study Email",        condition: "heygen_flow" },
@@ -126,14 +127,20 @@ function addDays(base: Date, days: number): Date {
 
 // ─── Initialize sequence ──────────────────────────────────────────────────────
 
-export async function initializeSequence(leadId: string): Promise<void> {
+export async function initializeSequence(leadId: string, track?: TrackId): Promise<void> {
   const [lead] = await db.select().from(outreachLeads).where(eq(outreachLeads.id, leadId)).limit(1);
   if (!lead) throw new Error("Lead not found: " + leadId);
   if (lead.sequenceStartedAt) return; // already initialized
 
-  // Determine flow
-  const hasAddress = !!(lead.mailingAddress && lead.mailingAddress.trim().length > 10);
-  const flow = hasAddress ? "lob_enabled" : "heygen_flow";
+  // Which pitch this lead receives: "broker" (referral-partner) or "client"
+  // (direct-to-investor). Caller wins; otherwise fall back to the lead's stored
+  // track, then "broker" for backward compatibility.
+  const sequenceTrack: TrackId =
+    track ?? ((lead as any).sequenceTrack === "client" ? "client" : "broker");
+
+  // Postcards were retired, so there is no longer a Lob branch — every lead runs
+  // the HeyGen-eligible flow (the HeyGen video still gates on the heygen_flow tag).
+  const flow = "heygen_flow";
 
   const now = new Date();
 
@@ -152,7 +159,7 @@ export async function initializeSequence(leadId: string): Promise<void> {
       touchName: def.touchName,
       status: "scheduled" as const,
       scheduledAt,
-      metadata: { condition: def.condition ?? null, flow } as any,
+      metadata: { condition: def.condition ?? null, flow, track: sequenceTrack } as any,
     };
   });
 
@@ -160,10 +167,10 @@ export async function initializeSequence(leadId: string): Promise<void> {
 
   // Update lead
   await db.update(outreachLeads)
-    .set({ sequenceStartedAt: now, sequenceFlow: flow, tags: sql`array_append(tags, ${flow})` as any })
+    .set({ sequenceStartedAt: now, sequenceFlow: flow, sequenceTrack, tags: sql`array_append(tags, ${flow})` as any })
     .where(eq(outreachLeads.id, leadId));
 
-  console.log(`[BrokerSequence] Initialized ${events.length} events for ${lead.fullName} (flow: ${flow})`);
+  console.log(`[BrokerSequence] Initialized ${events.length} events for ${lead.fullName} (flow: ${flow}, track: ${sequenceTrack})`);
 }
 
 // ─── Check if lead has replied on any channel ─────────────────────────────────
@@ -250,9 +257,14 @@ export async function handleEmailOpen(trackingToken: string): Promise<void> {
   }
 
   const firstName = lead.fullName.split(" ")[0];
+  const track: TrackId = (lead as any).sequenceTrack === "client" ? "client" : "broker";
   const smsBody = isDay7
-    ? `Hey ${firstName} — saw you opened. Quick note: brokers earn an average commission of 12.5% of $225,000 ($28,125 per client) — fully escrowed, zero risk, paid when visa clears. Happy to hop on a quick call this week — Dylan`
-    : `Hey ${firstName}, Dylan here from New Dawn. Just emailed about our E-2 platform (PM, Telecom, Insurance) for clients who want to direct a US business without daily ops. Worth a look?`;
+    ? (track === "client"
+        ? `Hey ${firstName} — saw you opened. Quick note: your investment is fully escrowed (full refund if the visa is denied), you direct the business while a team runs day-to-day, and you can live anywhere in the US. Happy to hop on a quick call this week — Dylan`
+        : `Hey ${firstName} — saw you opened. Quick note: brokers earn an average commission of 12.5% of $225,000 ($28,125 per client) — fully escrowed, zero risk, paid when visa clears. Happy to hop on a quick call this week — Dylan`)
+    : (track === "client"
+        ? `Hey ${firstName}, Dylan here from New Dawn. Just emailed about our E-2 platform (PM, Telecom, Insurance) — direct a US business without the daily ops, live anywhere. Worth a look?`
+        : `Hey ${firstName}, Dylan here from New Dawn. Just emailed about our E-2 platform (PM, Telecom, Insurance) for clients who want to direct a US business without daily ops. Worth a look?`);
 
   const result = await sendSms(lead.phone, smsBody);
   await markEvent(smsEvent.id, result.success ? "sent" : "failed", {
@@ -263,11 +275,12 @@ export async function handleEmailOpen(trackingToken: string): Promise<void> {
 
 // ─── Draft email content with Claude ─────────────────────────────────────────
 
-async function draftEmail(lead: OutreachLead, touchNumber: number): Promise<{ subject: string; html: string; text: string }> {
+async function draftEmail(lead: OutreachLead, touchNumber: number, track: TrackId = "broker"): Promise<{ subject: string; html: string; text: string }> {
   const firstName = lead.fullName.split(" ")[0];
   const location = [lead.company, lead.category?.replace(/_/g, " ")].filter(Boolean).join(" — ");
 
-  const touchInstructions: Record<number, string> = {
+  // Broker track — pitches the referral partnership (mentions the 12.5% / $28,125 fee).
+  const brokerInstructions: Record<number, string> = {
     1: `Touch 1 — Soft intro, ~120 words. Warm, curious tone. Reference something specific about their brokerage or market (${location}). Ask ONE genuine question about the type of clients they work with. Zero pitch. Zero mention of visa amounts or fees. Subject should feel personal, not like a campaign (e.g. "Quick question, ${firstName}").`,
     2: `Touch 2 — ~150 words. Credibility + social proof. Say you wanted to follow up. Introduce the concept briefly: you help international investors get E-2 Visas through New Dawn's multi-vertical platform (Property Management, Telecom, or Insurance) — the first franchise designed specifically for E-2. Drop trust signals naturally: Forbes 30 Under 30 recognition, escrow-protected funds (client gets full refund if visa denied), established brand. Still zero referral fee mention. Soft CTA: "Happy to send over a one-pager if helpful."`,
     3: `Touch 3 — ~180 words. "The Reveal". Subject: "Here's what's in it for you, ${firstName}" or "The part I haven't mentioned yet". Reveal the referral fee clearly as an average commission of 12.5% of $225,000 — that's $28,125 per client referred. Reinforce zero risk: funds held in escrow until visa clears, client gets full refund if denied. Mention clients choose their vertical (PM/Telecom/Insurance). Include Calendly link: ${CALENDLY}. Light urgency: opportunities structured for E-2 are limited.`,
@@ -278,9 +291,25 @@ async function draftEmail(lead: OutreachLead, touchNumber: number): Promise<{ su
     21: `Final breakup email — ~100 words. Subject: "Closing the loop, ${firstName}". Gracious, no guilt. Won't follow up again after this. Leave the door open. Re-include the referral fee (average commission of 12.5% of $225,000) and Calendly link: ${CALENDLY} one final time. Must feel genuinely human, not automated.`,
   };
 
-  const instruction = touchInstructions[touchNumber] ?? touchInstructions[1];
+  // Client track — written DIRECTLY to the E-2 investor candidate. Pitches the
+  // franchise itself. NEVER mentions referral fees, commissions, or a broker portal.
+  const clientInstructions: Record<number, string> = {
+    1: `Touch 1 — Soft intro, ~120 words. Warm, curious tone, written to the investor themselves. Reference their situation/market (${location}) if useful. Ask ONE genuine question about what they're looking for in a U.S. business or their E-2 timeline. Zero hard pitch. Zero mention of dollar amounts. Subject should feel personal (e.g. "Quick question, ${firstName}").`,
+    2: `Touch 2 — ~150 words. Credibility + social proof, written to the investor. Briefly: New Dawn helps international investors get E-2 Visas through a multi-vertical platform (Property Management, Telecom, or Insurance) — the first built specifically for E-2. Trust signals: Forbes 30 Under 30, YOUR investment held in escrow with full refund if the visa is denied. Soft CTA: "Happy to send over a one-pager if helpful." NO referral fees.`,
+    3: `Touch 3 — ~180 words. How the investment works FOR THE INVESTOR. Subject: "How your $225K is structured — and protected". Explain: the qualifying $225,000 investment funds a real operating U.S. business and satisfies E-2 requirements; held in escrow; financing available; you stay in control as the Director while a team runs daily ops; you can live anywhere in the U.S. Include Calendly: ${CALENDLY}. NEVER mention referral fees/commissions/broker portal.`,
+    4: `Touch 4 — Why it fits the investor, ~140 words. Reinforce the director model and choice of three verticals (Property Management, Telecom, or Insurance), escrow protection, and live-anywhere freedom. Soft CTA to reply or book a short call. Warm and professional. NO referral fees.`,
+    5: `Touch 4 / 5 — Real investor outcomes, ~150 words. Brief anonymized success story of an investor who invested $225K in one of the three verticals, got their E-2 visa, and now directs a real operating business while living where they want. Re-mention escrow protection. End with Calendly: ${CALENDLY}. NO referral fees.`,
+    6: `Touch 6 — Check-in, ~120 words. Friendly: "Where are you in exploring your E-2 options right now?" Remind of the three verticals, the director model, escrow protection, and live-anywhere freedom. Offer a one-pager or a 15-min call. Include Calendly: ${CALENDLY}. NO referral fees.`,
+    14: `Case study email — ~160 words. Anonymized success story of an investor who invested $225K in one of the three E-2 verticals, got their E-2 Visa, and now directs operations in the U.S. Reinforce escrow protection. End with Calendly: ${CALENDLY} and: "Even if the timing isn't right now, I'd love to be your resource when it is." NO referral fees.`,
+    21: `Final breakup email — ~100 words. Subject: "Closing the loop, ${firstName}". Gracious, no guilt, written to the investor. Won't follow up again. Leave the door open. Re-include Calendly: ${CALENDLY} one final time. Must feel genuinely human. NO referral fees.`,
+  };
 
-  const system = `You are drafting outreach emails on behalf of Dylan Delaney at New Dawn Franchising (newdawnfranchising.com). Dylan is Forbes 30 Under 30 listed. He helps international investors get E-2 Visas through New Dawn's multi-vertical franchise platform (Property Management, Telecom, or Insurance) — the first built specifically for E-2 Treaty Investor Visa requirements. Write in Dylan's warm, confident, never-salesy voice. Reply with JSON: {"subject":"...","body":"plain text email body, no HTML tags"}.`;
+  const instructions = track === "client" ? clientInstructions : brokerInstructions;
+  const instruction = instructions[touchNumber] ?? instructions[1];
+
+  const system = track === "client"
+    ? `You are drafting outreach emails on behalf of Dylan Delaney at New Dawn Franchising (newdawnfranchising.com), written DIRECTLY to a prospective E-2 investor. Dylan is Forbes 30 Under 30 listed. He helps international investors get E-2 Visas through New Dawn's multi-vertical franchise platform (Property Management, Telecom, or Insurance) — the first built specifically for E-2 Treaty Investor Visa requirements. Write in Dylan's warm, confident, never-salesy voice. CRITICAL: never mention referral fees, commissions, broker payouts, or a broker portal — this email goes to the investor, not a referral partner. Reply with JSON: {"subject":"...","body":"plain text email body, no HTML tags"}.`
+    : `You are drafting outreach emails on behalf of Dylan Delaney at New Dawn Franchising (newdawnfranchising.com). Dylan is Forbes 30 Under 30 listed. He helps international investors get E-2 Visas through New Dawn's multi-vertical franchise platform (Property Management, Telecom, or Insurance) — the first built specifically for E-2 Treaty Investor Visa requirements. Write in Dylan's warm, confident, never-salesy voice. Reply with JSON: {"subject":"...","body":"plain text email body, no HTML tags"}.`;
 
   const raw = await callClaude(system, `Lead: ${lead.fullName}, ${lead.title ?? ""}, ${location}\n\n${instruction}`);
 
@@ -302,17 +331,23 @@ ${pixel}
   return { subject, html, text: body };
 }
 
-function draftLinkedInMessage(lead: OutreachLead, touchNumber: number): string {
+function draftLinkedInMessage(lead: OutreachLead, touchNumber: number, track: TrackId = "broker"): string {
   const firstName = lead.fullName.split(" ")[0];
   if (touchNumber === 0) {
     const location = lead.company ? `at ${lead.company}` : "";
     return `Hi ${firstName} — I came across your work${location} and wanted to reach out. I'm Dylan Delaney, founder of New Dawn Franchising. Really impressed by what you're building. Would love to connect!`.slice(0, 300);
   }
+  if (track === "client") {
+    return `Hi ${firstName}, sent you an email too — didn't want it to get buried. Thought this might be relevant if you're exploring an E-2 qualifying US business (choice of PM, Telecom or Insurance) you'd direct while a team runs day-to-day. Escrow-protected, live anywhere in the US. Happy to chat when it suits you.`;
+  }
   return `Hi ${firstName}, sent you an email too — didn't want it to get buried. Thought this might be relevant for any of your clients eyeing an E-2 qualifying US business (choice of PM, Telecom or Insurance). Brokers earn average 12.5% commission on referred investments. Happy to chat when it suits you.`;
 }
 
-function draftWhatsApp(lead: OutreachLead): string {
+function draftWhatsApp(lead: OutreachLead, track: TrackId = "broker"): string {
   const firstName = lead.fullName.split(" ")[0];
+  if (track === "client") {
+    return `Hey ${firstName}, following up on your E-2 options. Choose Property Management, Telecom or Insurance — $225K, you direct while a team executes, escrow protected, live anywhere in the US. 20 min? ${CALENDLY} — Dylan`;
+  }
   return `Hey ${firstName}, following up on the E-2 referral. Clients choose Property Management, Telecom or Insurance — $225K, they direct while teams execute, escrow protected. Brokers earn an average commission of 12.5% of $225,000 ($28,125 per client). 20 min? ${CALENDLY} — Dylan`;
 }
 
@@ -322,15 +357,23 @@ async function executeEvent(event: OutreachSequenceEvent, lead: OutreachLead): P
   const meta = (event.metadata ?? {}) as any;
   const condition: string | null = meta.condition ?? null;
   const flow: string = meta.flow ?? lead.sequenceFlow ?? "";
+  const track: TrackId = meta.track ?? ((lead as any).sequenceTrack === "client" ? "client" : "broker");
   const firstName = lead.fullName.split(" ")[0];
 
+  // Postcards retired: neutralize any legacy scheduled Lob events so cron doesn't
+  // reprocess them forever (they no longer match an execution branch below).
+  if (event.channel === "lob") {
+    await markEvent(event.id, "skipped", { notes: "Postcard/letter step retired (Lob removed)", executedAt: new Date() });
+    return;
+  }
+
   // Evaluate conditions before running
-  if (condition === "lob_enabled" && flow !== "lob_enabled") {
-    await markEvent(event.id, "skipped", { notes: "Lead tagged as HeyGen Flow — no mailing address", executedAt: new Date() });
+  if (condition === "lob_enabled") {
+    await markEvent(event.id, "skipped", { notes: "Postcard/letter step retired (Lob removed)", executedAt: new Date() });
     return;
   }
   if (condition === "heygen_flow" && flow !== "heygen_flow") {
-    await markEvent(event.id, "skipped", { notes: "Lead tagged as Lob Enabled — skipping HeyGen touch", executedAt: new Date() });
+    await markEvent(event.id, "skipped", { notes: "Lead not on HeyGen flow — skipping HeyGen touch", executedAt: new Date() });
     return;
   }
   if (condition === "linkedin_connected" && !lead.linkedinConnected) {
@@ -359,7 +402,7 @@ async function executeEvent(event: OutreachSequenceEvent, lead: OutreachLead): P
   // ─── Execute by channel ───────────────────────────────────────────────────
 
   if (event.channel === "linkedin") {
-    const msg = draftLinkedInMessage(lead, event.day);
+    const msg = draftLinkedInMessage(lead, event.day, track);
     const isConnectionRequest = event.day === 0;
     const actionType = isConnectionRequest ? "connection_request" : "dm";
     const token = randomUUID().replace(/-/g, "");
@@ -394,28 +437,13 @@ async function executeEvent(event: OutreachSequenceEvent, lead: OutreachLead): P
     return;
   }
 
-  if (event.channel === "lob") {
-    const isLetter = event.touchName.includes("Letter");
-    const result = isLetter
-      ? await sendBrokerLetter(lead)
-      : await sendBrokerPostcard(lead);
-    await markEvent(event.id, result.success ? "sent" : "failed", {
-      notes: result.success
-        ? `${isLetter ? "Letter" : "Postcard"} dispatched via Lob${result.demoMode ? " (demo mode — no LOB_API_KEY)" : ""}. Lob ID: ${result.lobId}. Address: ${lead.mailingAddress}`
-        : `Lob error: ${result.error}`,
-      metadata: { ...meta, lobId: result.lobId } as any,
-      executedAt: new Date(),
-    });
-    return;
-  }
-
   if (event.channel === "whatsapp") {
     const waNr = lead.whatsapp || lead.phone;
     if (!waNr) {
       await markEvent(event.id, "skipped", { notes: "No WhatsApp / phone number on file", executedAt: new Date() });
       return;
     }
-    const body = draftWhatsApp(lead);
+    const body = draftWhatsApp(lead, track);
     const result = await sendWhatsApp(waNr, body);
     await markEvent(event.id, result.success ? "sent" : "failed", {
       notes: result.error,
@@ -432,7 +460,9 @@ async function executeEvent(event: OutreachSequenceEvent, lead: OutreachLead): P
     }
     // Create HeyGen video for this lead
     const { generateHeygenVideo } = await import("./heygen-service") as any;
-    const script = `Hi ${firstName}, this is Dylan Delaney from New Dawn Franchising. I wanted to personally reach out because I believe you may have clients who could benefit from our E-2 Visa franchise investment model. We help international investors secure their visa and operate a real US business (Property Management, Telecom or Insurance) while local teams execute day-to-day. We were recognized by Forbes 30 Under 30, funds held in escrow with full refund if visa denied, and referring brokers earn an average commission of 12.5% of $225,000 ($28,125 per client). I'd love to connect for 20 minutes. Book a time at ${CALENDLY}. Looking forward to speaking with you.`;
+    const script = track === "client"
+      ? `Hi ${firstName}, this is Dylan Delaney from New Dawn Franchising. I wanted to personally reach out because our E-2 Visa franchise model could be a great fit for you. We help international investors secure their visa and operate a real US business (Property Management, Telecom or Insurance) while local teams execute day-to-day. We were recognized by Forbes 30 Under 30, your investment is held in escrow with full refund if the visa is denied, and you stay in control as the director while living anywhere in the US. I'd love to connect for 20 minutes. Book a time at ${CALENDLY}. Looking forward to speaking with you.`
+      : `Hi ${firstName}, this is Dylan Delaney from New Dawn Franchising. I wanted to personally reach out because I believe you may have clients who could benefit from our E-2 Visa franchise investment model. We help international investors secure their visa and operate a real US business (Property Management, Telecom or Insurance) while local teams execute day-to-day. We were recognized by Forbes 30 Under 30, funds held in escrow with full refund if visa denied, and referring brokers earn an average commission of 12.5% of $225,000 ($28,125 per client). I'd love to connect for 20 minutes. Book a time at ${CALENDLY}. Looking forward to speaking with you.`;
 
     let videoUrl = "";
     let heygenId = "";
@@ -451,10 +481,10 @@ async function executeEvent(event: OutreachSequenceEvent, lead: OutreachLead): P
 
     const html = `<html><body style="font-family:Arial,sans-serif;line-height:1.7;color:#222;max-width:600px;margin:auto;padding:20px">
 <p>Hi ${firstName},</p>
-<p>I made this for you — a quick personal video explaining what we do and why it may be relevant for your clients.</p>
+<p>I made this for you — a quick personal video explaining what we do and why it may be relevant ${track === "client" ? "for you" : "for your clients"}.</p>
 ${thumbnail}
 ${videoUrl ? `<p><a href="${videoUrl}" style="color:#1a2a4a">▶ Watch the video</a></p>` : ""}
-<p>The short version: we help international investors get E-2 Visas through a proven multi-vertical franchise model (Property Management, Telecom or Insurance). Brokers earn an average commission of 12.5% of $225,000 ($28,125 per referral). Funds are held in escrow — zero risk.</p>
+<p>The short version: we help international investors get E-2 Visas through a proven multi-vertical franchise model (Property Management, Telecom or Insurance). ${track === "client" ? "You stay in control as the director, your investment is held in escrow — zero risk." : "Brokers earn an average commission of 12.5% of $225,000 ($28,125 per referral). Funds are held in escrow — zero risk."}</p>
 <p>I'd love 20 minutes on a call: <a href="${CALENDLY}">${CALENDLY}</a></p>
 ${trackingPixel(token)}
 </body></html>`;
@@ -490,7 +520,7 @@ ${trackingPixel(token)}
     else if (event.touchName.includes("Case Study") || event.day === 14) touchNum = 14;
     else if (event.touchName.includes("Final") || event.day === 21) touchNum = 21;
 
-    const { subject, html, text } = await draftEmail(lead, touchNum);
+    const { subject, html, text } = await draftEmail(lead, touchNum, track);
     const token = randomUUID();
 
     // Embed tracking token into HTML (for email open pixel)

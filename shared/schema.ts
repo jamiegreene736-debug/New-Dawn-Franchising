@@ -270,6 +270,9 @@ export const dripCampaigns = pgTable("drip_campaigns", {
   name: text("name").notNull(),
   description: text("description"),
   isActive: boolean("is_active").default(true).notNull(),
+  // Which audience the campaign's steps speak to: "broker" (referral-partner
+  // pitch) or "client" (direct-to-E-2-investor pitch). Drives the Send-now track.
+  audienceType: text("audience_type").notNull().default("broker"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -1062,7 +1065,8 @@ export const outreachLeads = pgTable("outreach_leads", {
   sequenceStartedAt: timestamp("sequence_started_at"),
   sequencePaused: boolean("sequence_paused").default(false),
   sequencePausedReason: text("sequence_paused_reason"),
-  sequenceFlow: text("sequence_flow"), // "lob_enabled" | "heygen_flow"
+  sequenceFlow: text("sequence_flow"), // "heygen_flow" (legacy: "lob_enabled" before postcards were removed)
+  sequenceTrack: text("sequence_track").notNull().default("broker"), // "broker" | "client"
   lastEnrichedAt: timestamp("last_enriched_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

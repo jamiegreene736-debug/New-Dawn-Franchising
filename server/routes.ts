@@ -477,10 +477,9 @@ export async function registerRoutes(
     }
   });
 
-  // Serve logo at a stable URL for use in email signatures
-  app.get("/email-logo.png", (_req, res) => {
-    res.sendFile(path.resolve("attached_assets/Gemini_Generated_Image_t1u2o5t1u2o5t1u2_1771946732580.png"));
-  });
+  // email-logo.png is served as a static asset from client/public → dist/public
+  // (the previous sendFile from attached_assets/ 404'd because that folder is not
+  // present in the production runtime).
 
   app.get("/api/config/ga", (_req, res) => {
     res.json({ id: process.env.GA_MEASUREMENT_ID || "" });

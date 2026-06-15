@@ -235,6 +235,7 @@ const SIGNER_MAP: Record<string, SignerInfo> = {
     email: "franchising@newdawnfranchising.com",
     phone: "(346) 597-9994",
     linkedin: "https://www.linkedin.com/company/new-dawn-franchising",
+    photoKey: "dylan-headshot-email.jpg",
     whatsappUrl: "https://wa.me/13465979994",
     usePhoto: false,
   },
@@ -244,7 +245,7 @@ const SIGNER_MAP: Record<string, SignerInfo> = {
     email: "dylan@newdawnfranchising.com",
     phone: "(346) 597-9994",
     linkedin: "https://www.linkedin.com/in/dylanmdelaney",
-    photoKey: "dylan-headshot.png",
+    photoKey: "dylan-headshot-email.jpg",
     whatsappUrl: "https://wa.me/13465979994",
     calendlyUrl: "https://calendly.com",
     usePhoto: true,
@@ -269,12 +270,13 @@ export function buildEmailSignature(senderEmail: string, baseUrl: string): strin
   const signer = SIGNER_MAP[senderEmail.toLowerCase()] ?? DEFAULT_SIGNER;
   const logoUrl = `${baseUrl}/email-logo.png`;
 
-  // Use real Calendly URL if cached, else fallback
+  // usePhoto gates the Calendly "Book a Call" button; the headshot is driven
+  // independently by photoKey so a signer can show a photo without a Book-a-Call CTA.
   const calendlyUrl = signer.usePhoto
     ? (_dylanCalendlyUrl || signer.calendlyUrl || "https://calendly.com")
     : null;
   const whatsappUrl = signer.whatsappUrl || null;
-  const photoUrl = signer.usePhoto && signer.photoKey
+  const photoUrl = signer.photoKey
     ? `${baseUrl}/${signer.photoKey}`
     : null;
 

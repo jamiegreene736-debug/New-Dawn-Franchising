@@ -34,6 +34,68 @@ const LEGAL_DISCLAIMER = {
   ],
 };
 
+// ─── Localized footer / newsletter copy ───────────────────────────────────────
+// The footer lives in the shared shell, so it must follow the active locale
+// (e.g. the /es page). Spanish is a first-pass draft — the legal disclaimer in
+// particular should get a native-speaker & legal review before being relied on.
+const FOOTER_I18N = {
+  en: {
+    groupPrefix: "Part of the ",
+    groupSuffix: " — proprietary technology, decades of experience",
+    spanishLine: "Servimos a inversionistas de todo el mundo — hablamos español",
+    followFacebook: "Follow us on Facebook",
+    stayUpdated: "Stay updated",
+    newsletterDesc:
+      "Get the latest franchise news, E-2 visa updates, and industry insights delivered to your inbox.",
+    newsletterPlaceholder: "Enter your email",
+    subscribe: "Subscribe",
+    newsletterSuccess: "You're signed up! We'll keep you updated with the latest news.",
+    requestInfo: "Request info",
+    legalHeading: "Legal Disclaimer",
+    disclaimerLead: LEGAL_DISCLAIMER.lead,
+    disclaimerParagraphs: LEGAL_DISCLAIMER.paragraphs as readonly string[],
+    seeFullPrefix: "See our full ",
+    seeFullSuffix: " for complete disclosures.",
+    termsLabel: "Terms & Conditions",
+    rightsReserved: "All rights reserved.",
+    privacy: "Privacy Policy",
+    terms: "Terms & Conditions",
+  },
+  es: {
+    groupPrefix: "Parte del ",
+    groupSuffix: " — tecnología propia y décadas de experiencia",
+    spanishLine: "Servimos a inversionistas de todo el mundo — hablamos español",
+    followFacebook: "Síganos en Facebook",
+    stayUpdated: "Manténgase informado",
+    newsletterDesc:
+      "Reciba las últimas noticias sobre franquicias, novedades de la visa E-2 e información del sector directamente en su correo.",
+    newsletterPlaceholder: "Ingrese su correo electrónico",
+    subscribe: "Suscribirse",
+    newsletterSuccess: "¡Listo! Le mantendremos informado con las últimas noticias.",
+    requestInfo: "Solicitar información",
+    legalHeading: "Aviso legal",
+    disclaimerLead:
+      "Este sitio web es solo de carácter informativo general — no es una oferta para vender una franquicia ni constituye asesoría legal, migratoria, fiscal o financiera.",
+    disclaimerParagraphs: [
+      "La información de este sitio se proporciona únicamente con fines informativos y educativos de carácter general y no es una oferta para vender, ni una solicitud de oferta para comprar, una franquicia. Una franquicia se ofrece y se vende solo mediante un Documento de Divulgación de la Franquicia (FDD) que cumple con la Regla de Franquicias de la FTC (16 CFR Parte 436) y las leyes estatales de franquicias aplicables. Algunos estados regulan la oferta y venta de franquicias y exigen registro o presentación; New Dawn Franchising ofrecerá o venderá una franquicia solo en los estados donde estemos registrados o exentos, y únicamente después de cumplir los requisitos de registro, presentación y divulgación previos a la venta y de entregar el FDD según lo exige la ley.",
+      "New Dawn Franchising LLC es un franquiciante, no un bufete de abogados. Nada en este sitio constituye asesoría legal, migratoria, fiscal o financiera, y el uso del sitio o el contacto con nosotros no crea ninguna relación abogado-cliente ni profesional. No prestamos servicios migratorios ni constituimos su entidad legal — eso lo hace su propio abogado. La información sobre la visa de inversionista por tratado E-2 es general y educativa; las leyes migratorias y los países con tratado cambian con el tiempo. La elegibilidad y aprobación de la visa E-2 las determina únicamente el gobierno de EE. UU. (los oficiales consulares del Departamento de Estado y USCIS para cambio o extensión de estatus), nunca nosotros, y una visa nunca está garantizada.",
+      "Antes de tomar cualquier decisión de inversión o migratoria, debe contratar a su propio abogado de inmigración con licencia en EE. UU. y a asesores fiscales y financieros calificados, y realizar su propia diligencia debida independiente. La información se proporciona «tal cual», puede estar incompleta o desactualizada, y no ofrecemos ninguna garantía sobre su exactitud o integridad. Cualquier cifra de ingresos, ganancias, resultados o desempeño es solo ilustrativa y no constituye una garantía de resultados futuros; los resultados individuales varían.",
+    ] as readonly string[],
+    seeFullPrefix: "Consulte nuestros ",
+    seeFullSuffix: " completos para ver todas las divulgaciones.",
+    termsLabel: "Términos y Condiciones",
+    rightsReserved: "Todos los derechos reservados.",
+    privacy: "Política de Privacidad",
+    terms: "Términos y Condiciones",
+  },
+} as const;
+
+type FooterCopy = (typeof FOOTER_I18N)[keyof typeof FOOTER_I18N];
+
+function localeFromPath(path: string): keyof typeof FOOTER_I18N {
+  return path === "/es" || path.startsWith("/es/") ? "es" : "en";
+}
+
 function FacebookIcon({ className }: { className?: string }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className}>
@@ -297,7 +359,7 @@ function MobileNavGroup({ group, location: loc }: { group: NavGroup; location: s
   );
 }
 
-function NewsletterSignup() {
+function NewsletterSignup({ t }: { t: FooterCopy }) {
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
@@ -328,7 +390,7 @@ function NewsletterSignup() {
     return (
       <div data-testid="newsletter-success" className="flex items-center gap-2 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-800">
         <Mail className="size-4 shrink-0" />
-        You're signed up! We'll keep you updated with the latest news.
+        {t.newsletterSuccess}
       </div>
     );
   }
@@ -340,14 +402,14 @@ function NewsletterSignup() {
           data-testid="input-newsletter-email"
           type="email"
           required
-          placeholder="Enter your email"
+          placeholder={t.newsletterPlaceholder}
           value={email}
           onChange={(e) => { setEmail(e.target.value); if (status === "error") setStatus("idle"); }}
           className="h-9 bg-white text-sm"
         />
         <Button data-testid="button-newsletter-submit" type="submit" size="sm" disabled={status === "loading"} className="shrink-0 gap-1.5">
           {status === "loading" ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
-          Subscribe
+          {t.subscribe}
         </Button>
       </div>
       {status === "error" && (
@@ -707,6 +769,7 @@ function useVisitorTracking(location: string) {
 export function SiteShell({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const t = FOOTER_I18N[localeFromPath(location)];
 
   useVisitorTracking(location);
 
@@ -907,25 +970,25 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                   {COMPANY.addressFull}
                 </a>
                 <div data-testid="text-footer-group" className="mt-1 text-xs text-muted-foreground/70">
-                  Part of the <span translate="no">New Dawn Franchising Group of Companies&trade;</span> — proprietary technology, decades of experience
+                  {t.groupPrefix}<span translate="no">New Dawn Franchising Group of Companies&trade;</span>{t.groupSuffix}
                 </div>
                 <div data-testid="text-footer-spanish" className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground/70">
                   <Globe2 className="size-3" />
-                  <span lang="es">Servimos a inversionistas de todo el mundo — hablamos español</span>
+                  <span lang="es">{t.spanishLine}</span>
                 </div>
                 <a data-testid="link-footer-facebook" href={COMPANY.facebook} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground">
                   <FacebookIcon className="size-4" />
-                  Follow us on Facebook
+                  {t.followFacebook}
                 </a>
               </div>
 
               <div className="w-full max-w-sm">
-                <div data-testid="text-newsletter-title" className="text-sm font-semibold">Stay updated</div>
+                <div data-testid="text-newsletter-title" className="text-sm font-semibold">{t.stayUpdated}</div>
                 <p data-testid="text-newsletter-desc" className="mt-1 text-xs text-muted-foreground">
-                  Get the latest franchise news, E-2 visa updates, and industry insights delivered to your inbox.
+                  {t.newsletterDesc}
                 </p>
                 <div className="mt-3">
-                  <NewsletterSignup />
+                  <NewsletterSignup t={t} />
                 </div>
               </div>
             </div>
@@ -950,36 +1013,36 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                 </a>
               </Button>
               <Button data-testid="button-footer-contact" className="gap-2" asChild>
-                <Link href="/contact">Request info</Link>
+                <Link href="/contact">{t.requestInfo}</Link>
               </Button>
             </div>
             <div data-testid="footer-legal-disclaimer" className="mt-8 border-t pt-6">
               <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">
-                Legal Disclaimer
+                {t.legalHeading}
               </div>
               <p data-testid="text-disclaimer-lead" className="mt-2 max-w-4xl text-[11px] font-medium leading-relaxed text-muted-foreground/75">
-                {LEGAL_DISCLAIMER.lead}
+                {t.disclaimerLead}
               </p>
               <div className="mt-2 max-w-4xl space-y-2">
-                {LEGAL_DISCLAIMER.paragraphs.map((para, i) => (
+                {t.disclaimerParagraphs.map((para, i) => (
                   <p key={i} className="text-[11px] leading-relaxed text-muted-foreground/55">
                     {para}
                   </p>
                 ))}
                 <p className="text-[11px] leading-relaxed text-muted-foreground/55">
-                  See our full{" "}
+                  {t.seeFullPrefix}
                   <Link href="/terms" data-testid="link-disclaimer-terms" className="underline underline-offset-2 transition-colors hover:text-muted-foreground">
-                    Terms &amp; Conditions
-                  </Link>{" "}
-                  for complete disclosures.
+                    {t.termsLabel}
+                  </Link>
+                  {t.seeFullSuffix}
                 </p>
               </div>
             </div>
 
             <div className="mt-6 flex flex-wrap items-center gap-4 border-t pt-6 text-xs text-muted-foreground/60">
-              <span>&copy; {new Date().getFullYear()} New Dawn Franchising LLC. All rights reserved.</span>
-              <Link href="/privacy-policy" data-testid="link-footer-privacy" className="hover:text-muted-foreground transition-colors">Privacy Policy</Link>
-              <Link href="/terms" data-testid="link-footer-terms" className="hover:text-muted-foreground transition-colors">Terms &amp; Conditions</Link>
+              <span>&copy; {new Date().getFullYear()} New Dawn Franchising LLC. {t.rightsReserved}</span>
+              <Link href="/privacy-policy" data-testid="link-footer-privacy" className="hover:text-muted-foreground transition-colors">{t.privacy}</Link>
+              <Link href="/terms" data-testid="link-footer-terms" className="hover:text-muted-foreground transition-colors">{t.terms}</Link>
               <LanguageSwitcher className="ml-auto" />
             </div>
           </div>

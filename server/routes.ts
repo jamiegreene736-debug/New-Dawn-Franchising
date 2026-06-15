@@ -2339,57 +2339,60 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
         category: string;
       };
 
-      const { contacts: contactsTable } = await import("@shared/schema");
-      const { db } = await import("./db");
-      const { eq } = await import("drizzle-orm");
-
-      // Check for existing contact
-      if (contact.email) {
-        const [existing] = await db.select().from(contactsTable).where(eq(contactsTable.email, contact.email));
-        if (existing) {
-          return res.status(409).json({ message: "Contact with this email already exists", existing });
-        }
+      const { addProspectContact } = await import("./contact-upsert");
+      const result = await addProspectContact(contact, category);
+      if (result.status === "exists") {
+        return res.status(409).json({ message: "Contact already exists", existing: result.contact });
       }
-
-      const { calculateLeadScore } = await import("./lead-scoring");
-      const personaMap: Record<string, string> = {
-        immigration_attorney: "immigration_attorney",
-        e2_visa_firm: "immigration_attorney",
-        business_broker: "business_broker",
-        immigration_consultant: "immigration_consultant",
-        franchise_consultant: "franchise_consultant",
-        cpa_international: "international_tax_advisor",
-        relocation_service: "relocation_consultant",
-      };
-
-      const contactData = {
-        firstName: contact.firstName || contact.fullName.split(" ")[0],
-        lastName: contact.lastName || contact.fullName.split(" ").slice(1).join(" ") || "",
-        email: contact.email || null,
-        phone: contact.phone || null,
-        firmName: contact.companyName || null,
-        jobTitle: contact.jobTitle || null,
-        personaType: personaMap[category] || "immigration_attorney",
-        linkedinUrl: contact.linkedinUrl || null,
-        websiteUrl: null,
-        status: "new" as const,
-        tags: [] as string[],
-        notes: contact.bio?.slice(0, 300) || null,
-        source: "Prospect Finder",
-        country: null,
-        city: null,
-        gdprNote: null,
-        consentSource: null,
-        referredByContactId: null,
-        possibleDuplicateOf: null,
-      };
-
-      const score = calculateLeadScore(contactData, contact.e2ViaBio);
-      const [created] = await db.insert(contactsTable).values({ ...contactData, leadScore: score }).returning();
-      res.status(201).json(created);
+      res.status(201).json(result.contact);
     } catch (err: any) {
       console.error("Add to contacts error:", err);
       res.status(500).json({ message: err.message || "Failed to add contact" });
+    }
+  });
+
+  // Bulk version of add-to-contacts — add many found prospects at once (e.g.
+  // "select all 50" in Lead Research). Dedups each against the CRM and returns
+  // how many were newly added vs already present.
+  app.post("/api/crm/prospects/add-to-contacts/bulk", requireAdminAuth, async (req, res) => {
+    try {
+      const { contacts: incoming, category } = req.body as {
+        contacts: Array<{
+          fullName?: string; firstName?: string; lastName?: string; companyName?: string | null;
+          email?: string | null; phone?: string | null; linkedinUrl?: string | null;
+          jobTitle?: string | null; bio?: string | null; country?: string | null; city?: string | null;
+        }>;
+        category?: string;
+      };
+      if (!Array.isArray(incoming) || incoming.length === 0) {
+        return res.status(400).json({ message: "No contacts provided" });
+      }
+      if (incoming.length > 200) {
+        return res.status(400).json({ message: "Too many contacts in one request (max 200)" });
+      }
+
+      const { addProspectContact } = await import("./contact-upsert");
+      let added = 0;
+      let skipped = 0;
+      const createdIds: string[] = [];
+      for (const c of incoming) {
+        try {
+          const result = await addProspectContact(c, category);
+          if (result.status === "created") {
+            added++;
+            createdIds.push(result.contact.id);
+          } else {
+            skipped++;
+          }
+        } catch (e: any) {
+          console.error("Bulk add-to-contacts item failed:", e?.message || e);
+          skipped++;
+        }
+      }
+      res.status(201).json({ added, skipped, total: incoming.length, createdIds });
+    } catch (err: any) {
+      console.error("Bulk add to contacts error:", err);
+      res.status(500).json({ message: err.message || "Failed to add contacts" });
     }
   });
 

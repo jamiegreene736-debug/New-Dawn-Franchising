@@ -119,6 +119,7 @@ const FOOTER_I18N = {
     rightsReserved: "Tous droits réservés.",
     privacy: "Politique de confidentialité",
     terms: "Conditions générales",
+    legal: "Mentions légales",
   },
   zh: {
     groupPrefix: "隶属于 ",
@@ -147,6 +148,7 @@ const FOOTER_I18N = {
     rightsReserved: "保留所有权利。",
     privacy: "隐私政策",
     terms: "条款与条件",
+    legal: "法律与免责声明",
   },
   ja: {
     groupPrefix: "",
@@ -175,6 +177,7 @@ const FOOTER_I18N = {
     rightsReserved: "無断複写・転載を禁じます。",
     privacy: "プライバシーポリシー",
     terms: "利用規約",
+    legal: "法的事項・免責事項",
   },
   ko: {
     groupPrefix: "",
@@ -203,6 +206,7 @@ const FOOTER_I18N = {
     rightsReserved: "모든 권리 보유.",
     privacy: "개인정보 처리방침",
     terms: "이용약관",
+    legal: "법적 고지 및 면책조항",
   },
   tr: {
     groupPrefix: "",
@@ -231,6 +235,7 @@ const FOOTER_I18N = {
     rightsReserved: "Tüm hakları saklıdır.",
     privacy: "Gizlilik Politikası",
     terms: "Şartlar ve Koşullar",
+    legal: "Yasal Uyarılar",
   },
 } as const;
 

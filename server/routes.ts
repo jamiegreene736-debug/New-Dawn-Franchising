@@ -73,6 +73,9 @@ import {
 import { cachedProviderSearch } from "./search-cache";
 import { logSearchEvent } from "./search-telemetry";
 import { searchCrmContacts } from "./semantic-search";
+import { runSignalIngestion, getSignalsForContact } from "./lead-signals";
+import { rescoreAllContactsIcp, rescoreContactIcp } from "./icp-rescore";
+import { draftProspectOutreach, type OutreachChannel } from "./outreach-drafter";
 import { getProviderStatuses } from "./provider-credits";
 import { seedContactEnrichment } from "./people-finder";
 import { calculateDecisionMakerScore } from "./decision-maker-scorer";
@@ -94,7 +97,7 @@ import {
   getMeetings, getUpcomingMeetings, updateMeetingOutcome, handleMeetingBooked, classifyReplyIntent,
 } from "./meetings";
 import { generateWeeklyBrief } from "./strategy-brief";
-import { briefs, systemNotifications } from "@shared/schema";
+import { briefs, systemNotifications, contacts } from "@shared/schema";
 import { callClaude } from "./chat-service";
 
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "dylan@newdawnfranchising.com").toLowerCase().trim();
@@ -342,6 +345,19 @@ function scheduleAgentCrons() {
   cron.schedule("*/5 * * * *", () => {
     runScheduledJobs().catch(e => console.error("[ScheduledJobs Cron] Error:", e));
   });
+
+  // 5:00 AM CT — buying-intent signal ingestion (Phase 2), then re-score all
+  // contacts' ICP fit/intent (Phase 3) so the morning brief sees fresh signals.
+  cron.schedule("0 5 * * *", async () => {
+    console.log("[Signals Cron] Running daily intent-signal ingestion...");
+    try {
+      await runSignalIngestion(40);
+      await rescoreAllContactsIcp();
+    } catch (e) {
+      console.error("[Signals Cron] error:", e);
+    }
+  }, { timezone: "America/Chicago" });
+  console.log("Intent-signal ingestion + ICP re-scoring scheduled: daily 5:00 AM CT");
 
   // ── Startup catchup — runs once 90s after the server starts ─────────────────
   // Handles the common case where the server restarts after scheduled cron times
@@ -1761,6 +1777,66 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
     } catch (err: any) {
       console.error("CRM semantic search error:", err);
       res.status(500).json({ message: err.message || "CRM search failed" });
+    }
+  });
+
+  // ICP intel for a single contact: persisted fit/intent score + the buying-intent
+  // signals behind it. ?refresh=1 re-scores on demand (Phase 3).
+  app.get("/api/crm/contacts/:id/intel", requireAdminAuth, async (req, res) => {
+    try {
+      const id = String(req.params.id);
+      if (req.query.refresh === "1") await rescoreContactIcp(id);
+      const [c] = await db.select().from(contacts).where(eq(contacts.id, id));
+      if (!c) return res.status(404).json({ message: "Contact not found" });
+      const signals = await getSignalsForContact(id);
+      res.json({
+        icp: {
+          score: c.icpScore ?? null, fitScore: c.icpFitScore ?? null, intentScore: c.icpIntentScore ?? null,
+          tier: c.icpTier ?? null, audience: c.icpAudience ?? null, reasons: c.icpReasons ?? [],
+          explanation: c.icpExplanation ?? null, scoredAt: c.icpScoredAt ?? null,
+        },
+        signals,
+      });
+    } catch (err: any) {
+      console.error("Contact intel error:", err);
+      res.status(500).json({ message: err.message || "Failed to load contact intel" });
+    }
+  });
+
+  // Phase 4: draft personalized outreach (email/LinkedIn) for a prospect,
+  // grounded in their ICP reasons + signals. Used by the "Draft" action on
+  // search results and contact cards.
+  app.post("/api/crm/lead-research/draft-outreach", requireAdminAuth, async (req, res) => {
+    try {
+      const b = req.body as {
+        fullName?: string; firstName?: string | null; jobTitle?: string | null;
+        companyName?: string | null; country?: string | null; channel?: OutreachChannel;
+        audience?: "investor" | "partner" | "unknown"; reasons?: string[]; explanation?: string | null;
+        contactId?: string | null;
+      };
+      if (!b.fullName || !b.fullName.trim()) return res.status(400).json({ message: "fullName required" });
+      // If tied to a stored contact, fold in its real buying-intent signals.
+      let signals: Array<{ title: string; snippet?: string | null }> | undefined;
+      if (b.contactId) {
+        const stored = await getSignalsForContact(b.contactId);
+        signals = stored.map((s) => ({ title: s.title, snippet: s.snippet }));
+      }
+      const draft = await draftProspectOutreach({
+        fullName: b.fullName.trim(),
+        firstName: b.firstName ?? null,
+        jobTitle: b.jobTitle ?? null,
+        companyName: b.companyName ?? null,
+        country: b.country ?? null,
+        channel: b.channel === "linkedin" ? "linkedin" : "email",
+        audience: b.audience,
+        reasons: b.reasons,
+        explanation: b.explanation ?? null,
+        signals,
+      });
+      res.json(draft);
+    } catch (err: any) {
+      console.error("Draft outreach error:", err);
+      res.status(500).json({ message: err.message || "Failed to draft outreach" });
     }
   });
 

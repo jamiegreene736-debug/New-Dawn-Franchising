@@ -83,6 +83,9 @@ export interface ProspectSignals {
   linkedinUrl?: string | null;
   // Free text we can scan for intent: keywords, bio, notes, headline, etc.
   text?: string | null;
+  // External buying-intent signals already detected for this person (Phase 2):
+  // funding/news/relocation/visa-research events. Each contributes to intent.
+  signals?: Array<{ label: string; weight: number }>;
 }
 
 export type IcpAudience = "investor" | "partner" | "unknown";
@@ -100,6 +103,21 @@ export interface ProspectIntel {
 
 function clamp(n: number): number {
   return Math.max(0, Math.min(100, Math.round(n)));
+}
+
+/**
+ * Scan free text for buying-intent signals. Exported so the signal-ingestion
+ * layer (lead-signals.ts) can classify news/web snippets with the same rubric
+ * the scorer uses.
+ */
+export function matchIntentSignals(text: string | null | undefined): Array<{ label: string; weight: number }> {
+  const blob = (text || "").toLowerCase();
+  if (!blob.trim()) return [];
+  const out: Array<{ label: string; weight: number }> = [];
+  for (const sig of INTENT_SIGNALS) {
+    if (sig.re.test(blob)) out.push({ label: sig.label, weight: sig.weight });
+  }
+  return out;
 }
 
 function hay(s: ProspectSignals): string {
@@ -175,16 +193,24 @@ export function scoreProspect(s: ProspectSignals): ProspectIntel {
 
   // ── INTENT ─────────────────────────────────────────────────────────────────
   let intent = 0;
-  const intentHits: string[] = [];
+  const intentHits: Array<{ label: string; weight: number }> = [];
   for (const sig of INTENT_SIGNALS) {
     if (sig.re.test(blob)) {
       intent += sig.weight;
-      intentHits.push(sig.label);
+      intentHits.push({ label: sig.label, weight: sig.weight });
+    }
+  }
+  // Phase 2: fold in externally-detected signals (news/funding/relocation…).
+  for (const sig of s.signals || []) {
+    if (sig && Number.isFinite(sig.weight)) {
+      intent += sig.weight;
+      intentHits.push({ label: sig.label, weight: sig.weight });
     }
   }
   if (intentHits.length) {
     // Surface the two strongest intent reasons.
-    reasons.push(...intentHits.slice(0, 2));
+    intentHits.sort((a, b) => b.weight - a.weight);
+    reasons.push(...intentHits.slice(0, 2).map((h) => h.label));
   }
 
   fit = clamp(fit);

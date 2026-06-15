@@ -450,6 +450,16 @@ export const contacts = pgTable("contacts", {
   consentSource: text("consent_source"),
   referredByContactId: varchar("referred_by_contact_id"),
   possibleDuplicateOf: varchar("possible_duplicate_of"),
+  // ICP fit + buying-intent scoring (lead-intelligence + lead-signals), refreshed
+  // nightly. Nullable until first scored. See server/lead-intelligence.ts.
+  icpScore: integer("icp_score"),
+  icpFitScore: integer("icp_fit_score"),
+  icpIntentScore: integer("icp_intent_score"),
+  icpTier: text("icp_tier"),
+  icpAudience: text("icp_audience"),
+  icpReasons: text("icp_reasons").array(),
+  icpExplanation: text("icp_explanation"),
+  icpScoredAt: timestamp("icp_scored_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

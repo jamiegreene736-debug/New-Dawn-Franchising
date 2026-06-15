@@ -154,6 +154,36 @@ const STATEMENTS: string[] = [
   // (logged, non-fatal) and semantic-search.ts falls back to keyword ILIKE.
   `CREATE EXTENSION IF NOT EXISTS vector`,
   `ALTER TABLE contacts ADD COLUMN IF NOT EXISTS embedding vector(1536)`,
+  // ─── Buying-intent signals (Phase 2) ─────────────────────────────────────
+  // lead_signals stores detected intent events (news/relocation/visa-research/
+  // business-for-sale…) per contact, folded into ICP scoring. Written by the
+  // daily signal-ingestion cron and surfaced as "why now" on contact intel.
+  `CREATE TABLE IF NOT EXISTS lead_signals (
+    id           varchar    PRIMARY KEY DEFAULT gen_random_uuid(),
+    contact_id   varchar,
+    client_id    varchar,
+    signal_type  text       NOT NULL,
+    source       text       NOT NULL,
+    title        text       NOT NULL,
+    url          text,
+    snippet      text,
+    weight       integer    NOT NULL DEFAULT 0,
+    detected_at  timestamp  NOT NULL DEFAULT now(),
+    created_at   timestamp  NOT NULL DEFAULT now()
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_lead_signals_contact ON lead_signals (contact_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_lead_signals_detected ON lead_signals (detected_at)`,
+  // ─── Persisted ICP fit + intent scores (Phase 3) ─────────────────────────
+  // Computed by lead-intelligence + signals and refreshed nightly so the CRM
+  // can rank/segment stored contacts by ideal-customer fit, not just at search.
+  `ALTER TABLE contacts ADD COLUMN IF NOT EXISTS icp_score integer`,
+  `ALTER TABLE contacts ADD COLUMN IF NOT EXISTS icp_fit_score integer`,
+  `ALTER TABLE contacts ADD COLUMN IF NOT EXISTS icp_intent_score integer`,
+  `ALTER TABLE contacts ADD COLUMN IF NOT EXISTS icp_tier text`,
+  `ALTER TABLE contacts ADD COLUMN IF NOT EXISTS icp_audience text`,
+  `ALTER TABLE contacts ADD COLUMN IF NOT EXISTS icp_reasons text[]`,
+  `ALTER TABLE contacts ADD COLUMN IF NOT EXISTS icp_explanation text`,
+  `ALTER TABLE contacts ADD COLUMN IF NOT EXISTS icp_scored_at timestamp`,
 ];
 
 export async function ensureSchema(): Promise<void> {

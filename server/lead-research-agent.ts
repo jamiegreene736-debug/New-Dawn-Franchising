@@ -20,6 +20,7 @@ import { cachedProviderSearch } from "./search-cache";
 import { scoreProspect, type ProspectIntel } from "./lead-intelligence";
 import { searchCrmContacts } from "./semantic-search";
 import { logSearchEvent } from "./search-telemetry";
+import { draftProspectOutreach } from "./outreach-drafter";
 import type { EnrichedContact } from "./prospect-enrichment";
 
 export interface AgentPerson {
@@ -62,8 +63,8 @@ Behaviour:
 - To find people who work at a specific company (e.g. "everyone at GlobeVisa"), set companyNames to that company and companyDomains to its likely domain (e.g. globevisa.com), and DON'T require a job title — that returns the whole company. Only add titles if the user asks for specific roles.
 - If a search returns 0 results, retry once with a broader query (e.g. drop titles, or use companyDomains instead of companyNames, or vice-versa) before telling the user nothing was found.
 - After a search, state how many you found, highlight the 2–3 HIGHEST-scoring matches (name · title · company · why they're a strong fit), and tell them they can save the results to Contacts using the buttons below the list.
-- If asked to draft outreach, write the email/message directly in your reply (warm, non-salesy, signed "Dylan Delaney, New Dawn Franchising").
-- Never invent contacts — only reference what search_people returned.
+- If asked to draft/write/personalize outreach to a specific person you found, CALL draft_outreach with their exact fullName and the channel (email or linkedin), then present the returned subject/body. It grounds the message in why they matched.
+- Never invent contacts — only reference what search_people or search_crm returned.
 
 New Dawn targets two audiences: (1) international E-2 investors / high-net-worth individuals from treaty countries (UK, Germany, Japan, South Korea, Mexico, India, UAE, Brazil, Canada…) exploring US business ownership; titles like Owner, Founder, CEO, Investor, Managing Director, Entrepreneur. (2) Referral partners — immigration attorneys, visa consultants, wealth managers, relocation advisors, business brokers who work with international clients.`;
 
@@ -116,6 +117,19 @@ const TOOLS = [
         query: { type: "string", description: "Natural-language description of who to find in the CRM, e.g. 'immigration attorneys in the UK we've contacted'." },
       },
       required: ["query"],
+    },
+  },
+  {
+    name: "draft_outreach",
+    description:
+      "Write a personalized email or LinkedIn message to a specific prospect from the search results, grounded in WHY they matched (their ICP reasons / signals). Use when the user asks to draft, write, or personalize outreach to someone you found.",
+    input_schema: {
+      type: "object",
+      properties: {
+        fullName: { type: "string", description: "Exact full name of the prospect to write to (must be one of the people already found)." },
+        channel: { type: "string", enum: ["email", "linkedin"], description: "Which channel to write for. Default email." },
+      },
+      required: ["fullName"],
     },
   },
   {
@@ -194,6 +208,31 @@ export async function runLeadResearchAgent(
 
   async function execTool(name: string, input: any): Promise<string> {
     if (name === "analyze_icp") return ICP_SUMMARY;
+    if (name === "draft_outreach") {
+      const fullName = String(input?.fullName || "").trim();
+      const channel = input?.channel === "linkedin" ? "linkedin" : "email";
+      if (!fullName) return JSON.stringify({ error: "fullName required" });
+      // Pull the matched person (with intel) from this session's results.
+      const person = Array.from(foundByKey.values()).find(
+        (p) => p.fullName.toLowerCase() === fullName.toLowerCase(),
+      );
+      try {
+        const draft = await draftProspectOutreach({
+          fullName,
+          firstName: person?.firstName ?? fullName.split(" ")[0],
+          jobTitle: person?.jobTitle ?? null,
+          companyName: person?.companyName ?? null,
+          country: person?.location ?? null,
+          channel,
+          audience: person?.intel.audience,
+          reasons: person?.intel.reasons,
+          explanation: person?.intel.explanation,
+        });
+        return JSON.stringify({ channel: draft.channel, subject: draft.subject, body: draft.body });
+      } catch (e: any) {
+        return JSON.stringify({ error: e?.message || "draft failed" });
+      }
+    }
     if (name === "search_crm") {
       const query = String(input?.query || "").trim();
       if (!query) return JSON.stringify({ error: "query required" });

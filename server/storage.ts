@@ -53,6 +53,7 @@ export interface IStorage {
   removeClientsFromList(listId: string, clientIds: string[]): Promise<void>;
   addContactsToList(listId: string, contactIds: string[]): Promise<number>;
   removeContactsFromList(listId: string, contactIds: string[]): Promise<void>;
+  backfillCrmListMirrors(): Promise<number>;
   getClientsByListId(listId: string): Promise<CrmClient[]>;
   getDripCampaigns(): Promise<DripCampaign[]>;
   getDripCampaign(id: string): Promise<DripCampaign | undefined>;
@@ -441,6 +442,26 @@ export class DatabaseStorage implements IStorage {
     const ids = members.map((m) => m.clientId).filter((id): id is string => !!id);
     if (ids.length === 0) return [];
     return db.select().from(crmClients).where(inArray(crmClients.id, ids)).orderBy(desc(crmClients.createdAt));
+  }
+
+  /**
+   * One-time backfill so CRM lists created before the mirror existed become
+   * campaign-selectable without the user having to re-touch them. Idempotent:
+   * lists that already have a linked prospect_list are skipped, so it's safe to
+   * run on every boot. Called from server/index.ts after ensureSchema().
+   */
+  async backfillCrmListMirrors(): Promise<number> {
+    const lists = await db.select({ id: crmLists.id }).from(crmLists).where(isNull(crmLists.prospectListId));
+    let healed = 0;
+    for (const l of lists) {
+      try {
+        await this.ensureLinkedProspectList(l.id);
+        healed++;
+      } catch (err: any) {
+        console.error(`[crm-list-mirror] backfill failed for list ${l.id}: ${err?.message}`);
+      }
+    }
+    return healed;
   }
 
   // ── CRM-list → prospect-list mirror helpers ───────────────────────────────

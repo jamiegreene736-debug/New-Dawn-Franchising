@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import {
   Search, Filter, Plus, Download, ChevronDown, ChevronUp,
-  X, Tag, UserCheck, BookmarkPlus, Loader2, RefreshCw,
+  X, Tag, UserCheck, BookmarkPlus, Loader2, RefreshCw, ListPlus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -227,6 +227,8 @@ export function ContactsManager() {
   const [showBulkMenu, setShowBulkMenu] = useState(false);
   const [segmentName, setSegmentName] = useState("");
   const [showSaveSegment, setShowSaveSegment] = useState(false);
+  const [addToListId, setAddToListId] = useState<string>("");
+  const [newListName, setNewListName] = useState("");
 
   const [filters, setFilters] = useState<{
     status: string[];
@@ -261,6 +263,12 @@ export function ContactsManager() {
   const contacts = data?.contacts || [];
   const total = data?.total || 0;
   const totalPages = Math.max(1, Math.ceil(total / 50));
+
+  // CRM lists are shared with campaigns — adding contacts here makes the list
+  // selectable as a campaign audience (the server mirrors members to prospects).
+  const { data: crmLists = [] } = useQuery<{ id: string; name: string; count: number }[]>({
+    queryKey: ["/api/crm/lists"],
+  });
 
   const toggleSelect = (id: string) => {
     setSelected((prev) => {
@@ -349,6 +357,49 @@ export function ContactsManager() {
       setSegmentName("");
     },
   });
+
+  // Add the selected contacts to a CRM list (existing, or a new one created on the
+  // fly). The server mirrors each contact into the list's linked prospect_list, so
+  // the same list becomes selectable inside a campaign.
+  const addToListMutation = useMutation({
+    mutationFn: async ({ ids, listId, newName }: { ids: string[]; listId: string | null; newName?: string }) => {
+      let targetId = listId;
+      if (!targetId) {
+        const created = await apiRequest("POST", "/api/crm/lists", { name: newName });
+        targetId = (await created.json()).id as string;
+      }
+      const res = await apiRequest("POST", `/api/crm/lists/${targetId}/members`, { contactIds: ids });
+      const data = await res.json();
+      return { added: data.added as number, requested: ids.length, listId: targetId };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/lists"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/lists", data.listId, "members"] });
+      // Refresh the campaign-facing queries (global staleTime is Infinity).
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/prospect-lists"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/enroll-candidates"] });
+      setSelected(new Set());
+      setNewListName("");
+      setAddToListId("");
+      const skipped = data.requested - data.added;
+      toast({
+        title: `Added ${data.added} contact${data.added !== 1 ? "s" : ""} to list`,
+        description: skipped > 0 ? `${skipped} already in the list` : undefined,
+      });
+    },
+    onError: () => toast({ title: "Failed to add to list", variant: "destructive" }),
+  });
+
+  const submitAddToList = () => {
+    if (!addToListId || selected.size === 0) return;
+    if (addToListId === "__new__" && !newListName.trim()) return;
+    addToListMutation.mutate({
+      ids: Array.from(selected),
+      listId: addToListId === "__new__" ? null : addToListId,
+      newName: addToListId === "__new__" ? newListName.trim() : undefined,
+    });
+  };
 
   const filterSummary = [
     ...filters.status.map((s) => STATUS_LABELS[s] || s),
@@ -500,6 +551,43 @@ export function ContactsManager() {
                     if (tags.length) bulkTagMutation.mutate(tags);
                   }}>
                   <Tag className="size-3" /> Add Tags
+                </Button>
+              </div>
+              {/* Add selected contacts to a CRM list (shared with campaigns) */}
+              <div className="flex items-center gap-1">
+                <select
+                  data-testid="select-contacts-add-to-list"
+                  aria-label="Add selected contacts to a list"
+                  value={addToListId}
+                  onChange={(e) => setAddToListId(e.target.value)}
+                  className="h-7 rounded-md border border-input bg-transparent px-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  <option value="">Add to list…</option>
+                  {crmLists.map((l) => (
+                    <option key={l.id} value={l.id}>{l.name} ({l.count})</option>
+                  ))}
+                  <option value="__new__">＋ New list…</option>
+                </select>
+                {addToListId === "__new__" && (
+                  <Input
+                    data-testid="input-contacts-new-list-name"
+                    aria-label="New list name"
+                    placeholder="New list name"
+                    value={newListName}
+                    onChange={(e) => setNewListName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") submitAddToList(); }}
+                    className="h-7 text-xs w-32"
+                  />
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  data-testid="button-contacts-add-to-list"
+                  className="h-7 text-xs gap-1"
+                  disabled={addToListMutation.isPending || !addToListId || (addToListId === "__new__" && !newListName.trim())}
+                  onClick={submitAddToList}
+                >
+                  <ListPlus className="size-3" /> Add
                 </Button>
               </div>
               <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setSelected(new Set())}>

@@ -51,6 +51,8 @@ export interface IStorage {
   deleteCrmList(id: string): Promise<void>;
   addClientsToList(listId: string, clientIds: string[]): Promise<number>;
   removeClientsFromList(listId: string, clientIds: string[]): Promise<void>;
+  addContactsToList(listId: string, contactIds: string[]): Promise<number>;
+  removeContactsFromList(listId: string, contactIds: string[]): Promise<void>;
   getClientsByListId(listId: string): Promise<CrmClient[]>;
   getDripCampaigns(): Promise<DripCampaign[]>;
   getDripCampaign(id: string): Promise<DripCampaign | undefined>;
@@ -353,14 +355,24 @@ export class DatabaseStorage implements IStorage {
 
   async createCrmList(name: string): Promise<CrmList> {
     const [list] = await db.insert(crmLists).values({ name }).returning();
-    return list;
+    // Create the campaign-facing mirror up front so the list is immediately
+    // selectable as a campaign audience (even while still empty).
+    const [pl] = await db.insert(prospectLists).values({ name }).returning();
+    await db.update(crmLists).set({ prospectListId: pl.id }).where(eq(crmLists.id, list.id));
+    return { ...list, prospectListId: pl.id };
   }
 
   async renameCrmList(id: string, name: string): Promise<void> {
     await db.update(crmLists).set({ name }).where(eq(crmLists.id, id));
+    const pid = await this.getLinkedProspectListId(id);
+    if (pid) await db.update(prospectLists).set({ name }).where(eq(prospectLists.id, pid));
   }
 
   async deleteCrmList(id: string): Promise<void> {
+    const pid = await this.getLinkedProspectListId(id);
+    // Drop the mirror too (cascades prospect_list_members; any campaign listId FK
+    // is set null per the prospect_lists FK rule).
+    if (pid) await this.deleteProspectList(pid);
     await db.delete(crmLists).where(eq(crmLists.id, id));
   }
 
@@ -372,24 +384,150 @@ export class DatabaseStorage implements IStorage {
     const have = new Set(existing.map((e) => e.clientId));
     const toAdd = clientIds.filter((id) => !have.has(id));
     if (toAdd.length === 0) return 0;
-    await db.insert(crmListMembers)
-      .values(toAdd.map((clientId) => ({ listId, clientId })))
-      .onConflictDoNothing();
-    return toAdd.length;
+    const prospectListId = await this.ensureLinkedProspectList(listId);
+    let added = 0;
+    for (const clientId of toAdd) {
+      const c = await this.getCrmClient(clientId);
+      if (!c) continue;
+      // Mirror to a prospect and record it on the member row so removal is exact.
+      const prospectId = (await this.findOrCreateProspectForClient(c)).id;
+      await db.insert(crmListMembers).values({ listId, clientId, prospectId }).onConflictDoNothing();
+      await this.addProspectToList(prospectListId, prospectId);
+      added++;
+    }
+    return added;
   }
 
   async removeClientsFromList(listId: string, clientIds: string[]): Promise<void> {
     if (clientIds.length === 0) return;
+    const removedPids = await this.memberProspectIds(listId, "clientId", clientIds);
     await db.delete(crmListMembers)
       .where(and(eq(crmListMembers.listId, listId), inArray(crmListMembers.clientId, clientIds)));
+    await this.unmirrorProspects(listId, removedPids);
+  }
+
+  async addContactsToList(listId: string, contactIds: string[]): Promise<number> {
+    if (contactIds.length === 0) return 0;
+    const existing = await db.select({ contactId: crmListMembers.contactId })
+      .from(crmListMembers)
+      .where(and(eq(crmListMembers.listId, listId), inArray(crmListMembers.contactId, contactIds)));
+    const have = new Set(existing.map((e) => e.contactId));
+    const toAdd = contactIds.filter((id) => !have.has(id));
+    if (toAdd.length === 0) return 0;
+    const prospectListId = await this.ensureLinkedProspectList(listId);
+    let added = 0;
+    for (const contactId of toAdd) {
+      const ct = await this.getContact(contactId);
+      if (!ct) continue;
+      const prospectId = (await this.findOrCreateProspectForContact(ct)).id;
+      await db.insert(crmListMembers).values({ listId, contactId, prospectId }).onConflictDoNothing();
+      await this.addProspectToList(prospectListId, prospectId);
+      added++;
+    }
+    return added;
+  }
+
+  async removeContactsFromList(listId: string, contactIds: string[]): Promise<void> {
+    if (contactIds.length === 0) return;
+    const removedPids = await this.memberProspectIds(listId, "contactId", contactIds);
+    await db.delete(crmListMembers)
+      .where(and(eq(crmListMembers.listId, listId), inArray(crmListMembers.contactId, contactIds)));
+    await this.unmirrorProspects(listId, removedPids);
   }
 
   async getClientsByListId(listId: string): Promise<CrmClient[]> {
     const members = await db.select({ clientId: crmListMembers.clientId })
       .from(crmListMembers).where(eq(crmListMembers.listId, listId));
-    if (members.length === 0) return [];
-    const ids = members.map((m) => m.clientId);
+    const ids = members.map((m) => m.clientId).filter((id): id is string => !!id);
+    if (ids.length === 0) return [];
     return db.select().from(crmClients).where(inArray(crmClients.id, ids)).orderBy(desc(crmClients.createdAt));
+  }
+
+  // ── CRM-list → prospect-list mirror helpers ───────────────────────────────
+  // Campaigns enrol prospects, not CRM clients/contacts. Every CRM list is
+  // reflected into a `prospect_list` (link stored on crm_lists.prospect_list_id)
+  // so it appears in the campaign audience pickers. Each member row records the
+  // prospect it was mirrored to (crm_list_members.prospect_id) so removal targets
+  // the exact prospect — re-resolving by identity would mint a fresh, unrelated
+  // prospect for an email-less person and orphan the real one in the campaign.
+
+  /** The linked prospect_list id for a CRM list, or null if it has none yet. */
+  private async getLinkedProspectListId(listId: string): Promise<string | null> {
+    const [list] = await db.select({ pid: crmLists.prospectListId }).from(crmLists).where(eq(crmLists.id, listId));
+    return list?.pid ?? null;
+  }
+
+  /** The recorded mirror-prospect ids for the given members of a list. */
+  private async memberProspectIds(
+    listId: string,
+    col: "clientId" | "contactId",
+    ids: string[],
+  ): Promise<Set<string>> {
+    const rows = await db.select({ prospectId: crmListMembers.prospectId })
+      .from(crmListMembers)
+      .where(and(eq(crmListMembers.listId, listId), inArray(crmListMembers[col], ids)));
+    return new Set(rows.map((r) => r.prospectId).filter((p): p is string => !!p));
+  }
+
+  /**
+   * Ensure the CRM list has a linked prospect_list, creating it (and backfilling
+   * every current member) on first use — so lists created before the mirror
+   * existed self-heal the moment a member is touched. Returns the prospect_list id.
+   */
+  private async ensureLinkedProspectList(listId: string): Promise<string> {
+    const [list] = await db.select().from(crmLists).where(eq(crmLists.id, listId));
+    if (!list) throw new Error("CRM list not found");
+    if (list.prospectListId) {
+      const [pl] = await db.select({ id: prospectLists.id }).from(prospectLists).where(eq(prospectLists.id, list.prospectListId));
+      if (pl) return list.prospectListId;
+    }
+    const [pl] = await db.insert(prospectLists).values({ name: list.name }).returning();
+    await db.update(crmLists).set({ prospectListId: pl.id }).where(eq(crmLists.id, listId));
+    for (const pid of await this.backfillMemberProspectIds(listId)) {
+      await this.addProspectToList(pl.id, pid);
+    }
+    return pl.id;
+  }
+
+  /**
+   * Populate any member rows missing a recorded prospect_id (legacy rows added
+   * before the mirror existed), then return the list's distinct mirror-prospect ids.
+   */
+  private async backfillMemberProspectIds(listId: string): Promise<string[]> {
+    const rows = await db.select().from(crmListMembers).where(eq(crmListMembers.listId, listId));
+    const ids = new Set<string>();
+    for (const m of rows) {
+      let pid = m.prospectId ?? null;
+      if (!pid) {
+        if (m.clientId) {
+          const c = await this.getCrmClient(m.clientId);
+          if (c) pid = (await this.findOrCreateProspectForClient(c)).id;
+        } else if (m.contactId) {
+          const ct = await this.getContact(m.contactId);
+          if (ct) pid = (await this.findOrCreateProspectForContact(ct)).id;
+        }
+        if (pid) await db.update(crmListMembers).set({ prospectId: pid }).where(eq(crmListMembers.id, m.id));
+      }
+      if (pid) ids.add(pid);
+    }
+    return Array.from(ids);
+  }
+
+  /**
+   * After members leave a list, drop their mirrored prospects from the linked
+   * prospect_list — but only those no longer referenced by any remaining member
+   * (two members can map to the same prospect when they share an email).
+   */
+  private async unmirrorProspects(listId: string, candidatePids: Set<string>): Promise<void> {
+    if (candidatePids.size === 0) return;
+    const prospectListId = await this.getLinkedProspectListId(listId);
+    if (!prospectListId) return;
+    const remaining = await db.select({ prospectId: crmListMembers.prospectId })
+      .from(crmListMembers).where(eq(crmListMembers.listId, listId));
+    const stillReferenced = new Set(remaining.map((r) => r.prospectId).filter((p): p is string => !!p));
+    for (const pid of candidatePids) {
+      if (!stillReferenced.has(pid)) await this.removeProspectFromList(prospectListId, pid);
+    }
   }
 
   async getDripCampaigns(): Promise<DripCampaign[]> {

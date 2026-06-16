@@ -80,6 +80,36 @@ interface CrmClientFull {
   companyName?: string | null;
   profession?: string | null;
   leadTemperature?: string | null;
+  // Seamless enrichment (promoted columns)
+  enrichedAt?: string | null;
+  email2?: string | null;
+  email3?: string | null;
+  emailConfidence?: number | null;
+  phone2?: string | null;
+  phoneType?: string | null;
+  seniority?: string | null;
+  department?: string | null;
+  contactCity?: string | null;
+  contactState?: string | null;
+  companyDomain?: string | null;
+  companyWebsite?: string | null;
+  companyIndustry?: string | null;
+  companyStaffCount?: number | null;
+  companyStaffRange?: string | null;
+  companyRevenue?: string | null;
+  companyRevenueExact?: string | null;
+  companyFounded?: string | null;
+  companyType?: string | null;
+  companyDescription?: string | null;
+  companyLinkedinUrl?: string | null;
+  companyFundingTotal?: string | null;
+  companyCity?: string | null;
+  companyState?: string | null;
+  companyCountry?: string | null;
+  timeAtCompany?: string | null;
+  startedAtCurrentCompany?: string | null;
+  jobChangeAlert?: string | null;
+  stockTicker?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -832,6 +862,45 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
               <div className="border-t pt-2">
                 <p className="text-xs font-semibold text-muted-foreground mb-1">Notes</p>
                 <p className="text-xs whitespace-pre-wrap">{client.notes}</p>
+              </div>
+            )}
+
+            {/* Seamless enrichment — the full firmographic / contact data pulled at add-time */}
+            {(client.enrichedAt || client.seniority || client.companyIndustry || client.email2 || client.phone2 || client.timeAtCompany) && (
+              <div className="border-t pt-2 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-muted-foreground">Seamless data</p>
+                  {client.jobChangeAlert && (
+                    <span className="rounded-full bg-amber-100 text-amber-700 px-1.5 py-0.5 text-[10px] font-semibold">{client.jobChangeAlert}</span>
+                  )}
+                </div>
+                {client.email2 && (
+                  <div><p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Email 2</p><a href={`mailto:${client.email2}`} className="text-xs text-blue-600 hover:underline break-all">{client.email2}</a></div>
+                )}
+                {client.email3 && (
+                  <div><p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Email 3</p><a href={`mailto:${client.email3}`} className="text-xs text-blue-600 hover:underline break-all">{client.email3}</a></div>
+                )}
+                {client.phone2 && (
+                  <div><p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Phone 2{client.phoneType ? ` · ${client.phoneType}` : ""}</p><a href={`tel:${client.phone2}`} className="text-sm">{formatPhone(client.phone2)}</a></div>
+                )}
+                {client.phoneType && !client.phone2 && <ProfileField label="Phone type" value={client.phoneType} />}
+                <ProfileField label="Seniority" value={client.seniority} />
+                <ProfileField label="Department" value={client.department} />
+                <ProfileField label="Industry" value={client.companyIndustry} />
+                <ProfileField label="Company size" value={client.companyStaffRange || (client.companyStaffCount ? `${client.companyStaffCount} employees` : null)} />
+                <ProfileField label="Revenue" value={client.companyRevenue} />
+                <ProfileField label="Founded" value={client.companyFounded} />
+                <ProfileField label="Company type" value={client.companyType} />
+                <ProfileField label="Time at company" value={client.timeAtCompany} />
+                <ProfileField label="Company HQ" value={[client.companyCity, client.companyState, client.companyCountry].filter(Boolean).join(", ") || null} />
+                {client.companyFundingTotal && <ProfileField label="Funding raised" value={client.companyFundingTotal} />}
+                {client.stockTicker && <ProfileField label="Stock ticker" value={client.stockTicker} />}
+                {client.companyLinkedinUrl && (
+                  <div><p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Company LinkedIn</p><a href={client.companyLinkedinUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline">View company →</a></div>
+                )}
+                {client.companyDescription && (
+                  <div><p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">About company</p><p className="text-[11px] text-muted-foreground line-clamp-4">{client.companyDescription}</p></div>
+                )}
               </div>
             )}
           </div>

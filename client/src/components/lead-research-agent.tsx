@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Sparkles, Send, Loader2, UserPlus, Check, Linkedin, Mail, Phone, Megaphone, PenLine, Copy } from "lucide-react";
+import { Sparkles, Send, Loader2, UserPlus, Check, Linkedin, Mail, Phone, Megaphone, PenLine, Copy, Trash2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { apiRequest } from "@/lib/queryClient";
@@ -225,6 +225,17 @@ export default function LeadResearchAgent({ provider }: { provider?: string }) {
   // they're already in the CRM (inCrm) — so the UI doesn't offer to re-add them.
   const isInCrm = (p: AgentPerson) => added.has(keyOf(p)) || !!p.inCrm;
 
+  // Reset the conversation, results, and persisted session state.
+  function clearChat() {
+    setMessages([GREETING]);
+    setAdded(new Set());
+    setSelected(new Set());
+    setEnrolled(new Map());
+    setDrafts(new Map());
+    setInput("");
+    try { sessionStorage.removeItem(STORE_KEY); } catch { /* ignore */ }
+  }
+
   // Ensure the agent-found person exists as a CRM contact; returns the id.
   async function ensureContact(p: AgentPerson): Promise<string | null> {
     const res = await fetch("/api/crm/prospects/add-to-contacts", {
@@ -251,7 +262,18 @@ export default function LeadResearchAgent({ provider }: { provider?: string }) {
         provider,
       });
       const data = await res.json() as { reply: string; people?: AgentPerson[] };
-      setMessages((prev) => [...prev, { role: "assistant", content: data.reply || "Done.", people: data.people || [] }]);
+      const people = data.people || [];
+      // Re-addable after deletion: the server re-checks the CRM on every search,
+      // so if it now says a person is NOT in the CRM (e.g. you deleted them),
+      // drop any stale session "added" mark so the Add button comes back.
+      setAdded((prev) => {
+        if (!people.length) return prev;
+        let changed = false;
+        const next = new Set(prev);
+        for (const p of people) if (!p.inCrm && next.delete(keyOf(p))) changed = true;
+        return changed ? next : prev;
+      });
+      setMessages((prev) => [...prev, { role: "assistant", content: data.reply || "Done.", people }]);
     } catch {
       setMessages((prev) => [...prev, { role: "assistant", content: "Sorry — I couldn't reach the AI service. Please try again." }]);
     } finally {
@@ -415,6 +437,16 @@ export default function LeadResearchAgent({ provider }: { provider?: string }) {
           <p className="text-sm font-semibold leading-tight">AI Lead Research</p>
           <p className="text-[11px] text-muted-foreground">Build lists, analyze your ICP, and draft outreach — just ask.</p>
         </div>
+        {messages.length > 1 && (
+          <button
+            data-testid="button-clear-chat"
+            onClick={clearChat}
+            title="Clear the conversation and start over"
+            className="ml-auto shrink-0 flex items-center gap-1 rounded-md border bg-background/60 px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-background transition-colors"
+          >
+            <Trash2 className="size-3" /> Clear
+          </button>
+        )}
       </div>
 
       <div ref={scrollRef} className="max-h-[420px] overflow-y-auto px-4 py-3 space-y-3">

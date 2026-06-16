@@ -217,7 +217,7 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
   const [audioUrl, setAudioUrl] = useState("");
   const [verifyResult, setVerifyResult] = useState<{
     email?: { result: string; status: string; score: number; disposable?: boolean; webmail?: boolean; configured?: boolean };
-    phone?: { valid: boolean; normalized: string; note: string };
+    phone?: { configured?: boolean; valid: boolean; type?: string; carrier?: string | null; nationalFormat?: string | null; country?: string | null; note?: string; error?: string };
   } | null>(null);
   const [verifyLoading, setVerifyLoading] = useState(false);
   const [apolloLoading, setApolloLoading] = useState(false);
@@ -554,11 +554,20 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
       const res = await apiRequest("POST", `/api/crm/clients/${client.id}/enrich`, {});
       const data = await res.json();
       setApolloResult(data);
-      if (!data.found) toast({
-        title: data.error ? "Enrichment unavailable" : "No match found",
-        description: data.error?.message || "No provider returned a record for this name/email.",
-        variant: data.error ? "destructive" : undefined,
-      });
+      if (data.found && data.persisted) {
+        const n = (data.applied || []).length;
+        toast({
+          title: "Contact enriched",
+          description: n > 0 ? `Filled ${n} empty field${n !== 1 ? "s" : ""} + captured full company data.` : "Captured full company data (contact fields already set).",
+        });
+        onRefresh();
+      } else if (!data.found) {
+        toast({
+          title: data.error ? "Enrichment unavailable" : "No match found",
+          description: data.error?.message || "No provider returned a record for this name/email.",
+          variant: data.error ? "destructive" : undefined,
+        });
+      }
     } catch {
       toast({ title: "Enrichment failed", variant: "destructive" });
     } finally {
@@ -576,11 +585,20 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
       const res = await apiRequest("POST", `/api/crm/clients/${client.id}/enrich`, { providers: ["seamless"] });
       const data = await res.json();
       setSeamlessResult(data);
-      if (!data.found) toast({
-        title: data.error ? "Seamless.AI unavailable" : "No match found",
-        description: data.error?.message || "Seamless.AI returned no record for this name/company.",
-        variant: data.error ? "destructive" : undefined,
-      });
+      if (data.found && data.persisted) {
+        const n = (data.applied || []).length;
+        toast({
+          title: "Enriched via Seamless.AI",
+          description: n > 0 ? `Filled ${n} empty field${n !== 1 ? "s" : ""} + captured full company data.` : "Captured full company data (contact fields already set).",
+        });
+        onRefresh();
+      } else if (!data.found) {
+        toast({
+          title: data.error ? "Seamless.AI unavailable" : "No match found",
+          description: data.error?.message || "Seamless.AI returned no record for this name/company.",
+          variant: data.error ? "destructive" : undefined,
+        });
+      }
     } catch {
       toast({ title: "Seamless enrichment failed", variant: "destructive" });
     } finally {
@@ -793,15 +811,26 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
                       </div>
                     );
                   })()}
-                  {verifyResult.phone && (
-                    <div className="flex items-center gap-1.5">
-                      <Phone className="size-3 text-muted-foreground" />
-                      <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${verifyResult.phone.valid ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-                        {verifyResult.phone.valid ? "Valid format" : "Invalid format"}
-                      </span>
-                      <span className="text-[10px] text-muted-foreground">{verifyResult.phone.note}</span>
-                    </div>
-                  )}
+                  {verifyResult.phone && (() => {
+                    const p = verifyResult.phone!;
+                    const cls = p.configured === false ? "bg-gray-100 text-gray-600"
+                      : p.valid ? "bg-green-100 text-green-700"
+                      : "bg-red-100 text-red-700";
+                    const label = p.configured === false ? "Format only"
+                      : p.valid ? "Deliverable" : "Undeliverable";
+                    const detail = p.configured === false
+                      ? p.note
+                      : p.valid
+                        ? ([p.type && p.type !== "unknown" ? p.type : null, p.carrier].filter(Boolean).join(" · ") || "Live carrier-validated")
+                        : (p.error || "Not a reachable number");
+                    return (
+                      <div className="flex items-center gap-1.5">
+                        <Phone className="size-3 text-muted-foreground" />
+                        <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${cls}`}>{label}</span>
+                        {detail && <span className="text-[10px] text-muted-foreground capitalize">{detail}</span>}
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
             </div>

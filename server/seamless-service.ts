@@ -927,6 +927,45 @@ export async function seamlessRevealBySearchIds(
   return (await seamlessRevealBySearchIdsDetailed(ids, opts)).results;
 }
 
+/**
+ * RELIABLE re-enrichment for an EXISTING contact: SEARCH Seamless by name +
+ * company/domain to get a fresh, revealable searchResultId, then reveal it.
+ * This is the path that actually works — unlike research-by-identity, which
+ * fuzzy-matches and usually returns "no record". Used to backfill contacts
+ * added before we captured full data.
+ */
+export async function seamlessReEnrichByIdentity(input: {
+  fullName?: string | null;
+  company?: string | null;
+  domain?: string | null;
+}): Promise<{ person: SeamlessPerson | null; error: ProviderError | null }> {
+  if (!getKey()) return { person: null, error: null };
+  const fullName = (input.fullName || "").trim();
+  if (!fullName) return { person: null, error: null };
+  const domain = (input.domain || "").replace(/^https?:\/\//i, "").replace(/^www\./i, "").split("/")[0].toLowerCase() || undefined;
+  const { people, error } = await seamlessSearchContacts({
+    fullNames: [fullName],
+    companyNames: input.company ? [input.company] : undefined,
+    companyDomains: domain ? [domain] : undefined,
+    limit: 10,
+  });
+  if (error) return { person: null, error };
+  if (!people.length) return { person: null, error: null };
+  // Best match: exact full-name (case-insensitive), else first/last-name overlap, else top hit.
+  const want = fullName.toLowerCase();
+  const parts = want.split(/\s+/).filter(Boolean);
+  const match =
+    people.find((p) => p.fullName.toLowerCase() === want) ||
+    people.find((p) => parts.length >= 2 && p.fullName.toLowerCase().includes(parts[0]) && p.fullName.toLowerCase().includes(parts[parts.length - 1])) ||
+    people[0];
+  if (!match.searchResultId) return { person: null, error: null };
+  const reveal = await seamlessRevealBySearchIdsDetailed([match.searchResultId], {
+    attempts: 15, intervalMs: 1200, retryOnEmpty: true, label: "re-enrich",
+  });
+  if (reveal.error) return { person: null, error: reveal.error };
+  return { person: reveal.results[0]?.person ?? null, error: null };
+}
+
 export interface SeamlessEnrichIdentity {
   contactName?: string;
   companyName?: string;

@@ -254,6 +254,28 @@ const STATEMENTS: string[] = [
     added_at   timestamp  NOT NULL DEFAULT now()
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_crm_list_member_unique ON crm_list_members (list_id, client_id)`,
+  // Mirror link: each CRM list is reflected into a prospect_list so it can be
+  // selected as a campaign audience (campaigns enrol prospects, not clients/contacts).
+  `ALTER TABLE crm_lists ADD COLUMN IF NOT EXISTS prospect_list_id varchar`,
+  // A list member can be a CRM client OR a contact, so the Contacts tab can build
+  // lists too. client_id becomes nullable; contact_id is the alternative member ref.
+  // contact_id is left FK-free here (the `contacts` table isn't created by this
+  // guard, so a hard REFERENCES could no-op on a cold DB); orphans are skipped in code.
+  `ALTER TABLE crm_list_members ALTER COLUMN client_id DROP NOT NULL`,
+  `ALTER TABLE crm_list_members ADD COLUMN IF NOT EXISTS contact_id varchar`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_crm_list_member_contact_unique ON crm_list_members (list_id, contact_id)`,
+  // Mirror prospect recorded per member so removal is exact (see storage.ts).
+  `ALTER TABLE crm_list_members ADD COLUMN IF NOT EXISTS prospect_id varchar`,
+  // Enforce "exactly one of client_id / contact_id" at the DB level (the app only
+  // ever writes one, but this guards the dedup + mirror invariant). Guarded so the
+  // boot guard stays idempotent.
+  `DO $$ BEGIN
+     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'crm_list_member_one_ref') THEN
+       ALTER TABLE crm_list_members
+         ADD CONSTRAINT crm_list_member_one_ref
+         CHECK ((client_id IS NOT NULL) <> (contact_id IS NOT NULL));
+     END IF;
+   END $$`,
   // Seamless enrichment columns on crm_clients — added here so they exist in prod
   // on the next boot (the migration CLI is unreachable against Railway).
   `ALTER TABLE crm_clients ADD COLUMN IF NOT EXISTS enrichment_json jsonb`,

@@ -1056,6 +1056,11 @@ export default function CrmPage() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/lists"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/lists", data.listId, "members"] });
+      // The list is mirrored into a prospect_list so campaigns can select it —
+      // refresh the campaign-facing queries (global staleTime is Infinity).
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/prospect-lists"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/enroll-candidates"] });
       setSelectedIds(new Set());
       setNewListName("");
       setAddToListId("");
@@ -1076,6 +1081,9 @@ export default function CrmPage() {
     onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/lists"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/lists", vars.listId, "members"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/prospect-lists"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/enroll-candidates"] });
       setSelectedIds(new Set());
       toast({ title: `Removed ${vars.ids.length} contact${vars.ids.length !== 1 ? "s" : ""} from list` });
     },

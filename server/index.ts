@@ -7,6 +7,7 @@ import { createServer } from "http";
 import { pool } from "./db";
 import { ensureSchema } from "./ensure-schema";
 import { seedBlogPostsIfEmpty } from "./seed-posts";
+import { storage } from "./storage";
 
 const app = express();
 const httpServer = createServer(app);
@@ -89,6 +90,14 @@ app.use((req, res, next) => {
 (async () => {
   // Ensure required tables exist (runs over Railway's internal network).
   await ensureSchema();
+  // Give pre-existing CRM lists a linked prospect_list so they're campaign-selectable
+  // (idempotent — only does work on the first boot after this feature ships).
+  try {
+    const healed = await storage.backfillCrmListMirrors();
+    if (healed > 0) console.log(`[crm-list-mirror] backfilled ${healed} existing CRM list(s) into prospect lists`);
+  } catch (err: any) {
+    console.error(`[crm-list-mirror] backfill skipped: ${err?.message}`);
+  }
   // Publish the starter blog posts the first time the blog is empty.
   await seedBlogPostsIfEmpty();
 

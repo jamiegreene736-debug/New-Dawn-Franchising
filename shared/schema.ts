@@ -304,6 +304,9 @@ export type ProspectListMember = typeof prospectListMembers.$inferSelect;
 export const crmLists = pgTable("crm_lists", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
+  // Each CRM list is mirrored into a prospect_list so it can be selected as a
+  // campaign audience (campaigns enrol prospects, not CRM clients/contacts).
+  prospectListId: varchar("prospect_list_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -314,7 +317,14 @@ export type InsertCrmList = z.infer<typeof insertCrmListSchema>;
 export const crmListMembers = pgTable("crm_list_members", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   listId: varchar("list_id").notNull().references(() => crmLists.id, { onDelete: "cascade" }),
-  clientId: varchar("client_id").notNull().references(() => crmClients.id, { onDelete: "cascade" }),
+  // A member is exactly one of: a CRM client, or a contact. `client_id` was the
+  // original column; `contact_id` was added so the Contacts tab can build lists too.
+  clientId: varchar("client_id").references(() => crmClients.id, { onDelete: "cascade" }),
+  contactId: varchar("contact_id").references(() => contacts.id, { onDelete: "cascade" }),
+  // The prospect this member was mirrored to in the linked prospect_list. Stored at
+  // add-time so removal is exact (re-resolving by identity would mint a fresh,
+  // unrelated prospect for email-less people and leave the real one in the campaign).
+  prospectId: varchar("prospect_id"),
   addedAt: timestamp("added_at").defaultNow().notNull(),
 });
 

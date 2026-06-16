@@ -2804,29 +2804,46 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
     }
   });
 
-  // Bulk-add the selected CRM clients to a list. Dedupes existing members.
+  // Bulk-add the selected CRM clients and/or contacts to a list. Dedupes existing
+  // members. Each member is mirrored into the list's linked prospect_list so the
+  // list is immediately usable as a campaign audience.
   app.post("/api/crm/lists/:listId/members", requireAdminAuth, async (req, res) => {
     try {
       const clientIds = Array.isArray(req.body?.clientIds)
         ? (req.body.clientIds as unknown[]).map(String).filter(Boolean)
         : [];
-      if (clientIds.length === 0) return res.status(400).json({ message: "clientIds array required" });
-      const added = await storage.addClientsToList(String(req.params.listId), clientIds);
-      res.json({ added, requested: clientIds.length });
+      const contactIds = Array.isArray(req.body?.contactIds)
+        ? (req.body.contactIds as unknown[]).map(String).filter(Boolean)
+        : [];
+      if (clientIds.length === 0 && contactIds.length === 0) {
+        return res.status(400).json({ message: "clientIds or contactIds array required" });
+      }
+      const listId = String(req.params.listId);
+      let added = 0;
+      if (clientIds.length) added += await storage.addClientsToList(listId, clientIds);
+      if (contactIds.length) added += await storage.addContactsToList(listId, contactIds);
+      res.json({ added, requested: clientIds.length + contactIds.length });
     } catch (err: any) {
       res.status(500).json({ message: err.message || "Failed to add to list" });
     }
   });
 
-  // Bulk-remove the selected CRM clients from a list.
+  // Bulk-remove the selected CRM clients and/or contacts from a list.
   app.post("/api/crm/lists/:listId/members/remove", requireAdminAuth, async (req, res) => {
     try {
       const clientIds = Array.isArray(req.body?.clientIds)
         ? (req.body.clientIds as unknown[]).map(String).filter(Boolean)
         : [];
-      if (clientIds.length === 0) return res.status(400).json({ message: "clientIds array required" });
-      await storage.removeClientsFromList(String(req.params.listId), clientIds);
-      res.json({ removed: clientIds.length });
+      const contactIds = Array.isArray(req.body?.contactIds)
+        ? (req.body.contactIds as unknown[]).map(String).filter(Boolean)
+        : [];
+      if (clientIds.length === 0 && contactIds.length === 0) {
+        return res.status(400).json({ message: "clientIds or contactIds array required" });
+      }
+      const listId = String(req.params.listId);
+      if (clientIds.length) await storage.removeClientsFromList(listId, clientIds);
+      if (contactIds.length) await storage.removeContactsFromList(listId, contactIds);
+      res.json({ removed: clientIds.length + contactIds.length });
     } catch (err: any) {
       res.status(500).json({ message: err.message || "Failed to remove from list" });
     }

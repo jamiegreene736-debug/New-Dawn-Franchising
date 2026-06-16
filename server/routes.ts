@@ -819,6 +819,11 @@ export async function registerRoutes(
 
   app.post("/api/leads", async (req, res) => {
     try {
+      // Honeypot: a real user never fills `companyWebsite`. If it's present, return
+      // a normal-looking 201 to the bot but store nothing.
+      if (typeof req.body?.companyWebsite === "string" && req.body.companyWebsite.trim()) {
+        return res.status(201).json({ ok: true });
+      }
       const data = insertLeadSchema.parse(req.body);
       const lead = await storage.createLead(data);
       res.status(201).json(lead);
@@ -833,6 +838,18 @@ export async function registerRoutes(
         leadSource: "website",
         notes: lead.message || null,
       }).catch((e) => console.error("Failed to auto-create CRM client from lead:", e));
+
+      // TODO(CRM): push this lead to HubSpot and/or GoHighLevel here.
+      // No HubSpot/GHL integration exists in this repo yet — no HUBSPOT_* / GHL_*
+      // env vars and no client. To wire it: add the credentials as env vars, then
+      // fire-and-forget POST the lead to the CRM's contacts/forms API, e.g.:
+      //   if (process.env.HUBSPOT_PORTAL_ID && process.env.HUBSPOT_FORM_GUID) {
+      //     pushLeadToHubSpot(lead).catch((e) => console.error("HubSpot push failed:", e));
+      //   }
+      //   if (process.env.GHL_API_KEY && process.env.GHL_LOCATION_ID) {
+      //     pushLeadToGoHighLevel(lead).catch((e) => console.error("GHL push failed:", e));
+      //   }
+      // Do NOT hardcode credentials. FDD-request leads carry message "[FDD Request]".
 
       // Fire-and-forget emails — don't block the response
       const NOTIFY_TO = "franchising@newdawnfranchising.com";

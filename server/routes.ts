@@ -71,6 +71,11 @@ import {
   type LeadSearchFilters,
   type ProviderId,
 } from "./seamless-prospects";
+import {
+  seamlessRevealBySearchIdsDetailed,
+  type ProviderError,
+  type SeamlessPerson,
+} from "./seamless-service";
 import { cachedProviderSearch } from "./search-cache";
 import { logSearchEvent } from "./search-telemetry";
 import { searchCrmContacts } from "./semantic-search";
@@ -459,6 +464,33 @@ function scheduleAgentCrons() {
 
   console.log("HeyGen video polling scheduled: every 3 minutes");
   console.log("Scheduled jobs runner: every 5 minutes");
+}
+
+// Reveal email/phone for a set of Seamless searchResultIds and key the results
+// by id, so "Add to CRM" can enrich a contact at the moment it's saved. This is
+// the reliable enrich path: Seamless matched the person during search, so its
+// searchResultId is a guaranteed handle (unlike a post-hoc name/company lookup).
+// Surfaces the provider error (e.g. out of credits) so callers stop rather than
+// silently saving a bare row.
+async function revealForAdd(
+  searchResultIds: Array<string | null | undefined>,
+): Promise<{ byId: Map<string, SeamlessPerson>; error: ProviderError | null }> {
+  const ids = Array.from(new Set(searchResultIds.filter((x): x is string => !!x)));
+  if (ids.length === 0) return { byId: new Map(), error: null };
+  const { results, error } = await seamlessRevealBySearchIdsDetailed(ids);
+  const byId = new Map<string, SeamlessPerson>();
+  for (const r of results) if (r.searchResultId) byId.set(r.searchResultId, r.person);
+  return { byId, error };
+}
+
+/** Map a Seamless ProviderError to an HTTP status for the add endpoints. */
+function providerErrorStatus(error: ProviderError): number {
+  switch (error.code) {
+    case "insufficientCredits": return 402;
+    case "rateLimited": return 429;
+    case "unauthorized": return 403;
+    default: return 502;
+  }
 }
 
 export async function registerRoutes(
@@ -1193,19 +1225,28 @@ export async function registerRoutes(
       if (!Array.isArray(contacts) || contacts.length === 0) {
         return res.status(400).json({ message: "contacts array is required" });
       }
+      // Enrich at add-time: reveal every searchResultId in one batch up front,
+      // then merge email/phone into each contact before insert. If the reveal
+      // fails (e.g. out of credits), stop and report — don't save bare rows.
+      const { byId, error } = await revealForAdd(contacts.map((c) => c?.searchResultId));
+      if (error) return res.status(providerErrorStatus(error)).json({ message: error.message, code: error.code });
+
       const { findExistingCrmClient } = await import("./contact-upsert");
       const results = [];
       let skipped = 0;
+      let enriched = 0;
       for (const contact of contacts) {
+        const person = typeof contact?.searchResultId === "string" ? byId.get(contact.searchResultId) : undefined;
+        if (person && ((!contact.email && person.email) || (!contact.phone && person.phone))) enriched++;
         const data = insertCrmClientSchema.parse({
           fullName: contact.fullName || "Unknown",
-          email: contact.email || "",
-          phone: contact.phone || undefined,
-          country: contact.country || undefined,
+          email: contact.email || person?.email || "",
+          phone: contact.phone || person?.phone || undefined,
+          country: contact.country || person?.country || undefined,
           leadSource: leadSource || "prospect_finder",
-          companyName: contact.companyName || undefined,
-          profession: contact.jobTitle || undefined,
-          linkedinUrl: contact.linkedinUrl || undefined,
+          companyName: contact.companyName || person?.company || undefined,
+          profession: contact.jobTitle || person?.jobTitle || undefined,
+          linkedinUrl: contact.linkedinUrl || person?.linkedinUrl || undefined,
           notes: contact.bio ? contact.bio.slice(0, 500) : undefined,
           status: "new",
           tags: tags && tags.length > 0 ? tags : [],
@@ -1221,7 +1262,7 @@ export async function registerRoutes(
         const created = await storage.createCrmClient(data);
         results.push(created);
       }
-      res.status(201).json({ added: results.length, skipped, clients: results });
+      res.status(201).json({ added: results.length, skipped, enriched, clients: results });
     } catch (err) {
       if (err instanceof ZodError) {
         res.status(400).json({ message: fromZodError(err).message });
@@ -1255,7 +1296,27 @@ export async function registerRoutes(
 
   app.post("/api/crm/clients", requireAdminAuth, async (req, res) => {
     try {
-      const data = insertCrmClientSchema.parse(req.body);
+      // Enrich at add-time: when the lead came from a Seamless search, reveal its
+      // email/phone from the searchResultId BEFORE saving, so it lands enriched.
+      let body = req.body;
+      const searchResultId = typeof req.body?.searchResultId === "string" ? req.body.searchResultId : null;
+      if (searchResultId) {
+        const { byId, error } = await revealForAdd([searchResultId]);
+        if (error) return res.status(providerErrorStatus(error)).json({ message: error.message, code: error.code });
+        const person = byId.get(searchResultId);
+        if (person) {
+          body = {
+            ...body,
+            email: body.email || person.email || "",
+            phone: body.phone || person.phone || undefined,
+            linkedinUrl: body.linkedinUrl || person.linkedinUrl || undefined,
+            profession: body.profession || person.jobTitle || undefined,
+            companyName: body.companyName || person.company || undefined,
+            country: body.country || person.country || undefined,
+          };
+        }
+      }
+      const data = insertCrmClientSchema.parse(body);
       // Dedup (email → name+company) so adding the same prospect twice — e.g.
       // re-clicking "Add to CRM" in Lead Research — returns the existing client
       // instead of inserting a duplicate. crm_clients has no UNIQUE constraint.

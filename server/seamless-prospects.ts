@@ -69,6 +69,7 @@ export interface LeadSearchFilters {
   companyFoundedOn?: string[];
   pastCompany?: string[];
   newsTypes?: string[];
+  jobChangeType?: string; // "New Hire" | "New Promotion"
 }
 
 function normalizeDomain(raw: string): string {
@@ -106,6 +107,7 @@ function toContactFilters(f: LeadSearchFilters, limit: number, nextToken?: strin
     companyFoundedOn: clean(f.companyFoundedOn),
     pastCompanyNames: clean(f.pastCompany),
     newsTypes: clean(f.newsTypes),
+    jobChangeType: f.jobChangeType || undefined,
     limit,
     nextToken: nextToken || undefined,
   };
@@ -494,6 +496,9 @@ function sanitizeFilters(parsed: any): LeadSearchFilters {
     contactCountry: strArr(parsed.contactCountry),
     fullName: strArr(parsed.fullName),
     keywords: strArr(parsed.keywords),
+    jobChangeType: typeof parsed.jobChangeType === "string" && ["New Hire", "New Promotion"].includes(parsed.jobChangeType)
+      ? parsed.jobChangeType
+      : undefined,
   };
 }
 
@@ -513,6 +518,7 @@ Use ONLY these keys (omit any you can't infer; never invent other keys):
 - contactCountry: string[]  (FULL country names, e.g. ["United States"])
 - fullName: string[]  (when a specific person is named)
 - keywords: string[]  (industries, skills, niches, or anything that doesn't fit the keys above — e.g. an industry like "property management" goes here)
+- jobChangeType: "New Hire" | "New Promotion"  (ONLY when the user asks for people who recently changed jobs — "new hires", "recently promoted", "just started", "newly appointed")
 
 Rules:
 - "more than 500 employees" → companySize ["501 - 1,000","1,001 - 5,000","5,001 - 10,000","10,001+"].

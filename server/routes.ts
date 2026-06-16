@@ -477,10 +477,56 @@ async function revealForAdd(
 ): Promise<{ byId: Map<string, SeamlessPerson>; error: ProviderError | null }> {
   const ids = Array.from(new Set(searchResultIds.filter((x): x is string => !!x)));
   if (ids.length === 0) return { byId: new Map(), error: null };
-  const { results, error } = await seamlessRevealBySearchIdsDetailed(ids);
+  // Generous budget + one retry: an "Add" is user-initiated, so we can wait for
+  // the async research to finish (typically 2-3s, occasionally longer when cold)
+  // instead of giving up at 6s and saving a bare contact.
+  const { results, error } = await seamlessRevealBySearchIdsDetailed(ids, {
+    attempts: 15,
+    intervalMs: 1200,
+    retryOnEmpty: true,
+    label: "add",
+  });
   const byId = new Map<string, SeamlessPerson>();
   for (const r of results) if (r.searchResultId) byId.set(r.searchResultId, r.person);
   return { byId, error };
+}
+
+/** Build the crm_clients enrichment patch from a revealed Seamless person: the
+ * full raw payload as JSONB plus the promoted, displayable columns. */
+function enrichmentPatch(p: SeamlessPerson, now: Date): Record<string, unknown> {
+  return {
+    enrichmentJson: p.raw ?? null,
+    enrichmentSource: "seamless",
+    enrichedAt: now,
+    email2: p.email2 ?? null,
+    email3: p.email3 ?? null,
+    emailConfidence: p.emailConfidence ?? null,
+    phone2: p.phone2 ?? null,
+    phoneType: p.phoneType ?? null,
+    seniority: p.seniority ?? null,
+    department: p.department ?? null,
+    contactCity: p.city ?? null,
+    contactState: p.state ?? null,
+    companyDomain: p.domain ?? null,
+    companyWebsite: p.companyDomainWebsite ?? null,
+    companyIndustry: p.companyIndustry ?? null,
+    companyStaffCount: p.companyStaffCount ?? null,
+    companyStaffRange: p.employeeSizeRange ?? null,
+    companyRevenue: p.companyRevenue ?? null,
+    companyRevenueExact: p.companyRevenueExact ?? null,
+    companyFounded: p.companyFounded ?? null,
+    companyType: p.companyType ?? null,
+    companyDescription: p.companyDescription ?? null,
+    companyLinkedinUrl: p.companyLinkedinUrl ?? null,
+    companyFundingTotal: p.companyFundingTotal ?? null,
+    companyCity: p.companyCity ?? null,
+    companyState: p.companyState ?? null,
+    companyCountry: p.companyCountry ?? null,
+    timeAtCompany: p.timeAtCompany ?? null,
+    startedAtCurrentCompany: p.startedAtCurrentCompany ?? null,
+    jobChangeAlert: p.jobChangeAlert ?? null,
+    stockTicker: p.stockTicker ?? null,
+  };
 }
 
 /** Map a Seamless ProviderError to an HTTP status for the add endpoints. */
@@ -1232,6 +1278,7 @@ export async function registerRoutes(
       if (error) return res.status(providerErrorStatus(error)).json({ message: error.message, code: error.code });
 
       const { findExistingCrmClient } = await import("./contact-upsert");
+      const now = new Date();
       const results = [];
       let skipped = 0;
       let enriched = 0;
@@ -1259,7 +1306,10 @@ export async function registerRoutes(
           companyName: data.companyName,
         });
         if (existing) { skipped++; continue; }
-        const created = await storage.createCrmClient(data);
+        // Persist the full Seamless payload (JSONB) + promoted columns.
+        const created = await storage.createCrmClient(
+          (person ? { ...data, ...enrichmentPatch(person, now) } : data) as typeof data,
+        );
         results.push(created);
       }
       res.status(201).json({ added: results.length, skipped, enriched, clients: results });
@@ -1299,12 +1349,14 @@ export async function registerRoutes(
       // Enrich at add-time: when the lead came from a Seamless search, reveal its
       // email/phone from the searchResultId BEFORE saving, so it lands enriched.
       let body = req.body;
+      let revealedPerson: SeamlessPerson | undefined;
       const searchResultId = typeof req.body?.searchResultId === "string" ? req.body.searchResultId : null;
       if (searchResultId) {
         const { byId, error } = await revealForAdd([searchResultId]);
         if (error) return res.status(providerErrorStatus(error)).json({ message: error.message, code: error.code });
-        const person = byId.get(searchResultId);
-        if (person) {
+        revealedPerson = byId.get(searchResultId);
+        if (revealedPerson) {
+          const person = revealedPerson;
           body = {
             ...body,
             email: body.email || person.email || "",
@@ -1327,7 +1379,10 @@ export async function registerRoutes(
         companyName: data.companyName,
       });
       if (existing) return res.status(200).json(existing);
-      const client = await storage.createCrmClient(data);
+      // Persist the full Seamless payload (JSONB) + promoted columns.
+      const client = await storage.createCrmClient(
+        (revealedPerson ? { ...data, ...enrichmentPatch(revealedPerson, new Date()) } : data) as typeof data,
+      );
       res.status(201).json(client);
     } catch (err) {
       if (err instanceof ZodError) {

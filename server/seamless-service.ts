@@ -163,6 +163,30 @@ export interface SeamlessPerson {
   // How long the person has been at their current company (from Seamless).
   timeAtCompany?: string | null;            // human-readable, e.g. "3 yrs 2 mos"
   startedAtCurrentCompany?: string | null;  // ISO date (YYYY-MM-DD)
+  // ── Rich reveal fields (populated by /contacts/research). All optional so the
+  // free search step and existing callers are unaffected. ──
+  email2?: string | null;
+  email3?: string | null;
+  phone2?: string | null;
+  phoneType?: string | null;                // contactPhone1 data type (mobile/direct/…)
+  phoneIsDnc?: boolean | null;
+  companyIndustry?: string | null;
+  companyStaffCount?: number | null;
+  companyRevenueExact?: string | null;      // e.g. "35000000"
+  companyFounded?: string | null;
+  companyDescription?: string | null;
+  companyLinkedinUrl?: string | null;
+  companyDomainWebsite?: string | null;
+  stockTicker?: string | null;
+  companyFundingTotal?: string | null;
+  timeAtRole?: string | null;
+  titleStartedAt?: string | null;
+  jobChangeAlert?: string | null;           // "New Hire" | "New Promotion"
+  formerCompany?: string | null;
+  formerTitle?: string | null;
+  linkedinSalesNavUrl?: string | null;
+  // The COMPLETE Seamless research payload — stored verbatim so nothing is lost.
+  raw?: Record<string, unknown> | null;
 }
 
 /**
@@ -304,36 +328,95 @@ interface SeamlessSearchItem {
   startedAtCurrentCompany?: string;  // ISO date (YYYY-MM-DD)
 }
 
+interface SeamlessLocation {
+  street1?: string;
+  city?: string;
+  state?: string;
+  postCode?: string;
+  county?: string;
+  country?: string;
+  stateAbbr?: string;
+  countryAbbr?: string;
+  fullString?: string;
+  timezone?: string;
+}
+
+// The full /contacts/research contact payload (per Seamless OpenAPI). We map the
+// high-value fields onto SeamlessPerson and keep the WHOLE object as `raw` so
+// nothing Seamless returns is ever silently dropped again. The index signature
+// lets us read any documented-but-not-typed field without a compile error.
 interface SeamlessEnrichedContact {
+  contactId?: string;
   firstName?: string;
+  middleName?: string;
   lastName?: string;
   fullName?: string;
   name?: string;
+  // Emails (+ undocumented AI confidence scores — parse defensively).
   email?: string;
   personalEmail?: string;
   email1?: string;
-  // Seamless returns AI scores whose exact scale/type isn't documented in the
-  // public OpenAPI spec — treat as number-or-string and parse defensively.
+  email1Selected?: boolean;
   email1EmailAI?: number | string;
   email1TotalAI?: number | string;
   email2?: string;
+  email2TotalAI?: number | string;
   email3?: string;
+  email3TotalAI?: number | string;
+  emailDomain?: string;
+  // Phones (+ data type: mobile/direct/etc, DNC flag, AI confidence).
   contactPhone1?: string;
+  contactPhone1DataType?: string;
+  contactPhone1TotalAI?: number | string;
+  contactPhone1IsDnc?: boolean;
   contactPhone2?: string;
+  contactPhone2DataType?: string;
+  contactPhone2IsDnc?: boolean;
   companyPhone1?: string;
-  company?: string;
-  companyDomain?: string;
+  companyPhone2?: string;
+  companyPhone3?: string;
+  // Role.
   title?: string;
   department?: string;
   seniority?: string;
   lIProfileUrl?: string;
+  lISalesNavUrl?: string;
+  lIRecruiterUrl?: string;
+  // Company / firmographics.
+  company?: string;
+  companyDomain?: string;
+  companyDescription?: string;
+  companyFounded?: string;
+  companyIndustry?: string;
+  companyStaffCount?: number;
+  companyStaffCountRange?: string;
+  companyAnnualRevenue?: string;
+  companyRevenueRange?: string;
+  companyType?: string;
+  companyLIProfileUrl?: string;
+  companyLinkedInId?: string;
+  stockTicker?: string;
+  companyFundingTotal?: string;
+  companyLatestFundingDate?: string;
   website?: string;
-  contactLocation?: {
-    city?: string;
-    state?: string;
-    country?: string;
-    countryAbbr?: string;
-  };
+  image?: string;
+  // Location.
+  contactLocation?: SeamlessLocation;
+  companyLocation?: SeamlessLocation;
+  // Tenure / job change.
+  timeAtCompany?: string;
+  timeAtRole?: string;
+  startedAtCurrentCompany?: string;
+  titleStartedAt?: string;
+  jobChangeAlert?: string;
+  formerCompany?: string;
+  formerTitle?: string;
+  formerStartedAt?: string;
+  formerEndedAt?: string;
+  jobHistory?: Array<{ companyName?: string; title?: string; startedAt?: string; endedAt?: string }>;
+  newsAndEvents?: Array<{ title?: string; url?: string; date?: string; type?: string }>;
+  // Any other documented-but-untyped field is still readable + kept in `raw`.
+  [key: string]: unknown;
 }
 
 /** Parse an undocumented Seamless AI score into a 0-100 number, or null. */
@@ -437,6 +520,7 @@ function mapEnrichedContact(
     : 0;
 
   const phone = c.contactPhone1 || c.contactPhone2 || c.companyPhone1 || null;
+  const phone2 = (c.contactPhone1 && c.contactPhone2) ? c.contactPhone2 : (c.companyPhone1 || null);
 
   const fullName = c.fullName || c.name || "";
   let firstName = c.firstName || base?.firstName || "";
@@ -446,6 +530,7 @@ function mapEnrichedContact(
     firstName = s.firstName;
     lastName = s.lastName;
   }
+  const str = (v: unknown): string | null => (v === undefined || v === null || v === "" ? null : String(v));
 
   return {
     searchResultId: base?.searchResultId ?? null,
@@ -466,6 +551,39 @@ function mapEnrichedContact(
     country: c.contactLocation?.country || base?.country || null,
     city: c.contactLocation?.city || base?.city || null,
     state: c.contactLocation?.state || base?.state || null,
+    // Company firmographics (also carried up from the free search step via base).
+    industries: base?.industries ?? (c.companyIndustry ? [c.companyIndustry] : null),
+    employeeSizeRange: c.companyStaffCountRange || base?.employeeSizeRange || null,
+    companyRevenue: c.companyRevenueRange || base?.companyRevenue || null,
+    companyType: c.companyType || base?.companyType || null,
+    companyCity: c.companyLocation?.city || base?.companyCity || null,
+    companyState: c.companyLocation?.state || base?.companyState || null,
+    companyCountry: c.companyLocation?.country || base?.companyCountry || null,
+    timeAtCompany: c.timeAtCompany || base?.timeAtCompany || null,
+    startedAtCurrentCompany: c.startedAtCurrentCompany || base?.startedAtCurrentCompany || null,
+    // ── Rich reveal-only fields ──
+    email2: c.email2 || (c.email && c.email1 && c.email !== c.email1 ? c.email1 : null) || null,
+    email3: c.email3 || null,
+    phone2: phone2 ? String(phone2) : null,
+    phoneType: str(c.contactPhone1DataType),
+    phoneIsDnc: typeof c.contactPhone1IsDnc === "boolean" ? c.contactPhone1IsDnc : null,
+    companyIndustry: c.companyIndustry || null,
+    companyStaffCount: typeof c.companyStaffCount === "number" ? c.companyStaffCount : null,
+    companyRevenueExact: str(c.companyAnnualRevenue),
+    companyFounded: str(c.companyFounded),
+    companyDescription: c.companyDescription || null,
+    companyLinkedinUrl: c.companyLIProfileUrl || null,
+    companyDomainWebsite: c.website || c.companyDomain || null,
+    stockTicker: c.stockTicker || null,
+    companyFundingTotal: str(c.companyFundingTotal),
+    timeAtRole: c.timeAtRole || null,
+    titleStartedAt: c.titleStartedAt || null,
+    jobChangeAlert: c.jobChangeAlert || null,
+    formerCompany: c.formerCompany || null,
+    formerTitle: c.formerTitle || null,
+    linkedinSalesNavUrl: c.lISalesNavUrl || null,
+    // Everything Seamless returned, verbatim.
+    raw: c as Record<string, unknown>,
   };
 }
 
@@ -629,16 +747,21 @@ interface PollResult {
 }
 
 /** Poll research requestIds until enriched contacts are ready (bounded). */
-async function pollResearch(requestIds: string[]): Promise<PollResult[]> {
+async function pollResearch(
+  requestIds: string[],
+  opts: { attempts?: number; intervalMs?: number } = {},
+): Promise<PollResult[]> {
   const apiKey = getKey();
   if (!apiKey || requestIds.length === 0) return [];
+  const attempts = opts.attempts ?? POLL_ATTEMPTS;
+  const intervalMs = opts.intervalMs ?? POLL_INTERVAL_MS;
 
   const out = new Map<string, PollResult>();
   const pending = new Set(requestIds);
   const query = requestIds.map((id) => `requestIds=${encodeURIComponent(id)}`).join("&");
 
-  for (let attempt = 0; attempt < POLL_ATTEMPTS && pending.size > 0; attempt++) {
-    await sleep(POLL_INTERVAL_MS);
+  for (let attempt = 0; attempt < attempts && pending.size > 0; attempt++) {
+    await sleep(intervalMs);
     try {
       const res = await fetch(`${SEAMLESS_BASE}/contacts/research/poll?${query}`, {
         method: "GET",
@@ -680,7 +803,7 @@ async function pollResearch(requestIds: string[]): Promise<PollResult[]> {
   }
   if (pending.size > 0) {
     console.warn(
-      `[Seamless] poll exhausted after ${POLL_ATTEMPTS} attempts — ${pending.size}/${requestIds.length} requestIds still pending; returning ${out.size} enriched (partial recall this run)`,
+      `[Seamless] poll exhausted after ${attempts} attempts (${(attempts * intervalMs) / 1000}s) — ${pending.size}/${requestIds.length} requestIds still pending; returning ${out.size} enriched (partial recall this run)`,
     );
   }
   return Array.from(out.values());
@@ -763,23 +886,45 @@ export async function seamlessSearchCompanies(
  * (e.g. insufficientCredits) when the request fails — so callers can stop and
  * report it rather than silently saving an un-revealed contact.
  */
+export interface RevealOpts {
+  attempts?: number;       // poll attempts (default POLL_ATTEMPTS)
+  intervalMs?: number;     // poll interval (default POLL_INTERVAL_MS)
+  retryOnEmpty?: boolean;  // re-poll once if the first pass returns nothing
+  label?: string;          // tag for the diagnostic logs
+}
+
 export async function seamlessRevealBySearchIdsDetailed(
   ids: string[],
+  opts: RevealOpts = {},
 ): Promise<{ results: Array<{ searchResultId: string | null; person: SeamlessPerson }>; error: ProviderError | null }> {
   if (!getKey() || ids.length === 0) return { results: [], error: null };
-  const { requestIds, error } = await submitResearch({ searchResultIds: ids.slice(0, 100) });
-  if (error) return { results: [], error };
-  const enriched = await pollResearch(requestIds);
-  return {
-    results: enriched.map((r) => ({ searchResultId: r.searchResultId ?? null, person: mapEnrichedContact(r.contact) })),
-    error: null,
-  };
+  const tag = `[Seamless reveal${opts.label ? " " + opts.label : ""}]`;
+  const submit = await submitResearch({ searchResultIds: ids.slice(0, 100) });
+  if (submit.error) {
+    console.warn(`${tag} submit failed: ${submit.error.code} — ${submit.error.message}`);
+    return { results: [], error: submit.error };
+  }
+  const pollOpts = { attempts: opts.attempts, intervalMs: opts.intervalMs };
+  let enriched = await pollResearch(submit.requestIds, pollOpts);
+  // Async research occasionally isn't ready within the first poll budget (cold or
+  // congested). Re-poll once — Seamless keeps processing server-side, so the
+  // result is usually ready now. This is the fix for bare "no email" adds.
+  if (enriched.length === 0 && opts.retryOnEmpty) {
+    console.warn(`${tag} empty after first poll for ${ids.length} id(s) — re-polling once`);
+    enriched = await pollResearch(submit.requestIds, pollOpts);
+  }
+  const results = enriched.map((r) => ({ searchResultId: r.searchResultId ?? null, person: mapEnrichedContact(r.contact) }));
+  const withEmail = results.filter((r) => r.person.email).length;
+  const withPhone = results.filter((r) => r.person.phone).length;
+  console.log(`${tag} ${results.length}/${ids.length} revealed (${withEmail} email, ${withPhone} phone)`);
+  return { results, error: null };
 }
 
 export async function seamlessRevealBySearchIds(
   ids: string[],
+  opts: RevealOpts = {},
 ): Promise<Array<{ searchResultId: string | null; person: SeamlessPerson }>> {
-  return (await seamlessRevealBySearchIdsDetailed(ids)).results;
+  return (await seamlessRevealBySearchIdsDetailed(ids, opts)).results;
 }
 
 export interface SeamlessEnrichIdentity {

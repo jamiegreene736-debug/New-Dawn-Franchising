@@ -126,6 +126,39 @@ export const crmClients = pgTable("crm_clients", {
   profession: text("profession"),
   leadTemperature: text("lead_temperature"),
   tags: text("tags").array().default([]),
+  // ── Seamless enrichment: the FULL raw research payload (nothing lost) plus
+  // promoted columns for the high-value fields we display / filter on. ──
+  enrichmentJson: jsonb("enrichment_json"),       // complete Seamless contact payload
+  enrichmentSource: text("enrichment_source"),    // e.g. "seamless"
+  enrichedAt: timestamp("enriched_at"),
+  email2: text("email2"),
+  email3: text("email3"),
+  emailConfidence: integer("email_confidence"),
+  phone2: text("phone2"),
+  phoneType: text("phone_type"),                  // mobile / direct / …
+  seniority: text("seniority"),
+  department: text("department"),
+  contactCity: text("contact_city"),
+  contactState: text("contact_state"),
+  companyDomain: text("company_domain"),
+  companyWebsite: text("company_website"),
+  companyIndustry: text("company_industry"),
+  companyStaffCount: integer("company_staff_count"),
+  companyStaffRange: text("company_staff_range"),
+  companyRevenue: text("company_revenue"),        // range, e.g. "$20M - $50M"
+  companyRevenueExact: text("company_revenue_exact"),
+  companyFounded: text("company_founded"),
+  companyType: text("company_type"),
+  companyDescription: text("company_description"),
+  companyLinkedinUrl: text("company_linkedin_url"),
+  companyFundingTotal: text("company_funding_total"),
+  companyCity: text("company_city"),
+  companyState: text("company_state"),
+  companyCountry: text("company_country"),
+  timeAtCompany: text("time_at_company"),
+  startedAtCurrentCompany: text("started_at_current_company"),
+  jobChangeAlert: text("job_change_alert"),       // "New Hire" | "New Promotion"
+  stockTicker: text("stock_ticker"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

@@ -265,6 +265,28 @@ export const prospectListMembers = pgTable("prospect_list_members", {
 
 export type ProspectListMember = typeof prospectListMembers.$inferSelect;
 
+// CRM client lists — named lists of investor CRM clients (crm_clients), the
+// counterpart to prospectLists for the lead-research prospects table. Lets the
+// CRM tab group selected contacts into reusable lists.
+export const crmLists = pgTable("crm_lists", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertCrmListSchema = createInsertSchema(crmLists).omit({ id: true, createdAt: true });
+export type CrmList = typeof crmLists.$inferSelect;
+export type InsertCrmList = z.infer<typeof insertCrmListSchema>;
+
+export const crmListMembers = pgTable("crm_list_members", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  listId: varchar("list_id").notNull().references(() => crmLists.id, { onDelete: "cascade" }),
+  clientId: varchar("client_id").notNull().references(() => crmClients.id, { onDelete: "cascade" }),
+  addedAt: timestamp("added_at").defaultNow().notNull(),
+});
+
+export type CrmListMember = typeof crmListMembers.$inferSelect;
+
 export const dripCampaigns = pgTable("drip_campaigns", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),

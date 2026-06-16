@@ -239,6 +239,21 @@ const STATEMENTS: string[] = [
     created_at       timestamp  NOT NULL DEFAULT now()
   )`,
   `CREATE INDEX IF NOT EXISTS idx_auto_queue_status ON auto_outreach_queue (status, created_at)`,
+  // CRM client lists — named lists of investor CRM clients. Created here (not just
+  // via drizzle-kit push) so the tables exist in prod on the next boot, since the
+  // migration CLI is unreachable against Railway's internal network.
+  `CREATE TABLE IF NOT EXISTS crm_lists (
+    id          varchar    PRIMARY KEY DEFAULT gen_random_uuid(),
+    name        text       NOT NULL,
+    created_at  timestamp  NOT NULL DEFAULT now()
+  )`,
+  `CREATE TABLE IF NOT EXISTS crm_list_members (
+    id         varchar    PRIMARY KEY DEFAULT gen_random_uuid(),
+    list_id    varchar    NOT NULL REFERENCES crm_lists(id) ON DELETE CASCADE,
+    client_id  varchar    NOT NULL REFERENCES crm_clients(id) ON DELETE CASCADE,
+    added_at   timestamp  NOT NULL DEFAULT now()
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_crm_list_member_unique ON crm_list_members (list_id, client_id)`,
 ];
 
 export async function ensureSchema(): Promise<void> {

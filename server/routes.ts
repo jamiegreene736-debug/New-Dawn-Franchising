@@ -2568,6 +2568,84 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
     }
   });
 
+  // --- CRM Client Lists ---
+  // Named lists of investor CRM clients (crm_clients), so the CRM tab can group
+  // selected contacts. Distinct from prospect-lists, which target the prospects
+  // table used by lead research / drip campaigns.
+  app.get("/api/crm/lists", requireAdminAuth, async (_req, res) => {
+    try {
+      res.json(await storage.getCrmLists());
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to fetch lists" });
+    }
+  });
+
+  app.post("/api/crm/lists", requireAdminAuth, async (req, res) => {
+    try {
+      const name = String(req.body?.name || "").trim();
+      if (!name) return res.status(400).json({ message: "List name is required" });
+      res.json(await storage.createCrmList(name));
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to create list" });
+    }
+  });
+
+  app.patch("/api/crm/lists/:id", requireAdminAuth, async (req, res) => {
+    try {
+      const name = String(req.body?.name || "").trim();
+      if (!name) return res.status(400).json({ message: "List name is required" });
+      await storage.renameCrmList(String(req.params.id), name);
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to rename list" });
+    }
+  });
+
+  app.delete("/api/crm/lists/:id", requireAdminAuth, async (req, res) => {
+    try {
+      await storage.deleteCrmList(String(req.params.id));
+      res.json({ message: "List deleted" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to delete list" });
+    }
+  });
+
+  app.get("/api/crm/lists/:listId/members", requireAdminAuth, async (req, res) => {
+    try {
+      res.json(await storage.getClientsByListId(String(req.params.listId)));
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to fetch list members" });
+    }
+  });
+
+  // Bulk-add the selected CRM clients to a list. Dedupes existing members.
+  app.post("/api/crm/lists/:listId/members", requireAdminAuth, async (req, res) => {
+    try {
+      const clientIds = Array.isArray(req.body?.clientIds)
+        ? (req.body.clientIds as unknown[]).map(String).filter(Boolean)
+        : [];
+      if (clientIds.length === 0) return res.status(400).json({ message: "clientIds array required" });
+      const added = await storage.addClientsToList(String(req.params.listId), clientIds);
+      res.json({ added, requested: clientIds.length });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to add to list" });
+    }
+  });
+
+  // Bulk-remove the selected CRM clients from a list.
+  app.post("/api/crm/lists/:listId/members/remove", requireAdminAuth, async (req, res) => {
+    try {
+      const clientIds = Array.isArray(req.body?.clientIds)
+        ? (req.body.clientIds as unknown[]).map(String).filter(Boolean)
+        : [];
+      if (clientIds.length === 0) return res.status(400).json({ message: "clientIds array required" });
+      await storage.removeClientsFromList(String(req.params.listId), clientIds);
+      res.json({ removed: clientIds.length });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to remove from list" });
+    }
+  });
+
   // --- Tracking pixel endpoint (no auth required) ---
   app.get("/api/track/open/:sendId", async (req, res) => {
     const sendId = req.params.sendId as string;

@@ -2095,7 +2095,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
       const client = await storage.getCrmClient(String(req.params.id));
       if (!client) return res.status(404).json({ message: "Client not found" });
 
-      const { found, enrichment, sources } = await enrichPersonAllProviders(
+      const { found, enrichment, sources, error } = await enrichPersonAllProviders(
         {
           fullName: client.fullName,
           email: client.email,
@@ -2105,7 +2105,9 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
         },
         { only: toRun },
       );
-      if (!found) return res.json({ found: false });
+      // On no result, pass through the provider error (e.g. out of credits) so
+      // the UI can show the real reason rather than a misleading "no match".
+      if (!found) return res.json({ found: false, error: error ?? null });
       res.json({ found: true, enrichment, sources });
     } catch (err: any) {
       console.error("[enrich] error:", err?.message || err);

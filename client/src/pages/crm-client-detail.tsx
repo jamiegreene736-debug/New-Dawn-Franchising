@@ -194,6 +194,7 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
   type EnrichResult = {
     found: boolean;
     enrichment?: { email?: string | null; phone?: string | null; jobTitle?: string | null; company?: string | null; linkedinUrl?: string | null; city?: string | null; state?: string | null; country?: string | null };
+    error?: { code?: string; message?: string } | null;
   } | null;
   const [apolloResult, setApolloResult] = useState<EnrichResult>(null);
   const [seamlessLoading, setSeamlessLoading] = useState(false);
@@ -523,7 +524,11 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
       const res = await apiRequest("POST", `/api/crm/clients/${client.id}/enrich`, {});
       const data = await res.json();
       setApolloResult(data);
-      if (!data.found) toast({ title: "No match found", description: "No provider returned a record for this name/email." });
+      if (!data.found) toast({
+        title: data.error ? "Enrichment unavailable" : "No match found",
+        description: data.error?.message || "No provider returned a record for this name/email.",
+        variant: data.error ? "destructive" : undefined,
+      });
     } catch {
       toast({ title: "Enrichment failed", variant: "destructive" });
     } finally {
@@ -541,7 +546,11 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
       const res = await apiRequest("POST", `/api/crm/clients/${client.id}/enrich`, { providers: ["seamless"] });
       const data = await res.json();
       setSeamlessResult(data);
-      if (!data.found) toast({ title: "No match found", description: "Seamless.AI returned no record for this name/company." });
+      if (!data.found) toast({
+        title: data.error ? "Seamless.AI unavailable" : "No match found",
+        description: data.error?.message || "Seamless.AI returned no record for this name/company.",
+        variant: data.error ? "destructive" : undefined,
+      });
     } catch {
       toast({ title: "Seamless enrichment failed", variant: "destructive" });
     } finally {
@@ -780,6 +789,9 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
                   {apolloLoading ? "Enriching…" : "Enrich contact (all providers)"}
                 </button>
                 {renderEnrichPanel(apolloResult, "purple")}
+                {apolloResult && !apolloResult.found && apolloResult.error && (
+                  <p className="mt-1.5 text-[11px] leading-snug text-rose-600">{apolloResult.error.message}</p>
+                )}
               </div>
 
               {/* Seamless.AI only — reveals email/phone from name + company + LinkedIn */}
@@ -794,6 +806,9 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
                   {seamlessLoading ? "Revealing…" : "Enrich via Seamless.AI"}
                 </button>
                 {renderEnrichPanel(seamlessResult, "teal")}
+                {seamlessResult && !seamlessResult.found && seamlessResult.error && (
+                  <p className="mt-1.5 text-[11px] leading-snug text-rose-600">{seamlessResult.error.message}</p>
+                )}
               </div>
             </div>
 

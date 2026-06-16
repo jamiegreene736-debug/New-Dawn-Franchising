@@ -4,12 +4,18 @@ export interface PhoneLookupResult {
   phone: string;
   valid: boolean;
   type: PhoneType;
+  carrier: string | null;
   nationalFormat: string | null;
   countryCode: string | null;
+  configured: boolean;
+  error?: string;
 }
 
+const TWILIO_SID = process.env.TWILIO_ACCOUNT_SID || "";
+const TWILIO_TOKEN = process.env.TWILIO_AUTH_TOKEN || "";
+
 export function getTwilioLookupStatus() {
-  return { configured: true };
+  return { configured: !!(TWILIO_SID && TWILIO_TOKEN) };
 }
 
 function formatPhoneNumber(raw: string): { e164: string; national: string | null; country: string | null } {
@@ -33,15 +39,49 @@ function formatPhoneNumber(raw: string): { e164: string; national: string | null
   return { e164: raw.startsWith("+") ? raw : `+${digits}`, national: raw, country: null };
 }
 
+/**
+ * Live phone validation via the Twilio Lookup v2 API (Line Type Intelligence):
+ * tells us whether the number is real/allocatable ("deliverable") and its line
+ * type (mobile/landline/voip) + carrier. Costs ~$0.008 per lookup. Requires
+ * TWILIO_ACCOUNT_SID + TWILIO_AUTH_TOKEN — returns configured:false otherwise.
+ */
 export async function lookupPhone(rawPhone: string): Promise<PhoneLookupResult> {
   const { e164, national, country } = formatPhoneNumber(rawPhone);
-  return {
-    phone: e164,
-    valid: true,
-    type: "mobile",
-    nationalFormat: national,
-    countryCode: country,
+  const base: PhoneLookupResult = {
+    phone: e164, valid: false, type: "unverified", carrier: null,
+    nationalFormat: national, countryCode: country, configured: true,
   };
+  if (!TWILIO_SID || !TWILIO_TOKEN) return { ...base, configured: false };
+  try {
+    const auth = Buffer.from(`${TWILIO_SID}:${TWILIO_TOKEN}`).toString("base64");
+    const url = `https://lookups.twilio.com/v2/PhoneNumbers/${encodeURIComponent(e164)}?Fields=line_type_intelligence`;
+    const res = await fetch(url, {
+      headers: { Authorization: `Basic ${auth}` },
+      signal: AbortSignal.timeout(9000),
+    });
+    // Twilio 404 = the number isn't a valid/allocatable phone number.
+    if (res.status === 404) return { ...base, valid: false, type: "unknown" };
+    if (!res.ok) return { ...base, type: "unverified", error: `Twilio lookup HTTP ${res.status}` };
+    const j: any = await res.json();
+    const lt = j.line_type_intelligence || {};
+    const rawType = String(lt.type || "").toLowerCase();
+    const type: PhoneType =
+      rawType.includes("mobile") ? "mobile"
+      : rawType.includes("landline") || rawType.includes("fixed") ? "landline"
+      : rawType.includes("voip") || rawType.includes("nonFixedVoip".toLowerCase()) ? "voip"
+      : "unknown";
+    return {
+      phone: j.phone_number || e164,
+      valid: j.valid !== false,
+      type,
+      carrier: lt.carrier_name || null,
+      nationalFormat: j.national_format || national,
+      countryCode: j.country_code || country,
+      configured: true,
+    };
+  } catch (err: any) {
+    return { ...base, type: "unverified", error: err?.message || "lookup failed" };
+  }
 }
 
 export function validateAddressFormat(
@@ -81,7 +121,7 @@ export async function lookupPhoneBatch(
     for (let j = 0; j < chunk.length; j++) {
       const s = settled[j];
       results.set(chunk[j], s.status === "fulfilled" ? s.value : {
-        phone: chunk[j], valid: false, type: "unverified", nationalFormat: null, countryCode: null
+        phone: chunk[j], valid: false, type: "unverified", carrier: null, nationalFormat: null, countryCode: null, configured: true,
       });
     }
   }

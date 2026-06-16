@@ -73,6 +73,7 @@ import {
 } from "./seamless-prospects";
 import {
   seamlessRevealBySearchIdsDetailed,
+  seamlessReEnrichByIdentity,
   type ProviderError,
   type SeamlessPerson,
 } from "./seamless-service";
@@ -2170,13 +2171,28 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
           : { result: "unknown", status: "unknown", score: 0, configured: getHunterStatus().configured };
       }
       if (phone) {
-        // Lightweight format/length check (E.164-ish). Not a live carrier lookup.
-        const digits = phone.replace(/[^\d]/g, "");
-        out.phone = {
-          valid: digits.length >= 10 && digits.length <= 15,
-          normalized: digits,
-          note: "Format check only — not a live carrier lookup.",
-        };
+        const { lookupPhone, getTwilioLookupStatus } = await import("./twilio-lookup");
+        if (!getTwilioLookupStatus().configured) {
+          // No live validation available — fall back to a format check and tell
+          // the user how to enable real deliverability.
+          const digits = phone.replace(/[^\d]/g, "");
+          out.phone = {
+            configured: false,
+            valid: digits.length >= 10 && digits.length <= 15,
+            note: "Format check only. For live deliverability, set TWILIO_ACCOUNT_SID + TWILIO_AUTH_TOKEN.",
+          };
+        } else {
+          const r = await lookupPhone(phone);
+          out.phone = {
+            configured: true,
+            valid: r.valid,
+            type: r.type,
+            carrier: r.carrier,
+            nationalFormat: r.nationalFormat,
+            country: r.countryCode,
+            error: r.error,
+          };
+        }
       }
       res.json(out);
     } catch (err: any) {
@@ -2211,6 +2227,42 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
       const client = await storage.getCrmClient(String(req.params.id));
       if (!client) return res.status(404).json({ message: "Client not found" });
 
+      // Seamless = the reliable path: SEARCH the person → reveal by searchResultId
+      // (not research-by-identity, which usually returns "no record"). On a hit we
+      // persist the FULL payload + promoted columns and fill any EMPTY base fields
+      // — this is what backfills contacts added before we captured everything.
+      if (toRun.includes("seamless")) {
+        const domain = ((client as any).companyDomain || (client.email || "").split("@")[1] || "").trim() || null;
+        const { person, error } = await seamlessReEnrichByIdentity({
+          fullName: client.fullName,
+          company: client.companyName,
+          domain,
+        });
+        if (error) {
+          return res.status(providerErrorStatus(error)).json({ found: false, message: error.message, code: error.code, error });
+        }
+        if (person) {
+          const patch: Record<string, unknown> = { ...enrichmentPatch(person, new Date()) };
+          const applied: string[] = [];
+          if (!client.email && person.email) { patch.email = person.email; applied.push("email"); }
+          if (!client.phone && person.phone) { patch.phone = person.phone; applied.push("phone"); }
+          if (!client.linkedinUrl && person.linkedinUrl) { patch.linkedinUrl = person.linkedinUrl; applied.push("linkedin"); }
+          if (!client.profession && person.jobTitle) { patch.profession = person.jobTitle; applied.push("title"); }
+          if (!client.companyName && person.company) { patch.companyName = person.company; applied.push("company"); }
+          if (!client.country && person.country) { patch.country = person.country; applied.push("country"); }
+          await storage.updateCrmClient(client.id, patch as any);
+          const enrichment = {
+            email: person.email, phone: person.phone, jobTitle: person.jobTitle,
+            company: person.company, linkedinUrl: person.linkedinUrl,
+            city: person.city, state: person.state, country: person.country,
+          };
+          return res.json({ found: true, persisted: true, applied, enrichment, sources: ["seamless"] });
+        }
+        // Seamless had no match — fall through to any other requested providers.
+      }
+
+      const others = toRun.filter((p) => p !== "seamless");
+      if (others.length === 0) return res.json({ found: false });
       const { found, enrichment, sources, error } = await enrichPersonAllProviders(
         {
           fullName: client.fullName,
@@ -2219,10 +2271,8 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
           domain: (client.email || "").split("@")[1],
           linkedinUrl: client.linkedinUrl,
         },
-        { only: toRun },
+        { only: others },
       );
-      // On no result, pass through the provider error (e.g. out of credits) so
-      // the UI can show the real reason rather than a misleading "no match".
       if (!found) return res.json({ found: false, error: error ?? null });
       res.json({ found: true, enrichment, sources });
     } catch (err: any) {

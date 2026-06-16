@@ -793,6 +793,34 @@ export default function Home() {
           </div>
         </section>
 
+        {/* High-visibility FDD capture band — placed right after the hero so the
+            "what will I earn?" question is caught early, and styled as a full-width
+            navy band so it's clearly its own section. No figures: routes the
+            curiosity to Item 19 of the FDD (FTC Franchise Rule). */}
+        <section data-testid="section-fdd-numbers" className="border-y bg-[linear-gradient(180deg,hsl(var(--primary))_0%,#1b2d5d_100%)] py-10 md:py-14">
+          <div className="nh-container">
+            <div className="mx-auto max-w-2xl text-center text-[hsl(var(--primary-foreground))]">
+              <h2 data-testid="block-inv-numbers" className="text-balance text-2xl font-semibold md:text-3xl">
+                Wondering what the numbers look like?
+              </h2>
+              <p className="mt-3 text-sm leading-relaxed opacity-90 md:text-base">
+                New Dawn's Franchise Disclosure Document includes a Financial Performance Representation (Item 19). Request the FDD to review the figures in full.
+              </p>
+              <Button
+                data-testid="button-inv-fdd-numbers"
+                size="lg"
+                className="mt-6 gap-2 bg-[hsl(var(--accent))] px-8 text-base text-[hsl(var(--accent-foreground))] hover:bg-[hsl(var(--accent))]/90"
+                asChild
+              >
+                <Link href="/request-fdd">
+                  Request the FDD
+                  <ArrowRight className="size-5" />
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </section>
+
         <HomepageTeamRow />
 
         {/* ── Embassy Wait Time Checker ── */}
@@ -1251,21 +1279,6 @@ export default function Home() {
                 title="You stay in control"
                 desc="You hold ownership and bank-account control, approve the key decisions, and supervise performance — while our local teams handle daily execution. That's the substantive directing role the E-2 visa is built around."
               />
-            </div>
-
-            {/* Priority anchor: route "what will I earn?" curiosity into the single FDD
-                capture flow — without stating or implying any figures (FTC Item 19). */}
-            <div data-testid="block-inv-numbers" className="mx-auto mt-8 max-w-3xl rounded-2xl border border-[hsl(var(--accent))]/30 bg-white/70 p-6 text-center shadow-sm md:p-8">
-              <h3 className="text-xl font-semibold md:text-2xl">Wondering what the numbers look like?</h3>
-              <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground md:text-base">
-                New Dawn's Franchise Disclosure Document includes a Financial Performance Representation (Item 19). Request the FDD to review the figures in full.
-              </p>
-              <Button data-testid="button-inv-fdd-numbers" className="mt-5 gap-2" asChild>
-                <Link href="/request-fdd">
-                  Request the FDD
-                  <ArrowRight className="size-4" />
-                </Link>
-              </Button>
             </div>
 
             <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">

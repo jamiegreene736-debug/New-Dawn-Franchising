@@ -18,7 +18,7 @@ import { EMAIL_STYLE, WEBSITE, CALENDLY, type CampaignTrackStep } from "@shared/
 export const GLOBEVISA_CAMPAIGN_NAME = "GlobeVisa — E-2 Referral Partnership";
 
 const GLOBEVISA_DESCRIPTION =
-  "6-step omnichannel referral-partner sequence for GlobeVisa (citizenship/residency-by-investment consultancy). LinkedIn → email → SMS → call across 12 days. Centred on the referral commission ($28,125 = 12.5% of the $225K investment per placement) and how GlobeVisa's treaty-country HNW investor clients are the ideal E-2 fit — pure added revenue on clients they already advise.";
+  "6-step omnichannel referral-partner sequence for GlobeVisa (citizenship/residency-by-investment consultancy). LinkedIn → email → SMS → call, front-loaded then tapering across ~3 weeks (days 1, 3, 6, 11, 16, 22). Centred on the referral commission ($28,125 = 12.5% of the $225K investment per placement) and how GlobeVisa's treaty-country HNW investor clients are the ideal E-2 fit — pure added revenue on clients they already advise.";
 
 const SIGNATURE_HTML = `<p>Best regards,<br/><strong>Dylan Delaney</strong><br/>New Dawn Franchising<br/><a href="${WEBSITE}">www.newdawnfranchising.com</a><br/>franchising@newdawnfranchising.com</p>`;
 const SIGNATURE_TEXT = `Best regards,\nDylan Delaney\nNew Dawn Franchising\n${WEBSITE}\nfranchising@newdawnfranchising.com`;
@@ -26,7 +26,7 @@ const SIGNATURE_TEXT = `Best regards,\nDylan Delaney\nNew Dawn Franchising\n${WE
 export const GLOBEVISA_TRACK: CampaignTrackStep[] = [
   {
     stepOrder: 1,
-    delayDays: 0,
+    delayDays: 1,
     stepType: "linkedin_connect",
     stepName: "LinkedIn Connect Request",
     priority: "Medium",
@@ -42,7 +42,7 @@ Suggested note (300 chars max):
   },
   {
     stepOrder: 2,
-    delayDays: 0,
+    delayDays: 3,
     stepType: "email",
     stepName: "Touch 1 — Partnership Intro + Commission Hook",
     priority: "High",
@@ -74,7 +74,7 @@ ${SIGNATURE_TEXT}`,
   },
   {
     stepOrder: 3,
-    delayDays: 2,
+    delayDays: 6,
     stepType: "email",
     stepName: "Touch 2 — The Commission Math",
     priority: "High",
@@ -110,9 +110,9 @@ ${SIGNATURE_TEXT}`,
   },
   {
     stepOrder: 4,
-    delayDays: 4,
+    delayDays: 11,
     stepType: "sms",
-    stepName: "Day 4 SMS — Commission Nudge",
+    stepName: "Day 11 SMS — Commission Nudge",
     priority: "Low",
     subject: "New Dawn E-2 partnership",
     bodyHtml: `Hi {{name}}, Dylan from New Dawn Franchising. Following up — your E-2-eligible investor clients get a turnkey $225K U.S. business, and GlobeVisa earns $28,125 per referral. Pure upside on clients you already advise. Quick call? ${CALENDLY}`,
@@ -120,7 +120,7 @@ ${SIGNATURE_TEXT}`,
   },
   {
     stepOrder: 5,
-    delayDays: 7,
+    delayDays: 16,
     stepType: "email",
     stepName: "Touch 3 — Why Your Clients Fit + How It Works",
     priority: "Medium",
@@ -154,9 +154,9 @@ ${SIGNATURE_TEXT}`,
   },
   {
     stepOrder: 6,
-    delayDays: 12,
+    delayDays: 22,
     stepType: "call",
-    stepName: "Day 12 — Partner Call",
+    stepName: "Day 22 — Partner Call",
     priority: "Medium",
     subject: "Call GlobeVisa re: E-2 referral partnership",
     bodyHtml: `Call {{name}} at GlobeVisa to close the referral partnership.
@@ -182,11 +182,102 @@ Talking points:
   },
 ];
 
-/** Seed the GlobeVisa referral-partnership campaign (idempotent, broker audience). */
+// ─────────────────────────────────────────────────────────────────────────────
+// GLOBEVISA — E-2 NURTURE (NON-RESPONDERS)
+//
+// A light, low-frequency companion track for contacts who didn't respond to the
+// main 6-step sequence. Soft and value-forward — it stays top-of-mind and keeps
+// the $28,125-per-referral door open without pressure. Enrol non-responders here
+// after the main campaign ends.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const GLOBEVISA_NURTURE_NAME = "GlobeVisa — E-2 Nurture (Non-Responders)";
+
+const GLOBEVISA_NURTURE_DESCRIPTION =
+  "Light, low-frequency nurture track for GlobeVisa contacts who didn't respond to the main 6-step sequence. 3 soft, value-forward touches (email → LinkedIn → email) spread over ~6 weeks (days 3, 21, 45). Keeps New Dawn top-of-mind and the $28,125-per-referral door open without pressure. Enrol non-responders here once the main campaign ends.";
+
+export const GLOBEVISA_NURTURE_TRACK: CampaignTrackStep[] = [
+  {
+    stepOrder: 1,
+    delayDays: 3,
+    stepType: "email",
+    stepName: "Nurture 1 — Soft Value Touch",
+    priority: "Low",
+    subject: "No rush, {{name}} — a quick E-2 vs EB-5 note for your clients",
+    bodyHtml: `<div style="${EMAIL_STYLE}">
+  <p>Hi {{name}},</p>
+  <p>No agenda here — just leaving something useful in your inbox.</p>
+  <p>When your investor clients ask about the U.S., the comparison that usually helps is E-2 vs EB-5:</p>
+  <ul>
+    <li><strong>EB-5</strong> — $800,000+, multi-year queues, permanent residency.</li>
+    <li><strong>E-2</strong> — from a $225,000 qualifying business, weeks-to-months, renewable, for treaty-country nationals.</li>
+  </ul>
+  <p>For a lot of GlobeVisa's clients, E-2 is the faster, lighter route — and New Dawn provides the qualifying, turnkey U.S. business, so it's genuinely done-for-you.</p>
+  <p>If a client ever fits, referral partners earn <strong>$28,125</strong> (12.5% of $225,000) per placement — but truly no pressure. Just wanted it on your radar.</p>
+  ${SIGNATURE_HTML}
+</div>`,
+    bodyText: `Hi {{name}},
+
+No agenda — just something useful. When clients ask about the U.S., the E-2 vs EB-5 comparison helps:
+- EB-5: $800,000+, multi-year queues, permanent residency.
+- E-2: from a $225,000 qualifying business, weeks-to-months, renewable, treaty-country nationals.
+
+For many GlobeVisa clients E-2 is the faster, lighter route, and New Dawn provides the qualifying turnkey business. If a client ever fits, partners earn $28,125 per placement — no pressure, just on your radar.
+
+${SIGNATURE_TEXT}`,
+  },
+  {
+    stepOrder: 2,
+    delayDays: 21,
+    stepType: "linkedin_message",
+    stepName: "Nurture 2 — LinkedIn Check-In",
+    priority: "Low",
+    subject: "",
+    bodyHtml: `Send a brief LinkedIn message to {{name}} (if connected).
+
+Suggested message:
+"Hi {{name}} — no ask, just keeping New Dawn on your radar as the U.S. (E-2) option for your investor clients. Whenever someone wants a faster, lower-cost route than EB-5, we handle the qualifying business end-to-end (and partners earn $28,125 per referral). Happy to send a one-pager any time."`,
+    bodyText: `Send a brief LinkedIn message to {{name}} (if connected).
+
+Suggested message:
+"Hi {{name}} — no ask, just keeping New Dawn on your radar as the U.S. (E-2) option for your investor clients. Whenever someone wants a faster, lower-cost route than EB-5, we handle the qualifying business end-to-end (and partners earn $28,125 per referral). Happy to send a one-pager any time."`,
+  },
+  {
+    stepOrder: 3,
+    delayDays: 45,
+    stepType: "email",
+    stepName: "Nurture 3 — Door's Open",
+    priority: "Low",
+    subject: "Door's open whenever a client comes up, {{name}}",
+    bodyHtml: `<div style="${EMAIL_STYLE}">
+  <p>Hi {{name}},</p>
+  <p>I'll keep this short. The partnership stands whenever the timing's right on your side:</p>
+  <ul>
+    <li>Your client gets a turnkey, E-2-qualifying U.S. business they direct — not operate.</li>
+    <li>You earn <strong>$28,125</strong> (12.5% of $225,000) per qualified placement, paid when the visa clears.</li>
+  </ul>
+  <p>No campaign, no pressure — just reply or grab a time and we'll set you up as a referral partner so it's ready the moment a client fits: <a href="${CALENDLY}">${CALENDLY}</a></p>
+  ${SIGNATURE_HTML}
+</div>`,
+    bodyText: `Hi {{name}},
+
+Keeping this short — the partnership stands whenever the timing's right:
+- Your client gets a turnkey, E-2-qualifying U.S. business they direct (not operate).
+- You earn $28,125 (12.5% of $225,000) per qualified placement, paid when the visa clears.
+
+No pressure — reply or grab a time and we'll set you up as a referral partner so it's ready when a client fits: ${CALENDLY}
+
+${SIGNATURE_TEXT}`,
+  },
+];
+
+/** Seed the GlobeVisa referral-partnership campaign + its light non-responder
+ * nurture track (both idempotent, broker audience). */
 export async function seedGlobevisaCampaign(): Promise<void> {
   try {
     await seedTrackCampaign(GLOBEVISA_CAMPAIGN_NAME, GLOBEVISA_DESCRIPTION, "broker", GLOBEVISA_TRACK);
+    await seedTrackCampaign(GLOBEVISA_NURTURE_NAME, GLOBEVISA_NURTURE_DESCRIPTION, "broker", GLOBEVISA_NURTURE_TRACK);
   } catch (err) {
-    console.error("[Drip] Failed to seed GlobeVisa campaign:", err);
+    console.error("[Drip] Failed to seed GlobeVisa campaign(s):", err);
   }
 }

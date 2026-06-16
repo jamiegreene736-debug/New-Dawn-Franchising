@@ -16,7 +16,7 @@ const BROKER_DESCRIPTION =
   "13-step omnichannel broker outreach sequence for E-2 visa referral partners. Covers LinkedIn, email, SMS, and call tasks across 28 days — highlighting referral fees ($28,125), escrow protection, VC-backed team, director model, three verticals (PM/Insurance/Telecom), proprietary AI, and structured buy-back exits.";
 
 const CLIENT_DESCRIPTION =
-  "13-step omnichannel outreach sequence written directly to E-2 investor candidates. Same warm voice as the broker track, but it pitches the franchise itself (own a U.S. business, director model, live anywhere, escrow-protected $225K, three verticals, buy-back exit) — with no referral-fee language.";
+  "13-step omnichannel client outreach sequence (Grok 2.0) written directly to E-2 investor candidates. Centers on what clients want: obtain and renew an E-2 visa, live anywhere in the U.S., proven day-to-day operating systems, FDD Item 19 financial performance, a structured franchise exit plan, and escrow-protected funds held until visa approval — with no referral-fee language.";
 
 /**
  * Create or re-sync a single track's drip campaign.
@@ -111,7 +111,7 @@ export async function seedTrackCampaign(
 /**
  * Seed BOTH outreach tracks:
  *   • "Grok Campaign"            — broker referral-partner pitch (audience: broker)
- *   • "Grok Campaign — Clients"  — direct-to-E-2-investor pitch (audience: client)
+ *   • "Grok Campaign 2.0 - Clients" — direct-to-E-2-investor pitch (audience: client)
  */
 export async function seedGrokCampaign(): Promise<void> {
   try {

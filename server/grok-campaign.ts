@@ -30,7 +30,7 @@ const CLIENT_DESCRIPTION =
  * track reuses the already-seeded campaign + its enrollments. Steps are matched
  * by stepOrder (never reordered) for the same reason.
  */
-async function seedTrackCampaign(
+export async function seedTrackCampaign(
   name: string,
   description: string,
   audienceType: TrackId,

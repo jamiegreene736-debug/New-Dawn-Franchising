@@ -600,9 +600,9 @@ async function searchCompaniesRaw(
 /** Submit a research (enrichment) job. Returns the requestIds to poll. */
 async function submitResearch(
   payload: Record<string, unknown>,
-): Promise<string[]> {
+): Promise<{ requestIds: string[]; error: ProviderError | null }> {
   const apiKey = getKey();
-  if (!apiKey) return [];
+  if (!apiKey) return { requestIds: [], error: null };
   try {
     const res = await fetch(`${SEAMLESS_BASE}/contacts/research`, {
       method: "POST",
@@ -611,13 +611,14 @@ async function submitResearch(
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
     if (!res.ok) {
-      // 422 = insufficient credits / missing license; treat as "no results".
-      return [];
+      // Classify the real reason (422 insufficientCredits, 401/403 unauthorized,
+      // 429 rate limit, …) instead of masking it as an empty "no results".
+      return { requestIds: [], error: await seamlessHttpError(res) };
     }
     const json = (await res.json()) as { requestIds?: string[] };
-    return Array.isArray(json.requestIds) ? json.requestIds : [];
+    return { requestIds: Array.isArray(json.requestIds) ? json.requestIds : [], error: null };
   } catch {
-    return [];
+    return { requestIds: [], error: networkError() };
   }
 }
 
@@ -689,7 +690,7 @@ async function pollResearch(requestIds: string[]): Promise<PollResult[]> {
 async function enrichBySearchIds(items: SeamlessPerson[]): Promise<SeamlessPerson[]> {
   const ids = items.map((p) => p.searchResultId).filter((x): x is string => !!x);
   if (ids.length === 0) return items;
-  const requestIds = await submitResearch({ searchResultIds: ids.slice(0, 100) });
+  const { requestIds } = await submitResearch({ searchResultIds: ids.slice(0, 100) });
   const enriched = await pollResearch(requestIds);
   if (enriched.length === 0) return items; // graceful: return search-level data
 
@@ -761,7 +762,7 @@ export async function seamlessRevealBySearchIds(
   ids: string[],
 ): Promise<Array<{ searchResultId: string | null; person: SeamlessPerson }>> {
   if (!getKey() || ids.length === 0) return [];
-  const requestIds = await submitResearch({ searchResultIds: ids.slice(0, 100) });
+  const { requestIds } = await submitResearch({ searchResultIds: ids.slice(0, 100) });
   const enriched = await pollResearch(requestIds);
   return enriched.map((r) => ({
     searchResultId: r.searchResultId ?? null,
@@ -769,21 +770,35 @@ export async function seamlessRevealBySearchIds(
   }));
 }
 
+export interface SeamlessEnrichIdentity {
+  contactName?: string;
+  companyName?: string;
+  domain?: string;
+  title?: string;
+  email?: string;
+  liProfileUrl?: string;
+}
+
+/**
+ * Enrich people by identity (name+company/domain, email, or LinkedIn URL),
+ * surfacing the provider error (e.g. insufficientCredits) when the request
+ * fails — so callers can tell "out of credits" apart from a genuine no-match.
+ */
+export async function seamlessEnrichByIdentityDetailed(
+  identities: SeamlessEnrichIdentity[],
+): Promise<{ people: SeamlessPerson[]; error: ProviderError | null }> {
+  if (!getKey() || identities.length === 0) return { people: [], error: null };
+  const { requestIds, error } = await submitResearch({ contacts: identities.slice(0, 100) });
+  if (error) return { people: [], error };
+  const enriched = await pollResearch(requestIds);
+  return { people: enriched.map((r) => mapEnrichedContact(r.contact)), error: null };
+}
+
 /** Enrich people by identity (name+company/domain, email, or LinkedIn URL). */
 export async function seamlessEnrichByIdentity(
-  identities: Array<{
-    contactName?: string;
-    companyName?: string;
-    domain?: string;
-    title?: string;
-    email?: string;
-    liProfileUrl?: string;
-  }>,
+  identities: SeamlessEnrichIdentity[],
 ): Promise<SeamlessPerson[]> {
-  if (!getKey() || identities.length === 0) return [];
-  const requestIds = await submitResearch({ contacts: identities.slice(0, 100) });
-  const enriched = await pollResearch(requestIds);
-  return enriched.map((r) => mapEnrichedContact(r.contact));
+  return (await seamlessEnrichByIdentityDetailed(identities)).people;
 }
 
 function toPersonResult(p: SeamlessPerson): SeamlessPersonResult {

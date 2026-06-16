@@ -10,7 +10,7 @@
 
 import { apolloEnrichPerson, apolloConfigured } from "./apollo-service";
 import { origamiEnrichPerson, origamiConfigured } from "./origami-service";
-import { seamlessEnrichByIdentity, getSeamlessStatus } from "./seamless-service";
+import { seamlessEnrichByIdentityDetailed, getSeamlessStatus, type ProviderError } from "./seamless-service";
 
 export interface EnrichIdentity {
   fullName?: string | null;
@@ -60,7 +60,7 @@ export function configuredEnrichmentProviders(): Array<"seamless" | "apollo" | "
 export async function enrichPersonAllProviders(
   identity: EnrichIdentity,
   options?: { only?: Array<"seamless" | "apollo" | "origami"> },
-): Promise<{ found: boolean; enrichment: PersonEnrichment; sources: string[] }> {
+): Promise<{ found: boolean; enrichment: PersonEnrichment; sources: string[]; error: ProviderError | null }> {
   const fullName = (identity.fullName || `${identity.firstName ?? ""} ${identity.lastName ?? ""}`).trim();
   const parts = fullName.split(/\s+/).filter(Boolean);
   const firstName = identity.firstName || parts[0] || "";
@@ -76,14 +76,15 @@ export async function enrichPersonAllProviders(
   const only = options?.only;
   const wants = (p: "seamless" | "apollo" | "origami") => !only || only.includes(p);
 
-  const [seamless, apollo, origami] = await Promise.all([
+  const noSeamless = { person: null, error: null as ProviderError | null };
+  const [seamlessRes, apollo, origami] = await Promise.all([
     wants("seamless") && seamlessConfigured()
-      ? seamlessEnrichByIdentity([
+      ? seamlessEnrichByIdentityDetailed([
           { contactName: fullName || undefined, companyName: company, domain, email, liProfileUrl: linkedinUrl },
         ])
-          .then((arr) => arr[0] || null)
-          .catch(() => null)
-      : Promise.resolve(null),
+          .then((r) => ({ person: r.people[0] || null, error: r.error }))
+          .catch(() => noSeamless)
+      : Promise.resolve(noSeamless),
     wants("apollo") && apolloConfigured()
       ? apolloEnrichPerson({
           firstName,
@@ -107,6 +108,7 @@ export async function enrichPersonAllProviders(
       : Promise.resolve(null),
   ]);
 
+  const seamless = seamlessRes.person;
   const sources: string[] = [];
   if (seamless) sources.push("seamless");
   if (apollo) sources.push("apollo");
@@ -129,7 +131,9 @@ export async function enrichPersonAllProviders(
   };
 
   const found = !!(seamless || apollo || origami) && Object.values(enrichment).some(Boolean);
-  return { found, enrichment, sources };
+  // Surface the Seamless provider error (e.g. out of credits) only when nothing
+  // was found, so the UI can explain the real reason instead of "no match".
+  return { found, enrichment, sources, error: found ? null : seamlessRes.error };
 }
 
 /** Run `fn` over `items` with a bounded number of concurrent workers. */

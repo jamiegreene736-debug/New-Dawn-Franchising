@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Lead, type InsertLead, type BlogPost, type InsertBlogPost, type Broker, type BrokerClient, type InsertBrokerClient, type CrmClient, type InsertCrmClient, type CrmClientActivity, type InsertCrmClientActivity, type CrmClientDocument, type CrmDirectEmail, type Prospect, type InsertProspect, type ProspectList, type DripCampaign, type InsertDripCampaign, type DripStep, type InsertDripStep, type DripEnrollment, type InsertDripEnrollment, type DripSend, type InsertDripSend, type FacebookPost, type InsertFacebookPost, type SignatureRequest, type SmsCampaign, type InsertSmsCampaign, type WhatsappCampaign, type InsertWhatsappCampaign, users, leads, blogPosts, brokers, brokerClients, crmClients, crmClientActivities, crmClientDocuments, crmDirectEmails, signatureRequests, prospects, prospectLists, prospectListMembers, dripCampaigns, dripSteps, dripEnrollments, dripSends, facebookPosts, smsCampaigns, whatsappCampaigns, type Contact, type InsertContact, type ContactActivity, type InsertContactActivity, type ContactTask, type InsertContactTask, type PipelineDeal, type InsertPipelineDeal, type SavedSegment, type InsertSavedSegment, type EmailTemplate, type InsertEmailTemplate, contacts, contactActivities, contactTasks, pipelineDeals, savedSegments, emailTemplates, type PhoneCall, phoneCalls } from "@shared/schema";
+import { type User, type InsertUser, type Lead, type InsertLead, type BlogPost, type InsertBlogPost, type Broker, type BrokerClient, type InsertBrokerClient, type CrmClient, type InsertCrmClient, type CrmClientActivity, type InsertCrmClientActivity, type CrmClientDocument, type CrmDirectEmail, type Prospect, type InsertProspect, type ProspectList, type CrmList, type DripCampaign, type InsertDripCampaign, type DripStep, type InsertDripStep, type DripEnrollment, type InsertDripEnrollment, type DripSend, type InsertDripSend, type FacebookPost, type InsertFacebookPost, type SignatureRequest, type SmsCampaign, type InsertSmsCampaign, type WhatsappCampaign, type InsertWhatsappCampaign, users, leads, blogPosts, brokers, brokerClients, crmClients, crmClientActivities, crmClientDocuments, crmDirectEmails, signatureRequests, prospects, prospectLists, prospectListMembers, crmLists, crmListMembers, dripCampaigns, dripSteps, dripEnrollments, dripSends, facebookPosts, smsCampaigns, whatsappCampaigns, type Contact, type InsertContact, type ContactActivity, type InsertContactActivity, type ContactTask, type InsertContactTask, type PipelineDeal, type InsertPipelineDeal, type SavedSegment, type InsertSavedSegment, type EmailTemplate, type InsertEmailTemplate, contacts, contactActivities, contactTasks, pipelineDeals, savedSegments, emailTemplates, type PhoneCall, phoneCalls } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, asc, sql, ilike, or, gte, lte, inArray, isNull } from "drizzle-orm";
 
@@ -45,6 +45,13 @@ export interface IStorage {
   addProspectToList(listId: string, prospectId: string): Promise<void>;
   removeProspectFromList(listId: string, prospectId: string): Promise<void>;
   getProspectsByListId(listId: string): Promise<Prospect[]>;
+  getCrmLists(): Promise<(CrmList & { count: number })[]>;
+  createCrmList(name: string): Promise<CrmList>;
+  renameCrmList(id: string, name: string): Promise<void>;
+  deleteCrmList(id: string): Promise<void>;
+  addClientsToList(listId: string, clientIds: string[]): Promise<number>;
+  removeClientsFromList(listId: string, clientIds: string[]): Promise<void>;
+  getClientsByListId(listId: string): Promise<CrmClient[]>;
   getDripCampaigns(): Promise<DripCampaign[]>;
   getDripCampaign(id: string): Promise<DripCampaign | undefined>;
   createDripCampaign(campaign: InsertDripCampaign): Promise<DripCampaign>;
@@ -332,6 +339,57 @@ export class DatabaseStorage implements IStorage {
     if (members.length === 0) return [];
     const ids = members.map((m) => m.prospectId);
     return db.select().from(prospects).where(inArray(prospects.id, ids)).orderBy(desc(prospects.createdAt));
+  }
+
+  async getCrmLists(): Promise<(CrmList & { count: number })[]> {
+    const lists = await db.select().from(crmLists).orderBy(asc(crmLists.createdAt));
+    const counts = await db.select({
+      listId: crmListMembers.listId,
+      count: sql<number>`cast(count(*) as int)`,
+    }).from(crmListMembers).groupBy(crmListMembers.listId);
+    const countMap = new Map(counts.map((c) => [c.listId, c.count]));
+    return lists.map((l) => ({ ...l, count: countMap.get(l.id) ?? 0 }));
+  }
+
+  async createCrmList(name: string): Promise<CrmList> {
+    const [list] = await db.insert(crmLists).values({ name }).returning();
+    return list;
+  }
+
+  async renameCrmList(id: string, name: string): Promise<void> {
+    await db.update(crmLists).set({ name }).where(eq(crmLists.id, id));
+  }
+
+  async deleteCrmList(id: string): Promise<void> {
+    await db.delete(crmLists).where(eq(crmLists.id, id));
+  }
+
+  async addClientsToList(listId: string, clientIds: string[]): Promise<number> {
+    if (clientIds.length === 0) return 0;
+    const existing = await db.select({ clientId: crmListMembers.clientId })
+      .from(crmListMembers)
+      .where(and(eq(crmListMembers.listId, listId), inArray(crmListMembers.clientId, clientIds)));
+    const have = new Set(existing.map((e) => e.clientId));
+    const toAdd = clientIds.filter((id) => !have.has(id));
+    if (toAdd.length === 0) return 0;
+    await db.insert(crmListMembers)
+      .values(toAdd.map((clientId) => ({ listId, clientId })))
+      .onConflictDoNothing();
+    return toAdd.length;
+  }
+
+  async removeClientsFromList(listId: string, clientIds: string[]): Promise<void> {
+    if (clientIds.length === 0) return;
+    await db.delete(crmListMembers)
+      .where(and(eq(crmListMembers.listId, listId), inArray(crmListMembers.clientId, clientIds)));
+  }
+
+  async getClientsByListId(listId: string): Promise<CrmClient[]> {
+    const members = await db.select({ clientId: crmListMembers.clientId })
+      .from(crmListMembers).where(eq(crmListMembers.listId, listId));
+    if (members.length === 0) return [];
+    const ids = members.map((m) => m.clientId);
+    return db.select().from(crmClients).where(inArray(crmClients.id, ids)).orderBy(desc(crmClients.createdAt));
   }
 
   async getDripCampaigns(): Promise<DripCampaign[]> {

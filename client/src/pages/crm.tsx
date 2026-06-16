@@ -37,6 +37,8 @@ import {
   Tag,
   Phone,
   Sparkles,
+  ListPlus,
+  ListChecks,
 } from "lucide-react";
 import { CrmClientDetail } from "./crm-client-detail";
 import ProspectFinder from "./prospect-finder";
@@ -870,6 +872,9 @@ export default function CrmPage() {
   const [bulkTagMode, setBulkTagMode] = useState<"merge" | "replace">("merge");
   const [editingTagsId, setEditingTagsId] = useState<string | null>(null);
   const [inlineTagInput, setInlineTagInput] = useState("");
+  const [filterListId, setFilterListId] = useState<string | null>(null);
+  const [addToListId, setAddToListId] = useState<string>("");
+  const [newListName, setNewListName] = useState("");
 
   const urlParams = new URLSearchParams(search);
   const urlTab = urlParams.get("tab") as "clients" | "prospects" | "emails" | "facebook" | "reports" | "api-status" | "franchisees" | "phone-calls" | null;
@@ -909,6 +914,17 @@ export default function CrmPage() {
 
   const { data: crmTags = [] } = useQuery<string[]>({
     queryKey: ["/api/crm/client-tags"],
+  });
+
+  const { data: crmLists = [] } = useQuery<{ id: string; name: string; count: number }[]>({
+    queryKey: ["/api/crm/lists"],
+  });
+
+  // Members of the list currently used as a filter (only fetched when one is active).
+  const { data: listMembers = [] } = useQuery<CrmClient[]>({
+    queryKey: ["/api/crm/lists", filterListId, "members"],
+    queryFn: async () => (await apiRequest("GET", `/api/crm/lists/${filterListId}/members`)).json(),
+    enabled: !!filterListId,
   });
 
   const createMutation = useMutation({
@@ -1025,19 +1041,72 @@ export default function CrmPage() {
     onError: () => toast({ title: "Failed to update tags", variant: "destructive" }),
   });
 
+  // Add selected clients to a list (existing one, or a new one created on the fly).
+  const addToListMutation = useMutation({
+    mutationFn: async ({ ids, listId, newName }: { ids: string[]; listId: string | null; newName?: string }) => {
+      let targetId = listId;
+      if (!targetId) {
+        const created = await apiRequest("POST", "/api/crm/lists", { name: newName });
+        targetId = (await created.json()).id as string;
+      }
+      const res = await apiRequest("POST", `/api/crm/lists/${targetId}/members`, { clientIds: ids });
+      const data = await res.json();
+      return { added: data.added as number, requested: ids.length, listId: targetId };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/lists"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/lists", data.listId, "members"] });
+      setSelectedIds(new Set());
+      setNewListName("");
+      setAddToListId("");
+      const skipped = data.requested - data.added;
+      toast({
+        title: `Added ${data.added} contact${data.added !== 1 ? "s" : ""} to list`,
+        description: skipped > 0 ? `${skipped} already in the list` : undefined,
+      });
+    },
+    onError: () => toast({ title: "Failed to add to list", variant: "destructive" }),
+  });
+
+  const removeFromListMutation = useMutation({
+    mutationFn: async ({ ids, listId }: { ids: string[]; listId: string }) => {
+      const res = await apiRequest("POST", `/api/crm/lists/${listId}/members/remove`, { clientIds: ids });
+      return res.json();
+    },
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/lists"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/lists", vars.listId, "members"] });
+      setSelectedIds(new Set());
+      toast({ title: `Removed ${vars.ids.length} contact${vars.ids.length !== 1 ? "s" : ""} from list` });
+    },
+    onError: () => toast({ title: "Failed to remove from list", variant: "destructive" }),
+  });
+
+  const submitAddToList = () => {
+    if (!addToListId || selectedIds.size === 0) return;
+    if (addToListId === "__new__" && !newListName.trim()) return;
+    addToListMutation.mutate({
+      ids: Array.from(selectedIds),
+      listId: addToListId === "__new__" ? null : addToListId,
+      newName: addToListId === "__new__" ? newListName.trim() : undefined,
+    });
+  };
+
   const getBrokerName = (brokerId: string | null | undefined) => {
     if (!brokerId) return null;
     const broker = brokers.find((b) => b.id === brokerId);
     return broker ? broker.fullName : null;
   };
 
+  const listMemberIds = new Set(listMembers.map((c) => c.id));
   const filteredClients = clients.filter((c) => {
     const matchesSearch = !searchTerm ||
       c.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.email.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = filterStatus === "all" || c.status === filterStatus;
     const matchesTag = !filterTag || (c.tags && c.tags.includes(filterTag));
-    return matchesSearch && matchesStatus && matchesTag;
+    const matchesList = !filterListId || listMemberIds.has(c.id);
+    return matchesSearch && matchesStatus && matchesTag && matchesList;
   });
 
   const unimportedBrokerClients = brokerClients.filter((bc: any) => !bc.importedAt);
@@ -1261,6 +1330,37 @@ export default function CrmPage() {
         </section>
       )}
 
+      {/* CRM Lists Quick Access */}
+      {crmLists.length > 0 && (
+        <section className="py-2.5 border-b bg-gray-50">
+          <div className="nh-container">
+            <div className="flex items-center gap-2 overflow-x-auto scrollbar-tab pb-1">
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap shrink-0 flex items-center gap-1.5">
+                <ListChecks className="size-3.5" /> Lists
+              </span>
+              {filterListId && (
+                <button
+                  onClick={() => setFilterListId(null)}
+                  className="flex items-center gap-1 shrink-0 text-xs px-2.5 py-1 rounded-full bg-primary text-white border border-primary"
+                >
+                  {crmLists.find(l => l.id === filterListId)?.name ?? "List"} <X className="size-3" />
+                </button>
+              )}
+              {crmLists.filter(l => l.id !== filterListId).map(list => (
+                <button
+                  key={list.id}
+                  onClick={() => setFilterListId(list.id)}
+                  className="flex items-center gap-1.5 shrink-0 text-xs px-3 py-1 rounded-full bg-white border border-gray-200 hover:border-primary/40 hover:bg-primary/5 text-gray-700 hover:text-primary transition-colors"
+                >
+                  <span className="font-medium">{list.name}</span>
+                  <span className="bg-gray-100 text-gray-500 rounded-full px-1.5 py-0.5 text-[10px] font-medium">{list.count}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
       <section className="py-6">
         <div className="nh-container">
           {unimportedBrokerClients.length > 0 && (
@@ -1402,6 +1502,52 @@ export default function CrmPage() {
                   >
                     <Sparkles className="size-3.5" /> Enrich
                   </Button>
+                  {/* Add selected to a list (existing or new) */}
+                  <div className="flex items-center gap-1.5">
+                    <select
+                      data-testid="select-add-to-list"
+                      value={addToListId}
+                      onChange={(e) => setAddToListId(e.target.value)}
+                      className="h-8 rounded border border-blue-300 bg-white px-2 text-xs text-blue-900 focus:outline-none"
+                    >
+                      <option value="">Add to list…</option>
+                      {crmLists.map((l) => (
+                        <option key={l.id} value={l.id}>{l.name} ({l.count})</option>
+                      ))}
+                      <option value="__new__">＋ New list…</option>
+                    </select>
+                    {addToListId === "__new__" && (
+                      <input
+                        data-testid="input-new-list-name"
+                        value={newListName}
+                        onChange={(e) => setNewListName(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") submitAddToList(); }}
+                        placeholder="New list name"
+                        className="h-8 rounded border border-blue-300 bg-white px-2 text-xs w-32 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                      />
+                    )}
+                    <Button
+                      size="sm"
+                      data-testid="button-add-to-list"
+                      className="h-8 gap-1 bg-teal-600 hover:bg-teal-700 text-white text-xs"
+                      disabled={addToListMutation.isPending || !addToListId || (addToListId === "__new__" && !newListName.trim())}
+                      onClick={submitAddToList}
+                    >
+                      <ListPlus className="size-3.5" /> Add
+                    </Button>
+                    {filterListId && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 text-xs border-rose-300 text-rose-700 hover:bg-rose-50"
+                        disabled={removeFromListMutation.isPending}
+                        onClick={() => removeFromListMutation.mutate({ ids: Array.from(selectedIds), listId: filterListId })}
+                        title={`Remove selected from "${crmLists.find(l => l.id === filterListId)?.name ?? "list"}"`}
+                      >
+                        Remove from list
+                      </Button>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2 ml-auto flex-wrap">
                     <select
                       value={bulkTagMode}

@@ -15,6 +15,7 @@ import { scheduleDripProcessing, processDripEmails, reprocessStep, fireClickReac
 import { scheduleGmailSync, syncFranchisingInbox, getGmailSyncStatus, getGmailSyncLastResult } from "./gmail-sync-service";
 import { seedDefaultCampaign } from "./default-campaign";
 import { seedGrokCampaign } from "./grok-campaign";
+import { seedGlobevisaCampaign } from "./globevisa-campaign";
 import { sendEmail, sendEmailFromSender, getTrackingPixelUrl, getAvailableSenders, CRM_EMAIL_TEMPLATES, cacheDylanCalendlyUrl } from "./email-service";
 import { isAutomatedOrBulkEmail, shouldShowInCrmEmailHistory } from "./crm-email-filter";
 import { generateFacebookPost } from "./facebook-generator";
@@ -5167,6 +5168,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
   scheduleGmailSync();
   seedDefaultCampaign();
   seedGrokCampaign();
+  seedGlobevisaCampaign();
   scheduleDailyFacebookPosting();
   scheduleAgentCrons();
 

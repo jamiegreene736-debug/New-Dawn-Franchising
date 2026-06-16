@@ -25,6 +25,7 @@ interface AgentPerson {
   phone: string | null;
   linkedinUrl: string | null;
   location: string | null;
+  searchResultId?: string | null;
   intel?: ProspectIntel;
   inCrm?: boolean;
 }
@@ -59,6 +60,7 @@ const toContactBody = (p: AgentPerson) => ({
   fullName: p.fullName, firstName: p.firstName, lastName: p.lastName,
   companyName: p.companyName || "", email: p.email, phone: p.phone,
   linkedinUrl: p.linkedinUrl, jobTitle: p.jobTitle, country: p.location, bio: null,
+  searchResultId: p.searchResultId ?? null,
 });
 
 // Map an agent person onto the crm_clients payload shape — "Add to CRM" creates
@@ -76,7 +78,19 @@ const toClientBody = (p: AgentPerson) => ({
   leadSource: "ai_research",
   status: "new",
   tags: ["lead-research"],
+  searchResultId: p.searchResultId ?? null,
 });
+
+// Pull the human-readable message out of an apiRequest error ("<status>: <json>").
+function apiErrorMessage(err: any, fallback: string): string {
+  const raw = String(err?.message || "");
+  const body = raw.replace(/^\d+:\s*/, "");
+  try {
+    const j = JSON.parse(body);
+    if (j?.message) return j.message as string;
+  } catch { /* not JSON */ }
+  return body || fallback;
+}
 
 // A single agent turn returns up to this many unique people (mirrors the server's
 // `.slice(0, 60)` in runLeadResearchAgent). Used for the pre-search credit estimate.
@@ -267,17 +281,24 @@ export default function LeadResearchAgent({ provider }: { provider?: string }) {
   async function addToCrm(p: AgentPerson) {
     const key = keyOf(p);
     try {
-      await apiRequest("POST", "/api/crm/clients", toClientBody(p));
+      const res = await apiRequest("POST", "/api/crm/clients", toClientBody(p));
+      const saved = await res.json().catch(() => null);
       setAdded((s) => new Set(s).add(key));
       refreshCrm();
-      toast({ title: "Added to CRM", description: `${p.fullName} is now in the CRM tab — open their profile to enrich or message them.` });
+      const gotContact = !!(saved?.email || saved?.phone);
+      toast({
+        title: "Added to CRM",
+        description: gotContact
+          ? `${p.fullName} added & enriched — email/phone revealed via Seamless.`
+          : `${p.fullName} added. Seamless had no email/phone on file for them.`,
+      });
     } catch (err: any) {
       const m = String(err?.message || "");
       if (m.includes("already exists") || m.includes("409")) {
         setAdded((s) => new Set(s).add(key));
         toast({ title: "Already in CRM", description: p.fullName });
       } else {
-        toast({ title: "Couldn't add to CRM", description: p.fullName, variant: "destructive" });
+        toast({ title: "Couldn't add to CRM", description: apiErrorMessage(err, p.fullName), variant: "destructive" });
       }
     }
   }
@@ -318,7 +339,7 @@ export default function LeadResearchAgent({ provider }: { provider?: string }) {
         leadSource: "ai_research",
         tags: ["lead-research"],
       });
-      const data = (await res.json()) as { added: number; skipped: number };
+      const data = (await res.json()) as { added: number; skipped: number; enriched?: number };
       setAdded((s) => {
         const next = new Set(s);
         targets.forEach((p) => next.add(keyOf(p)));
@@ -330,12 +351,16 @@ export default function LeadResearchAgent({ provider }: { provider?: string }) {
         return next;
       });
       refreshCrm();
+      const parts = [
+        data.enriched ? `${data.enriched} enriched via Seamless` : null,
+        data.skipped > 0 ? `${data.skipped} already in your CRM` : null,
+      ].filter(Boolean);
       toast({
         title: `${data.added} added to the CRM tab`,
-        description: data.skipped > 0 ? `${data.skipped} were already in your CRM.` : `${data.added} new lead${data.added === 1 ? "" : "s"} saved — open a profile to enrich or message.`,
+        description: parts.length > 0 ? parts.join(" · ") : `${data.added} new lead${data.added === 1 ? "" : "s"} saved — open a profile to message.`,
       });
-    } catch {
-      toast({ title: "Bulk add failed", description: "Please try again.", variant: "destructive" });
+    } catch (err: any) {
+      toast({ title: "Couldn't add to CRM", description: apiErrorMessage(err, "Please try again."), variant: "destructive" });
     } finally {
       setBulkAdding(false);
     }

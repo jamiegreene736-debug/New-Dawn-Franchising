@@ -34,6 +34,10 @@ export interface AgentPerson {
   phone: string | null;
   linkedinUrl: string | null;
   location: string | null;
+  // Seamless search-result handle — lets "Add to CRM" reveal email/phone for
+  // this exact person at add-time (the reliable enrich path). Null for results
+  // from providers/paths without one.
+  searchResultId?: string | null;
   // ICP fit + buying-intent scoring with a human-readable "why this matches".
   intel: ProspectIntel;
   inCrm?: boolean; // true if this person already exists in our CRM
@@ -156,6 +160,7 @@ function mapContact(c: EnrichedContact): AgentPerson {
     phone: c.phone ?? null,
     linkedinUrl: c.linkedinUrl ?? null,
     location: c.companyLocation ?? null,
+    searchResultId: c.searchResultId ?? null,
     intel: {
       fitScore: c.icpFitScore ?? 0,
       intentScore: c.icpIntentScore ?? 0,

@@ -758,16 +758,28 @@ export async function seamlessSearchCompanies(
  * credit per contact. Returns the enriched person keyed by searchResultId so the
  * caller can merge the result back onto the displayed row.
  */
+/**
+ * Reveal email/phone for Seamless search results, surfacing the provider error
+ * (e.g. insufficientCredits) when the request fails — so callers can stop and
+ * report it rather than silently saving an un-revealed contact.
+ */
+export async function seamlessRevealBySearchIdsDetailed(
+  ids: string[],
+): Promise<{ results: Array<{ searchResultId: string | null; person: SeamlessPerson }>; error: ProviderError | null }> {
+  if (!getKey() || ids.length === 0) return { results: [], error: null };
+  const { requestIds, error } = await submitResearch({ searchResultIds: ids.slice(0, 100) });
+  if (error) return { results: [], error };
+  const enriched = await pollResearch(requestIds);
+  return {
+    results: enriched.map((r) => ({ searchResultId: r.searchResultId ?? null, person: mapEnrichedContact(r.contact) })),
+    error: null,
+  };
+}
+
 export async function seamlessRevealBySearchIds(
   ids: string[],
 ): Promise<Array<{ searchResultId: string | null; person: SeamlessPerson }>> {
-  if (!getKey() || ids.length === 0) return [];
-  const { requestIds } = await submitResearch({ searchResultIds: ids.slice(0, 100) });
-  const enriched = await pollResearch(requestIds);
-  return enriched.map((r) => ({
-    searchResultId: r.searchResultId ?? null,
-    person: mapEnrichedContact(r.contact),
-  }));
+  return (await seamlessRevealBySearchIdsDetailed(ids)).results;
 }
 
 export interface SeamlessEnrichIdentity {

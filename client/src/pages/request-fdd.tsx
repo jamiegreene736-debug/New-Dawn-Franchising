@@ -1,11 +1,19 @@
-// NOTE: submits into the existing /api/leads pipeline (creates a CRM client + email notifications). No separate HubSpot hook exists in this repo; vertical-of-interest is folded into the message field because the leads schema has no vertical column. Flagged for client review.
+// Single FDD lead-capture form (the one mechanism the homepage CTAs point to).
+// Submits into the existing /api/leads pipeline (creates a CRM client + internal
+// and confirmation emails). No HubSpot / GoHighLevel hook exists in this repo yet
+// — see the clearly-marked TODO in server/routes.ts (the /api/leads handler) for
+// exactly where to POST the lead to HubSpot/GHL.
+//
+// COMPLIANCE (FTC Franchise Rule): this page must never state, imply, summarize,
+// estimate, or chart any earnings / revenue / income figures. All financial
+// performance information lives in Item 19 of the FDD. Keep all copy framed as
+// "Request the FDD" / "review our Item 19".
 import { useEffect, useState } from "react";
 import { CheckCircle2, FileText, Mail, MapPin, Phone, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 
 const COMPANY = {
@@ -19,7 +27,7 @@ const COMPANY = {
 const SEO = {
   title: "Request the FDD | New Dawn Franchising E-2 Visa Franchise",
   description:
-    "Request the New Dawn Franchising Franchise Disclosure Document (FDD). Share your treaty country and vertical of interest and we'll send the FDD, confirm your timeline, and schedule a call. Investment from $225,000.",
+    "Request the New Dawn Franchising Franchise Disclosure Document (FDD), including our Item 19 Financial Performance Representation. Share your details and we'll send the FDD and follow up shortly.",
   canonical: "https://www.newdawnfranchising.com/request-fdd",
   image: "https://www.newdawnfranchising.com/opengraph.jpg",
 };
@@ -32,14 +40,6 @@ const COUNTRIES = [
   "South Africa", "Nigeria", "Kenya", "UAE", "Saudi Arabia", "Israel", "Other",
 ];
 
-const VERTICALS = [
-  { value: "", label: "Select one…" },
-  { value: "Property Management", label: "Property Management" },
-  { value: "Telecom", label: "Telecom" },
-  { value: "Insurance", label: "Insurance" },
-  { value: "Not sure yet", label: "Not sure yet" },
-];
-
 const NEXT_STEPS = [
   { t: "We send you the FDD plus a franchise overview", id: "n1" },
   { t: "We confirm your treaty country and investment timeline", id: "n2" },
@@ -49,20 +49,21 @@ const NEXT_STEPS = [
 type FddFormState = {
   fullName: string;
   email: string;
-  phone: string;
   country: string;
-  vertical: string;
-  message: string;
+  phone: string;
+  // Honeypot — must stay empty for real users; bots fill it. Server drops it.
+  companyWebsite: string;
 };
 
 const DEFAULTS: FddFormState = {
   fullName: "",
   email: "",
-  phone: "",
   country: "",
-  vertical: "",
-  message: "",
+  phone: "",
+  companyWebsite: "",
 };
+
+type FieldErrors = Partial<Record<"fullName" | "email" | "country", string>>;
 
 function setMetaTag(selector: string, attr: "name" | "property", key: string, content: string) {
   let el = document.head.querySelector<HTMLMetaElement>(selector);
@@ -115,42 +116,54 @@ export default function RequestFddPage() {
   useRequestFddSeo();
   const { toast } = useToast();
   const [state, setState] = useState<FddFormState>(DEFAULTS);
+  const [errors, setErrors] = useState<FieldErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
   function update<K extends keyof FddFormState>(key: K, value: FddFormState[K]) {
     setState((s) => ({ ...s, [key]: value }));
+    // Clear a field's inline error as the user corrects it.
+    setErrors((e) => (key in e ? { ...e, [key]: undefined } : e));
+  }
+
+  function validate(s: FddFormState): FieldErrors {
+    const e: FieldErrors = {};
+    if (!s.fullName.trim()) e.fullName = "Please enter your full name.";
+    if (!s.email.trim()) e.email = "Please enter your email.";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.email.trim())) e.email = "Please enter a valid email address.";
+    if (!s.country.trim()) e.country = "Please select your country of citizenship.";
+    return e;
   }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    if (!state.fullName.trim() || !state.email.trim()) {
-      toast({
-        title: "Missing info",
-        description: "Please add your name and email.",
-      });
+    // Honeypot: a real user never fills this. If it's filled, treat as spam —
+    // show the success state but submit nothing.
+    if (state.companyWebsite.trim()) {
+      setSubmitted(true);
+      return;
+    }
+
+    const v = validate(state);
+    setErrors(v);
+    if (Object.keys(v).length > 0) {
+      toast({ title: "Please check the form", description: "A few fields need your attention." });
       return;
     }
 
     setIsSubmitting(true);
     try {
-      // The leads schema accepts { fullName, email, phone, country, timeline, capitalRange, message }.
-      // Nationality maps to `country`; vertical-of-interest is folded into the message string.
+      // The leads schema accepts { fullName, email, phone, country, timeline,
+      // capitalRange, message }. We tag the note so the CRM knows it's an FDD
+      // request. (companyWebsite is the honeypot — the server drops it.)
       const payload = {
         fullName: state.fullName,
         email: state.email,
         phone: state.phone,
         country: state.country,
-        timeline: "",
-        capitalRange: "",
-        message: [
-          "[FDD Request]",
-          state.vertical ? `Vertical of interest: ${state.vertical}` : "",
-          state.message,
-        ]
-          .filter(Boolean)
-          .join("\n\n"),
+        message: "[FDD Request]",
+        companyWebsite: state.companyWebsite,
       };
 
       const res = await fetch("/api/leads", {
@@ -165,10 +178,6 @@ export default function RequestFddPage() {
       }
 
       setSubmitted(true);
-      toast({
-        title: "Request received",
-        description: "We'll be in touch shortly with the FDD and overview.",
-      });
     } catch (err: any) {
       toast({
         title: "Couldn't submit",
@@ -182,7 +191,7 @@ export default function RequestFddPage() {
 
   return (
     <div data-testid="page-request-fdd" className="min-h-screen">
-      <section data-testid="section-fdd-hero" className="border-b">
+      <section data-testid="section-fdd-hero" id="request-fdd" className="border-b">
         <div className="nh-container py-10 md:py-14">
           <div className="mx-auto max-w-3xl text-center">
             <div className="mx-auto mb-4 inline-flex items-center gap-2 rounded-full border bg-white/60 px-3 py-1 text-[13px] font-medium text-foreground/80 shadow-sm backdrop-blur">
@@ -190,14 +199,13 @@ export default function RequestFddPage() {
               Franchise Disclosure Document
             </div>
             <h1 data-testid="fdd-title" className="text-balance text-4xl font-semibold tracking-tight md:text-5xl">
-              Request the FDD
+              Request the Franchise Disclosure Document
             </h1>
             <p
               data-testid="fdd-subtitle"
               className="mt-4 text-pretty text-base leading-relaxed text-muted-foreground md:text-lg"
             >
-              Tell us a little about yourself and we'll send you the New Dawn Franchising Franchise Disclosure Document
-              and overview. Investment from $225,000. <span lang="es" className="text-foreground/50">También hablamos español.</span>
+              Review the full FDD, including our Item 19 Financial Performance Representation.
             </p>
           </div>
 
@@ -210,8 +218,9 @@ export default function RequestFddPage() {
               <div className="mt-4 text-lg font-semibold">What is the FDD?</div>
               <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                 The Franchise Disclosure Document (FDD) is the formal disclosure a franchisor provides under the FTC
-                Franchise Rule. It covers the investment, fees, obligations, and the relationship between you and New
-                Dawn Franchising — the detailed information you need to evaluate the opportunity with your own advisors.
+                Franchise Rule. It covers the investment, fees, obligations, the relationship between you and New Dawn
+                Franchising, and our Item 19 Financial Performance Representation — the detailed information you need to
+                evaluate the opportunity with your own advisors.
               </p>
 
               <div className="mt-6 text-sm font-semibold">What happens next</div>
@@ -251,18 +260,16 @@ export default function RequestFddPage() {
             {/* Right column — the form */}
             <Card data-testid="card-fdd-form" className="nh-surface nh-noise border-card-border/80 p-6">
               {submitted ? (
-                <div data-testid="form-success" className="flex flex-col items-center gap-4 py-10 text-center">
+                <div data-testid="form-success" className="flex flex-col items-center gap-4 py-12 text-center">
                   <div className="grid size-14 place-items-center rounded-full border bg-[hsl(var(--accent))]/10">
                     <CheckCircle2 className="size-7 text-[hsl(var(--accent))]" />
                   </div>
-                  <div className="text-xl font-semibold">Confirmed — we've received your request</div>
-                  <p className="max-w-sm text-sm text-muted-foreground">
-                    Thanks, {state.fullName.split(" ")[0]}! A member of our team will be in touch shortly with the FDD
-                    and a franchise overview.
-                  </p>
+                  <div className="max-w-sm text-xl font-semibold">
+                    Thank you — we'll send your FDD and follow up shortly.
+                  </div>
                 </div>
               ) : (
-                <form onSubmit={onSubmit} className="grid gap-4">
+                <form onSubmit={onSubmit} className="grid gap-4" noValidate>
                   <div className="grid gap-2">
                     <Label data-testid="label-fullname" htmlFor="fullName">
                       Full name *
@@ -274,7 +281,13 @@ export default function RequestFddPage() {
                       onChange={(e) => update("fullName", e.target.value)}
                       placeholder="Your name"
                       required
+                      aria-required="true"
+                      aria-invalid={!!errors.fullName}
+                      aria-describedby={errors.fullName ? "err-fullName" : undefined}
                     />
+                    {errors.fullName && (
+                      <p id="err-fullName" className="text-[0.8rem] font-medium text-destructive">{errors.fullName}</p>
+                    )}
                   </div>
 
                   <div className="grid gap-2 sm:grid-cols-2">
@@ -290,7 +303,13 @@ export default function RequestFddPage() {
                         onChange={(e) => update("email", e.target.value)}
                         placeholder="you@example.com"
                         required
+                        aria-required="true"
+                        aria-invalid={!!errors.email}
+                        aria-describedby={errors.email ? "err-email" : undefined}
                       />
+                      {errors.email && (
+                        <p id="err-email" className="text-[0.8rem] font-medium text-destructive">{errors.email}</p>
+                      )}
                     </div>
                     <div className="grid gap-2">
                       <Label data-testid="label-phone" htmlFor="phone">
@@ -299,6 +318,7 @@ export default function RequestFddPage() {
                       <Input
                         data-testid="input-phone"
                         id="phone"
+                        type="tel"
                         value={state.phone}
                         onChange={(e) => update("phone", e.target.value)}
                         placeholder="+1 (___) ___-____"
@@ -308,13 +328,17 @@ export default function RequestFddPage() {
 
                   <div className="grid gap-2">
                     <Label data-testid="label-country" htmlFor="country">
-                      Nationality / treaty country
+                      Country of citizenship *
                     </Label>
                     <select
                       data-testid="select-country"
                       id="country"
                       value={state.country}
                       onChange={(e) => update("country", e.target.value)}
+                      required
+                      aria-required="true"
+                      aria-invalid={!!errors.country}
+                      aria-describedby={errors.country ? "err-country" : undefined}
                       className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                     >
                       <option value="">Select country…</option>
@@ -322,38 +346,22 @@ export default function RequestFddPage() {
                         <option key={c} value={c}>{c}</option>
                       ))}
                     </select>
+                    {errors.country && (
+                      <p id="err-country" className="text-[0.8rem] font-medium text-destructive">{errors.country}</p>
+                    )}
                   </div>
 
-                  <div className="grid gap-2">
-                    <Label data-testid="label-vertical" htmlFor="vertical">
-                      Vertical of interest
-                    </Label>
-                    <select
-                      data-testid="select-vertical"
-                      id="vertical"
-                      value={state.vertical}
-                      onChange={(e) => update("vertical", e.target.value)}
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    >
-                      {VERTICALS.map((v) => (
-                        <option key={v.value || "placeholder"} value={v.value} disabled={v.value === ""}>
-                          {v.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label data-testid="label-message" htmlFor="message">
-                      Message (optional)
-                    </Label>
-                    <Textarea
-                      data-testid="textarea-message"
-                      id="message"
-                      value={state.message}
-                      onChange={(e) => update("message", e.target.value)}
-                      placeholder="Tell us about your goals, timeline, or any questions…"
-                      className="min-h-28"
+                  {/* Honeypot — hidden from real users; bots fill it and get silently dropped. */}
+                  <div aria-hidden="true" className="pointer-events-none absolute left-[-9999px] top-[-9999px] h-0 w-0 overflow-hidden">
+                    <label htmlFor="companyWebsite">Company website (leave this field empty)</label>
+                    <input
+                      id="companyWebsite"
+                      name="companyWebsite"
+                      type="text"
+                      tabIndex={-1}
+                      autoComplete="off"
+                      value={state.companyWebsite}
+                      onChange={(e) => update("companyWebsite", e.target.value)}
                     />
                   </div>
 

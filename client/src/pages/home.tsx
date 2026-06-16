@@ -730,9 +730,15 @@ export default function Home() {
                   </Button>
                 </div>
 
-                <p data-testid="text-fdd-credibility" className="mt-auto pt-4 text-xs text-muted-foreground/70">
-                  Franchise Disclosure Document (FDD) available upon request. New Dawn Franchising is a registered franchisor.
-                </p>
+                <div data-testid="text-fdd-credibility" className="mt-auto flex flex-col items-start gap-2 pt-4">
+                  <Button data-testid="button-hero-fdd" size="sm" className="gap-2" asChild>
+                    <Link href="/request-fdd">
+                      Request the FDD
+                      <ArrowRight className="size-4" />
+                    </Link>
+                  </Button>
+                  <p className="text-xs text-muted-foreground/70">New Dawn Franchising is a registered franchisor.</p>
+                </div>
               </motion.div>
 
               <motion.div
@@ -1247,6 +1253,21 @@ export default function Home() {
               />
             </div>
 
+            {/* Priority anchor: route "what will I earn?" curiosity into the single FDD
+                capture flow — without stating or implying any figures (FTC Item 19). */}
+            <div data-testid="block-inv-numbers" className="mx-auto mt-8 max-w-3xl rounded-2xl border border-[hsl(var(--accent))]/30 bg-white/70 p-6 text-center shadow-sm md:p-8">
+              <h3 className="text-xl font-semibold md:text-2xl">Wondering what the numbers look like?</h3>
+              <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground md:text-base">
+                New Dawn's Franchise Disclosure Document includes a Financial Performance Representation (Item 19). Request the FDD to review the figures in full.
+              </p>
+              <Button data-testid="button-inv-fdd-numbers" className="mt-5 gap-2" asChild>
+                <Link href="/request-fdd">
+                  Request the FDD
+                  <ArrowRight className="size-4" />
+                </Link>
+              </Button>
+            </div>
+
             <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
               <Button data-testid="button-inv-cta" className="gap-2" asChild>
                 <Link href="/request-fdd">
@@ -1431,6 +1452,20 @@ export default function Home() {
 
             <div className="mx-auto mt-10 grid max-w-3xl gap-3">
               {[
+                {
+                  q: "What can I expect to earn?",
+                  a: (
+                    <>
+                      Financial performance information is disclosed in Item 19 of our Franchise Disclosure Document
+                      (FDD).{" "}
+                      <Link href="/request-fdd" className="font-semibold text-[hsl(var(--primary))] hover:underline">
+                        Request the FDD
+                      </Link>{" "}
+                      to review our Item 19 Financial Performance Representation in full.
+                    </>
+                  ),
+                  id: "earnings",
+                },
                 {
                   q: "Is this legal/immigration advice?",
                   a: "No. We can describe our franchise model and operations, but you should consult qualified legal and immigration professionals for visa guidance.",

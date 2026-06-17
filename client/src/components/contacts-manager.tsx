@@ -11,19 +11,6 @@ import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
-function timeAgo(iso: string | null | undefined): string {
-  if (!iso) return "";
-  const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return "";
-  const secs = Math.max(0, Math.floor((Date.now() - then) / 1000));
-  if (secs < 60) return "just now";
-  const mins = Math.floor(secs / 60);
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-}
-
 const PERSONA_LABELS: Record<string, string> = {
   immigration_attorney: "Immigration Attorney",
   immigration_consultant: "Immigration Consultant",
@@ -283,51 +270,6 @@ export function ContactsManager() {
     queryKey: ["/api/crm/lists"],
   });
 
-  // Seamless.AI auto-sync status (drives the "Sync from Seamless" button + caption).
-  // Polls so the "last synced …" caption stays fresh while the cron runs server-side.
-  const { data: seamlessSync } = useQuery<{
-    configured: boolean;
-    listName: string;
-    cron: string;
-    running: boolean;
-    last: {
-      fetched: number; imported: number; skipped: number; listAdded: number;
-      listName: string; lastSyncAt: string | null; lastRunAt: string | null; error: string | null;
-    };
-  }>({
-    queryKey: ["/api/seamless/sync/status"],
-    refetchInterval: 60_000,
-  });
-
-  // Pull the Seamless org contacts now (the cron also does this every few minutes).
-  const syncSeamlessMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/seamless/sync", {});
-      return res.json() as Promise<{
-        fetched: number; imported: number; skipped: number; listAdded: number;
-        listName: string; error: string | null; note?: string;
-      }>;
-    },
-    onSuccess: (data) => {
-      if (data.note) {
-        toast({ title: data.note });
-      } else if (data.error) {
-        toast({ title: "Seamless sync finished with an error", description: data.error, variant: "destructive" });
-      } else {
-        toast({
-          title: `Synced ${data.fetched} Seamless contact${data.fetched !== 1 ? "s" : ""}`,
-          description: `${data.imported} new · ${data.skipped} existing · ${data.listAdded} added to "${data.listName}"`,
-        });
-      }
-      // Global staleTime is Infinity — invalidate every surface the sync touched.
-      queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/lists"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/crm/prospect-lists"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/seamless/sync/status"] });
-    },
-    onError: (err: Error) => toast({ title: "Seamless sync failed", description: err.message, variant: "destructive" }),
-  });
-
   const toggleSelect = (id: string) => {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -475,33 +417,9 @@ export function ContactsManager() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold">Contacts</h1>
-            <p className="text-sm text-muted-foreground">
-              {total.toLocaleString()} contact{total !== 1 ? "s" : ""}
-              {seamlessSync?.last?.lastRunAt && (
-                <span className="ml-2 text-xs">
-                  · Seamless synced {timeAgo(seamlessSync.last.lastRunAt)}
-                  {seamlessSync.last.error ? " (last run errored)" : ""}
-                </span>
-              )}
-            </p>
+            <p className="text-sm text-muted-foreground">{total.toLocaleString()} contact{total !== 1 ? "s" : ""}</p>
           </div>
           <div className="flex items-center gap-2">
-            {seamlessSync?.configured !== false && (
-              <Button
-                data-testid="button-sync-seamless"
-                size="sm"
-                variant="outline"
-                onClick={() => syncSeamlessMutation.mutate()}
-                disabled={syncSeamlessMutation.isPending || seamlessSync?.running}
-                title={`Pull your Seamless.AI contacts into the CRM and the "${seamlessSync?.listName || "Seamless — Synced Contacts"}" campaign list`}
-              >
-                {syncSeamlessMutation.isPending || seamlessSync?.running ? (
-                  <><Loader2 className="size-4 mr-1 animate-spin" /> Syncing…</>
-                ) : (
-                  <><Download className="size-4 mr-1" /> Sync from Seamless</>
-                )}
-              </Button>
-            )}
             <Button data-testid="button-refresh-contacts" size="sm" variant="outline" onClick={() => refetch()}>
               <RefreshCw className="size-4 mr-1" /> Refresh
             </Button>

@@ -57,6 +57,7 @@ export interface LeadSearchFilters {
   companySize?: string[];
   companyRevenue?: string[];
   companyName?: string[];
+  companyNameSearchType?: "default" | "related" | "exact";
   companyDomain?: string[];
   contactState?: string[];
   contactCountry?: string[];
@@ -95,6 +96,7 @@ function toContactFilters(f: LeadSearchFilters, limit: number, nextToken?: strin
     companySizes: clean(f.companySize),
     companyRevenues: clean(f.companyRevenue),
     companyNames: clean(f.companyName),
+    companyNameSearchType: f.companyNameSearchType,
     companyDomains: clean(f.companyDomain)?.map(normalizeDomain),
     states: clean(f.contactState),
     countries: clean(f.contactCountry),
@@ -116,6 +118,7 @@ function toContactFilters(f: LeadSearchFilters, limit: number, nextToken?: strin
 function toCompanyFilters(f: LeadSearchFilters, limit: number, nextToken?: string | null): SeamlessCompanyFilters {
   return {
     companyNames: clean(f.companyName),
+    companyNameSearchType: f.companyNameSearchType,
     companyDomains: clean(f.companyDomain)?.map(normalizeDomain),
     states: clean(f.contactState),
     countries: clean(f.contactCountry),

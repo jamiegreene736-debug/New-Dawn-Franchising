@@ -66,11 +66,17 @@ Behaviour:
 - Be concise, friendly, and action-oriented — like a sharp SDR teammate.
 - When the user asks to "find" / "build a list" / "get me" prospects, CALL search_people (don't just describe what you would do).
 - To find people who work at a specific company (e.g. "everyone at GlobeVisa"), set companyNames to that company and companyDomains to its likely domain (e.g. globevisa.com), and DON'T require a job title — that returns the whole company. Only add titles if the user asks for specific roles.
+- To find companies SIMILAR TO / LIKE a named company, follow the COMPANIES-LIKE-X workflow below (propose real peer companies, confirm, then search them) — this is different from finding people AT one company.
 - If a search returns 0 results with NO error, retry once with a broader query (e.g. drop titles, or use companyDomains instead of companyNames, or vice-versa) before telling the user nothing was found.
 - If a search result has an "error" field, the data provider FAILED — the company was never actually searched. Do NOT retry and do NOT guess that the company is too small, misspelled, or low on public data. Tell the user the real problem plainly. If the error is about credits, say the Seamless lead-data API is out of credits and its public-API credit balance needs topping up (this is separate from the Seamless website's credits).
 - After a search, state how many you found, highlight the 2–3 HIGHEST-scoring matches (name · title · company · why they're a strong fit), and tell them they can save the results to Contacts using the buttons below the list.
 - If asked to draft/write/personalize outreach to a specific person you found, CALL draft_outreach with their exact fullName and the channel (email or linkedin), then present the returned subject/body. It grounds the message in why they matched.
 - Never invent contacts — only reference what search_people or search_crm returned.
+
+FINDING COMPANIES "LIKE" / "SIMILAR TO" A NAMED COMPANY — this is a two-step, CONFIRM-FIRST workflow; follow it exactly:
+1. PROPOSE (no search on this turn): From your OWN knowledge, list 8–12 REAL, specific, NAMED companies in the same space as the one the user named (e.g. for "find companies like GlobeVisa, the immigration-consulting company" → name actual immigration / investor-visa / relocation-consulting firms). For each, give the company name plus a 4–8 word note on what it is, and its likely website domain if you know it. Then ask the user to confirm or edit the list — e.g. "Want me to look these up in Seamless? Tell me to drop or add any." Do NOT call search_people yet.
+2. SEARCH (only after the user confirms — "yes", "proceed", "go", or gives an edited list): CALL search_people with companyNames set to the EXACT company names you proposed (carry them over from your previous message; drop any the user removed and add any they asked for). Use mode "contacts" and leave titles empty so you get the decision-makers across all those companies — only add titles if the user asked for specific roles. You may also set companyDomains to the domains you listed.
+Critical: the whole point of this feature is searching the SPECIFIC company NAMES you proposed. NEVER substitute a vague industry or keyword search for the named-company search, and never skip the confirmation step. If the user's very first message already says to just go ahead (e.g. "find companies like X and pull contacts"), you may still propose the named list and then search it in the same reply, but always search by the actual company names.
 
 New Dawn targets two audiences: (1) international E-2 investors / high-net-worth individuals from treaty countries (UK, Germany, Japan, South Korea, Mexico, India, UAE, Brazil, Canada…) exploring US business ownership; titles like Owner, Founder, CEO, Investor, Managing Director, Entrepreneur. (2) Referral partners — immigration attorneys, visa consultants, wealth managers, relocation advisors, business brokers who work with international clients.`;
 
@@ -95,11 +101,12 @@ const TOOLS = [
   {
     name: "search_people",
     description:
-      "Search lead-data providers for people/contacts matching the criteria and build a prospect list. Use whenever the user wants to find prospects or build a list. To find everyone at a specific company, set companyNames (and companyDomains if you can infer the domain) and leave titles empty.",
+      "Search lead-data providers for people/contacts matching the criteria and build a prospect list. Use whenever the user wants to find prospects or build a list. To find everyone at a specific company, set companyNames (and companyDomains if you can infer the domain) and leave titles empty. To find people across several specific companies at once (e.g. a curated list of firms similar to one the user named), pass all of those company names in companyNames.",
     input_schema: {
       type: "object",
       properties: {
-        companyNames: { type: "array", items: { type: "string" }, description: "Company/employer names, e.g. GlobeVisa. Use this to find people who work at a specific company." },
+        companyNames: { type: "array", items: { type: "string" }, description: "Company/employer names to match — e.g. [\"GlobeVisa\", \"Henley & Partners\", \"Fragomen\"]. Pass MULTIPLE real, specific names here to search a whole list of companies at once. Always prefer matching by actual company names over vague industry/keyword filters when the user wants people at named companies." },
+        companyNameSearchType: { type: "string", enum: ["default", "related", "exact"], description: "How to match companyNames. 'default' = fuzzy (recommended for a curated list of real company names). 'exact' = only that exact name. 'related' = let Seamless also pull in related/similar businesses." },
         companyDomains: { type: "array", items: { type: "string" }, description: "Company website domains, e.g. globevisa.com. Infer from the company name when possible." },
         titles: { type: "array", items: { type: "string" }, description: "Job titles, e.g. CEO, Owner, Investor, Immigration Attorney" },
         seniorities: { type: "array", items: { type: "string" }, description: "e.g. C-Level, VP, Director, Manager" },
@@ -283,6 +290,10 @@ export async function runLeadResearchAgent(
         industry: arr(input?.industries),
         companySize: arr(input?.companySizes),
         companyName: arr(input?.companyNames),
+        companyNameSearchType:
+          input?.companyNameSearchType === "related" || input?.companyNameSearchType === "exact"
+            ? input.companyNameSearchType
+            : undefined,
         companyDomain: arr(input?.companyDomains),
         fullName: arr(input?.fullName),
         keywords: arr(input?.keywords),

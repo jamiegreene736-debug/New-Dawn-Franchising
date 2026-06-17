@@ -13,6 +13,7 @@ import { generateBrokerAgreementPDF } from "./broker-agreement-pdf";
 import { searchProspects, SEARCH_CATEGORIES } from "./prospect-search";
 import { scheduleDripProcessing, processDripEmails, reprocessStep, fireClickReaction } from "./drip-processor";
 import { scheduleGmailSync, syncFranchisingInbox, getGmailSyncStatus, getGmailSyncLastResult } from "./gmail-sync-service";
+import { scheduleSeamlessOrgSync } from "./seamless-org-sync";
 import { seedDefaultCampaign } from "./default-campaign";
 import { seedGrokCampaign } from "./grok-campaign";
 import { seedGlobevisaCampaign } from "./globevisa-campaign";
@@ -5200,6 +5201,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
   scheduleWeeklyBlogGeneration();
   scheduleDripProcessing();
   scheduleGmailSync();
+  scheduleSeamlessOrgSync();
   seedDefaultCampaign();
   seedGrokCampaign();
   seedGlobevisaCampaign();

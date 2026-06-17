@@ -309,6 +309,21 @@ const STATEMENTS: string[] = [
   `ALTER TABLE crm_clients ADD COLUMN IF NOT EXISTS started_at_current_company text`,
   `ALTER TABLE crm_clients ADD COLUMN IF NOT EXISTS job_change_alert text`,
   `ALTER TABLE crm_clients ADD COLUMN IF NOT EXISTS stock_ticker text`,
+  // Seamless.AI org-contact auto-sync watermark + last-run stats (single row).
+  // Lets the scheduled sync (server/seamless-org-sync.ts) resume incrementally
+  // across restarts and powers the "last synced …" status in the Contacts UI.
+  `CREATE TABLE IF NOT EXISTS seamless_sync_state (
+    id              varchar      PRIMARY KEY DEFAULT 'singleton',
+    last_sync_at    timestamptz,
+    last_run_at     timestamptz,
+    last_fetched    integer      NOT NULL DEFAULT 0,
+    last_imported   integer      NOT NULL DEFAULT 0,
+    last_skipped    integer      NOT NULL DEFAULT 0,
+    last_list_added integer      NOT NULL DEFAULT 0,
+    last_error      text,
+    list_id         varchar,
+    updated_at      timestamptz  NOT NULL DEFAULT now()
+  )`,
 ];
 
 export async function ensureSchema(): Promise<void> {

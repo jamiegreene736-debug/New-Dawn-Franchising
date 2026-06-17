@@ -876,6 +876,84 @@ export async function seamlessSearchCompanies(
   return { companies: items.map(mapCompanyItem), nextToken, error: error ?? null };
 }
 
+// ─── Org contacts (GET /contacts — "Get Org Contacts") ──────────────────────
+// Pulls the contacts SAVED in the Seamless org (the "My Contacts" list in the
+// Seamless app) rather than searching the global DB. Two things matter here:
+//   • These records are ALREADY revealed — email/phone are present — so reading
+//     them consumes NO research credits (unlike /contacts/research).
+//   • Seamless's public API has NO per-"Contact List" filter and NO webhooks
+//     (verified against their OpenAPI spec). GET /contacts returns EVERY org
+//     contact in a [startDate, endDate] window, paginated. So we cannot pull a
+//     single named list ("GlobeVisa …") on its own; we pull the whole org.
+// The records share the /contacts/research payload shape, so each is normalised
+// with the same mapEnrichedContact mapper.
+
+export interface SeamlessOrgContactsResult {
+  people: SeamlessPerson[];
+  pages: number;
+  error: ProviderError | null;
+}
+
+export async function seamlessGetOrgContacts(opts: {
+  startDate: Date;
+  endDate: Date;
+  pageSize?: number;
+  maxPages?: number;
+}): Promise<SeamlessOrgContactsResult> {
+  const apiKey = getKey();
+  if (!apiKey) return { people: [], pages: 0, error: null };
+
+  const pageSize = Math.min(Math.max(opts.pageSize ?? 100, 1), 100);
+  const maxPages = Math.max(opts.maxPages ?? 50, 1);
+  const startDate = opts.startDate.toISOString();
+  const endDate = opts.endDate.toISOString();
+
+  const people: SeamlessPerson[] = [];
+  let pages = 0;
+
+  for (let page = 1; page <= maxPages; page++) {
+    const qs = new URLSearchParams({
+      page: String(page),
+      limit: String(pageSize),
+      startDate,
+      endDate,
+    }).toString();
+
+    let res: Response;
+    try {
+      res = await fetch(`${SEAMLESS_BASE}/contacts?${qs}`, {
+        method: "GET",
+        headers: authHeaders(apiKey),
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      });
+    } catch {
+      const error = networkError();
+      console.warn(`[Seamless] GET /contacts page ${page} ${error.code}: ${error.message}`);
+      return { people, pages, error };
+    }
+
+    if (!res.ok) {
+      const error = await seamlessHttpError(res);
+      console.warn(`[Seamless] GET /contacts page ${page} ${error.status} ${error.code}: ${error.message}`);
+      return { people, pages, error };
+    }
+
+    const json = (await res.json()) as { data?: SeamlessEnrichedContact[] };
+    const batch = Array.isArray(json.data) ? json.data : [];
+    pages++;
+    for (const c of batch) people.push(mapEnrichedContact(c));
+    // A short page is the last page — stop paging.
+    if (batch.length < pageSize) break;
+  }
+
+  if (pages >= maxPages) {
+    console.warn(
+      `[Seamless] GET /contacts hit the maxPages=${maxPages} cap (${people.length} contacts) — more org contacts may exist in this window; widen the window or raise SEAMLESS_SYNC_MAX_PAGES`,
+    );
+  }
+  return { people, pages, error: null };
+}
+
 /**
  * Reveal (enrich) the given search results' email + phone. Consumes ~1 Seamless
  * credit per contact. Returns the enriched person keyed by searchResultId so the

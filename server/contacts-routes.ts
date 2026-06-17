@@ -5,6 +5,7 @@ import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { calculateLeadScore, rescoreContact } from "./lead-scoring";
 import { seamlessSearch, getSeamlessStatus } from "./seamless-service";
+import { syncSeamlessOrgContacts, getSeamlessSyncConfig, getSeamlessSyncState } from "./seamless-org-sync";
 import { sendEmail } from "./email-service";
 
 function requireAdminAuth(req: Request, res: Response, next: () => void) {
@@ -468,6 +469,35 @@ export function registerContactRoutes(app: Express) {
       res.json(result);
     } catch (err) {
       res.status(500).json({ message: "Seamless search failed" });
+    }
+  });
+
+  // ─── Seamless.AI org-contact sync ─────────────────────────────────────────
+  // Pull the contacts saved in your Seamless account ("My Contacts") into the CRM
+  // and the dedicated, campaign-selectable "Seamless — Synced Contacts" list. The
+  // scheduler (server/seamless-org-sync.ts) runs this automatically; this is the
+  // manual "Sync now" trigger. Pass { full: true } to force a full re-backfill.
+
+  app.post("/api/seamless/sync", requireAdminAuth, async (req, res) => {
+    try {
+      if (!process.env.SEAMLESS_API_KEY) {
+        return res.status(503).json({ message: "Seamless.AI is not configured (SEAMLESS_API_KEY missing)." });
+      }
+      const full = req.body?.full === true || req.query?.full === "1";
+      const result = await syncSeamlessOrgContacts({ full });
+      res.json(result);
+    } catch (err: any) {
+      console.error("POST /api/seamless/sync error:", err);
+      res.status(500).json({ message: err?.message || "Seamless sync failed" });
+    }
+  });
+
+  app.get("/api/seamless/sync/status", requireAdminAuth, async (_req, res) => {
+    try {
+      const last = await getSeamlessSyncState();
+      res.json({ ...getSeamlessSyncConfig(), last });
+    } catch (err: any) {
+      res.status(500).json({ message: err?.message || "Failed to fetch Seamless sync status" });
     }
   });
 

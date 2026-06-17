@@ -876,6 +876,127 @@ export async function seamlessSearchCompanies(
   return { companies: items.map(mapCompanyItem), nextToken, error: error ?? null };
 }
 
+// ─── Org contacts (GET /contacts — "Get Org Contacts") ──────────────────────
+// Pulls the contacts SAVED in the Seamless org (the "My Contacts" list in the
+// Seamless app) rather than searching the global DB. Things that matter here:
+//   • These records are ALREADY revealed — email/phone are present — so reading
+//     them consumes NO research credits (unlike /contacts/research).
+//   • Seamless's public API has NO per-"Contact List" filter and NO webhooks
+//     (verified against their OpenAPI spec). GET /contacts returns EVERY org
+//     contact in a [startDate, endDate] window, paginated. So we cannot pull a
+//     single named list ("GlobeVisa …") on its own; we pull the whole org.
+//   • The API REJECTS any window wider than 30 days (HTTP 400 invalidArguments,
+//     "provide a time range that is no more than 30 days"). So to cover a longer
+//     backfill we walk newest→oldest in ≤29-day sub-windows and de-dup across
+//     them by contactId.
+//   • The response shape is `{ success, data: [...] }` (no nextToken/total), so
+//     a short page (< pageSize) marks the last page of a window.
+// The records share the /contacts/research payload shape, so each is normalised
+// with the same mapEnrichedContact mapper.
+
+// Stay safely under Seamless's hard 30-day cap on the GET /contacts window.
+const ORG_CONTACTS_WINDOW_DAYS = 29;
+const DAY_MS = 24 * 3600 * 1000;
+
+/** Parse a Seamless body, tolerating the stray unescaped control chars their
+ *  contact payloads occasionally contain (e.g. a raw newline in a description). */
+function parseSeamlessJson<T>(text: string): T {
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    // Strip C0 control chars (0x00–0x1F) that aren't legal inside JSON strings.
+    return JSON.parse(text.replace(/[\u0000-\u001F]/g, "")) as T;
+  }
+}
+
+export interface SeamlessOrgContactsResult {
+  people: SeamlessPerson[];
+  pages: number;
+  windows: number;
+  error: ProviderError | null;
+}
+
+export async function seamlessGetOrgContacts(opts: {
+  startDate: Date;
+  endDate: Date;
+  pageSize?: number;
+  maxPages?: number; // pages fetched PER window
+  maxWindows?: number; // safety cap on the number of ≤29-day windows
+}): Promise<SeamlessOrgContactsResult> {
+  const apiKey = getKey();
+  if (!apiKey) return { people: [], pages: 0, windows: 0, error: null };
+
+  const pageSize = Math.min(Math.max(opts.pageSize ?? 100, 1), 100);
+  const maxPages = Math.max(opts.maxPages ?? 50, 1);
+  const maxWindows = Math.max(opts.maxWindows ?? 60, 1);
+  const windowMs = ORG_CONTACTS_WINDOW_DAYS * DAY_MS;
+  const floor = opts.startDate.getTime();
+
+  // De-dup across windows (a contact at a window boundary can appear twice).
+  const byId = new Map<string, SeamlessPerson>();
+  let pages = 0;
+  let windows = 0;
+  let windowEnd = opts.endDate.getTime();
+
+  while (windowEnd > floor && windows < maxWindows) {
+    const windowStart = Math.max(floor, windowEnd - windowMs);
+    windows++;
+    const startIso = new Date(windowStart).toISOString();
+    const endIso = new Date(windowEnd).toISOString();
+
+    for (let page = 1; page <= maxPages; page++) {
+      const qs = new URLSearchParams({
+        page: String(page),
+        limit: String(pageSize),
+        startDate: startIso,
+        endDate: endIso,
+      }).toString();
+
+      let res: Response;
+      try {
+        res = await fetch(`${SEAMLESS_BASE}/contacts?${qs}`, {
+          method: "GET",
+          headers: authHeaders(apiKey),
+          signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+        });
+      } catch {
+        const error = networkError();
+        console.warn(`[Seamless] GET /contacts ${error.code}: ${error.message}`);
+        return { people: [...byId.values()], pages, windows, error };
+      }
+
+      if (!res.ok) {
+        const error = await seamlessHttpError(res);
+        console.warn(`[Seamless] GET /contacts ${error.status} ${error.code}: ${error.message}`);
+        return { people: [...byId.values()], pages, windows, error };
+      }
+
+      const json = parseSeamlessJson<{ data?: SeamlessEnrichedContact[] }>(await res.text());
+      const batch = Array.isArray(json.data) ? json.data : [];
+      pages++;
+      for (const c of batch) {
+        const person = mapEnrichedContact(c);
+        const id =
+          (typeof c.contactId === "string" && c.contactId) ||
+          person.linkedinUrl ||
+          `${person.fullName}|${person.company ?? ""}`.toLowerCase();
+        if (!byId.has(id)) byId.set(id, person);
+      }
+      if (batch.length < pageSize) break; // last page of this window
+    }
+
+    // Step the window back; the next window ends where this one began.
+    windowEnd = windowStart - 1;
+  }
+
+  if (windows >= maxWindows) {
+    console.warn(
+      `[Seamless] GET /contacts hit the maxWindows=${maxWindows} cap (${byId.size} contacts) — older org contacts may remain unsynced; raise SEAMLESS_SYNC_BACKFILL_DAYS/MAX windows if needed`,
+    );
+  }
+  return { people: [...byId.values()], pages, windows, error: null };
+}
+
 /**
  * Reveal (enrich) the given search results' email + phone. Consumes ~1 Seamless
  * credit per contact. Returns the enriched person keyed by searchResultId so the

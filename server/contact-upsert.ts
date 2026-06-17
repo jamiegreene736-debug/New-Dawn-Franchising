@@ -225,6 +225,7 @@ export async function flagExistingClients(
 export async function addProspectContact(
   input: ProspectContactInput,
   category?: string,
+  opts: { source?: string } = {},
 ): Promise<UpsertResult> {
   const existing = await findExistingContact(input);
   if (existing) return { status: "exists", contact: existing };
@@ -243,7 +244,7 @@ export async function addProspectContact(
     status: "new" as const,
     tags: [] as string[],
     notes: input.bio?.slice(0, 300) || null,
-    source: "Prospect Finder",
+    source: opts.source || "Prospect Finder",
     country: input.country || null,
     city: input.city || null,
     gdprNote: null,

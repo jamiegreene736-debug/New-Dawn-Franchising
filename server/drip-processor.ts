@@ -99,6 +99,29 @@ function channelOf(stepType: string): string {
   return "task";
 }
 
+// SMS/WhatsApp steps need a phone, which they read off the enrolled prospect.
+// A mirrored prospect can lag its source CRM record (e.g. created email-only
+// before its contact/client gained a phone), leaving the SMS step with no number
+// — so it would fall back to the email address and fail. Recover the phone from
+// the linked CRM client/contact (by email) and backfill the prospect so future
+// sends and other surfaces see it too. Returns "" only when no phone exists.
+async function resolveProspectPhone(prospect: any): Promise<string> {
+  const direct = (prospect?.phone || "").trim();
+  if (direct) return direct;
+  const email = (prospect?.email || "").trim();
+  if (!email) return "";
+  const client = await storage.getCrmClientByEmail(email);
+  let recovered = (client?.phone || "").trim();
+  if (!recovered) {
+    const contact = await storage.getContactByEmail(email);
+    recovered = (contact?.phone || "").trim();
+  }
+  if (recovered && prospect?.id) {
+    await storage.updateProspect(prospect.id, { phone: recovered } as any).catch(() => {});
+  }
+  return recovered;
+}
+
 // Guard against overlapping runs (a manual "Send Due Now" overlapping the cron,
 // or repeated clicks) so the same enrollments aren't processed twice in parallel.
 let dripRunInProgress = false;
@@ -282,7 +305,7 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
           }
         } else if (stepType === "sms") {
           const prospect = await storage.getProspect(enrollment.prospectId);
-          const phone = prospect?.phone || "";
+          const phone = await resolveProspectPhone(prospect);
           const send = await storage.createDripSend({
             enrollmentId: enrollment.id,
             stepId: step.id,
@@ -377,7 +400,7 @@ export async function reprocessStep(campaignId: string, stepId: string): Promise
     try {
       if (stepType === "sms") {
         const prospect = await storage.getProspect(enrollment.prospectId);
-        const phone = prospect?.phone || "";
+        const phone = await resolveProspectPhone(prospect);
         const send = await storage.createDripSend({
           enrollmentId: enrollment.id, stepId: step.id, channel: "sms",
           recipientEmail: phone || enrollment.prospectEmail, recipientName: enrollment.prospectName,

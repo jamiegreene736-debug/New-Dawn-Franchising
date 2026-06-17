@@ -869,14 +869,34 @@ export class DatabaseStorage implements IStorage {
     return c;
   }
 
+  // A mirrored prospect is a snapshot of its source CRM record and can drift from
+  // it — classically when a phone is added to the contact/client *after* an
+  // email-only prospect was already created. When we re-find that prospect by
+  // email during mirroring, backfill any contact fields the prospect is missing
+  // so SMS/WhatsApp steps (which read prospect.phone) and other surfaces see the
+  // phone. Only fills blanks — never overwrites a value the prospect already has.
+  private async backfillProspectFromSource(
+    existing: Prospect,
+    src: { phone?: string | null; company?: string | null; website?: string | null },
+  ): Promise<Prospect> {
+    const patch: Partial<Prospect> = {};
+    if (!existing.phone && src.phone) patch.phone = src.phone;
+    if (!existing.company && src.company) patch.company = src.company;
+    if (!existing.website && src.website) patch.website = src.website;
+    if (Object.keys(patch).length === 0) return existing;
+    const updated = await this.updateProspect(existing.id, patch);
+    return updated ?? ({ ...existing, ...patch } as Prospect);
+  }
+
   // Mirror a CRM contact into a prospect (campaigns enroll prospects, not contacts).
   // Matches an existing prospect by email (preferred), else by name + company.
   async findOrCreateProspectForContact(contact: Contact): Promise<Prospect> {
     const name = [contact.firstName, contact.lastName].filter(Boolean).join(" ").trim() || contact.firstName || "Unknown";
+    const srcFields = { phone: contact.phone, company: contact.firmName, website: contact.websiteUrl };
     if (contact.email) {
       const [byEmail] = await db.select().from(prospects)
         .where(sql`lower(${prospects.email}) = ${contact.email.toLowerCase()}`).limit(1);
-      if (byEmail) return byEmail;
+      if (byEmail) return this.backfillProspectFromSource(byEmail, srcFields);
     } else {
       // Match on company correctly whether it's set or NULL (eq(col, "") never matches NULL).
       const companyCond = contact.firmName
@@ -884,7 +904,7 @@ export class DatabaseStorage implements IStorage {
         : isNull(prospects.company);
       const [byName] = await db.select().from(prospects)
         .where(and(eq(prospects.name, name), companyCond)).limit(1);
-      if (byName) return byName;
+      if (byName) return this.backfillProspectFromSource(byName, srcFields);
     }
     return this.createProspect({
       name,
@@ -903,7 +923,7 @@ export class DatabaseStorage implements IStorage {
     if (client.email) {
       const [byEmail] = await db.select().from(prospects)
         .where(sql`lower(${prospects.email}) = ${client.email.toLowerCase()}`).limit(1);
-      if (byEmail) return byEmail;
+      if (byEmail) return this.backfillProspectFromSource(byEmail, { phone: client.phone, company: client.companyName, website: null });
     }
     return this.createProspect({
       name,

@@ -527,9 +527,183 @@ Rules:
 Example input: "Finance CEOs in Texas with more than 500 employees"
 Example output: {"jobTitle":["CEO","Chief Executive Officer"],"seniority":["C-Level"],"department":["Finance"],"contactState":["Texas"],"companySize":["501 - 1,000","1,001 - 5,000","5,001 - 10,000","10,001+"]}`;
 
+// ─── Deterministic heuristic parse (no OpenAI dependency) ────────────────────
+// A network-free parser that extracts the high-value filters from a prospecting
+// sentence. It is the SAFETY NET: the AI Search box must keep working — and must
+// never dump the whole sentence into keywords — even when OpenAI is unreachable.
+
+// Full US state names → Seamless expects the full name (contactState passes
+// straight through), so we normalise to it.
+const US_STATE_NAMES: Record<string, string> = {
+  alabama: "Alabama", alaska: "Alaska", arizona: "Arizona", arkansas: "Arkansas",
+  california: "California", colorado: "Colorado", connecticut: "Connecticut",
+  delaware: "Delaware", florida: "Florida", georgia: "Georgia", hawaii: "Hawaii",
+  idaho: "Idaho", illinois: "Illinois", indiana: "Indiana", iowa: "Iowa",
+  kansas: "Kansas", kentucky: "Kentucky", louisiana: "Louisiana", maine: "Maine",
+  maryland: "Maryland", massachusetts: "Massachusetts", michigan: "Michigan",
+  minnesota: "Minnesota", mississippi: "Mississippi", missouri: "Missouri",
+  montana: "Montana", nebraska: "Nebraska", nevada: "Nevada",
+  "new hampshire": "New Hampshire", "new jersey": "New Jersey", "new mexico": "New Mexico",
+  "new york": "New York", "north carolina": "North Carolina", "north dakota": "North Dakota",
+  ohio: "Ohio", oklahoma: "Oklahoma", oregon: "Oregon", pennsylvania: "Pennsylvania",
+  "rhode island": "Rhode Island", "south carolina": "South Carolina", "south dakota": "South Dakota",
+  tennessee: "Tennessee", texas: "Texas", utah: "Utah", vermont: "Vermont",
+  virginia: "Virginia", washington: "Washington", "west virginia": "West Virginia",
+  wisconsin: "Wisconsin", wyoming: "Wyoming",
+};
+
+// Country lexicon → the full name Seamless expects (contactCountry).
+const COUNTRY_NAMES: Record<string, string> = {
+  "united states": "United States", usa: "United States", us: "United States", america: "United States",
+  "united kingdom": "United Kingdom", uk: "United Kingdom", "great britain": "United Kingdom", england: "United Kingdom",
+  canada: "Canada", australia: "Australia", india: "India", ireland: "Ireland",
+  germany: "Germany", france: "France", spain: "Spain", italy: "Italy",
+  netherlands: "Netherlands", mexico: "Mexico", brazil: "Brazil",
+  china: "China", japan: "Japan", singapore: "Singapore",
+  "united arab emirates": "United Arab Emirates", uae: "United Arab Emirates", "new zealand": "New Zealand",
+};
+
+// Title phrases → canonical jobTitle variants + a seniority bucket (only values
+// from SENIORITY_VALUES). Order matters: more specific phrases come first so
+// "vice president" wins over the "president" nested inside it.
+const TITLE_LEXICON: Array<{ re: RegExp; titles: string[]; seniority?: string }> = [
+  { re: /\bchief executive officers?\b|\bceos?\b/i,               titles: ["CEO", "Chief Executive Officer"], seniority: "C-Level" },
+  { re: /\bchief financial officers?\b|\bcfos?\b/i,               titles: ["CFO", "Chief Financial Officer"], seniority: "C-Level" },
+  { re: /\bchief (?:technology|technical) officers?\b|\bctos?\b/i, titles: ["CTO", "Chief Technology Officer"], seniority: "C-Level" },
+  { re: /\bchief operating officers?\b|\bcoos?\b/i,               titles: ["COO", "Chief Operating Officer"], seniority: "C-Level" },
+  { re: /\bchief marketing officers?\b|\bcmos?\b/i,               titles: ["CMO", "Chief Marketing Officer"], seniority: "C-Level" },
+  { re: /\bvice presidents?\b|\bvps?\b/i,                         titles: ["VP", "Vice President"], seniority: "VP" },
+  { re: /\bpresidents?\b/i,                                       titles: ["President"], seniority: "C-Level" },
+  { re: /\bco[- ]?founders?\b|\bfounders?\b/i,                    titles: ["Founder", "Co-Founder"], seniority: "C-Level" },
+  { re: /\b(?:business )?owners?\b/i,                             titles: ["Owner"], seniority: "C-Level" },
+  { re: /\bdirectors?\b/i,                                        titles: ["Director"], seniority: "Director" },
+  { re: /\bmanagers?\b/i,                                         titles: ["Manager"], seniority: "Manager" },
+  { re: /\bprincipals?\b/i,                                       titles: ["Principal"] },
+  { re: /\bpartners?\b/i,                                         titles: ["Partner"] },
+];
+
+// People-noun vocabulary that gates the "<people> at <company>" capture.
+const PEOPLE_NOUNS =
+  "contacts?|people|persons?|employees?|leads?|staff|team members?|team|workers?|reps?|decision[- ]?makers?|executives?|prospects?|professionals?";
+
+// Once one of these connectives appears it ends the captured company tail, so
+// "contacts at globevisa in texas" → company "globevisa", not "globevisa in texas".
+const TRAILING_STOP = /\b(?:in|from|for|with|located|based|near|around|that|who|which|and|or)\b.*$/i;
+
+function titleCaseCompany(raw: string): string {
+  const s = raw.trim().replace(/[.,!?;:]+$/g, "").trim();
+  // Leave ALLCAPS / camel-brand tokens alone ("IBM", "GlobeVisa"); otherwise
+  // Title Case a plain multi-word name ("acme widgets" → "Acme Widgets").
+  if (/^[A-Z0-9&.\- ]+$/.test(s) || /[a-z][A-Z]/.test(s)) return s;
+  return s.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/**
+ * Deterministic, OpenAI-independent parse of a prospecting sentence into
+ * structured filters. Pulls out company / titles / state / country WITHOUT ever
+ * stuffing the whole sentence into keywords.
+ */
+function heuristicParseFilters(query: string): LeadSearchFilters {
+  const q = (query || "").trim();
+  if (!q) return {};
+  const out: LeadSearchFilters = {};
+
+  // 1) Company. ONLY the high-confidence "<people-noun> at|from <X>" shape. A bare
+  //    "at" fires on idioms ("at scale", "at least"); the weak connectives "for"/
+  //    "with" capture common nouns ("contacts for review", "people with
+  //    experience"), so only the strong company prepositions "at"/"from" are used.
+  //    The captured tail is routed: a domain-shaped value → companyDomain; a
+  //    generic lowercase industry/category phrase ("tech companies", "law firms")
+  //    → a keyword (the niche), NOT a literal company; otherwise → companyName.
+  const companyGated = new RegExp(`(?:${PEOPLE_NOUNS})\\s+(?:at|from)\\s+(.+)$`, "i");
+  const CATEGORY_TAIL =
+    /\b(?:compan(?:y|ies)|firms?|startups?|organi[sz]ations?|businesses?|agenc(?:y|ies)|enterprises?|corporations?|providers?|vendors?|brands?|institutions?|industr(?:y|ies)|equity)\s*$/i;
+  const cm = q.match(companyGated);
+  if (cm && cm[1]) {
+    const tail = cm[1]
+      .replace(TRAILING_STOP, "")
+      .trim()
+      .replace(/^(?:the|a|an)\s+/i, "")
+      .replace(/[.,!?;:]+$/g, "")
+      .trim();
+    const lower = tail.toLowerCase();
+    // Don't mistake a US state / country ("...at Texas") for a company.
+    if (tail && !US_STATE_NAMES[lower] && !COUNTRY_NAMES[lower]) {
+      const categoryNiche = CATEGORY_TAIL.test(tail) ? tail.replace(CATEGORY_TAIL, "").trim() : "";
+      if (/^[a-z0-9][a-z0-9.\-]*\.[a-z]{2,}$/i.test(tail)) {
+        out.companyDomain = [lower];
+      } else if (categoryNiche && !/[A-Z]/.test(categoryNiche)) {
+        // All-lowercase generic category ("tech companies") → search the niche as
+        // a keyword. A capitalized brand before the category word ("Acme
+        // Industries", "General Motors Company") is kept as a real company below.
+        out.keywords = [categoryNiche];
+      } else {
+        out.companyName = [titleCaseCompany(tail)];
+      }
+    }
+  }
+
+  // 2) Job titles + seniority (several may match).
+  const titles: string[] = [];
+  const seniorities: string[] = [];
+  for (const entry of TITLE_LEXICON) {
+    if (entry.re.test(q)) {
+      for (const t of entry.titles) if (!titles.includes(t)) titles.push(t);
+      if (entry.seniority && !seniorities.includes(entry.seniority)) seniorities.push(entry.seniority);
+    }
+  }
+  if (titles.length) out.jobTitle = titles;
+  if (seniorities.length) out.seniority = seniorities;
+
+  // 3) US states (longest name first so "north carolina" wins over "carolina").
+  const states: string[] = [];
+  for (const name of Object.keys(US_STATE_NAMES).sort((a, b) => b.length - a.length)) {
+    if (new RegExp(`\\b${name.replace(/ /g, "\\s+")}\\b`, "i").test(q)) {
+      const canonical = US_STATE_NAMES[name];
+      if (!states.includes(canonical)) states.push(canonical);
+    }
+  }
+  if (states.length) out.contactState = states;
+
+  // 4) Countries — only when no US state matched (states are more specific).
+  if (!states.length) {
+    const countries: string[] = [];
+    for (const name of Object.keys(COUNTRY_NAMES).sort((a, b) => b.length - a.length)) {
+      if (new RegExp(`\\b${name.replace(/\./g, "\\.").replace(/ /g, "\\s+")}\\b`, "i").test(q)) {
+        const canonical = COUNTRY_NAMES[name];
+        if (!countries.includes(canonical)) countries.push(canonical);
+      }
+    }
+    if (countries.length) out.contactCountry = countries;
+  }
+
+  return out;
+}
+
+// Last-resort CORE phrase (NEVER the whole sentence): strips "find/show me/all
+// the/<people> at|in|for" scaffolding, leaving the substantive noun phrase as a
+// single keyword. Returns "" if nothing meaningful remains.
+function corePhrase(query: string): string {
+  let s = (query || "").trim().toLowerCase();
+  s = s.replace(/^\s*(?:please\s+)?(?:find|get|show|give|list|search|look\s+up|pull|fetch)\s+(?:me\s+)?/i, "");
+  s = s.replace(/^\s*(?:all\s+)?(?:the\s+)?(?:of\s+)?/i, "");
+  s = s.replace(new RegExp(`\\b(?:${PEOPLE_NOUNS})\\b`, "gi"), " ");
+  s = s.replace(/\b(?:at|from|for|with|in|of|located|based|near|around|that|who|which|and|or|the|a|an)\b/gi, " ");
+  s = s.replace(/[^\p{L}\p{N}\s&.\-]/gu, " ").replace(/\s+/g, " ").trim();
+  return s;
+}
+
+// AI natural-language → structured filters. OpenAI (gpt-4o-mini) is the primary
+// parser; the deterministic heuristic is a FALLBACK used only when OpenAI is
+// unavailable, times out, or returns nothing usable — never a gap-filler over a
+// good AI parse (which would inject a wrong company and over-constrain results).
+// Critically, NEITHER path ever searches the whole raw sentence as a keyword —
+// the failure that made the AI Search box silently return zero results.
 export async function parseNaturalLanguageToFilters(query: string): Promise<LeadSearchFilters> {
   const q = (query || "").trim();
   if (!q) return {};
+
+  let ai: LeadSearchFilters | null = null;
   try {
     const resp = await Promise.race([
       openai.chat.completions.create({
@@ -542,17 +716,30 @@ export async function parseNaturalLanguageToFilters(query: string): Promise<Lead
         max_tokens: 500,
         temperature: 0,
       }),
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), 15_000)),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 8_000)),
     ]);
-    if (!resp) return { keywords: [q] };
-    const raw = resp.choices[0]?.message?.content ?? "{}";
-    const parsed = JSON.parse(raw);
-    const filters = sanitizeFilters(parsed);
-    // If the model produced nothing usable, fall back to a keyword search.
-    const hasAny = Object.values(filters).some((v) => (Array.isArray(v) ? v.length : !!v));
-    return hasAny ? filters : { keywords: [q] };
-  } catch (err) {
-    console.error("[Seamless AI parse] failed:", err);
-    return { keywords: [q] };
+    if (!resp) {
+      console.warn("[Seamless AI parse] OpenAI timed out (8s) — falling back to heuristic parse.");
+    } else {
+      ai = sanitizeFilters(JSON.parse(resp.choices[0]?.message?.content ?? "{}"));
+    }
+  } catch (err: any) {
+    console.error("[Seamless AI parse] OpenAI failed — falling back to heuristic parse:", err?.message || err);
   }
+
+  if (ai) {
+    // Guard against the model echoing the whole prompt back as a single keyword.
+    if (ai.keywords?.some((kw) => kw.trim().toLowerCase() === q.toLowerCase())) delete ai.keywords;
+    if (Object.values(ai).some((v) => (Array.isArray(v) ? v.length > 0 : !!v))) return ai;
+  }
+
+  // OpenAI unavailable or produced nothing usable → deterministic heuristic.
+  const heuristic = heuristicParseFilters(q);
+  if (Object.values(heuristic).some((v) => (Array.isArray(v) ? v.length > 0 : !!v))) return heuristic;
+
+  // Last resort: the cleaned CORE phrase (NEVER the full sentence). If even that
+  // is empty, return {} so the route replies "couldn't interpret" rather than
+  // running a guaranteed-empty search.
+  const core = corePhrase(q);
+  return core ? { keywords: [core] } : {};
 }

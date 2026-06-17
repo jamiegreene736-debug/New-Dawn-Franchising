@@ -247,6 +247,53 @@ function mapCompany(org: ApolloOrg): SeamlessCompany {
 // ("People API Search"), which requires a MASTER API key. It returns search-level
 // matches with emails/phones masked until an explicit reveal/enrichment step.
 
+// Resolving a company name costs one extra Apollo round-trip, so cap how many we
+// look up and run them concurrently to stay well under the caller's request budget.
+const COMPANY_RESOLVE_TIMEOUT_MS = 8000;
+const MAX_COMPANY_RESOLVES = 3;
+
+/**
+ * api_search targets companies by DOMAIN or organization id — it silently ignores
+ * company NAMES. When the caller only has a name (e.g. "GlobeVisa"), resolve it to
+ * a domain via Organization Search first. Best-effort: returns [] on any failure.
+ * Returns the domains found AND the names it could NOT resolve, so the caller can
+ * still bias the search toward an unresolved name instead of dropping it.
+ */
+async function resolveCompanyDomains(
+  names: string[],
+  key: string,
+): Promise<{ domains: string[]; unresolved: string[] }> {
+  const top = names.slice(0, MAX_COMPANY_RESOLVES);
+  const overflow = names.slice(MAX_COMPANY_RESOLVES); // beyond the cap — treat as unresolved
+  const results = await Promise.all(
+    top.map(async (name): Promise<{ name: string; domain: string | null }> => {
+      try {
+        const res = await fetch(`${APOLLO_BASE}/mixed_companies/search`, {
+          method: "POST",
+          headers: authHeaders(key),
+          body: JSON.stringify({ q_organization_name: name, per_page: 1 }),
+          signal: AbortSignal.timeout(COMPANY_RESOLVE_TIMEOUT_MS),
+        });
+        if (!res.ok) {
+          console.warn(`[Apollo] company resolve "${name}" failed: HTTP ${res.status}`);
+          return { name, domain: null };
+        }
+        const json = (await res.json()) as { organizations?: ApolloOrg[]; accounts?: ApolloOrg[] };
+        const org = (json.organizations || json.accounts || [])[0];
+        const domain =
+          org?.primary_domain ||
+          (org?.website_url ? org.website_url.replace(/^https?:\/\//, "").replace(/\/.*$/, "") : null);
+        return { name, domain: domain ? domain.toLowerCase() : null };
+      } catch {
+        return { name, domain: null };
+      }
+    }),
+  );
+  const domains = Array.from(new Set(results.map((r) => r.domain).filter((d): d is string => !!d)));
+  const unresolved = [...results.filter((r) => !r.domain).map((r) => r.name), ...overflow];
+  return { domains, unresolved };
+}
+
 export async function apolloSearchContacts(
   filters: SeamlessContactFilters,
 ): Promise<{ people: SeamlessPerson[]; nextToken: string | null; error?: ProviderError | null }> {
@@ -267,11 +314,26 @@ export async function apolloSearchContacts(
   if (seniorities.length) body.person_seniorities = seniorities;
   const locations = buildLocations(filters.states, filters.countries);
   if (locations.length) body.person_locations = locations;
-  if (filters.companyDomains?.length) body.q_organization_domains_list = filters.companyDomains;
-  if (filters.companyNames?.length) body.q_organization_names = filters.companyNames;
+  // Company targeting on api_search is by DOMAIN (or org id) ONLY — it ignores
+  // company NAMES (#138 moved this call to the api_search endpoint). Use explicit
+  // domains; otherwise resolve names → domains via Organization Search so
+  // "contacts at <Company>" actually returns that company's people, not nothing.
+  const orgDomains = filters.companyDomains?.length ? [...filters.companyDomains] : [];
+  let unresolvedNames: string[] = [];
+  if (!orgDomains.length && filters.companyNames?.length) {
+    const resolved = await resolveCompanyDomains(filters.companyNames, key);
+    orgDomains.push(...resolved.domains);
+    unresolvedNames = resolved.unresolved;
+  }
+  if (orgDomains.length) body.q_organization_domains_list = orgDomains;
   const sizes = mapSizes(filters.companySizes);
   if (sizes.length) body.organization_num_employees_ranges = sizes;
-  if (keywords) body.q_keywords = keywords;
+  // Free-text keywords. Only bias toward an unresolved company name when NO domain
+  // resolved at all — Apollo ANDs q_keywords with q_organization_domains_list, so
+  // adding a name-keyword alongside a resolved domain would prune results to ~zero.
+  const nameKeywords = orgDomains.length === 0 ? unresolvedNames : [];
+  const qKeywords = [keywords, ...nameKeywords].filter(Boolean).join(" ").trim();
+  if (qKeywords) body.q_keywords = qKeywords;
 
   try {
     const res = await fetch(`${APOLLO_BASE}/mixed_people/api_search`, {

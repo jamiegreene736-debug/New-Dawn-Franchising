@@ -4,7 +4,6 @@ import {
   Folder, Bookmark, Clock, Settings2, Info, Star, Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import LeadResearchAgent from "@/components/lead-research-agent";
 
 // ─── Shared filter shape (mirrors server LeadSearchFilters) ──────────────────
 
@@ -596,9 +595,43 @@ export default function SeamlessSearchPanel({
               Who can I help you find today?
             </h3>
 
-            {/* Conversational AI lead-research agent (builds lists, analyzes ICP,
-                drafts outreach, and saves/enrolls results). */}
-            <LeadResearchAgent />
+            {/* Natural-language search box — runs against the ACTIVE source
+                (Seamless / Apollo / Origami) and drops results into the table
+                below, where they can be added to the CRM. */}
+            <div className="rounded-xl border bg-background shadow-sm transition-colors focus-within:ring-1 focus-within:ring-primary">
+              <textarea
+                value={aiQuery}
+                onChange={(e) => setAiQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    if (!isSearching && aiQuery.trim()) onAiSearch();
+                  }
+                }}
+                rows={2}
+                data-testid="ai-search-input"
+                placeholder={
+                  isCompanies
+                    ? `Describe the companies to find on ${sourceName} — e.g. "property management firms in Florida with 50+ staff"`
+                    : `Describe who to find on ${sourceName} — e.g. "franchise owners and CEOs in Texas"`
+                }
+                className="w-full resize-none bg-transparent px-4 pt-3 pb-2 text-sm focus:outline-none"
+              />
+              <div className="flex items-center justify-between gap-2 border-t px-3 py-2">
+                <span className="text-[11px] text-muted-foreground">
+                  Press Enter to search · Shift+Enter for a new line
+                </span>
+                <Button
+                  onClick={onAiSearch}
+                  disabled={isSearching || !aiQuery.trim()}
+                  className="h-9 gap-2"
+                  data-testid="ai-search-btn"
+                >
+                  {isSearching ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
+                  {isSearching ? "Searching…" : `Search ${sourceName}`}
+                </Button>
+              </div>
+            </div>
 
             <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
               <button
@@ -622,7 +655,8 @@ export default function SeamlessSearchPanel({
             </div>
 
             <p className="mt-2 text-xs text-muted-foreground">
-              Type naturally — we'll translate it into the filters on the left. Press Enter to run.
+              Type naturally — we'll translate it into the filters on the left, then search {sourceName}.
+              Or build a precise query with the filters and hit Search.
             </p>
 
             {/* Structured filter search — kept reachable even when the filter rail is hidden */}

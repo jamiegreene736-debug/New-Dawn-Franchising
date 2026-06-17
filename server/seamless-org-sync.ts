@@ -200,10 +200,14 @@ export async function syncSeamlessOrgContacts(opts: { full?: boolean } = {}): Pr
         ? new Date(now.getTime() - BACKFILL_DAYS * 24 * 3600 * 1000)
         : new Date(prev.lastSyncAt.getTime() - OVERLAP_HOURS * 3600 * 1000);
 
-    const { people, pages, error } = await seamlessGetOrgContacts({
+    // Seamless caps each GET /contacts call to a 30-day window, so a long
+    // backfill is walked in ≤29-day chunks — size the window cap to the lookback.
+    const maxWindows = Math.ceil(BACKFILL_DAYS / 29) + 2;
+    const { people, pages, windows, error } = await seamlessGetOrgContacts({
       startDate,
       endDate: now,
       maxPages: MAX_PAGES,
+      maxWindows,
     });
 
     // 1) Upsert into `contacts` (deduped). Collect EVERY id — created or existing —
@@ -246,7 +250,7 @@ export async function syncSeamlessOrgContacts(opts: { full?: boolean } = {}): Pr
     await saveState(state);
 
     console.log(
-      `[SeamlessSync] ${people.length} org contacts fetched (${pages} pg) → ${imported} new, ${skipped} existing, ${listAdded} added to "${LIST_NAME}"${errMsg ? ` · error: ${errMsg}` : ""}`,
+      `[SeamlessSync] ${people.length} org contacts fetched (${pages} pg / ${windows} window${windows !== 1 ? "s" : ""}) → ${imported} new, ${skipped} existing, ${listAdded} added to "${LIST_NAME}"${errMsg ? ` · error: ${errMsg}` : ""}`,
     );
     lastResult = resultFromState(state);
     return lastResult;

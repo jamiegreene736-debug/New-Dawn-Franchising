@@ -159,6 +159,12 @@ export const crmClients = pgTable("crm_clients", {
   startedAtCurrentCompany: text("started_at_current_company"),
   jobChangeAlert: text("job_change_alert"),       // "New Hire" | "New Promotion"
   stockTicker: text("stock_ticker"),
+  // ── Email deliverability (Hunter.io verification) ──
+  // Lets the CRM flag bad addresses so the user can fix or remove them.
+  emailStatus: text("email_status"),              // valid | risky | invalid | unknown
+  emailVerifiedAt: timestamp("email_verified_at"),
+  emailScore: integer("email_score"),             // Hunter 0-100 confidence
+  suggestedEmail: text("suggested_email"),        // a better address found when the current one is invalid
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

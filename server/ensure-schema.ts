@@ -309,6 +309,11 @@ const STATEMENTS: string[] = [
   `ALTER TABLE crm_clients ADD COLUMN IF NOT EXISTS started_at_current_company text`,
   `ALTER TABLE crm_clients ADD COLUMN IF NOT EXISTS job_change_alert text`,
   `ALTER TABLE crm_clients ADD COLUMN IF NOT EXISTS stock_ticker text`,
+  // Email deliverability flag (Hunter.io verification) — powers the bad-email UI in crm.tsx.
+  `ALTER TABLE crm_clients ADD COLUMN IF NOT EXISTS email_status text`,
+  `ALTER TABLE crm_clients ADD COLUMN IF NOT EXISTS email_verified_at timestamp`,
+  `ALTER TABLE crm_clients ADD COLUMN IF NOT EXISTS email_score integer`,
+  `ALTER TABLE crm_clients ADD COLUMN IF NOT EXISTS suggested_email text`,
   // Seamless.AI org-contact auto-sync watermark + last-run stats (single row).
   // Lets the scheduled sync (server/seamless-org-sync.ts) resume incrementally
   // across restarts and powers the "last synced …" status in the Contacts UI.

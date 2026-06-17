@@ -2350,6 +2350,91 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
     }
   });
 
+  // Bulk-verify selected CRM clients' emails with Hunter.io. When an address is
+  // undeliverable we try to find a better one (Hunter finder → domain pattern) so
+  // the user can fix it instead of only deleting. The verdict is persisted on the
+  // client (email_status / email_score / email_verified_at / suggested_email) so
+  // the CRM can flag bad emails in the UI across reloads.
+  app.post("/api/crm/clients/bulk-verify-emails", requireAdminAuth, async (req, res) => {
+    try {
+      if (!getHunterStatus().configured) {
+        return res.status(503).json({ message: "Email verification is not configured (set HUNTER_API_KEY)." });
+      }
+      const rawIds = Array.isArray(req.body?.ids) ? (req.body.ids as string[]) : [];
+      if (rawIds.length === 0) return res.status(400).json({ message: "ids array required" });
+      const ids = rawIds.slice(0, BULK_ENRICH_MAX_PER_REQUEST);
+
+      // Map Hunter's verifier verdict to the four states the UI flags on.
+      const classify = (
+        v: Awaited<ReturnType<typeof hunterVerifyEmail>>,
+        email: string,
+      ): "valid" | "risky" | "invalid" | "unknown" => {
+        if (!email) return "invalid";        // no address on file = unusable
+        if (!v) return "unknown";            // Hunter unreachable / not configured
+        if (v.disposable) return "invalid";  // throwaway inbox
+        switch ((v.result || "").toLowerCase()) {
+          case "deliverable": return "valid";
+          case "undeliverable": return "invalid";
+          case "risky": return "risky";
+          default: return "unknown";
+        }
+      };
+
+      const results = await mapWithConcurrency(ids, 4, async (id) => {
+        const client = await storage.getCrmClient(id);
+        if (!client) return { id, name: "", email: "", found: false, status: "unknown" as const, score: null as number | null, suggested: null as string | null };
+
+        const email = (client.email || "").trim();
+        const v = email ? await hunterVerifyEmail(email) : null;
+        const status = classify(v, email);
+        const score = v?.score ?? null;
+
+        // Undeliverable → look for a replacement so the user has something to apply.
+        let suggested: string | null = null;
+        if (status === "invalid") {
+          const parts = (client.fullName || "").trim().split(/\s+/).filter(Boolean);
+          const firstName = parts[0] || "";
+          const lastName = parts.slice(1).join(" ");
+          const domain = (((client as any).companyDomain as string) || email.split("@")[1] || "").trim().toLowerCase();
+          if (domain && firstName && lastName) {
+            const hit = await hunterFindEmail(firstName, lastName, domain);
+            if (hit && hit.email.toLowerCase() !== email.toLowerCase()) {
+              suggested = hit.email;
+            } else {
+              const pattern = await hunterDomainPattern(domain);
+              if (pattern) {
+                const built = buildEmailFromPattern(firstName, lastName, domain, pattern);
+                if (built.toLowerCase() !== email.toLowerCase()) suggested = built;
+              }
+            }
+          }
+        }
+
+        await storage.updateCrmClient(id, {
+          emailStatus: status,
+          emailVerifiedAt: new Date(),
+          emailScore: score,
+          suggestedEmail: suggested,
+        } as any);
+
+        return { id, name: client.fullName, email, found: true, status, score, suggested };
+      });
+
+      const summary = {
+        total: results.length,
+        valid: results.filter((r) => r.status === "valid").length,
+        risky: results.filter((r) => r.status === "risky").length,
+        invalid: results.filter((r) => r.status === "invalid").length,
+        unknown: results.filter((r) => r.status === "unknown").length,
+        suggested: results.filter((r) => r.suggested).length,
+      };
+      res.json({ results, summary, totalRequested: rawIds.length });
+    } catch (err: any) {
+      console.error("[bulk-verify-emails] error:", err?.message || err);
+      res.status(500).json({ message: err?.message || "Email verification failed" });
+    }
+  });
+
   // Bulk-enrich selected saved prospects.
   app.post("/api/crm/prospects/bulk-enrich", requireAdminAuth, async (req, res) => {
     try {

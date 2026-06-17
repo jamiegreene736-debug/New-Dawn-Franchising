@@ -300,8 +300,12 @@ interface Props {
   onSearch: () => void;
   onAiSearch: () => void;
   isSearching: boolean;
-  /** Whether the Seamless data source is connected (drives the status pill). */
+  /** Whether the active data source is connected (drives the status pill). */
   connected?: boolean;
+  /** Display name of the active provider tab (e.g. "Apollo.io"). */
+  providerLabel?: string;
+  /** Env var that connects the active provider (e.g. "APOLLO_API_KEY"). */
+  providerEnv?: string;
   /** Optional first name for the hero greeting. */
   userName?: string;
   /** Per-provider connection + remaining-credit status. */
@@ -316,9 +320,11 @@ interface Props {
 
 export default function SeamlessSearchPanel({
   searchTab, setSearchTab, filters, setFilters, aiQuery, setAiQuery,
-  onSearch, onAiSearch, isSearching, connected, userName,
+  onSearch, onAiSearch, isSearching, connected, providerLabel, providerEnv, userName,
   providers, selectedProviders, onToggleProvider, providerRun,
 }: Props) {
+  const sourceName = providerLabel || "Lead data source";
+  const envName = providerEnv || "SEAMLESS_API_KEY";
   const [showFilters, setShowFilters] = useState(true);
   const active = countActiveFilters(filters);
   const set = <K extends keyof LeadFilters>(key: K, value: LeadFilters[K]) => setFilters({ ...filters, [key]: value });
@@ -373,10 +379,10 @@ export default function SeamlessSearchPanel({
               ? "border-green-200 bg-green-50 text-green-700"
               : "border-amber-200 bg-amber-50 text-amber-700"
           }`}
-          title={connected ? "Lead data source is connected" : "Add SEAMLESS_API_KEY in Railway to enable search"}
+          title={connected ? `${sourceName} is connected` : `Add ${envName} in Railway to enable ${sourceName} search`}
         >
           <span className={`size-1.5 rounded-full ${connected ? "bg-green-500" : "bg-amber-500"}`} />
-          {connected ? "Data source connected" : "Connect data source"}
+          {connected ? `${sourceName} connected` : `Connect ${sourceName}`}
         </span>
       </div>
 
@@ -674,7 +680,7 @@ export default function SeamlessSearchPanel({
             )}
 
             <p className="mt-8 text-center text-[11px] text-muted-foreground/70">
-              Lead data layered from Seamless.AI · Apollo.io · Origami
+              Searching {sourceName} · results import into your CRM
             </p>
           </div>
         </div>

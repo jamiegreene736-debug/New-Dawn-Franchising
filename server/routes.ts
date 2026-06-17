@@ -546,6 +546,11 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  // Vanity URL: /broker-portal forwards to the real Referring Broker Portal,
+  // which lives at /brokers. Done server-side (before the SPA fallback) so it's a
+  // proper HTTP redirect that works on first hit without loading the React app.
+  app.get("/broker-portal", (_req, res) => res.redirect(301, "/brokers"));
+
   // Manifest: tells the client the current narration version + scene count so it
   // can request versioned (cache-busting) audio URLs. Never cached.
   app.get("/api/homepage-overview-voiceover", (_req, res) => {

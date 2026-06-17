@@ -66,6 +66,19 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation, useSearch } from "wouter";
 
+function timeAgo(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "";
+  const secs = Math.max(0, Math.floor((Date.now() - then) / 1000));
+  if (secs < 60) return "just now";
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
 const STATUS_OPTIONS = [
   { value: "new", label: "New Lead", color: "bg-slate-100 text-slate-700" },
   { value: "broker_outreach", label: "Broker Outreach", color: "bg-blue-100 text-blue-700" },
@@ -920,6 +933,42 @@ export default function CrmPage() {
     queryKey: ["/api/crm/lists"],
   });
 
+  // Seamless.AI auto-sync status — drives the "Sync from Seamless" button + the
+  // "last synced …" caption. Polls so the caption stays fresh while the cron runs.
+  const { data: seamlessSync } = useQuery<{
+    configured: boolean;
+    cron: string;
+    running: boolean;
+    last: { fetched: number; imported: number; skipped: number; lastRunAt: string | null; error: string | null };
+  }>({
+    queryKey: ["/api/seamless/sync/status"],
+    refetchInterval: 60_000,
+  });
+
+  // Pull the Seamless org contacts into the CRM tab now (the cron also runs every
+  // few minutes). New clients land here; assign them to a list from the CRM tab.
+  const syncSeamlessMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/seamless/sync", {});
+      return res.json() as Promise<{ fetched: number; imported: number; skipped: number; error: string | null; note?: string }>;
+    },
+    onSuccess: (data) => {
+      if (data.note) {
+        toast({ title: data.note });
+      } else if (data.error) {
+        toast({ title: "Seamless sync finished with an error", description: data.error, variant: "destructive" });
+      } else {
+        toast({
+          title: `Synced ${data.fetched} Seamless contact${data.fetched !== 1 ? "s" : ""}`,
+          description: `${data.imported} new in CRM · ${data.skipped} already here`,
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/clients"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/seamless/sync/status"] });
+    },
+    onError: (err: Error) => toast({ title: "Seamless sync failed", description: err.message, variant: "destructive" }),
+  });
+
   // Members of the list currently used as a filter (only fetched when one is active).
   const { data: listMembers = [] } = useQuery<CrmClient[]>({
     queryKey: ["/api/crm/lists", filterListId, "members"],
@@ -1440,13 +1489,39 @@ export default function CrmPage() {
                 <ChevronDown className="pointer-events-none absolute right-2 top-2.5 size-4 text-muted-foreground" />
               </div>
             </div>
-            <Button
-              data-testid="button-add-crm-client"
-              className="gap-2"
-              onClick={() => { setShowForm(true); setEditingClient(null); }}
-            >
-              <Plus className="size-4" /> Add client
-            </Button>
+            <div className="flex items-center gap-2">
+              {seamlessSync?.configured !== false && (
+                <div className="flex flex-col items-end">
+                  <Button
+                    data-testid="button-sync-seamless"
+                    variant="outline"
+                    className="gap-2"
+                    onClick={() => syncSeamlessMutation.mutate()}
+                    disabled={syncSeamlessMutation.isPending || seamlessSync?.running}
+                    title="Pull your Seamless.AI contacts into the CRM. Then use 'Add to list' to build a campaign audience."
+                  >
+                    {syncSeamlessMutation.isPending || seamlessSync?.running ? (
+                      <><Loader2 className="size-4 animate-spin" /> Syncing…</>
+                    ) : (
+                      <><RefreshCw className="size-4" /> Sync from Seamless</>
+                    )}
+                  </Button>
+                  {seamlessSync?.last?.lastRunAt && (
+                    <span className="text-[11px] text-muted-foreground mt-0.5">
+                      Synced {timeAgo(seamlessSync.last.lastRunAt)}
+                      {seamlessSync.last.error ? " · last run errored" : ""}
+                    </span>
+                  )}
+                </div>
+              )}
+              <Button
+                data-testid="button-add-crm-client"
+                className="gap-2"
+                onClick={() => { setShowForm(true); setEditingClient(null); }}
+              >
+                <Plus className="size-4" /> Add client
+              </Button>
+            </div>
           </div>
 
           {(showForm || editingClient) && (

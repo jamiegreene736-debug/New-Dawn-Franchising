@@ -18,6 +18,7 @@ import { contacts as contactsTable, crmClients as crmClientsTable } from "@share
 import { db } from "./db";
 import { eq, and, isNull, sql } from "drizzle-orm";
 import { calculateLeadScore } from "./lead-scoring";
+import type { SeamlessPerson } from "./seamless-service";
 
 export interface ProspectContactInput {
   fullName?: string;
@@ -216,6 +217,95 @@ export async function flagExistingClients(
     }
   }
   return out;
+}
+
+export interface CrmClientUpsertResult {
+  status: "created" | "exists";
+  client: typeof crmClientsTable.$inferSelect;
+}
+
+/**
+ * Map a revealed Seamless person → crm_clients enrichment columns: the full raw
+ * research payload as JSONB plus the promoted, displayable columns. Mirror of
+ * `enrichmentPatch()` in routes.ts — keep the two in sync.
+ */
+function seamlessEnrichmentPatch(p: SeamlessPerson, now: Date): Record<string, unknown> {
+  return {
+    enrichmentJson: p.raw ?? null,
+    enrichmentSource: "seamless",
+    enrichedAt: now,
+    email2: p.email2 ?? null,
+    email3: p.email3 ?? null,
+    emailConfidence: p.emailConfidence ?? null,
+    phone2: p.phone2 ?? null,
+    phoneType: p.phoneType ?? null,
+    seniority: p.seniority ?? null,
+    department: p.department ?? null,
+    contactCity: p.city ?? null,
+    contactState: p.state ?? null,
+    companyDomain: p.domain ?? null,
+    companyWebsite: p.companyDomainWebsite ?? null,
+    companyIndustry: p.companyIndustry ?? null,
+    companyStaffCount: p.companyStaffCount ?? null,
+    companyStaffRange: p.employeeSizeRange ?? null,
+    companyRevenue: p.companyRevenue ?? null,
+    companyRevenueExact: p.companyRevenueExact ?? null,
+    companyFounded: p.companyFounded ?? null,
+    companyType: p.companyType ?? null,
+    companyDescription: p.companyDescription ?? null,
+    companyLinkedinUrl: p.companyLinkedinUrl ?? null,
+    companyFundingTotal: p.companyFundingTotal ?? null,
+    companyCity: p.companyCity ?? null,
+    companyState: p.companyState ?? null,
+    companyCountry: p.companyCountry ?? null,
+    timeAtCompany: p.timeAtCompany ?? null,
+    startedAtCurrentCompany: p.startedAtCurrentCompany ?? null,
+    jobChangeAlert: p.jobChangeAlert ?? null,
+    stockTicker: p.stockTicker ?? null,
+  };
+}
+
+/**
+ * Upsert a Seamless person into the `crm_clients` pipeline (the "CRM" tab),
+ * persisting the full enrichment payload. Dedups by email → name+company and
+ * returns the existing row unchanged when the person is already in the pipeline.
+ * Used by the Seamless org-contact auto-sync (server/seamless-org-sync.ts).
+ */
+export async function addCrmClientFromSeamless(
+  p: SeamlessPerson,
+  opts: { leadSource?: string } = {},
+): Promise<CrmClientUpsertResult> {
+  const fullName = (p.fullName || `${p.firstName} ${p.lastName}`).trim() || "Unknown";
+  const companyName = normCompany(p.company);
+  const existing = await findExistingCrmClient({ fullName, email: p.email, companyName });
+  if (existing) return { status: "exists", client: existing };
+
+  const now = new Date();
+  const values = {
+    fullName,
+    email: normEmail(p.email) || "", // crm_clients.email is NOT NULL — "" when unknown
+    phone: p.phone || null,
+    country: p.country || null,
+    leadSource: opts.leadSource || "seamless_sync",
+    companyName,
+    profession: p.jobTitle || null,
+    linkedinUrl: p.linkedinUrl || null,
+    status: "new" as const,
+    tags: [] as string[],
+    ...seamlessEnrichmentPatch(p, now),
+  };
+
+  const [created] = await db
+    .insert(crmClientsTable)
+    .values(values as typeof crmClientsTable.$inferInsert)
+    .returning();
+  if (created) return { status: "created", client: created };
+
+  // No unique constraint to conflict on, so this is extremely unlikely — but
+  // re-resolve defensively rather than fabricate a client.
+  const raced = await findExistingCrmClient({ fullName, email: p.email, companyName });
+  if (raced) return { status: "exists", client: raced };
+  throw new Error("addCrmClientFromSeamless: insert returned no row and no existing match found");
 }
 
 /**

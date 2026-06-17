@@ -1,8 +1,10 @@
 import { storage } from "./storage";
 import {
   BROKER_TRACK,
+  BROKER_2_TRACK,
   CLIENT_TRACK,
   BROKER_CAMPAIGN_NAME,
+  BROKER_2_CAMPAIGN_NAME,
   CLIENT_CAMPAIGN_NAME,
   withSpacing,
   type CampaignTrackStep,
@@ -14,6 +16,9 @@ export const GROK_CAMPAIGN_NAME = BROKER_CAMPAIGN_NAME;
 
 const BROKER_DESCRIPTION =
   "13-step omnichannel broker outreach sequence for E-2 visa referral partners. Covers LinkedIn, email, SMS, and call tasks across 28 days — highlighting referral fees ($28,125), escrow protection, VC-backed team, director model, three verticals (PM/Insurance/Telecom), proprietary AI, and structured buy-back exits.";
+
+const BROKER_2_DESCRIPTION =
+  "13-step omnichannel broker outreach sequence (Grok 2.0) for E-2 referral partners — immigration attorneys, consultants, wealth managers, and business brokers. Mirrors the client Grok 2.0 structure across 28 days. Centers on what brokers need: credible client solutions (obtain & renew E-2 visa, live anywhere, escrow-protected funds, FDD Item 19, structured exit), plus 12.5% referral commission ($28,125), broker portal, and end-to-end referral journey.";
 
 const CLIENT_DESCRIPTION =
   "13-step omnichannel client outreach sequence (Grok 2.0) written directly to E-2 investor candidates. Centers on what clients want: obtain and renew an E-2 visa, live anywhere in the U.S., proven day-to-day operating systems, FDD Item 19 financial performance, a structured franchise exit plan, and escrow-protected funds held until visa approval — with no referral-fee language.";
@@ -109,13 +114,15 @@ export async function seedTrackCampaign(
 }
 
 /**
- * Seed BOTH outreach tracks:
- *   • "Grok Campaign"            — broker referral-partner pitch (audience: broker)
+ * Seed all three outreach tracks:
+ *   • "Grok Campaign"               — legacy broker referral-partner pitch (audience: broker)
+ *   • "Grok 2.0 - for brokers"      — Grok 2.0 broker referral-partner pitch (audience: broker)
  *   • "Grok Campaign 2.0 - Clients" — direct-to-E-2-investor pitch (audience: client)
  */
 export async function seedGrokCampaign(): Promise<void> {
   try {
     await seedTrackCampaign(BROKER_CAMPAIGN_NAME, BROKER_DESCRIPTION, "broker", BROKER_TRACK);
+    await seedTrackCampaign(BROKER_2_CAMPAIGN_NAME, BROKER_2_DESCRIPTION, "broker", BROKER_2_TRACK);
     await seedTrackCampaign(CLIENT_CAMPAIGN_NAME, CLIENT_DESCRIPTION, "client", CLIENT_TRACK);
   } catch (err) {
     console.error(`[Drip] Failed to seed Grok campaigns:`, err);

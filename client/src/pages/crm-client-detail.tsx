@@ -1235,7 +1235,7 @@ export function CrmClientDetail({ client, onClose, onRefresh }: {
                       <p className="text-[11px] text-muted-foreground mt-1.5 leading-snug">
                         {overrideTrack === "client"
                           ? "Direct-to-investor pitch — sells the E-2 franchise to the candidate. No referral-fee language."
-                          : "Referral-partner pitch — for attorneys, consultants & brokers who refer their clients (mentions the $28,125 referral fee)."}
+                          : "Grok 2.0 referral-partner pitch — for attorneys, consultants & brokers who refer E-2 clients (commission, broker portal, FDD Item 19 talking points)."}
                       </p>
                     </div>
 

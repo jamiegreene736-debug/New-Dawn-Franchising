@@ -512,5 +512,19 @@ export function scheduleDripProcessing() {
     resendUnopenedFirstEmails();
   }, { timezone: "America/New_York" });
 
-  console.log("Drip email processing scheduled: Hourly Mon–Fri 8 AM–6 PM ET (optimal window gating active)");
+  // Catch-up run shortly after boot. The hourly cron only fires at the top of the
+  // hour, so a process restart (Railway redeploy, crash, OOM) that lands mid-run
+  // would otherwise strand the remaining enrollments until the next hour — which
+  // is exactly how a 50-contact send can stop after only a handful of emails.
+  // This resumes within a minute instead. It's safe to run on every boot: the
+  // optimal-window + daily/hourly cap gates inside processDripEmails() make it a
+  // no-op outside business hours, and the per-step already-sent guard prevents
+  // any double-send. The short delay lets the server + DB pool finish warming up.
+  const STARTUP_CATCHUP_DELAY_MS = 45_000;
+  setTimeout(() => {
+    console.log("[Drip] Startup catch-up run (resuming any work stranded by a restart)...");
+    processDripEmails().catch((e) => console.error("[Drip] Startup catch-up error:", e));
+  }, STARTUP_CATCHUP_DELAY_MS);
+
+  console.log("Drip email processing scheduled: Hourly Mon–Fri 8 AM–6 PM ET + startup catch-up (optimal window gating active)");
 }

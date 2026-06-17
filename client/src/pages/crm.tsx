@@ -142,6 +142,10 @@ interface CrmClient {
   profession?: string | null;
   leadTemperature?: string | null;
   tags?: string[] | null;
+  emailStatus?: string | null;        // valid | risky | invalid | unknown
+  emailVerifiedAt?: string | null;
+  emailScore?: number | null;
+  suggestedEmail?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -158,6 +162,28 @@ function StatusBadge({ status }: { status: string }) {
   return (
     <span data-testid={`badge-status-${status}`} className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${opt.color}`}>
       {opt.label}
+    </span>
+  );
+}
+
+// Email deliverability flag from the Hunter.io bulk verifier. Rendered on each
+// contact so a bad address is impossible to miss (red), with risky/valid states
+// and a subtle "unverified" until the contact has been checked.
+function EmailStatusBadge({ status, score }: { status?: string | null; score?: number | null }) {
+  if (!status) return null;
+  const map: Record<string, { cls: string; label: string; Icon: typeof CheckCircle }> = {
+    valid:   { cls: "bg-green-100 text-green-700", label: "Email valid", Icon: CheckCircle },
+    risky:   { cls: "bg-amber-100 text-amber-700", label: "Email risky", Icon: AlertCircle },
+    invalid: { cls: "bg-red-100 text-red-700",     label: "Bad email",   Icon: XCircle },
+    unknown: { cls: "bg-gray-100 text-gray-500",   label: "Unverified",  Icon: AlertCircle },
+  };
+  const m = map[status];
+  if (!m) return null;
+  const Icon = m.Icon;
+  const showScore = typeof score === "number" && status !== "invalid" && status !== "unknown";
+  return (
+    <span data-testid={`badge-email-${status}`} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${m.cls}`}>
+      <Icon className="size-3" /> {m.label}{showScore ? ` · ${score}` : ""}
     </span>
   );
 }
@@ -878,6 +904,7 @@ export default function CrmPage() {
   const [deleteClientId, setDeleteClientId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [emailFilter, setEmailFilter] = useState<"all" | "bad">("all");
   const [filterTag, setFilterTag] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkEnrichOpen, setBulkEnrichOpen] = useState(false);
@@ -1079,6 +1106,52 @@ export default function CrmPage() {
     onError: () => toast({ title: "Failed to update tags", variant: "destructive" }),
   });
 
+  // Verify selected clients' emails via Hunter.io; flags bad addresses and finds
+  // replacements server-side (results are persisted, so the UI updates on refetch).
+  const bulkVerifyMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      // Chunk to the server's per-request cap so a large selection isn't silently
+      // truncated — verify ALL selected contacts, aggregating the summary.
+      const CHUNK = 25;
+      const agg = { total: 0, valid: 0, risky: 0, invalid: 0, unknown: 0, suggested: 0 };
+      for (let i = 0; i < ids.length; i += CHUNK) {
+        const res = await apiRequest("POST", "/api/crm/clients/bulk-verify-emails", { ids: ids.slice(i, i + CHUNK) });
+        const data = (await res.json()) as { summary: typeof agg };
+        (Object.keys(agg) as (keyof typeof agg)[]).forEach((k) => { agg[k] += data.summary?.[k] ?? 0; });
+      }
+      return { summary: agg };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/clients"] });
+      setSelectedIds(new Set());
+      const s = data.summary;
+      toast({
+        title: `Verified ${s.total} email${s.total !== 1 ? "s" : ""}`,
+        description: `${s.valid} valid · ${s.risky} risky · ${s.invalid} bad${s.suggested ? ` · ${s.suggested} replacement${s.suggested !== 1 ? "s" : ""} found` : ""}`,
+      });
+    },
+    onError: (err: Error) => toast({ title: "Verification failed", description: err.message, variant: "destructive" }),
+  });
+
+  // Apply a Hunter-suggested replacement email to a client and reset its flag so
+  // it can be re-verified. Reuses the standard client PATCH endpoint.
+  const applySuggestedEmailMutation = useMutation({
+    mutationFn: async ({ id, email }: { id: string; email: string }) => {
+      const res = await apiRequest("PATCH", `/api/crm/clients/${id}`, {
+        email,
+        emailStatus: "unknown",
+        emailScore: null,
+        suggestedEmail: null,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/clients"] });
+      toast({ title: "Email updated", description: "Re-verify to confirm the new address." });
+    },
+    onError: (err: Error) => toast({ title: "Couldn't update email", description: err.message, variant: "destructive" }),
+  });
+
   const updateTagsMutation = useMutation({
     mutationFn: async ({ id, tags }: { id: string; tags: string[] }) => {
       const res = await apiRequest("PATCH", `/api/crm/clients/${id}`, { tags });
@@ -1166,8 +1239,11 @@ export default function CrmPage() {
     const matchesStatus = filterStatus === "all" || c.status === filterStatus;
     const matchesTag = !filterTag || (c.tags && c.tags.includes(filterTag));
     const matchesList = !filterListId || listMemberIds.has(c.id);
-    return matchesSearch && matchesStatus && matchesTag && matchesList;
+    const matchesEmail = emailFilter === "all" || c.emailStatus === "invalid";
+    return matchesSearch && matchesStatus && matchesTag && matchesList && matchesEmail;
   });
+
+  const badEmailCount = clients.filter((c) => c.emailStatus === "invalid").length;
 
   const unimportedBrokerClients = brokerClients.filter((bc: any) => !bc.importedAt);
 
@@ -1491,6 +1567,16 @@ export default function CrmPage() {
                 </select>
                 <ChevronDown className="pointer-events-none absolute right-2 top-2.5 size-4 text-muted-foreground" />
               </div>
+              {(badEmailCount > 0 || emailFilter === "bad") && (
+                <button
+                  data-testid="button-filter-bad-emails"
+                  onClick={() => setEmailFilter(emailFilter === "bad" ? "all" : "bad")}
+                  className={`inline-flex items-center gap-1.5 h-9 rounded-md border px-3 text-sm font-medium transition-colors ${emailFilter === "bad" ? "border-red-400 bg-red-100 text-red-700" : "border-red-200 bg-red-50 text-red-600 hover:bg-red-100"}`}
+                  title="Show only contacts flagged with a bad email"
+                >
+                  <XCircle className="size-4" /> Bad emails ({badEmailCount})
+                </button>
+              )}
             </div>
             <div className="flex items-center gap-2">
               {seamlessSync?.configured !== false && (
@@ -1587,6 +1673,17 @@ export default function CrmPage() {
                     title="Find email, phone & LinkedIn for the selected clients"
                   >
                     <Sparkles className="size-3.5" /> Enrich
+                  </Button>
+                  <Button
+                    size="sm"
+                    data-testid="button-bulk-verify-emails"
+                    className="h-8 gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs"
+                    disabled={bulkVerifyMutation.isPending}
+                    onClick={() => bulkVerifyMutation.mutate(Array.from(selectedIds))}
+                    title="Verify the selected emails with Hunter.io and flag bad ones"
+                  >
+                    {bulkVerifyMutation.isPending ? <Loader2 className="size-3.5 animate-spin" /> : <Mail className="size-3.5" />}
+                    Verify emails
                   </Button>
                   {/* Add selected to a list (existing or new) */}
                   <div className="flex items-center gap-1.5">
@@ -1741,6 +1838,7 @@ export default function CrmPage() {
                             <CheckCircle2 className="size-3" /> Receipt
                           </span>
                         )}
+                        <EmailStatusBadge status={client.emailStatus} score={client.emailScore} />
                       </div>
 
                       {/* Row 2: contact info */}
@@ -1749,6 +1847,23 @@ export default function CrmPage() {
                         {client.phone && ` · ${formatPhone(client.phone)}`}
                         {client.country && ` · ${client.country}`}
                       </div>
+
+                      {/* Suggested replacement email when the current one is bad */}
+                      {client.emailStatus === "invalid" && client.suggestedEmail && (
+                        <div className="mt-1 flex items-center gap-2 text-xs">
+                          <span className="text-muted-foreground">
+                            Suggested: <span className="font-medium text-foreground">{client.suggestedEmail}</span>
+                          </span>
+                          <button
+                            data-testid={`button-apply-email-${client.id}`}
+                            disabled={applySuggestedEmailMutation.isPending && applySuggestedEmailMutation.variables?.id === client.id}
+                            onClick={() => applySuggestedEmailMutation.mutate({ id: client.id, email: client.suggestedEmail! })}
+                            className="rounded border border-emerald-300 bg-emerald-50 px-2 py-0.5 font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
+                          >
+                            Apply
+                          </button>
+                        </div>
+                      )}
 
                       {/* Row 3: referral party + date */}
                       <div className="mt-1 text-xs flex items-center gap-1">

@@ -3,7 +3,7 @@
  * Franchising "Grok Campaign" voice across every surface that can fire a
  * "Send now" action:
  *
- *   • server/grok-campaign.ts        → seeds two drip campaigns (broker + client)
+ *   • server/grok-campaign.ts        → seeds three drip campaigns (broker v1, broker v2, client)
  *   • client/.../crm-client-detail   → the per-contact "Send Now" override tab
  *   • client/.../email-campaigns     → audience label on the bulk launcher
  *   • server/broker-sequence-service → the automated omnichannel engine
@@ -42,6 +42,7 @@ export interface CampaignTrackStep {
 }
 
 export const BROKER_CAMPAIGN_NAME = "Grok Campaign"; // keep exact: preserves existing enrollments
+export const BROKER_2_CAMPAIGN_NAME = "Grok 2.0 - for brokers";
 export const CLIENT_CAMPAIGN_NAME = "Grok Campaign 2.0 - Clients";
 
 export const CALENDLY = "https://calendly.com/dylan-newdawnfranchising";
@@ -929,15 +930,463 @@ El Paso, Texas`,
   },
 ];
 
+// ─────────────────────────────────────────────────────────────────────────────
+// BROKER 2.0 TRACK — same 13-step omnichannel structure as CLIENT_TRACK, but
+// written to referral partners (immigration attorneys, E-2 consultants, wealth
+// managers, business brokers). Centers on what brokers need: a credible E-2
+// solution for their clients, commission ($28,125 / 12.5%), escrow alignment,
+// broker portal, FDD Item 19 talking points, and a complete client lifecycle.
+// LOAD-BEARING: mirrors CLIENT_TRACK stepOrder/delayDays/stepTypes exactly.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const BROKER_2_TRACK: CampaignTrackStep[] = [
+  {
+    stepOrder: 1,
+    delayDays: 0,
+    stepType: "linkedin_connect",
+    stepName: "LinkedIn Connect Request",
+    priority: "Medium",
+    subject: "",
+    bodyHtml: `Send a LinkedIn connection request to {{name}}.
+
+Suggested note (300 chars max):
+"Hi {{name}} — I work with immigration attorneys & E-2 advisors on referral partnerships. New Dawn Franchising: $225K E-2 platform, escrow-protected, 12.5% broker commission ($28,125/placement). Would love to connect."`,
+    bodyText: `Send a LinkedIn connection request to {{name}}.
+
+Suggested note (300 chars max):
+"Hi {{name}} — I work with immigration attorneys & E-2 advisors on referral partnerships. New Dawn Franchising: $225K E-2 platform, escrow-protected, 12.5% broker commission ($28,125/placement). Would love to connect."`,
+  },
+  {
+    stepOrder: 2,
+    delayDays: 0,
+    stepType: "email",
+    stepName: "Touch 1 — What Your E-2 Clients Need",
+    priority: "High",
+    subject: "A referral partner for your E-2 pipeline — and $28,125 per placement",
+    bodyHtml: `<div style="${EMAIL_STYLE}">
+  <p>Dear {{name}},</p>
+  <p>I'm reaching out from <strong><a href="${WEBSITE}">New Dawn Franchising</a></strong> — a multi-vertical franchise platform built specifically for the <strong>E-2 Treaty Investor Visa</strong>. We partner with immigration attorneys, visa consultants, wealth managers, and business brokers who need a credible U.S. business solution for their clients.</p>
+  <p>When your E-2 candidates ask what they actually want, the checklist is usually the same:</p>
+  <ul>
+    <li><strong>Obtain an E-2 visa</strong> — through a real, qualifying $225,000 U.S. business investment</li>
+    <li><strong>Renew it long-term</strong> — with documented operating activity and renewal-ready reporting</li>
+    <li><strong>Live anywhere in the United States</strong> — director oversight without being tied to one city</li>
+    <li><strong>Proven day-to-day systems</strong> — so they're not answering tenant calls or running field ops</li>
+    <li><strong>Escrow protection</strong> — client funds held safely until the visa is approved</li>
+    <li><strong>A reasonable ROI</strong> — with financial performance disclosed in our FDD (Item 19)</li>
+    <li><strong>A clear exit plan</strong> — structured buy-back so clients aren't locked in indefinitely</li>
+  </ul>
+  <p>New Dawn delivers all of that across three recurring-revenue verticals — <strong>Property Management, Insurance, or Telecom</strong> — while your client directs the business and our approved teams handle daily execution.</p>
+  <p>For referring brokers, every qualified placement earns <strong>12.5% commission — $28,125</strong> on our standard $225,000 package, paid when the visa clears and funds are released from escrow.</p>
+  <p>Would you be open to a 15-minute call to see whether this fits your practice?</p>
+  <p>Best regards,<br/><strong>Dylan Delaney</strong><br/>New Dawn Franchising<br/><a href="${WEBSITE}">www.newdawnfranchising.com</a> · <a href="${WEBSITE}/broker-portal">Broker Portal</a><br/>dylan@newdawnfranchising.com</p>
+</div>`,
+    bodyText: `Dear {{name}},
+
+I'm reaching out from New Dawn Franchising — a multi-vertical franchise platform built specifically for the E-2 Treaty Investor Visa. We partner with immigration attorneys, visa consultants, wealth managers, and business brokers who need a credible U.S. business solution for their clients.
+
+When your E-2 candidates ask what they actually want, the checklist is usually the same:
+- Obtain an E-2 visa through a real, qualifying $225,000 U.S. business investment
+- Renew it long-term with documented operating activity and renewal-ready reporting
+- Live anywhere in the United States — director oversight without being tied to one city
+- Proven day-to-day systems so they're not answering tenant calls or running field ops
+- Escrow protection — client funds held safely until the visa is approved
+- A reasonable ROI with financial performance disclosed in our FDD (Item 19)
+- A clear exit plan — structured buy-back so clients aren't locked in indefinitely
+
+New Dawn delivers all of that across three recurring-revenue verticals — Property Management, Insurance, or Telecom — while your client directs the business and our approved teams handle daily execution.
+
+For referring brokers, every qualified placement earns 12.5% commission — $28,125 on our standard $225,000 package, paid when the visa clears and funds are released from escrow.
+
+Would you be open to a 15-minute call to see whether this fits your practice?
+
+Best regards,
+Dylan Delaney
+New Dawn Franchising
+${WEBSITE} · Broker Portal: ${WEBSITE}/broker-portal
+dylan@newdawnfranchising.com`,
+  },
+  {
+    stepOrder: 3,
+    delayDays: 1,
+    stepType: "sms",
+    stepName: "Day 1 SMS — Broker Intro",
+    priority: "Low",
+    subject: "New Dawn broker intro",
+    bodyHtml: `Hi {{name}}, Dylan from New Dawn Franchising. Just emailed about our E-2 referral partnership — your clients get escrow-protected $225K, live-anywhere director model, FDD Item 19 ROI. You earn $28,125 (12.5%) per placement. Worth a look? ${WEBSITE}`,
+    bodyText: `Hi {{name}}, Dylan from New Dawn Franchising. Just emailed about our E-2 referral partnership — your clients get escrow-protected $225K, live-anywhere director model, FDD Item 19 ROI. You earn $28,125 (12.5%) per placement. Worth a look? ${WEBSITE}`,
+  },
+  {
+    stepOrder: 4,
+    delayDays: 2,
+    stepType: "linkedin_message",
+    stepName: "LinkedIn DM — Follow-Up",
+    priority: "Medium",
+    subject: "",
+    bodyHtml: `Send a LinkedIn message to {{name}} (if connected).
+
+Suggested message:
+"Hi {{name}} — sent you an email so it doesn't get buried. New Dawn is built for E-2 referral partners: your clients get obtain & renew the visa, live anywhere in the U.S., escrow-protected funds, proven day-to-day ops, FDD Item 19 financials, and a structured exit. You earn $28,125 (12.5%) per qualified placement. Happy to share a broker one-pager."`,
+    bodyText: `Send a LinkedIn message to {{name}} (if connected).
+
+Suggested message:
+"Hi {{name}} — sent you an email so it doesn't get buried. New Dawn is built for E-2 referral partners: your clients get obtain & renew the visa, live anywhere in the U.S., escrow-protected funds, proven day-to-day ops, FDD Item 19 financials, and a structured exit. You earn $28,125 (12.5%) per qualified placement. Happy to share a broker one-pager."`,
+  },
+  {
+    stepOrder: 5,
+    delayDays: 3,
+    stepType: "email",
+    stepName: "Touch 2 — Escrow Protection & Commission Alignment",
+    priority: "High",
+    subject: "Escrow protects your clients — and aligns your $28,125 commission",
+    bodyHtml: `<div style="${EMAIL_STYLE}">
+  <p>Hi {{name}},</p>
+  <p>One of the first questions your E-2 clients ask: <strong>"What happens to my money if the visa doesn't come through?"</strong> And one of the first questions referring brokers ask: <strong>"When do I actually get paid?"</strong></p>
+  <p>New Dawn's escrow structure answers both:</p>
+  <ul>
+    <li><strong>Client funds held in escrow</strong> — the qualifying $225,000 investment is safeguarded from day one, not released into the business until the E-2 visa is approved</li>
+    <li><strong>Refund framework</strong> — if a qualifying E-2 application is denied, investment funds are released from escrow and returned to the client (full details in the FDD)</li>
+    <li><strong>Real operating business</strong> — established and running during the petition, giving your client's attorney genuine enterprise documentation</li>
+    <li><strong>Commission paid when funds clear</strong> — your <strong>12.5% referral fee ($28,125)</strong> is paid when the visa clears and New Dawn receives funds from escrow — aligned incentives for everyone</li>
+  </ul>
+  <p>This is intentional. Your clients should never be in a position where their money is gone and their visa is not — and you should never be in a position where you've referred a client into an unstructured process.</p>
+  <p>Track every referral in our <a href="${WEBSITE}/broker-portal">broker portal</a>. Happy to walk you through the escrow and commission flow on a short call: <a href="${CALENDLY}">book a time here</a>.</p>
+  <p>Best,<br/><strong>Dylan Delaney</strong><br/>New Dawn Franchising</p>
+</div>`,
+    bodyText: `Hi {{name}},
+
+One of the first questions your E-2 clients ask: "What happens to my money if the visa doesn't come through?" And one of the first questions referring brokers ask: "When do I actually get paid?"
+
+New Dawn's escrow structure answers both:
+- Client funds held in escrow — $225,000 safeguarded until E-2 visa approval
+- Refund framework — if a qualifying E-2 application is denied, funds returned to client (details in FDD)
+- Real operating business — genuine enterprise documentation for your client's attorney
+- Commission paid when funds clear — your 12.5% referral fee ($28,125) paid when visa clears and funds are released
+
+Your clients should never be in a position where their money is gone and their visa is not — and you should never refer into an unstructured process.
+
+Track referrals in our broker portal: ${WEBSITE}/broker-portal
+Book a call: ${CALENDLY}
+
+Best,
+Dylan Delaney
+New Dawn Franchising`,
+  },
+  {
+    stepOrder: 6,
+    delayDays: 5,
+    stepType: "email",
+    stepName: "Touch 3 — Director Model & Day-to-Day Operations",
+    priority: "High",
+    subject: "What to tell your clients — live anywhere, we run the day-to-day",
+    bodyHtml: `<div style="${EMAIL_STYLE}">
+  <p>Hi {{name}},</p>
+  <p>When you present an E-2 qualifying opportunity to skeptical clients, the objection is almost always the same: <strong>"I don't want to move to Texas and run a business myself."</strong></p>
+  <p>That's exactly why New Dawn's <strong>director model</strong> resonates with referral partners:</p>
+  <h3 style="color: #c9a227;">Live Anywhere in the United States</h3>
+  <p>Your client is the <strong>Director</strong> — they set strategy, review performance, and maintain executive oversight. They don't have to live where the business operates. Miami, Austin, New York, or abroad between embassy appointments: the platform is designed for geographic flexibility.</p>
+  <h3 style="color: #c9a227;">Proven Day-to-Day Operating Systems</h3>
+  <p>Our approved local teams handle daily execution in the client's chosen vertical:</p>
+  <ul>
+    <li><strong>Property Management</strong> — tenant relations, maintenance coordination, lease administration</li>
+    <li><strong>Insurance</strong> — policy servicing, client renewals, licensed staff under their supervision</li>
+    <li><strong>Telecom</strong> — account provisioning, billing, and customer support</li>
+  </ul>
+  <p>Proprietary technology — owner dashboards, automated client communication, marketing, and workflow automation — gives your client full visibility without being on-site every day. This isn't off-the-shelf software; it's infrastructure built for E-2 investor oversight.</p>
+  <p>Each vertical meets E-2 requirements: a real, operating enterprise with documented revenue, active management, and renewal-ready reporting.</p>
+  <p>Would a 15-minute walkthrough help you present this to your next E-2 client? <a href="${CALENDLY}">Book here</a>.</p>
+  <p>Best,<br/><strong>Dylan Delaney</strong><br/>New Dawn Franchising</p>
+</div>`,
+    bodyText: `Hi {{name}},
+
+When you present an E-2 qualifying opportunity to skeptical clients, the objection is almost always: "I don't want to move to Texas and run a business myself."
+
+That's why New Dawn's director model resonates with referral partners:
+
+Live Anywhere in the U.S.: your client is the Director — strategy, performance review, executive oversight — without living where the business operates.
+
+Proven Day-to-Day Operating Systems: approved local teams handle Property Management, Insurance, or Telecom execution. Proprietary technology (dashboards, automation, marketing) gives full visibility without being on-site.
+
+Each vertical meets E-2 requirements: real operating enterprise, documented revenue, active management, renewal-ready reporting.
+
+Would a 15-minute walkthrough help you present this to your next E-2 client? ${CALENDLY}
+
+Best,
+Dylan Delaney
+New Dawn Franchising`,
+  },
+  {
+    stepOrder: 7,
+    delayDays: 7,
+    stepType: "email",
+    stepName: "Touch 4 — FDD Item 19 Talking Points",
+    priority: "High",
+    subject: "Arm yourself with FDD Item 19 — answer your clients' ROI questions",
+    bodyHtml: `<div style="${EMAIL_STYLE}">
+  <p>Hi {{name}},</p>
+  <p>Your E-2 clients will ask: <strong>"What kind of return can I expect?"</strong> You need a credible answer — without overpromising.</p>
+  <p>New Dawn's Franchise Disclosure Document (FDD) includes a <strong>Financial Performance Representation (Item 19)</strong> — the section where franchisors disclose actual or projected financial results. This is your best tool for ROI conversations:</p>
+  <ul>
+    <li><strong>Expected revenue and expenses</strong> — detailed financial projections for each vertical (Property Management, Insurance, Telecom)</li>
+    <li><strong>Recurring-revenue model</strong> — management fees, policy renewals, or telecom contracts that compound over time</li>
+    <li><strong>Investment structure</strong> — how the $225,000 qualifying investment is allocated</li>
+    <li><strong>Financing options</strong> — we work with lenders experienced in E-2 transactions</li>
+  </ul>
+  <p>We don't put specific earnings figures in outreach emails (federal franchise law requires clients review the FDD directly), but <strong>you can request the FDD on behalf of your practice</strong> and walk clients through Item 19 on a discovery call.</p>
+  <p>Meanwhile, your referral commission stays straightforward: <strong>$225,000 × 12.5% = $28,125</strong> per qualified placement.</p>
+  <p><a href="${WEBSITE}/request-fdd">Request the FDD</a> for your files, or <a href="${CALENDLY}">book a call</a> and we'll walk you through the numbers together.</p>
+  <p>Best regards,<br/><strong>Dylan Delaney</strong><br/>New Dawn Franchising<br/>dylan@newdawnfranchising.com</p>
+</div>`,
+    bodyText: `Hi {{name}},
+
+Your E-2 clients will ask: "What kind of return can I expect?" You need a credible answer — without overpromising.
+
+New Dawn's FDD includes a Financial Performance Representation (Item 19) — your best tool for ROI conversations:
+- Expected revenue and expenses for each vertical (Property Management, Insurance, Telecom)
+- Recurring-revenue model — management fees, policy renewals, or telecom contracts
+- Investment structure — how the $225,000 qualifying investment is allocated
+- Financing options — lenders experienced in E-2 transactions
+
+Request the FDD for your files at ${WEBSITE}/request-fdd. Your referral commission: $225,000 × 12.5% = $28,125 per qualified placement.
+
+Book a call: ${CALENDLY}
+
+Best regards,
+Dylan Delaney
+New Dawn Franchising
+dylan@newdawnfranchising.com`,
+  },
+  {
+    stepOrder: 8,
+    delayDays: 7,
+    stepType: "call",
+    stepName: "Call — Broker Referral Partnership Discussion",
+    priority: "High",
+    subject: "",
+    bodyHtml: `Call {{name}} to discuss the New Dawn broker referral partnership.
+
+Talking points (broker-centered):
+• Referral commission: $225,000 × 12.5% = $28,125 per qualified client — paid when visa clears
+• Client value prop: obtain & renew E-2 visa, live anywhere in U.S., director model
+• Escrow guarantee — client funds held until visa approval; refund framework in FDD
+• Day-to-day ops — approved local teams run PM, Insurance, or Telecom
+• FDD Item 19 — financial performance talking points for client ROI conversations
+• Exit plan — structured buy-back program for skeptical clients
+• Broker portal — register referrals, track clients & commission status: ${WEBSITE}/broker-portal
+• No exclusivity required — partner alongside existing referral relationships
+• Book follow-up: ${CALENDLY}`,
+    bodyText: `Call {{name}} to discuss the New Dawn broker referral partnership.
+
+Talking points (broker-centered):
+• Referral commission: $225,000 × 12.5% = $28,125 per qualified client — paid when visa clears
+• Client value prop: obtain & renew E-2 visa, live anywhere in U.S., director model
+• Escrow guarantee — client funds held until visa approval; refund framework in FDD
+• Day-to-day ops — approved local teams run PM, Insurance, or Telecom
+• FDD Item 19 — financial performance talking points for client ROI conversations
+• Exit plan — structured buy-back program for skeptical clients
+• Broker portal — register referrals, track clients & commission status: ${WEBSITE}/broker-portal
+• No exclusivity required — partner alongside existing referral relationships
+• Book follow-up: ${CALENDLY}`,
+  },
+  {
+    stepOrder: 9,
+    delayDays: 10,
+    stepType: "email",
+    stepName: "Touch 5 — E-2 Renewal Story For Your Clients",
+    priority: "Medium",
+    subject: "Help your clients think past the first visa — renewal is the real goal",
+    bodyHtml: `<div style="${EMAIL_STYLE}">
+  <p>Hi {{name}},</p>
+  <p>Your sharpest E-2 clients don't just ask how to <em>get</em> the visa — they ask how to <em>keep</em> it. That's the conversation that separates a credible referral from a one-time transaction.</p>
+  <p>The E-2 Treaty Investor Visa is <strong>renewable indefinitely</strong> in two- to five-year increments, as long as the business continues to qualify. New Dawn is structured for exactly that long-term story:</p>
+  <ul>
+    <li><strong>Recurring-revenue contracts</strong> — management fees, policy renewals, or telecom billing that compound year over year</li>
+    <li><strong>Documented operating activity</strong> — auditable records your client's attorney can present at every renewal</li>
+    <li><strong>Active management by the investor</strong> — executive oversight satisfying the "develop and direct" requirement</li>
+    <li><strong>U.S. workers employed</strong> — local teams on the ground, supporting enterprise credibility</li>
+    <li><strong>Spouse work authorization</strong> — eligible under E-2 dependent rules</li>
+  </ul>
+  <p>When you can present a complete lifecycle — entry, operation, renewal, and exit — your clients trust the referral. And you earn <strong>$28,125</strong> for every qualified placement that closes.</p>
+  <p>Happy to discuss how this fits your practice on a quick call.</p>
+  <p>Best,<br/><strong>Dylan Delaney</strong><br/>New Dawn Franchising</p>
+</div>`,
+    bodyText: `Hi {{name}},
+
+Your sharpest E-2 clients don't just ask how to get the visa — they ask how to keep it. That's the conversation that separates a credible referral from a one-time transaction.
+
+The E-2 Treaty Investor Visa is renewable indefinitely in two- to five-year increments. New Dawn is structured for that long-term story:
+- Recurring-revenue contracts that compound year over year
+- Documented operating activity — auditable records for every renewal
+- Active management by the investor — executive oversight satisfying "develop and direct"
+- U.S. workers employed — local teams supporting enterprise credibility
+- Spouse work authorization — eligible under E-2 dependent rules
+
+When you present a complete lifecycle — entry, operation, renewal, and exit — your clients trust the referral. And you earn $28,125 for every qualified placement that closes.
+
+Happy to discuss on a quick call.
+
+Best,
+Dylan Delaney
+New Dawn Franchising`,
+  },
+  {
+    stepOrder: 10,
+    delayDays: 14,
+    stepType: "email",
+    stepName: "Touch 6 — Structured Exit For Skeptical Clients",
+    priority: "Medium",
+    subject: "Close skeptical clients — New Dawn has a structured exit plan",
+    bodyHtml: `<div style="${EMAIL_STYLE}">
+  <p>Hi {{name}},</p>
+  <p>When your E-2 clients evaluate a qualifying investment, <strong>exit strategy matters as much as entry</strong>. The clients who hesitate longest are often the ones who fear being locked into a franchise indefinitely.</p>
+  <p>That's why New Dawn has <strong>structured buy-back programs</strong> — giving your clients a clear, documented path when they're ready to transition out:</p>
+  <ul>
+    <li><strong>A defined exit</strong> — not an open-ended obligation your client will regret in five years</li>
+    <li><strong>In-house buy-back option</strong> — a structured mechanism documented in the FDD</li>
+    <li><strong>Complete lifecycle story</strong> — entry, operation, renewal, and exit their attorney can document</li>
+    <li><strong>Reduced risk for you</strong> — you can confidently present a full picture to skeptical referrals</li>
+  </ul>
+  <p>Pair that with escrow-protected funds, the director model, proven day-to-day operating systems, FDD Item 19 financial performance, and the freedom to live anywhere in the U.S. — and you have a referral opportunity that's genuinely differentiated in the E-2 space.</p>
+  <p>Referring brokers earn <strong>$28,125</strong> (12.5% of $225,000) per qualified placement. Want me to send the broker partnership overview?</p>
+  <p>Best,<br/><strong>Dylan Delaney</strong><br/>New Dawn Franchising</p>
+</div>`,
+    bodyText: `Hi {{name}},
+
+When your E-2 clients evaluate a qualifying investment, exit strategy matters as much as entry. The clients who hesitate longest often fear being locked into a franchise indefinitely.
+
+New Dawn has structured buy-back programs — a clear, documented path when clients are ready to transition out:
+- A defined exit — not an open-ended obligation
+- In-house buy-back option — documented in the FDD
+- Complete lifecycle story — entry, operation, renewal, and exit their attorney can document
+- Reduced risk for you — confidently present a full picture to skeptical referrals
+
+Pair that with escrow-protected funds, the director model, proven day-to-day ops, FDD Item 19, and live-anywhere flexibility.
+
+Referring brokers earn $28,125 (12.5% of $225,000) per qualified placement. Want me to send the broker partnership overview?
+
+Best,
+Dylan Delaney
+New Dawn Franchising`,
+  },
+  {
+    stepOrder: 11,
+    delayDays: 17,
+    stepType: "sms",
+    stepName: "Day 17 SMS — Pipeline Check-In",
+    priority: "Low",
+    subject: "E-2 pipeline check-in",
+    bodyHtml: `Hi {{name}}, Dylan from New Dawn. Any E-2 clients exploring U.S. business options? Escrow-protected $225K, director model, FDD Item 19, structured exit. You earn $28,125/referral. Register clients at ${WEBSITE}/broker-portal · ${CALENDLY}`,
+    bodyText: `Hi {{name}}, Dylan from New Dawn. Any E-2 clients exploring U.S. business options? Escrow-protected $225K, director model, FDD Item 19, structured exit. You earn $28,125/referral. Register clients at ${WEBSITE}/broker-portal · ${CALENDLY}`,
+  },
+  {
+    stepOrder: 12,
+    delayDays: 21,
+    stepType: "email",
+    stepName: "Touch 7 — The Broker Referral Journey",
+    priority: "Medium",
+    subject: "What a broker-referred client journey looks like — and when you get paid",
+    bodyHtml: `<div style="${EMAIL_STYLE}">
+  <p>Hi {{name}},</p>
+  <p>I wanted to lay out the complete broker referral journey — so you know exactly what your clients experience and when your commission lands:</p>
+  <ol>
+    <li><strong>You register the client</strong> — submit their details through our <a href="${WEBSITE}/broker-portal">broker portal</a> before or at first contact</li>
+    <li><strong>Discovery call</strong> — we match your client to their preferred vertical (Property Management, Insurance, or Telecom) and review FDD Item 19</li>
+    <li><strong>Investment & escrow</strong> — $225,000 placed in escrow; funds held until the E-2 visa is approved</li>
+    <li><strong>E-2 petition support</strong> — real operating business documentation for their attorney</li>
+    <li><strong>Director onboarding</strong> — your client takes executive oversight; our teams launch day-to-day operations</li>
+    <li><strong>Live anywhere</strong> — your client directs the business from anywhere in the U.S.</li>
+    <li><strong>Ongoing operations & reporting</strong> — proprietary dashboards and renewal-ready documentation</li>
+    <li><strong>E-2 renewals</strong> — recurring revenue and documented activity supporting indefinite visa renewal</li>
+    <li><strong>Your commission</strong> — <strong>$28,125</strong> (12.5% of $225,000) paid when the visa clears and funds are released from escrow</li>
+    <li><strong>Exit optionality</strong> — structured buy-back when your client is ready to transition out</li>
+  </ol>
+  <p>Even if the timing isn't right today, I'd love to be your go-to when an E-2 client needs a qualifying U.S. business.</p>
+  <p><a href="${CALENDLY}">Book 20 minutes here</a> · <a href="${WEBSITE}/broker-portal">Open the broker portal</a></p>
+  <p>Best,<br/><strong>Dylan Delaney</strong><br/>New Dawn Franchising</p>
+</div>`,
+    bodyText: `Hi {{name}},
+
+The complete broker referral journey — what your clients experience and when your commission lands:
+
+1. You register the client — submit details through our broker portal before or at first contact
+2. Discovery call — match to preferred vertical and review FDD Item 19
+3. Investment & escrow — $225,000 placed in escrow; funds held until E-2 visa approval
+4. E-2 petition support — real operating business documentation for their attorney
+5. Director onboarding — client takes executive oversight; our teams launch daily ops
+6. Live anywhere — client directs the business from anywhere in the U.S.
+7. Ongoing operations & reporting — proprietary dashboards and renewal-ready documentation
+8. E-2 renewals — recurring revenue supporting indefinite visa renewal
+9. Your commission — $28,125 (12.5% of $225,000) paid when visa clears and funds release
+10. Exit optionality — structured buy-back when client is ready to transition out
+
+Even if the timing isn't right today, I'd love to be your go-to when an E-2 client needs a qualifying U.S. business.
+
+Book 20 minutes: ${CALENDLY} · Broker portal: ${WEBSITE}/broker-portal
+
+Best,
+Dylan Delaney
+New Dawn Franchising`,
+  },
+  {
+    stepOrder: 13,
+    delayDays: 28,
+    stepType: "email",
+    stepName: "Touch 8 — Final Note",
+    priority: "Low",
+    subject: "Closing the loop — E-2 referrals & $28,125 commission whenever you need us",
+    bodyHtml: `<div style="${EMAIL_STYLE}">
+  <p>Hi {{name}},</p>
+  <p>This will be my last email in this series — I don't want to clutter your inbox.</p>
+  <p>If any of your clients are ever looking for an E-2 qualifying franchise, please keep <strong><a href="${WEBSITE}">New Dawn Franchising</a></strong> in mind.</p>
+  <p><strong>Quick recap for your files:</strong></p>
+  <ul>
+    <li><strong>For your clients:</strong> obtain & renew the E-2 visa, live anywhere in the U.S., escrow-protected $225,000 investment</li>
+    <li><strong>Three verticals:</strong> Property Management, Insurance, or Telecom — recurring-revenue models</li>
+    <li><strong>Director model:</strong> client oversees; New Dawn runs day-to-day operations</li>
+    <li><strong>Proven systems:</strong> proprietary technology, dashboards, and renewal-ready reporting</li>
+    <li><strong>ROI talking points:</strong> FDD Item 19 Financial Performance Representation (<a href="${WEBSITE}/request-fdd">request the FDD</a>)</li>
+    <li><strong>Structured exit:</strong> in-house buy-back program when clients are ready to transition</li>
+    <li><strong>For you:</strong> <strong>$28,125</strong> referral commission (12.5% of $225,000) per qualified placement — paid when visa clears</li>
+    <li><strong>Broker portal:</strong> <a href="${WEBSITE}/broker-portal">register referrals & track commission status</a></li>
+  </ul>
+  <p>Feel free to reach out anytime at <a href="mailto:dylan@newdawnfranchising.com">dylan@newdawnfranchising.com</a> or <a href="${CALENDLY}">book a call</a>. We're always here.</p>
+  <p>Wishing you continued success,<br/><strong>Dylan Delaney</strong><br/>New Dawn Franchising<br/>El Paso, Texas</p>
+</div>`,
+    bodyText: `Hi {{name}},
+
+This will be my last email in this series — I don't want to clutter your inbox.
+
+If any of your clients are ever looking for an E-2 qualifying franchise, please keep New Dawn Franchising in mind.
+
+Quick recap for your files:
+- For your clients: obtain & renew the E-2 visa, live anywhere in the U.S., escrow-protected $225,000 investment
+- Three verticals: Property Management, Insurance, or Telecom — recurring-revenue models
+- Director model: client oversees; New Dawn runs day-to-day operations
+- Proven systems: proprietary technology, dashboards, and renewal-ready reporting
+- ROI talking points: FDD Item 19 Financial Performance Representation (request at ${WEBSITE}/request-fdd)
+- Structured exit: in-house buy-back program when clients are ready to transition
+- For you: $28,125 referral commission (12.5% of $225,000) per qualified placement — paid when visa clears
+- Broker portal: ${WEBSITE}/broker-portal
+
+Feel free to reach out anytime at dylan@newdawnfranchising.com or book a call: ${CALENDLY}. We're always here.
+
+Wishing you continued success,
+Dylan Delaney
+New Dawn Franchising
+El Paso, Texas`,
+  },
+];
+
 export const CAMPAIGN_TRACKS: Record<TrackId, CampaignTrackStep[]> = {
-  broker: BROKER_TRACK,
+  broker: BROKER_2_TRACK,
   client: CLIENT_TRACK,
 };
 
 export function getTrackSteps(track: TrackId): CampaignTrackStep[] {
-  return CAMPAIGN_TRACKS[track] ?? BROKER_TRACK;
+  return CAMPAIGN_TRACKS[track] ?? BROKER_2_TRACK;
 }
 
 export function campaignNameForTrack(track: TrackId): string {
-  return track === "client" ? CLIENT_CAMPAIGN_NAME : BROKER_CAMPAIGN_NAME;
+  if (track === "client") return CLIENT_CAMPAIGN_NAME;
+  return BROKER_2_CAMPAIGN_NAME;
 }

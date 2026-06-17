@@ -43,8 +43,13 @@ async function apolloHttpError(res: Response): Promise<ProviderError> {
     (typeof body?.error === "string" && body.error) ||
     (typeof body?.message === "string" && body.message) ||
     "";
-  if (res.status === 401 || res.status === 403) {
-    return { status: res.status, code: "unauthorized", message: "Apollo.io rejected the API key (unauthorized). Check APOLLO_API_KEY." };
+  if (res.status === 401) {
+    return { status: 401, code: "unauthorized", message: "Apollo.io rejected the API key (unauthorized). Check APOLLO_API_KEY." };
+  }
+  if (res.status === 403) {
+    // The People Search endpoint (mixed_people/api_search) only accepts a MASTER
+    // API key — a regular key returns 403. Tell the user exactly how to fix it.
+    return { status: 403, code: "unauthorized", message: "Apollo.io's People Search API requires a master API key. In Apollo → Settings → Integrations → API, create a key with 'Set as master key' enabled and set it as APOLLO_API_KEY." };
   }
   if (res.status === 429) {
     return { status: 429, code: "rateLimited", message: "Apollo.io rate limit reached. Try again shortly." };
@@ -236,7 +241,11 @@ function mapCompany(org: ApolloOrg): SeamlessCompany {
   };
 }
 
-// ─── People search (POST /mixed_people/search) ──────────────────────────────
+// ─── People search (POST /mixed_people/api_search) ───────────────────────────
+// Apollo deprecated the old /mixed_people/search endpoint for API callers (it now
+// returns HTTP 422 "deprecated"). The current endpoint is /mixed_people/api_search
+// ("People API Search"), which requires a MASTER API key. It returns search-level
+// matches with emails/phones masked until an explicit reveal/enrichment step.
 
 export async function apolloSearchContacts(
   filters: SeamlessContactFilters,
@@ -265,7 +274,7 @@ export async function apolloSearchContacts(
   if (keywords) body.q_keywords = keywords;
 
   try {
-    const res = await fetch(`${APOLLO_BASE}/mixed_people/search`, {
+    const res = await fetch(`${APOLLO_BASE}/mixed_people/api_search`, {
       method: "POST",
       headers: authHeaders(key),
       body: JSON.stringify(body),
@@ -273,23 +282,38 @@ export async function apolloSearchContacts(
     });
     if (!res.ok) {
       const error = await apolloHttpError(res);
-      console.warn(`[Apollo] /mixed_people/search ${error.status} ${error.code}: ${error.message}`);
+      console.warn(`[Apollo] /mixed_people/api_search ${error.status} ${error.code}: ${error.message}`);
       return { people: [], nextToken: null, error };
     }
     const json = (await res.json()) as {
       people?: ApolloPerson[];
-      pagination?: { page?: number; total_pages?: number };
+      pagination?: { page?: number; total_pages?: number; total_entries?: number };
     };
     const people = Array.isArray(json.people) ? json.people.map(mapPerson) : [];
-    const pg = json.pagination;
-    const nextToken =
-      pg && pg.page != null && pg.total_pages != null && pg.page < pg.total_pages
-        ? String(pg.page + 1)
-        : null;
+    const nextToken = computeNextToken(json.pagination, page, perPage);
     return { people, nextToken };
   } catch {
     return { people: [], nextToken: null, error: apolloNetworkError() };
   }
+}
+
+/**
+ * Apollo paginates via `page`/`per_page`. The api_search response may report
+ * `total_pages` directly or only `total_entries`; handle both, and fall back to
+ * "assume more if this page came back full" so we never strand later pages.
+ */
+function computeNextToken(
+  pg: { page?: number; total_pages?: number; total_entries?: number } | undefined,
+  requestedPage: number,
+  perPage: number,
+): string | null {
+  const curPage = pg?.page ?? requestedPage;
+  let totalPages = pg?.total_pages;
+  if (totalPages == null && pg?.total_entries != null) {
+    totalPages = Math.max(1, Math.ceil(pg.total_entries / perPage));
+  }
+  if (totalPages != null) return curPage < totalPages ? String(curPage + 1) : null;
+  return null;
 }
 
 // ─── Company search (POST /mixed_companies/search) ──────────────────────────

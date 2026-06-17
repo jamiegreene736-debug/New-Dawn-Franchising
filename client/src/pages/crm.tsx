@@ -949,7 +949,10 @@ export default function CrmPage() {
   // few minutes). New clients land here; assign them to a list from the CRM tab.
   const syncSeamlessMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/seamless/sync", {});
+      // Manual click = a FULL pull of your Seamless contacts (the cron stays
+      // incremental). So the button always re-fetches everything, even when the
+      // background watermark is already current.
+      const res = await apiRequest("POST", "/api/seamless/sync", { full: true });
       return res.json() as Promise<{ fetched: number; imported: number; skipped: number; error: string | null; note?: string }>;
     },
     onSuccess: (data) => {

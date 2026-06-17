@@ -23,6 +23,7 @@ import { logSearchEvent } from "./search-telemetry";
 import { draftProspectOutreach } from "./outreach-drafter";
 import { flagExistingContacts, flagExistingClients } from "./contact-upsert";
 import type { EnrichedContact } from "./prospect-enrichment";
+import { findSimilarCompanies } from "./similar-companies";
 
 export interface AgentPerson {
   fullName: string;
@@ -43,9 +44,20 @@ export interface AgentPerson {
   inCrm?: boolean; // true if this person already exists in our CRM
 }
 
+// A company surfaced by find_similar_companies. Carries a domain so the user can
+// immediately ask "find contacts at <name>" and the Seamless contact search has
+// the strongest possible identifier to work with.
+export interface AgentCompany {
+  name: string;
+  domain: string | null;
+  description: string | null;
+  location: string | null;
+}
+
 export interface AgentResult {
   reply: string;
   people: AgentPerson[];
+  companies: AgentCompany[];
   provider: ProviderId;
   error?: string;
 }
@@ -56,9 +68,15 @@ const MAX_ROUNDS = 4;
 const SYSTEM_PROMPT = `You are the Lead Research assistant for New Dawn Franchising, an E-2 visa franchise platform (Property Management, Telecom, Insurance) based in El Paso, Texas. You help the team find and reach their ideal customers and referral partners.
 
 You can take real actions through tools:
-- Use "search_people" to build prospect lists from external data providers when the user describes who they want to reach. Translate their description into structured filters (titles, seniorities, countries, keywords, etc.).
+- Use "find_similar_companies" to discover COMPANIES that are like / similar to / competitors of a specific named company, or a list of companies in a niche (e.g. "find me companies like GlobeVisa", "GlobeVisa's competitors", "visa consultancies like X", "firms similar to Y"). It searches the LIVE WEB (not just our lead database), so it actually finds real comparable companies. Pass a "descriptionHint" of what the reference company does whenever you know it (e.g. "global immigration & investor-visa consultancy") — it produces much better matches.
+- Use "search_people" to build prospect lists of PEOPLE/CONTACTS from external data providers when the user describes who they want to reach. Translate their description into structured filters (titles, seniorities, countries, keywords, etc.).
 - Use "search_crm" to find people we ALREADY have in our CRM (e.g. "who in our pipeline looks like an immigration attorney", "investors from the UK we've talked to"). Prefer this when the user refers to existing contacts/leads rather than net-new prospecting.
 - Use "analyze_icp" when they ask who to target, to analyze their business/website, or when you need context about New Dawn before searching.
+
+COMPANIES vs PEOPLE — pick the right tool:
+- "find me companies like X" / "competitors of X" / "X-type firms" → that's about COMPANIES. CALL find_similar_companies. Do NOT call search_people for this — search_people only finds people at companies you already name; it cannot find companies that are "like" another one.
+- After find_similar_companies returns, present the results as a short numbered list — for each company give its name, one line on what it does, and its location (mention the website domain too). Then tell the user they can say "find contacts at <company name>" and you'll pull the people there.
+- "find me contacts/people at <company>" / "who works at <company>" → CALL search_people with companyNames set to that company (and companyDomains if you know the domain), and no titles, to return the whole company.
 
 Every prospect that search_people returns is automatically scored for ICP FIT and buying INTENT, and tagged hot/warm/cool. The tool result gives you each person's tier and the reasons behind it ("UK-based founder; relocation intent"). Use these to prioritise — lead with the hottest matches and briefly say WHY they're a fit.
 
@@ -92,6 +110,22 @@ SUGGESTED SEARCHES:
 - Partners: titles [Immigration Attorney, Partner, Founder] + keywords [E-2 visa, immigration, investor visa, relocation].`;
 
 const TOOLS = [
+  {
+    name: "find_similar_companies",
+    description:
+      "Find real COMPANIES similar to a reference company by searching the live web. Use whenever the user wants companies LIKE / SIMILAR TO / COMPETITORS OF a named company, or a list of companies in a niche (e.g. 'companies like GlobeVisa', 'GlobeVisa competitors'). Returns each company's name, website domain, what it does, and location. This finds organizations — to then get the PEOPLE at one of them, call search_people with that company's name/domain.",
+    input_schema: {
+      type: "object",
+      properties: {
+        reference: { type: "string", description: "The reference company to find peers/competitors of, e.g. GlobeVisa." },
+        referenceDomain: { type: "string", description: "The reference company's website domain if known, e.g. globevisa.com." },
+        descriptionHint: { type: "string", description: "What the reference company does / its industry, if you know it — improves match quality. E.g. 'global immigration & investor-visa consultancy'." },
+        countries: { type: "array", items: { type: "string" }, description: "Optional country/region focus for the peer companies." },
+        count: { type: "number", description: "How many companies to return (default 12, max 25)." },
+      },
+      required: ["reference"],
+    },
+  },
   {
     name: "search_people",
     description:
@@ -190,17 +224,19 @@ export async function runLeadResearchAgent(
   const provider = pickProvider(requestedProvider);
 
   if (!apiKey) {
-    return { reply: "The AI assistant isn't configured yet (ANTHROPIC_API_KEY is missing). Add it in Railway to enable conversational lead research.", people: [], provider };
+    return { reply: "The AI assistant isn't configured yet (ANTHROPIC_API_KEY is missing). Add it in Railway to enable conversational lead research.", people: [], companies: [], provider };
   }
 
   // Conversation must start with a user message.
   const clean = (messages || []).filter((m) => m && typeof m.content === "string" && m.content.trim());
   while (clean.length && clean[0].role !== "user") clean.shift();
-  if (clean.length === 0) return { reply: "What kind of customers are you looking for?", people: [], provider };
+  if (clean.length === 0) return { reply: "What kind of customers are you looking for?", people: [], companies: [], provider };
 
   // Working transcript for the Anthropic API (content blocks).
   const convo: any[] = clean.map((m) => ({ role: m.role, content: m.content }));
   const foundByKey = new Map<string, AgentPerson>();
+  // Companies surfaced by find_similar_companies this turn (for the UI cards).
+  const companiesByKey = new Map<string, AgentCompany>();
 
   async function callClaude(): Promise<any> {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -267,6 +303,45 @@ export async function runLeadResearchAgent(
         return JSON.stringify({ source: "crm", found: matches.length, matchType: matches[0]?.matchType ?? "keyword", sample });
       } catch (e: any) {
         return JSON.stringify({ error: e?.message || "crm search failed" });
+      }
+    }
+    if (name === "find_similar_companies") {
+      const reference = String(input?.reference || "").trim();
+      if (!reference) return JSON.stringify({ error: "reference company required" });
+      const arr = (v: any): string[] | undefined =>
+        Array.isArray(v) ? v.map((x) => String(x || "").trim()).filter(Boolean) : undefined;
+      const count = Number(input?.count);
+      const started = Date.now();
+      try {
+        const result = await findSimilarCompanies({
+          reference,
+          referenceDomain: input?.referenceDomain ? String(input.referenceDomain) : null,
+          descriptionHint: input?.descriptionHint ? String(input.descriptionHint) : null,
+          countries: arr(input?.countries),
+          limit: Number.isFinite(count) ? count : 12,
+        });
+        // Stash for the UI (company cards with a one-click "Find contacts").
+        for (const c of result.companies) {
+          const key = (c.domain || c.name).toLowerCase();
+          if (!companiesByKey.has(key)) companiesByKey.set(key, c);
+        }
+        void logSearchEvent({
+          surface: "agent", query: `similar:${reference}`,
+          resultCount: result.companies.length, durationMs: Date.now() - started,
+          error: result.error ?? null,
+        });
+        if (result.error) return JSON.stringify({ error: result.error, reference, note: result.note });
+        return JSON.stringify({
+          reference: result.reference,
+          groundedByWeb: result.groundedByWeb,
+          found: result.companies.length,
+          companies: result.companies.map((c) => ({ name: c.name, domain: c.domain, what: c.description, location: c.location })),
+          note: result.note,
+          next: "These are COMPANIES. To get the people at one, the user can say 'find contacts at <company>' and you should then call search_people with companyNames (and companyDomains if known).",
+        });
+      } catch (e: any) {
+        void logSearchEvent({ surface: "agent", query: `similar:${reference}`, error: e?.message, durationMs: Date.now() - started });
+        return JSON.stringify({ error: e?.message || "similar-company search failed", reference });
       }
     }
     if (name === "search_people") {
@@ -392,9 +467,10 @@ export async function runLeadResearchAgent(
       }
     }
 
-    return { reply: reply || "Done.", people, provider };
+    const companies = Array.from(companiesByKey.values());
+    return { reply: reply || "Done.", people, companies, provider };
   } catch (err: any) {
     console.error("[LeadResearchAgent] error:", err?.message || err);
-    return { reply: "Sorry — I hit a problem reaching the AI service. Please try again.", people: [], provider, error: err?.message };
+    return { reply: "Sorry — I hit a problem reaching the AI service. Please try again.", people: [], companies: [], provider, error: err?.message };
   }
 }

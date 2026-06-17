@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Sparkles, Send, Loader2, UserPlus, Check, Linkedin, Mail, Phone, Megaphone, PenLine, Copy, Trash2 } from "lucide-react";
+import { Sparkles, Send, Loader2, UserPlus, Check, Linkedin, Mail, Phone, Megaphone, PenLine, Copy, Trash2, Building2, Users, Globe } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { apiRequest } from "@/lib/queryClient";
@@ -38,10 +38,21 @@ const TIER_STYLE: Record<string, string> = {
 };
 const TIER_LABEL: Record<string, string> = { hot: "🔥 Hot", warm: "Warm", cool: "Cool", low: "Low fit" };
 
+// A company surfaced by "find me companies like X". Each carries a domain so the
+// "Find contacts" button can ask the agent for the people there with the best
+// possible identifier.
+interface AgentCompany {
+  name: string;
+  domain: string | null;
+  description: string | null;
+  location: string | null;
+}
+
 interface ChatMsg {
   role: "user" | "assistant";
   content: string;
   people?: AgentPerson[];
+  companies?: AgentCompany[];
 }
 
 const SUGGESTIONS = [
@@ -261,8 +272,9 @@ export default function LeadResearchAgent({ provider }: { provider?: string }) {
         messages: history.map((m) => ({ role: m.role, content: m.content })),
         provider,
       });
-      const data = await res.json() as { reply: string; people?: AgentPerson[] };
+      const data = await res.json() as { reply: string; people?: AgentPerson[]; companies?: AgentCompany[] };
       const people = data.people || [];
+      const companies = data.companies || [];
       // Re-addable after deletion: the server re-checks the CRM on every search,
       // so if it now says a person is NOT in the CRM (e.g. you deleted them),
       // drop any stale session "added" mark so the Add button comes back.
@@ -273,7 +285,7 @@ export default function LeadResearchAgent({ provider }: { provider?: string }) {
         for (const p of people) if (!p.inCrm && next.delete(keyOf(p))) changed = true;
         return changed ? next : prev;
       });
-      setMessages((prev) => [...prev, { role: "assistant", content: data.reply || "Done.", people }]);
+      setMessages((prev) => [...prev, { role: "assistant", content: data.reply || "Done.", people, companies }]);
     } catch {
       setMessages((prev) => [...prev, { role: "assistant", content: "Sorry — I couldn't reach the AI service. Please try again." }]);
     } finally {
@@ -454,6 +466,41 @@ export default function LeadResearchAgent({ provider }: { provider?: string }) {
           <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
             <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${m.role === "user" ? "bg-[hsl(var(--primary))] text-white" : "bg-muted text-foreground"}`}>
               <p className="whitespace-pre-wrap leading-relaxed">{m.content}</p>
+              {m.companies && m.companies.length > 0 && (
+                <div className="mt-2 space-y-1.5">
+                  {m.companies.map((c, j) => (
+                    <div key={j} className="rounded-lg border bg-card px-2 py-1.5">
+                      <div className="flex items-center gap-2">
+                        <Building2 className="size-4 shrink-0 text-muted-foreground" />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-xs font-semibold text-foreground">{c.name}</p>
+                          {c.description && (
+                            <p className="truncate text-[11px] text-muted-foreground" title={c.description}>{c.description}</p>
+                          )}
+                          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground">
+                            {c.location && <span>{c.location}</span>}
+                            {c.domain && (
+                              <a href={`https://${c.domain}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-blue-600 hover:underline">
+                                <Globe className="size-2.5" />{c.domain}
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 shrink-0 gap-1 px-2 text-[11px]"
+                          disabled={loading}
+                          onClick={() => requestSend(`Find contacts at ${c.name}${c.domain ? ` (${c.domain})` : ""}`)}
+                          title={`Find people at ${c.name}`}
+                        >
+                          <Users className="size-3" /> Find contacts
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
               {m.people && m.people.length > 0 && (() => {
                 const people = m.people;
                 const selectable = people.filter((pp) => !isInCrm(pp));

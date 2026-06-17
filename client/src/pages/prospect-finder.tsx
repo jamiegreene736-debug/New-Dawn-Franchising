@@ -148,6 +148,19 @@ const PROVIDER_LABELS: Record<ProviderId, string> = {
   apollo: "Apollo.io",
   origami: "Origami",
 };
+// The Railway env var that connects each provider — surfaced in the
+// "not connected" hint so the user knows exactly what to add.
+const PROVIDER_ENV: Record<ProviderId, string> = {
+  seamless: "SEAMLESS_API_KEY",
+  apollo: "APOLLO_API_KEY",
+  origami: "ORIGAMI_API_KEY",
+};
+// Tab labels for the provider search tabs (top-level view switcher).
+const PROVIDER_TAB_LABELS: Record<ProviderId, string> = {
+  seamless: "Find Decision Makers",
+  apollo: "Apollo.io",
+  origami: "Origami.chat",
+};
 // Distinct accent colors so each provider's results are visually distinguishable.
 const PROVIDER_STYLES: Record<ProviderId, { dot: string; chip: string; badge: string }> = {
   seamless: { dot: "bg-blue-500",   chip: "border-blue-300 bg-blue-50 text-blue-700",     badge: "bg-blue-100 text-blue-700 border-blue-200" },
@@ -911,13 +924,16 @@ function sortContacts(rows: EnrichedContact[], col: string | null, dir: TableSor
 export default function ProspectFinder() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [viewTab, setViewTab] = useState<"search" | "saved">("search");
-  // ── Seamless.AI Lead Research search state ──
+  // Top-level view: one tab per lead-data source (Seamless / Apollo / Origami)
+  // plus the Saved List. Each provider tab runs only that source; results from
+  // any tab import into the same CRM tab via the provider-agnostic add flow.
+  const [viewTab, setViewTab] = useState<"seamless" | "apollo" | "origami" | "saved">("seamless");
+  const activeProvider: ProviderId | null = viewTab === "saved" ? null : viewTab;
+  // ── Lead Research search state ──
   const [searchTab, setSearchTab] = useState<"contacts" | "companies">("contacts");
   const [filters, setFilters] = useState<LeadFilters>({ ...EMPTY_FILTERS });
   const [aiQuery, setAiQuery] = useState("");
-  // Multi-provider search: which providers the user wants to run + live run state.
-  const [selectedProviders, setSelectedProviders] = useState<Set<ProviderId>>(new Set<ProviderId>());
+  // Live per-provider run state (the search pipeline indicator).
   const [providerRun, setProviderRun] = useState<ProviderRunState[]>([]);
   const [isSearchPending, setIsSearchPending] = useState(false);
   const [revealingIds, setRevealingIds] = useState<Set<string>>(new Set());
@@ -997,24 +1013,6 @@ export default function ProspectFinder() {
   const providerStatuses: ProviderStatus[] = providerStatusData?.providers
     ?? PROVIDER_ORDER.map((id) => ({ id, label: PROVIDER_LABELS[id], configured: false, credits: null }));
   const providerStatusById = new Map(providerStatuses.map((p) => [p.id, p]));
-
-  // Default the selection to every connected provider once status loads (run once).
-  const didInitProviders = useRef(false);
-  useEffect(() => {
-    if (didInitProviders.current || !providerStatusData) return;
-    const connected = providerStatuses.filter((p) => p.configured).map((p) => p.id);
-    setSelectedProviders(new Set(connected.length ? connected : (["seamless"] as ProviderId[])));
-    didInitProviders.current = true;
-  }, [providerStatusData]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const toggleProvider = (id: ProviderId) => {
-    setSelectedProviders((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
 
   // ── Seamless.AI search helpers ──────────────────────────────────────────────
   const toSearchFilters = (f: LeadFilters) => ({
@@ -1155,24 +1153,22 @@ export default function ProspectFinder() {
 
   // ── Sequential multi-provider search orchestrator ───────────────────────────
   const runMultiSearch = async (opts: { aiQuery?: string } = {}) => {
-    if (isSearchPending) return;
+    if (isSearchPending || !activeProvider) return;
     const useAi = !!opts.aiQuery?.trim();
     if (!useAi && countActiveFilters(filters) === 0) {
       toast({ title: "Add a filter", description: "Add at least one filter, or use AI Search above.", variant: "destructive" });
       return;
     }
-    // Run the selected providers that are actually connected, in canonical order.
-    const order = PROVIDER_ORDER.filter(
-      (p) => selectedProviders.has(p) && providerStatusById.get(p)?.configured,
-    );
-    if (order.length === 0) {
+    // Each tab searches exactly one source — the active provider tab.
+    if (!providerStatusById.get(activeProvider)?.configured) {
       toast({
-        title: "No search source selected",
-        description: "Pick at least one connected provider (Seamless, Apollo or Origami) above.",
+        title: `${PROVIDER_LABELS[activeProvider]} not connected`,
+        description: `Add ${PROVIDER_ENV[activeProvider]} in Railway → Variables to search ${PROVIDER_LABELS[activeProvider]}.`,
         variant: "destructive",
       });
       return;
     }
+    const order: ProviderId[] = [activeProvider];
 
     setIsSearchPending(true);
     setHasSearched(true);
@@ -1724,7 +1720,6 @@ export default function ProspectFinder() {
     downloadCsv(rows, `search_results_${dateStr}.csv`);
   };
 
-  const seamlessConnected = !!enrichmentStatus?.seamless;
   const anyProviderConnected = providerStatuses.some((p) => p.configured);
 
   return (
@@ -1744,22 +1739,47 @@ export default function ProspectFinder() {
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex gap-0">
-        {(["search", "saved"] as const).map((t) => (
-          <button key={t} onClick={() => setViewTab(t)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors capitalize ${
-              viewTab === t ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}>
-            {t === "search" ? "Find Decision Makers" : `Saved List (${savedProspects.length})`}
-          </button>
-        ))}
+      {/* Tabs — one per lead-data source, then the Saved List */}
+      <div className="flex flex-wrap gap-0">
+        {([...PROVIDER_ORDER, "saved"] as const).map((t) => {
+          const isProvider = t !== "saved";
+          const provStatus = isProvider ? providerStatusById.get(t as ProviderId) : null;
+          return (
+            <button
+              key={t}
+              data-testid={`view-tab-${t}`}
+              onClick={() => {
+                if (t === viewTab) return;
+                // Switching sources starts a clean search surface.
+                if (t !== "saved") {
+                  setHasSearched(false);
+                  setCompanies([]);
+                  setSelected(new Set());
+                  setProviderRun([]);
+                }
+                setViewTab(t);
+              }}
+              className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                viewTab === t ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {isProvider && (
+                <span
+                  className={`size-1.5 rounded-full ${
+                    provStatus?.configured ? PROVIDER_STYLES[t as ProviderId].dot : "bg-muted-foreground/40"
+                  }`}
+                />
+              )}
+              {t === "saved" ? `Saved List (${savedProspects.length})` : PROVIDER_TAB_LABELS[t as ProviderId]}
+            </button>
+          );
+        })}
       </div>
 
-      {/* ── Search Tab ── */}
-      {viewTab === "search" && (
+      {/* ── Provider search tabs (Seamless / Apollo / Origami) ── */}
+      {viewTab !== "saved" && (
         <div className="space-y-4">
-          {/* Seamless.AI search */}
+          {/* Single-source search panel for the active provider tab */}
           <SeamlessSearchPanel
             searchTab={searchTab}
             setSearchTab={(t) => {
@@ -1774,11 +1794,10 @@ export default function ProspectFinder() {
             onSearch={() => runMultiSearch()}
             onAiSearch={() => runMultiSearch({ aiQuery })}
             isSearching={isSearchPending}
-            connected={seamlessConnected}
+            connected={!!(activeProvider && providerStatusById.get(activeProvider)?.configured)}
+            providerLabel={activeProvider ? PROVIDER_LABELS[activeProvider] : undefined}
+            providerEnv={activeProvider ? PROVIDER_ENV[activeProvider] : undefined}
             userName="Dylan"
-            providers={providerStatuses}
-            selectedProviders={Array.from(selectedProviders)}
-            onToggleProvider={(id) => toggleProvider(id as ProviderId)}
             providerRun={providerRun}
           />
 

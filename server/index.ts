@@ -98,6 +98,14 @@ app.use((req, res, next) => {
   } catch (err: any) {
     console.error(`[crm-list-mirror] backfill skipped: ${err?.message}`);
   }
+  // Mirror the other direction: wrap Lead Research prospect lists into CRM lists so
+  // they're one shared set (visible in the CRM Lists view too). Idempotent on boot.
+  try {
+    const wrapped = await storage.backfillProspectListWrappers();
+    if (wrapped > 0) console.log(`[list-unify] wrapped ${wrapped} Lead Research list(s) into CRM lists`);
+  } catch (err: any) {
+    console.error(`[list-unify] wrapper backfill skipped: ${err?.message}`);
+  }
   // Publish the starter blog posts the first time the blog is empty.
   await seedBlogPostsIfEmpty();
 

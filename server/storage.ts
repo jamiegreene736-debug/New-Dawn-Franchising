@@ -1,6 +1,6 @@
 import { type User, type InsertUser, type Lead, type InsertLead, type BlogPost, type InsertBlogPost, type Broker, type BrokerClient, type InsertBrokerClient, type CrmClient, type InsertCrmClient, type CrmClientActivity, type InsertCrmClientActivity, type CrmClientDocument, type CrmDirectEmail, type Prospect, type InsertProspect, type ProspectList, type CrmList, type DripCampaign, type InsertDripCampaign, type DripStep, type InsertDripStep, type DripEnrollment, type InsertDripEnrollment, type DripSend, type InsertDripSend, type FacebookPost, type InsertFacebookPost, type SignatureRequest, type SmsCampaign, type InsertSmsCampaign, type WhatsappCampaign, type InsertWhatsappCampaign, users, leads, blogPosts, brokers, brokerClients, crmClients, crmClientActivities, crmClientDocuments, crmDirectEmails, signatureRequests, prospects, prospectLists, prospectListMembers, crmLists, crmListMembers, dripCampaigns, dripSteps, dripEnrollments, dripSends, facebookPosts, smsCampaigns, whatsappCampaigns, type Contact, type InsertContact, type ContactActivity, type InsertContactActivity, type ContactTask, type InsertContactTask, type PipelineDeal, type InsertPipelineDeal, type SavedSegment, type InsertSavedSegment, type EmailTemplate, type InsertEmailTemplate, contacts, contactActivities, contactTasks, pipelineDeals, savedSegments, emailTemplates, type PhoneCall, phoneCalls } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, asc, sql, ilike, or, gte, lte, inArray, isNull } from "drizzle-orm";
+import { eq, desc, and, asc, sql, ilike, or, gte, lte, inArray, isNull, isNotNull } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -41,6 +41,7 @@ export interface IStorage {
   deleteProspectsByLocation(category: string, location: string): Promise<void>;
   getProspectLists(): Promise<(ProspectList & { count: number })[]>;
   createProspectList(name: string): Promise<ProspectList>;
+  renameProspectList(id: string, name: string): Promise<void>;
   deleteProspectList(id: string): Promise<void>;
   addProspectToList(listId: string, prospectId: string): Promise<void>;
   removeProspectFromList(listId: string, prospectId: string): Promise<void>;
@@ -54,6 +55,7 @@ export interface IStorage {
   addContactsToList(listId: string, contactIds: string[]): Promise<number>;
   removeContactsFromList(listId: string, contactIds: string[]): Promise<void>;
   backfillCrmListMirrors(): Promise<number>;
+  backfillProspectListWrappers(): Promise<number>;
   getClientsByListId(listId: string): Promise<CrmClient[]>;
   getDripCampaigns(): Promise<DripCampaign[]>;
   getDripCampaign(id: string): Promise<DripCampaign | undefined>;
@@ -316,11 +318,24 @@ export class DatabaseStorage implements IStorage {
 
   async createProspectList(name: string): Promise<ProspectList> {
     const [list] = await db.insert(prospectLists).values({ name }).returning();
+    // Unified lists: a list created in Lead Research is also surfaced as a CRM list
+    // (and vice-versa), so there's one shared set across Lead Research, the CRM tab
+    // and the campaign audience pickers. Pair every prospect_list with a crm_list.
+    await this.ensureCrmListForProspectList(list.id, name);
     return list;
+  }
+
+  async renameProspectList(id: string, name: string): Promise<void> {
+    await db.update(prospectLists).set({ name }).where(eq(prospectLists.id, id));
+    // Keep the paired CRM list's name in sync (one shared list, one name).
+    await db.update(crmLists).set({ name }).where(eq(crmLists.prospectListId, id));
   }
 
   async deleteProspectList(id: string): Promise<void> {
     await db.delete(prospectLists).where(eq(prospectLists.id, id));
+    // Drop the paired CRM list too. Direct delete (not deleteCrmList) avoids
+    // recursing back through deleteProspectList; crm_list_members cascade.
+    await db.delete(crmLists).where(eq(crmLists.prospectListId, id));
   }
 
   async addProspectToList(listId: string, prospectId: string): Promise<void> {
@@ -329,11 +344,26 @@ export class DatabaseStorage implements IStorage {
     if (existing.length === 0) {
       await db.insert(prospectListMembers).values({ listId, prospectId });
     }
+    // Reflect into the paired CRM list so the person shows up in the CRM Lists view
+    // (deduped by prospect, so client/contact-origin members aren't double-added).
+    await this.reflectProspectIntoCrmList(listId, prospectId);
   }
 
   async removeProspectFromList(listId: string, prospectId: string): Promise<void> {
     await db.delete(prospectListMembers)
       .where(and(eq(prospectListMembers.listId, listId), eq(prospectListMembers.prospectId, prospectId)));
+    // Remove the reflected prospect-only member from the paired CRM list. Leave
+    // client/contact-origin members alone — those are managed from the CRM side.
+    const [crmList] = await db.select({ id: crmLists.id }).from(crmLists)
+      .where(eq(crmLists.prospectListId, listId));
+    if (crmList) {
+      await db.delete(crmListMembers).where(and(
+        eq(crmListMembers.listId, crmList.id),
+        eq(crmListMembers.prospectId, prospectId),
+        isNull(crmListMembers.clientId),
+        isNull(crmListMembers.contactId),
+      ));
+    }
   }
 
   async getProspectsByListId(listId: string): Promise<Prospect[]> {
@@ -464,6 +494,40 @@ export class DatabaseStorage implements IStorage {
     return healed;
   }
 
+  /**
+   * One-time backfill so prospect lists created in Lead Research before the
+   * unification become visible in the CRM Lists view. Wraps every prospect_list
+   * that isn't already owned by a crm_list and reflects its members. Idempotent
+   * (already-paired lists are skipped), so it's safe on every boot. Called from
+   * server/index.ts after ensureSchema().
+   */
+  async backfillProspectListWrappers(): Promise<number> {
+    const all = await db.select({ id: prospectLists.id, name: prospectLists.name }).from(prospectLists);
+    const owned = await db.select({ pid: crmLists.prospectListId }).from(crmLists)
+      .where(isNotNull(crmLists.prospectListId));
+    const ownedSet = new Set(owned.map((o) => o.pid).filter((p): p is string => !!p));
+    let healed = 0;
+    for (const pl of all) {
+      if (ownedSet.has(pl.id)) continue;
+      try {
+        const crmListId = await this.ensureCrmListForProspectList(pl.id, pl.name);
+        const members = await db.select({ prospectId: prospectListMembers.prospectId })
+          .from(prospectListMembers).where(eq(prospectListMembers.listId, pl.id));
+        for (const m of members) {
+          const dup = await db.select({ id: crmListMembers.id }).from(crmListMembers)
+            .where(and(eq(crmListMembers.listId, crmListId), eq(crmListMembers.prospectId, m.prospectId)));
+          if (dup.length === 0) {
+            await db.insert(crmListMembers).values({ listId: crmListId, prospectId: m.prospectId });
+          }
+        }
+        healed++;
+      } catch (err: any) {
+        console.error(`[list-unify] wrapper backfill failed for prospect_list ${pl.id}: ${err?.message}`);
+      }
+    }
+    return healed;
+  }
+
   // ── CRM-list → prospect-list mirror helpers ───────────────────────────────
   // Campaigns enrol prospects, not CRM clients/contacts. Every CRM list is
   // reflected into a `prospect_list` (link stored on crm_lists.prospect_list_id)
@@ -471,6 +535,39 @@ export class DatabaseStorage implements IStorage {
   // prospect it was mirrored to (crm_list_members.prospect_id) so removal targets
   // the exact prospect — re-resolving by identity would mint a fresh, unrelated
   // prospect for an email-less person and orphan the real one in the campaign.
+
+  /**
+   * Ensure a prospect_list has a paired crm_list (the reverse of the crm_list →
+   * prospect_list mirror), so lists created in Lead Research also appear in the
+   * CRM Lists view. Idempotent — returns the existing/created crm_list id.
+   */
+  private async ensureCrmListForProspectList(prospectListId: string, name?: string): Promise<string> {
+    const [existing] = await db.select({ id: crmLists.id }).from(crmLists)
+      .where(eq(crmLists.prospectListId, prospectListId));
+    if (existing) return existing.id;
+    let listName = name;
+    if (!listName) {
+      const [pl] = await db.select({ name: prospectLists.name }).from(prospectLists).where(eq(prospectLists.id, prospectListId));
+      listName = pl?.name ?? "List";
+    }
+    const [created] = await db.insert(crmLists).values({ name: listName, prospectListId }).returning();
+    return created.id;
+  }
+
+  /**
+   * Reflect a prospect added to a prospect_list into its paired crm_list, so the
+   * person is visible in the CRM Lists view. Deduped by prospect across the list
+   * so a client/contact already mirrored to this prospect isn't double-added.
+   */
+  private async reflectProspectIntoCrmList(prospectListId: string, prospectId: string): Promise<void> {
+    const [crmList] = await db.select({ id: crmLists.id }).from(crmLists)
+      .where(eq(crmLists.prospectListId, prospectListId));
+    if (!crmList) return; // no paired CRM list (legacy list not yet wrapped)
+    const dup = await db.select({ id: crmListMembers.id }).from(crmListMembers)
+      .where(and(eq(crmListMembers.listId, crmList.id), eq(crmListMembers.prospectId, prospectId)));
+    if (dup.length > 0) return;
+    await db.insert(crmListMembers).values({ listId: crmList.id, prospectId });
+  }
 
   /** The linked prospect_list id for a CRM list, or null if it has none yet. */
   private async getLinkedProspectListId(listId: string): Promise<string | null> {

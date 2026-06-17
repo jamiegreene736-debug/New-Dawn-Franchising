@@ -1,6 +1,7 @@
 import { Router } from "express";
 import OpenAI from "openai";
 import { db } from "./db";
+import { storage } from "./storage";
 import {
   agentLeads, agentMessages, agentDailyBatches, agentForumPosts,
   agentCompetitors, agentSettings, agentRunLogs, agentDnc,
@@ -530,7 +531,7 @@ async function execFindNewLeads(args: {
   if (args.add_to_list) {
     const listName = args.add_to_list.trim();
     const ex = await db.select().from(prospectLists).where(ilike(prospectLists.name, listName)).limit(1);
-    listId = ex.length > 0 ? ex[0].id : (await db.insert(prospectLists).values({ name: listName }).returning())[0].id;
+    listId = ex.length > 0 ? ex[0].id : (await storage.createProspectList(listName)).id;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -605,7 +606,7 @@ async function execFindNewLeads(args: {
           location: locsToSearch[0],
           source: "Enriched Search (AI Agent)", sourceUrl: c.linkedinUrl,
         }).returning();
-        await db.insert(prospectListMembers).values({ listId, prospectId: prospect.id }).onConflictDoNothing();
+        await storage.addProspectToList(listId, prospect.id);
       }
 
       const scoreTag = `[Score: ${c.decisionMakerScore}/100 ${c.scoreBreakdown.tierEmoji}]`;
@@ -728,7 +729,7 @@ async function execFindNewLeads(args: {
         category: "investor", location: lead.location || searchLocations[0],
         source: "LinkedIn (AI Agent)", sourceUrl: lead.linkedinUrl,
       }).returning();
-      await db.insert(prospectListMembers).values({ listId, prospectId: prospect.id }).onConflictDoNothing();
+      await storage.addProspectToList(listId, prospect.id);
     }
     const listNote = listId ? ` → **${args.add_to_list}**` : "";
     saved.push(`**${lead.name}**${lead.jobTitle ? `, ${lead.jobTitle}` : ""}${lead.company ? ` @ ${lead.company}` : ""}${lead.location ? ` (${lead.location})` : ""}${listNote}`);
@@ -761,7 +762,7 @@ async function execAddToProspectList(args: {
     if (existing.length > 0) {
       listId = existing[0].id;
     } else {
-      const [newList] = await db.insert(prospectLists).values({ name: listName }).returning();
+      const newList = await storage.createProspectList(listName);
       listId = newList.id;
       created = true;
     }
@@ -776,7 +777,7 @@ async function execAddToProspectList(args: {
       source: "AI Agent (manual)",
     }).returning();
 
-    await db.insert(prospectListMembers).values({ listId, prospectId: prospect.id }).onConflictDoNothing();
+    await storage.addProspectToList(listId, prospect.id);
 
     const listMsg = created ? `Created new list "${listName}" and added` : `Added`;
     return `${listMsg} ${args.name}${args.company ? ` (${args.company})` : ""} to the "${listName}" prospect list.`;
@@ -824,7 +825,7 @@ async function execFindPeopleAtCompany(args: {
   if (args.add_to_list) {
     const listName = args.add_to_list.trim();
     const ex = await db.select().from(prospectLists).where(ilike(prospectLists.name, listName)).limit(1);
-    listId = ex.length > 0 ? ex[0].id : (await db.insert(prospectLists).values({ name: listName }).returning())[0].id;
+    listId = ex.length > 0 ? ex[0].id : (await storage.createProspectList(listName)).id;
   }
 
   const result = await enrichSingleCompany(args.url, "", "custom", "");
@@ -847,7 +848,7 @@ async function execFindPeopleAtCompany(args: {
           location: "Global",
           source: "AI Agent (company search)",
         }).returning();
-        await db.insert(prospectListMembers).values({ listId, prospectId: p.id }).onConflictDoNothing();
+        await storage.addProspectToList(listId, p.id);
       } catch {}
     }
   }

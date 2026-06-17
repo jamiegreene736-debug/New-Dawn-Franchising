@@ -50,7 +50,7 @@ import {
   type BulkEnrichResult,
 } from "./bulk-enrich";
 import { pollAllRenderingVideos, runHeygenPreparation } from "./heygen-service";
-import { heygenVideos, prospectLists } from "../shared/schema";
+import { heygenVideos } from "../shared/schema";
 import { eq, desc } from "drizzle-orm";
 import { db } from "./db";
 import { runAllHealthChecks, runHealthCheckWithAlerts } from "./api-health";
@@ -2709,7 +2709,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
       if (!name || typeof name !== "string" || !name.trim()) {
         return res.status(400).json({ message: "List name is required" });
       }
-      await db.update(prospectLists).set({ name: name.trim() }).where(eq(prospectLists.id, String(req.params.id)));
+      await storage.renameProspectList(String(req.params.id), name.trim());
       res.json({ ok: true });
     } catch (err: any) {
       res.status(500).json({ message: err.message || "Failed to rename list" });

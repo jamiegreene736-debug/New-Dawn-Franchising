@@ -166,6 +166,8 @@ interface ApolloPerson {
   id?: string;
   first_name?: string;
   last_name?: string;
+  /** api_search masks surnames — still useful for display until reveal. */
+  last_name_obfuscated?: string;
   name?: string;
   title?: string;
   seniority?: string;
@@ -177,6 +179,7 @@ interface ApolloPerson {
   state?: string;
   country?: string;
   organization?: ApolloOrg;
+  organization_name?: string;
 }
 
 /** Apollo masks locked emails as "email_not_unlocked@domain.com" — treat as none. */
@@ -195,7 +198,7 @@ function titleCase(s?: string | null): string | null {
   return s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function mapPerson(p: ApolloPerson): SeamlessPerson {
+function mapPerson(p: ApolloPerson, companyFallback?: string | null): SeamlessPerson {
   const org = p.organization || {};
   const email = realEmail(p.email, p.email_status);
   const verified = (p.email_status || "").toLowerCase() === "verified";
@@ -205,7 +208,11 @@ function mapPerson(p: ApolloPerson): SeamlessPerson {
     null;
   const firstName = p.first_name || (p.name ? p.name.split(/\s+/)[0] : "") || "";
   const lastName =
-    p.last_name || (p.name ? p.name.split(/\s+/).slice(1).join(" ") : "") || "";
+    p.last_name ||
+    p.last_name_obfuscated ||
+    (p.name ? p.name.split(/\s+/).slice(1).join(" ") : "") ||
+    "";
+  const company = org.name || p.organization_name || companyFallback || null;
   return {
     searchResultId: null, // Apollo reveal isn't wired to Seamless credits
     firstName,
@@ -220,7 +227,7 @@ function mapPerson(p: ApolloPerson): SeamlessPerson {
     seniority: titleCase(p.seniority),
     department: p.departments?.[0] ? titleCase(p.departments[0]) : null,
     linkedinUrl: p.linkedin_url || null,
-    company: org.name || null,
+    company,
     domain,
     country: p.country || org.country || null,
     city: p.city || org.city || null,
@@ -323,11 +330,12 @@ function guessCompanyDomain(name: string): string | null {
 async function resolveCompanyDomains(
   names: string[],
   key: string,
-): Promise<{ domains: string[]; unresolved: string[] }> {
+): Promise<{ domains: string[]; unresolved: string[]; domainToName: Map<string, string> }> {
   const top = names.slice(0, MAX_COMPANY_RESOLVES);
   const overflow = names.slice(MAX_COMPANY_RESOLVES); // beyond the cap — treat as unresolved
+  const domainToName = new Map<string, string>();
   const results = await Promise.all(
-    top.map(async (name): Promise<{ name: string; domain: string | null }> => {
+    top.map(async (name): Promise<{ name: string; domain: string | null; resolvedName: string }> => {
       try {
         const res = await fetch(
           `${APOLLO_BASE}/mixed_companies/search?${apolloQuery({ q_organization_name: normalizeCompanyName(name), per_page: 1 })}`,
@@ -341,22 +349,30 @@ async function resolveCompanyDomains(
           // Org Search is unavailable (no master key, out of credits, deprecated…).
           // Don't give up — guess the domain so the free people-search still runs.
           console.warn(`[Apollo] company resolve "${name}" failed: HTTP ${res.status} — falling back to domain guess`);
-          return { name, domain: guessCompanyDomain(name) };
+          return { name, domain: guessCompanyDomain(name), resolvedName: name.trim() };
         }
         const json = (await res.json()) as { organizations?: ApolloOrg[]; accounts?: ApolloOrg[] };
         const org = (json.organizations || json.accounts || [])[0];
         const domain =
           org?.primary_domain ||
           (org?.website_url ? org.website_url.replace(/^https?:\/\//, "").replace(/\/.*$/, "") : null);
-        return { name, domain: (domain || guessCompanyDomain(name))?.toLowerCase() ?? null };
+        const normalizedDomain = (domain || guessCompanyDomain(name))?.toLowerCase() ?? null;
+        return {
+          name,
+          domain: normalizedDomain,
+          resolvedName: org?.name?.trim() || name.trim(),
+        };
       } catch {
-        return { name, domain: guessCompanyDomain(name) };
+        return { name, domain: guessCompanyDomain(name), resolvedName: name.trim() };
       }
     }),
   );
+  for (const r of results) {
+    if (r.domain) domainToName.set(r.domain, r.resolvedName);
+  }
   const domains = Array.from(new Set(results.map((r) => r.domain).filter((d): d is string => !!d)));
   const unresolved = [...results.filter((r) => !r.domain).map((r) => r.name), ...overflow];
-  return { domains, unresolved };
+  return { domains, unresolved, domainToName };
 }
 
 export async function apolloSearchContacts(
@@ -392,11 +408,17 @@ export async function apolloSearchContacts(
   // domains; otherwise resolve names → domains via Organization Search so
   // "contacts at <Company>" actually returns that company's people, not nothing.
   const orgDomains = filters.companyDomains?.length ? [...filters.companyDomains] : [];
+  const domainToName = new Map<string, string>();
   let unresolvedNames: string[] = [];
   if (!orgDomains.length && filters.companyNames?.length) {
     const resolved = await resolveCompanyDomains(filters.companyNames, key);
     orgDomains.push(...resolved.domains);
     unresolvedNames = resolved.unresolved;
+    resolved.domainToName.forEach((name, domain) => domainToName.set(domain, name));
+  }
+  for (const d of filters.companyDomains || []) {
+    const domain = d.toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+    if (domain && !domainToName.has(domain)) domainToName.set(domain, domain);
   }
   if (orgDomains.length) baseParams.q_organization_domains_list = orgDomains;
   const sizes = mapSizes(filters.companySizes);
@@ -427,7 +449,14 @@ export async function apolloSearchContacts(
         people?: ApolloPerson[];
         pagination?: { page?: number; total_pages?: number; total_entries?: number };
       };
-      const people = Array.isArray(json.people) ? json.people.map(mapPerson) : [];
+      const people = Array.isArray(json.people)
+        ? json.people.map((person) => {
+            const mapped = mapPerson(person);
+            if (mapped.company || !mapped.domain) return mapped;
+            const fallback = domainToName.get(mapped.domain.toLowerCase());
+            return fallback ? { ...mapped, company: fallback } : mapped;
+          })
+        : [];
       return { people, nextToken: computeNextToken(json.pagination, pageNum, perPage) };
     } catch {
       return { people: [], nextToken: null, error: apolloNetworkError() };

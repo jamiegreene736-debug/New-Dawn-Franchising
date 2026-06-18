@@ -526,6 +526,7 @@ Use ONLY these keys (omit any you can't infer; never invent other keys):
 
 Rules:
 - "more than 500 employees" → companySize ["501 - 1,000","1,001 - 5,000","5,001 - 10,000","10,001+"].
+- "everyone at/who works at/from <Company>" or "find me everyone that works at <Company>" → companyName ["<Company>"] ONLY. Omit jobTitle/seniority so ALL employees at that company are returned. Strip descriptors like "the Consulting Firm" from the name (e.g. "GlobeVisa the Consulting Firm" → "GlobeVisa"). Infer companyDomain when obvious (globevisa.com).
 - Map an industry/niche to keywords, NOT to a made-up key.
 - For seniority words: "CEO/CFO/CTO/owner/founder/president/chief" → "C-Level"; "VP/vice president" → "VP".
 Example input: "Finance CEOs in Texas with more than 500 employees"
@@ -594,8 +595,16 @@ const PEOPLE_NOUNS =
 // "contacts at globevisa in texas" → company "globevisa", not "globevisa in texas".
 const TRAILING_STOP = /\b(?:in|from|for|with|located|based|near|around|that|who|which|and|or)\b.*$/i;
 
+/** Strip trailing corporate descriptors: "GlobeVisa the Consulting Firm" → "GlobeVisa". */
+function stripCompanyDescriptors(raw: string): string {
+  let s = (raw || "").trim();
+  s = s.replace(/\b(?:the|a|an)\s+(?:consulting\s+firm|consulting\s+company|consultancy|company|firm|corporation|corp|inc|llc|ltd)\b/gi, "").trim();
+  s = s.replace(/\s{2,}/g, " ").trim();
+  return s || raw.trim();
+}
+
 function titleCaseCompany(raw: string): string {
-  const s = raw.trim().replace(/[.,!?;:]+$/g, "").trim();
+  const s = stripCompanyDescriptors(raw.trim().replace(/[.,!?;:]+$/g, "").trim());
   // Leave ALLCAPS / camel-brand tokens alone ("IBM", "GlobeVisa"); otherwise
   // Title Case a plain multi-word name ("acme widgets" → "Acme Widgets").
   if (/^[A-Z0-9&.\- ]+$/.test(s) || /[a-z][A-Z]/.test(s)) return s;
@@ -620,9 +629,12 @@ function heuristicParseFilters(query: string): LeadSearchFilters {
   //    generic lowercase industry/category phrase ("tech companies", "law firms")
   //    → a keyword (the niche), NOT a literal company; otherwise → companyName.
   const companyGated = new RegExp(`(?:${PEOPLE_NOUNS})\\s+(?:at|from)\\s+(.+)$`, "i");
+  // "find me everyone that works at GlobeVisa", "everyone who works at Acme Inc"
+  const worksAtGated =
+    /(?:find\s+(?:me\s+)?)?(?:all\s+)?(?:the\s+)?(?:everyone|everybody|all\s+(?:the\s+)?(?:people|contacts|employees))(?:\s+(?:who|that)\s+works?)?\s+at\s+(.+)$/i;
   const CATEGORY_TAIL =
     /\b(?:compan(?:y|ies)|firms?|startups?|organi[sz]ations?|businesses?|agenc(?:y|ies)|enterprises?|corporations?|providers?|vendors?|brands?|institutions?|industr(?:y|ies)|equity)\s*$/i;
-  const cm = q.match(companyGated);
+  const cm = q.match(companyGated) || q.match(worksAtGated);
   if (cm && cm[1]) {
     const tail = cm[1]
       .replace(TRAILING_STOP, "")

@@ -25,7 +25,7 @@ import {
   type SeamlessCompanyFilters,
   type ProviderError,
 } from "./seamless-service";
-import { apolloSearchContacts, apolloSearchCompanies } from "./apollo-service";
+import { apolloSearchContacts, apolloSearchCompanies, apolloSearchCompanyEmployees } from "./apollo-service";
 import { origamiSearchContacts, origamiSearchCompanies } from "./origami-service";
 import { calculateDecisionMakerScore } from "./decision-maker-scorer";
 import { scoreProspect } from "./lead-intelligence";
@@ -380,6 +380,30 @@ export async function apolloCompanySearch(
   const { companies: raw, nextToken, error } = await apolloSearchCompanies(toCompanyFilters(filters, limit, opts.nextToken));
   const result = mapCompanies(raw, filters, "Apollo.io", nextToken);
   return { ...result, error: withProvider(error, "apollo") };
+}
+
+/** Resolve a company by name, then paginate Apollo to return all employees. */
+export async function apolloCompanyEmployeeSearch(
+  filters: LeadSearchFilters,
+  opts: { maxResults?: number } = {},
+): Promise<SearchResult & { resolvedCompany?: string | null; totalAvailable?: number | null }> {
+  const companyName = filters.companyName?.[0];
+  const companyDomain = filters.companyDomain?.[0];
+  if (!companyName && !companyDomain) {
+    return { companies: [], totalContacts: 0, enrichedCount: 0, nextToken: null, error: withProvider({ status: 0, code: "validation", message: "companyName or companyDomain required" }, "apollo") };
+  }
+  const { people, organization, totalAvailable, error } = await apolloSearchCompanyEmployees({
+    companyName,
+    companyDomain,
+    maxResults: opts.maxResults ?? 500,
+  });
+  const result = groupPeopleIntoCompanies(people, filters, "Apollo.io", null);
+  return {
+    ...result,
+    error: withProvider(error, "apollo"),
+    resolvedCompany: organization?.name ?? companyName ?? null,
+    totalAvailable: totalAvailable ?? null,
+  };
 }
 
 // ─── Origami (supplemental) ──────────────────────────────────────────────────

@@ -15,8 +15,9 @@
  * errors are caught and surfaced as tool results, never thrown to the caller.
  */
 
-import { type ProviderId, type LeadSearchFilters } from "./seamless-prospects";
+import { type ProviderId, type LeadSearchFilters, apolloCompanyEmployeeSearch } from "./seamless-prospects";
 import { cachedProviderSearch } from "./search-cache";
+import { apolloConfigured } from "./apollo-service";
 import { scoreProspect, type ProspectIntel } from "./lead-intelligence";
 import { searchCrmContacts } from "./semantic-search";
 import { logSearchEvent } from "./search-telemetry";
@@ -52,6 +53,8 @@ export interface AgentResult {
 
 const MODEL = "claude-sonnet-4-6";
 const MAX_ROUNDS = 4;
+const MAX_PEOPLE_DEFAULT = 60;
+const MAX_PEOPLE_COMPANY = 500;
 
 const SYSTEM_PROMPT = `You are the Lead Research assistant for New Dawn Franchising, an E-2 visa franchise platform (Property Management, Telecom, Insurance) based in El Paso, Texas. You help the team find and reach their ideal customers and referral partners.
 
@@ -65,7 +68,7 @@ Every prospect that search_people returns is automatically scored for ICP FIT an
 Behaviour:
 - Be concise, friendly, and action-oriented — like a sharp SDR teammate.
 - When the user asks to "find" / "build a list" / "get me" prospects, CALL search_people (don't just describe what you would do).
-- To find people who work at a specific company (e.g. "everyone at GlobeVisa"), set companyNames to that company and companyDomains to its likely domain (e.g. globevisa.com), and DON'T require a job title — that returns the whole company. Only add titles if the user asks for specific roles.
+- To find people who work at a specific company (e.g. "everyone at GlobeVisa" or "find me everyone that works at GlobeVisa the Consulting Firm"), call search_people with companyNames set to the core company name (e.g. "GlobeVisa") and leave titles EMPTY — the system will look up the company in Apollo and return all employees. Only add titles if the user asks for specific roles.
 - If a search returns 0 results with NO error, retry once with a broader query (e.g. drop titles, or use companyDomains instead of companyNames, or vice-versa) before telling the user nothing was found.
 - If a search result has an "error" field, the data provider FAILED — the company was never actually searched. Do NOT retry and do NOT guess that the company is too small, misspelled, or low on public data. Tell the user the real problem plainly. If the error is about credits, say the Seamless lead-data API is out of credits and its public-API credit balance needs topping up (this is separate from the Seamless website's credits).
 - After a search, state how many you found, highlight the 2–3 HIGHEST-scoring matches (name · title · company · why they're a strong fit), and tell them they can save the results to Contacts using the buttons below the list.
@@ -95,7 +98,7 @@ const TOOLS = [
   {
     name: "search_people",
     description:
-      "Search lead-data providers for people/contacts matching the criteria and build a prospect list. Use whenever the user wants to find prospects or build a list. To find everyone at a specific company, set companyNames (and companyDomains if you can infer the domain) and leave titles empty.",
+      "Search lead-data providers for people/contacts matching the criteria and build a prospect list. Use whenever the user wants to find prospects or build a list. To find EVERYONE at a specific company, set companyNames to the company name (e.g. GlobeVisa) and leave titles empty — Apollo will resolve the company and return all employees.",
     input_schema: {
       type: "object",
       properties: {
@@ -176,10 +179,17 @@ function mapContact(c: EnrichedContact): AgentPerson {
 function pickProvider(requested?: string): ProviderId {
   const r = (requested || "").toLowerCase();
   if (r === "apollo" || r === "origami" || r === "seamless") return r as ProviderId;
-  if (process.env.SEAMLESS_API_KEY) return "seamless";
   if (process.env.APOLLO_API_KEY) return "apollo";
+  if (process.env.SEAMLESS_API_KEY) return "seamless";
   if (process.env.ORIGAMI_API_KEY) return "origami";
   return "seamless";
+}
+
+/** True when the user wants everyone at a company (name/domain set, no title filter). */
+function isCompanyEmployeeSearch(filters: LeadSearchFilters): boolean {
+  const hasCompany = !!(filters.companyName?.length || filters.companyDomain?.length);
+  const hasTitles = !!(filters.jobTitle?.length);
+  return hasCompany && !hasTitles;
 }
 
 export async function runLeadResearchAgent(
@@ -201,6 +211,7 @@ export async function runLeadResearchAgent(
   // Working transcript for the Anthropic API (content blocks).
   const convo: any[] = clean.map((m) => ({ role: m.role, content: m.content }));
   const foundByKey = new Map<string, AgentPerson>();
+  let lastSearchWasCompanyWide = false;
 
   async function callClaude(): Promise<any> {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -289,8 +300,12 @@ export async function runLeadResearchAgent(
       };
       const mode = input?.mode === "companies" ? "companies" : "contacts";
       const started = Date.now();
+      const companyWide = mode === "contacts" && provider === "apollo" && apolloConfigured() && isCompanyEmployeeSearch(filters);
+      if (companyWide) lastSearchWasCompanyWide = true;
       try {
-        const result = await cachedProviderSearch(provider, mode, filters, { limit: 50 });
+        const result = companyWide
+          ? await apolloCompanyEmployeeSearch(filters, { maxResults: MAX_PEOPLE_COMPANY })
+          : await cachedProviderSearch(provider, mode, filters, { limit: 50 });
         // A provider error (out of credits, rate-limited, unauthorized, network)
         // is NOT an empty result — the search never ran. Surface it truthfully so
         // the model stops fabricating reasons ("company too small / misspelled").
@@ -306,6 +321,15 @@ export async function runLeadResearchAgent(
         }
         // providerSearch groups people into companies; flatten back to contacts.
         const contacts: EnrichedContact[] = (result.companies || []).flatMap((c) => c.contacts || []);
+        if (companyWide && contacts.length === 0) {
+          void logSearchEvent({ surface: "agent", provider, filters, resultCount: 0, durationMs: Date.now() - started });
+          return JSON.stringify({
+            provider,
+            found: 0,
+            resolvedCompany: (result as any).resolvedCompany ?? filters.companyName?.[0] ?? null,
+            note: "Apollo could not find that company or it has no indexed employees. Ask the user to confirm the spelling or provide the company website domain.",
+          });
+        }
         const scored: AgentPerson[] = [];
         for (const ct of contacts) {
           const key = (ct.email || `${ct.fullName}|${ct.companyName}`).toLowerCase();
@@ -319,12 +343,24 @@ export async function runLeadResearchAgent(
         scored.sort((a, b) => b.intel.composite - a.intel.composite);
         void logSearchEvent({
           surface: "agent", provider, filters, resultCount: contacts.length,
-          cached: result.cached ?? null, durationMs: Date.now() - started,
+          cached: (result as any).cached ?? null, durationMs: Date.now() - started,
         });
         const sample = scored.slice(0, 5).map(
           (p) => `[${p.intel.tier}] ${p.fullName} — ${p.jobTitle || "?"}${p.companyName ? ` @ ${p.companyName}` : ""} · ${p.intel.reasons.slice(0, 2).join(", ") || "match"}`,
         );
-        return JSON.stringify({ provider, cached: result.cached ?? false, found: contacts.length, total_unique: foundByKey.size, top_matches: sample });
+        const payload: Record<string, unknown> = {
+          provider,
+          cached: (result as any).cached ?? false,
+          found: contacts.length,
+          total_unique: foundByKey.size,
+          top_matches: sample,
+        };
+        if (companyWide) {
+          payload.searchType = "company_employees";
+          payload.resolvedCompany = (result as any).resolvedCompany ?? filters.companyName?.[0] ?? null;
+          payload.totalAvailable = (result as any).totalAvailable ?? contacts.length;
+        }
+        return JSON.stringify(payload);
       } catch (e: any) {
         void logSearchEvent({ surface: "agent", provider, filters, error: e?.message, durationMs: Date.now() - started });
         return JSON.stringify({ error: e?.message || "search failed", provider });
@@ -357,7 +393,7 @@ export async function runLeadResearchAgent(
 
     const people = Array.from(foundByKey.values())
       .sort((a, b) => b.intel.composite - a.intel.composite)
-      .slice(0, 60);
+      .slice(0, lastSearchWasCompanyWide ? MAX_PEOPLE_COMPANY : MAX_PEOPLE_DEFAULT);
 
     // Flag people we ALREADY have so the UI can badge them "In CRM" and disable
     // their Add button — instead of the user discovering it only when "Add"

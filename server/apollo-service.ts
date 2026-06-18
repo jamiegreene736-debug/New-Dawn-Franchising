@@ -122,6 +122,7 @@ function buildLocations(states?: string[], countries?: string[]): string[] {
 // ─── Apollo response shapes (only the fields we read) ────────────────────────
 
 interface ApolloOrg {
+  id?: string;
   name?: string;
   website_url?: string;
   primary_domain?: string;
@@ -137,6 +138,7 @@ interface ApolloPerson {
   id?: string;
   first_name?: string;
   last_name?: string;
+  last_name_obfuscated?: string;
   name?: string;
   title?: string;
   seniority?: string;
@@ -148,6 +150,12 @@ interface ApolloPerson {
   state?: string;
   country?: string;
   organization?: ApolloOrg;
+}
+
+export interface ApolloResolvedOrganization {
+  id: string;
+  name: string;
+  domain: string | null;
 }
 
 /** Apollo masks locked emails as "email_not_unlocked@domain.com" — treat as none. */
@@ -176,9 +184,12 @@ function mapPerson(p: ApolloPerson): SeamlessPerson {
     null;
   const firstName = p.first_name || (p.name ? p.name.split(/\s+/)[0] : "") || "";
   const lastName =
-    p.last_name || (p.name ? p.name.split(/\s+/).slice(1).join(" ") : "") || "";
+    p.last_name ||
+    p.last_name_obfuscated ||
+    (p.name ? p.name.split(/\s+/).slice(1).join(" ") : "") ||
+    "";
   return {
-    searchResultId: null, // Apollo reveal isn't wired to Seamless credits
+    searchResultId: p.id ?? null,
     firstName,
     lastName,
     fullName: p.name || `${firstName} ${lastName}`.trim(),
@@ -236,17 +247,13 @@ function mapCompany(org: ApolloOrg): SeamlessCompany {
   };
 }
 
-// ─── People search (POST /mixed_people/search) ──────────────────────────────
+// ─── People search (POST /mixed_people/api_search) ───────────────────────────
+// Apollo deprecated /mixed_people/search for API callers. The current People API
+// Search uses organization_ids[] or q_organization_domains_list[] — NOT company
+// names — so callers that only have a name should resolve the org first via
+// apolloFindOrganization().
 
-export async function apolloSearchContacts(
-  filters: SeamlessContactFilters,
-): Promise<{ people: SeamlessPerson[]; nextToken: string | null; error?: ProviderError | null }> {
-  const key = getKey();
-  if (!key) return { people: [], nextToken: null };
-
-  const perPage = Math.min(filters.limit || 25, 100);
-  const page = filters.nextToken ? Math.max(1, parseInt(filters.nextToken, 10) || 1) : 1;
-
+function buildPeopleSearchBody(filters: SeamlessContactFilters, page: number, perPage: number): Record<string, unknown> {
   const keywords = [
     ...(filters.keywords ? [filters.keywords] : []),
     ...(filters.keywordList || []),
@@ -258,22 +265,33 @@ export async function apolloSearchContacts(
   if (seniorities.length) body.person_seniorities = seniorities;
   const locations = buildLocations(filters.states, filters.countries);
   if (locations.length) body.person_locations = locations;
+  if (filters.organizationIds?.length) body.organization_ids = filters.organizationIds;
   if (filters.companyDomains?.length) body.q_organization_domains_list = filters.companyDomains;
-  if (filters.companyNames?.length) body.q_organization_names = filters.companyNames;
   const sizes = mapSizes(filters.companySizes);
   if (sizes.length) body.organization_num_employees_ranges = sizes;
   if (keywords) body.q_keywords = keywords;
+  return body;
+}
+
+export async function apolloSearchContacts(
+  filters: SeamlessContactFilters,
+): Promise<{ people: SeamlessPerson[]; nextToken: string | null; error?: ProviderError | null }> {
+  const key = getKey();
+  if (!key) return { people: [], nextToken: null };
+
+  const perPage = Math.min(filters.limit || 25, 100);
+  const page = filters.nextToken ? Math.max(1, parseInt(filters.nextToken, 10) || 1) : 1;
 
   try {
-    const res = await fetch(`${APOLLO_BASE}/mixed_people/search`, {
+    const res = await fetch(`${APOLLO_BASE}/mixed_people/api_search`, {
       method: "POST",
       headers: authHeaders(key),
-      body: JSON.stringify(body),
+      body: JSON.stringify(buildPeopleSearchBody(filters, page, perPage)),
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
     if (!res.ok) {
       const error = await apolloHttpError(res);
-      console.warn(`[Apollo] /mixed_people/search ${error.status} ${error.code}: ${error.message}`);
+      console.warn(`[Apollo] /mixed_people/api_search ${error.status} ${error.code}: ${error.message}`);
       return { people: [], nextToken: null, error };
     }
     const json = (await res.json()) as {
@@ -292,6 +310,51 @@ export async function apolloSearchContacts(
   }
 }
 
+/** Paginate People API Search to collect up to maxResults contacts (company-wide lists). */
+export async function apolloSearchContactsAll(
+  filters: SeamlessContactFilters,
+  maxResults = 500,
+): Promise<{ people: SeamlessPerson[]; totalAvailable: number | null; error?: ProviderError | null }> {
+  const key = getKey();
+  if (!key) return { people: [], totalAvailable: null };
+
+  const perPage = 100;
+  const maxPages = Math.ceil(maxResults / perPage);
+  const all: SeamlessPerson[] = [];
+  let totalAvailable: number | null = null;
+  let page = 1;
+
+  for (let i = 0; i < maxPages; i++) {
+    try {
+      const res = await fetch(`${APOLLO_BASE}/mixed_people/api_search`, {
+        method: "POST",
+        headers: authHeaders(key),
+        body: JSON.stringify(buildPeopleSearchBody(filters, page, perPage)),
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      });
+      if (!res.ok) {
+        const error = await apolloHttpError(res);
+        console.warn(`[Apollo] /mixed_people/api_search page ${page} ${error.status} ${error.code}: ${error.message}`);
+        return { people: all, totalAvailable, error };
+      }
+      const json = (await res.json()) as {
+        people?: ApolloPerson[];
+        total_entries?: number;
+        pagination?: { page?: number; total_pages?: number };
+      };
+      if (typeof json.total_entries === "number") totalAvailable = json.total_entries;
+      const batch = Array.isArray(json.people) ? json.people.map(mapPerson) : [];
+      all.push(...batch);
+      const pg = json.pagination;
+      if (!pg || pg.page == null || pg.total_pages == null || pg.page >= pg.total_pages || batch.length === 0) break;
+      page = pg.page + 1;
+    } catch {
+      return { people: all, totalAvailable, error: apolloNetworkError() };
+    }
+  }
+  return { people: all.slice(0, maxResults), totalAvailable };
+}
+
 // ─── Company search (POST /mixed_companies/search) ──────────────────────────
 
 export async function apolloSearchCompanies(
@@ -305,7 +368,8 @@ export async function apolloSearchCompanies(
 
   const body: Record<string, unknown> = { page, per_page: perPage };
   if (filters.companyDomains?.length) body.q_organization_domains_list = filters.companyDomains;
-  if (filters.companyNames?.length) body.q_organization_names = filters.companyNames;
+  // Organization Search expects a single q_organization_name string (partial match OK).
+  if (filters.companyNames?.length) body.q_organization_name = filters.companyNames[0];
   const locations = buildLocations(filters.states, filters.countries);
   if (locations.length) body.organization_locations = locations;
   const sizes = mapSizes(filters.companySizes);
@@ -340,6 +404,99 @@ export async function apolloSearchCompanies(
   } catch {
     return { companies: [], nextToken: null, error: apolloNetworkError() };
   }
+}
+
+/** Strip conversational fluff so "GlobeVisa the Consulting Firm" → "GlobeVisa". */
+export function normalizeCompanyQuery(raw: string): string {
+  let s = (raw || "").trim();
+  if (!s) return s;
+  s = s.replace(/\b(the|a|an)\s+(consulting\s+firm|company|firm|corporation|corp|inc|llc|ltd)\b/gi, "").trim();
+  s = s.replace(/\s{2,}/g, " ").trim();
+  return s || raw.trim();
+}
+
+/** Resolve a company name to Apollo's organization id + domain (step 1 of employee lookup). */
+export async function apolloFindOrganization(
+  companyName: string,
+): Promise<{ org: ApolloResolvedOrganization | null; error?: ProviderError | null }> {
+  const key = getKey();
+  if (!key) return { org: null };
+
+  const query = normalizeCompanyQuery(companyName);
+  if (!query) return { org: null };
+
+  try {
+    const res = await fetch(`${APOLLO_BASE}/mixed_companies/search`, {
+      method: "POST",
+      headers: authHeaders(key),
+      body: JSON.stringify({ page: 1, per_page: 10, q_organization_name: query }),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+    if (!res.ok) {
+      const error = await apolloHttpError(res);
+      return { org: null, error };
+    }
+    const json = (await res.json()) as { organizations?: ApolloOrg[]; accounts?: ApolloOrg[] };
+    const raw = json.organizations || json.accounts || [];
+    if (!Array.isArray(raw) || raw.length === 0) return { org: null };
+
+    const q = query.toLowerCase();
+    const ranked = [...raw].sort((a, b) => {
+      const an = (a.name || "").toLowerCase();
+      const bn = (b.name || "").toLowerCase();
+      const aExact = an === q ? 0 : an.startsWith(q) ? 1 : an.includes(q) ? 2 : 3;
+      const bExact = bn === q ? 0 : bn.startsWith(q) ? 1 : bn.includes(q) ? 2 : 3;
+      return aExact - bExact;
+    });
+    const best = ranked[0];
+    if (!best?.id) return { org: null };
+    const domain =
+      best.primary_domain ||
+      (best.website_url ? best.website_url.replace(/^https?:\/\//, "").replace(/\/.*$/, "") : null) ||
+      null;
+    return { org: { id: best.id, name: best.name || query, domain } };
+  } catch {
+    return { org: null, error: apolloNetworkError() };
+  }
+}
+
+/**
+ * Find everyone at a company: resolve org by name (if needed), then paginate
+ * People API Search by organization_ids + domain.
+ */
+export async function apolloSearchCompanyEmployees(opts: {
+  companyName?: string;
+  companyDomain?: string;
+  maxResults?: number;
+}): Promise<{
+  people: SeamlessPerson[];
+  organization: ApolloResolvedOrganization | null;
+  totalAvailable: number | null;
+  error?: ProviderError | null;
+}> {
+  const key = getKey();
+  if (!key) return { people: [], organization: null, totalAvailable: null };
+
+  let org: ApolloResolvedOrganization | null = null;
+  const domain = opts.companyDomain?.replace(/^https?:\/\//i, "").replace(/^www\./i, "").split("/")[0].toLowerCase() || null;
+
+  if (opts.companyName) {
+    const found = await apolloFindOrganization(opts.companyName);
+    if (found.error) return { people: [], organization: null, totalAvailable: null, error: found.error };
+    org = found.org;
+  }
+
+  const searchDomain = domain || org?.domain || null;
+  if (!org?.id && !searchDomain) {
+    return { people: [], organization: org, totalAvailable: null };
+  }
+
+  const filters: SeamlessContactFilters = {
+    organizationIds: org?.id ? [org.id] : undefined,
+    companyDomains: searchDomain ? [searchDomain] : undefined,
+  };
+  const { people, totalAvailable, error } = await apolloSearchContactsAll(filters, opts.maxResults ?? 500);
+  return { people, organization: org, totalAvailable, error };
 }
 
 // ─── People enrichment / match (POST /people/match) ──────────────────────────

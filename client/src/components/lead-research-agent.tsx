@@ -94,7 +94,7 @@ function apiErrorMessage(err: any, fallback: string): string {
 
 // A single agent turn returns up to this many unique people (mirrors the server's
 // `.slice(0, 60)` in runLeadResearchAgent). Used for the pre-search credit estimate.
-const MAX_RESULTS = 60;
+const MAX_RESULTS = 500;
 
 type DraftEntry = { channel: string; subject: string | null; body: string };
 

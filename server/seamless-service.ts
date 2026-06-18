@@ -218,6 +218,7 @@ export interface SeamlessContactFilters {
   companyNames?: string[]; // companyName (multiple)
   companyNameSearchType?: "default" | "related" | "exact";
   companyDomains?: string[]; // companyDomain
+  organizationIds?: string[]; // Apollo organization_ids (resolved from company search)
   countries?: string[]; // contactCountry (full names, e.g. "United States")
   states?: string[]; // contactState
   zipCodes?: string[]; // contactZipCode

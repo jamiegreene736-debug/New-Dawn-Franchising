@@ -324,6 +324,10 @@ export default function SeamlessSearchPanel({
   const set = <K extends keyof LeadFilters>(key: K, value: LeadFilters[K]) => setFilters({ ...filters, [key]: value });
   const isCompanies = searchTab === "companies";
   const greetName = (userName || "").trim() || "there";
+  // Route the AI chat to the user's selected search source (Apollo, Seamless, etc.).
+  const agentProvider =
+    (selectedProviders || []).find((id) => providers?.some((p) => p.id === id && p.configured)) ||
+    providers?.find((p) => p.configured)?.id;
 
   return (
     <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
@@ -592,7 +596,7 @@ export default function SeamlessSearchPanel({
 
             {/* Conversational AI lead-research agent (builds lists, analyzes ICP,
                 drafts outreach, and saves/enrolls results). */}
-            <LeadResearchAgent />
+            <LeadResearchAgent provider={agentProvider} />
 
             <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
               <button

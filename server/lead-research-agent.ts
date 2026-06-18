@@ -34,7 +34,14 @@ export interface AgentPerson {
   email: string | null;
   phone: string | null;
   linkedinUrl: string | null;
-  location: string | null;
+  /** Person's own location (city/state/country). */
+  contactLocation: string | null;
+  /** Employer HQ / office location. */
+  companyLocation: string | null;
+  seniority: string | null;
+  department: string | null;
+  industries: string[] | null;
+  website: string | null;
   // Seamless search-result handle — lets "Add to CRM" reveal email/phone for
   // this exact person at add-time (the reliable enrich path). Null for results
   // from providers/paths without one.
@@ -197,7 +204,12 @@ function mapContact(c: EnrichedContact): AgentPerson {
     email: c.email ?? null,
     phone: c.phone ?? null,
     linkedinUrl: c.linkedinUrl ?? null,
-    location: c.companyLocation ?? null,
+    contactLocation: c.address ?? null,
+    companyLocation: c.companyLocation ?? null,
+    seniority: c.seniority ?? null,
+    department: c.department ?? null,
+    industries: c.industries ?? null,
+    website: c.website ?? null,
     searchResultId: c.searchResultId ?? null,
     intel: {
       fitScore: c.icpFitScore ?? 0,
@@ -287,7 +299,7 @@ export async function runLeadResearchAgent(
           firstName: person?.firstName ?? fullName.split(" ")[0],
           jobTitle: person?.jobTitle ?? null,
           companyName: person?.companyName ?? null,
-          country: person?.location ?? null,
+          country: person?.contactLocation ?? person?.companyLocation ?? null,
           channel,
           audience: person?.intel.audience,
           reasons: person?.intel.reasons,
@@ -316,7 +328,9 @@ export async function runLeadResearchAgent(
               fullName: m.fullName, firstName: m.fullName.split(" ")[0] || m.fullName,
               lastName: m.fullName.split(" ").slice(1).join(" "), jobTitle: m.jobTitle,
               companyName: m.firmName, email: m.email, phone: m.phone, linkedinUrl: m.linkedinUrl,
-              location: m.country, intel, inCrm: true,
+              contactLocation: m.country, companyLocation: null,
+              seniority: null, department: null, industries: null, website: null,
+              intel, inCrm: true,
             });
           }
         }

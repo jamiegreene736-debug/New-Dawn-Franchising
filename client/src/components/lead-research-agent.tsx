@@ -24,7 +24,12 @@ interface AgentPerson {
   email: string | null;
   phone: string | null;
   linkedinUrl: string | null;
-  location: string | null;
+  contactLocation: string | null;
+  companyLocation: string | null;
+  seniority: string | null;
+  department: string | null;
+  industries: string[] | null;
+  website: string | null;
   searchResultId?: string | null;
   intel?: ProspectIntel;
   inCrm?: boolean;
@@ -37,6 +42,8 @@ const TIER_STYLE: Record<string, string> = {
   low: "border-gray-200 bg-gray-50 text-gray-500",
 };
 const TIER_LABEL: Record<string, string> = { hot: "🔥 Hot", warm: "Warm", cool: "Cool", low: "Low fit" };
+
+const cell = (value?: string | null) => value?.trim() || "—";
 
 interface ChatMsg {
   role: "user" | "assistant";
@@ -59,7 +66,7 @@ const keyOf = (p: AgentPerson) => (p.email || p.fullName).toLowerCase();
 const toContactBody = (p: AgentPerson) => ({
   fullName: p.fullName, firstName: p.firstName, lastName: p.lastName,
   companyName: p.companyName || "", email: p.email, phone: p.phone,
-  linkedinUrl: p.linkedinUrl, jobTitle: p.jobTitle, country: p.location, bio: null,
+  linkedinUrl: p.linkedinUrl, jobTitle: p.jobTitle, country: p.contactLocation || p.companyLocation, bio: null,
   searchResultId: p.searchResultId ?? null,
 });
 
@@ -71,7 +78,7 @@ const toClientBody = (p: AgentPerson) => ({
   fullName: p.fullName,
   email: p.email || "",
   phone: p.phone || undefined,
-  country: p.location || undefined,
+  country: p.contactLocation || p.companyLocation || undefined,
   companyName: p.companyName || undefined,
   profession: p.jobTitle || undefined,
   linkedinUrl: p.linkedinUrl || undefined,
@@ -122,7 +129,7 @@ const GREETING: ChatMsg = {
 // (CRM tab, etc.) used to wipe them. Persist to sessionStorage so they survive
 // unmount/remount and reloads within the tab session. Bump the key whenever the
 // persisted shape changes so stale payloads are ignored rather than mis-read.
-const storeKeyFor = (provider: LeadProviderId) => `nd_lead_agent_v3_${provider}`;
+const storeKeyFor = (provider: LeadProviderId) => `nd_lead_agent_v4_${provider}`;
 const SKIP_CREDIT_KEY = "nd_lead_agent_skip_credit_note";
 
 interface PersistedState {
@@ -417,7 +424,7 @@ export default function LeadResearchAgent({ provider: providerProp }: { provider
     try {
       const res = await apiRequest("POST", "/api/crm/lead-research/draft-outreach", {
         fullName: p.fullName, firstName: p.firstName, jobTitle: p.jobTitle,
-        companyName: p.companyName, country: p.location, channel,
+        companyName: p.companyName, country: p.contactLocation || p.companyLocation, channel,
         audience: p.intel?.audience, reasons: p.intel?.reasons, explanation: p.intel?.explanation,
       });
       const d = await res.json() as { channel: string; subject: string | null; body: string };
@@ -474,20 +481,26 @@ export default function LeadResearchAgent({ provider: providerProp }: { provider
         )}
       </div>
 
-      <div ref={scrollRef} className="max-h-[420px] overflow-y-auto px-4 py-3 space-y-3">
+      <div ref={scrollRef} className="max-h-[520px] overflow-y-auto px-4 py-3 space-y-3">
         {messages.map((m, i) => (
-          <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-            <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${m.role === "user" ? "bg-[hsl(var(--primary))] text-white" : "bg-muted text-foreground"}`}>
-              <p className="whitespace-pre-wrap leading-relaxed">{m.content}</p>
-              {m.people && m.people.length > 0 && (() => {
-                const people = m.people;
-                const selectable = people.filter((pp) => !isInCrm(pp));
-                const selectedCount = selectable.filter((pp) => selected.has(keyOf(pp))).length;
-                const allSelected = selectable.length > 0 && selectedCount === selectable.length;
-                return (
-                <div className="mt-2 space-y-1.5">
-                  {people.length > 1 && (
-                    <div className="flex items-center justify-between gap-2 rounded-lg border bg-muted/40 px-2 py-1.5">
+          <div key={i} className={m.role === "assistant" && m.people?.length ? "space-y-2" : ""}>
+            <div className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+              <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${m.role === "user" ? "bg-[hsl(var(--primary))] text-white" : "bg-muted text-foreground"}`}>
+                <p className="whitespace-pre-wrap leading-relaxed">{m.content}</p>
+              </div>
+            </div>
+            {m.role === "assistant" && m.people && m.people.length > 0 && (() => {
+              const people = m.people;
+              const selectable = people.filter((pp) => !isInCrm(pp));
+              const selectedCount = selectable.filter((pp) => selected.has(keyOf(pp))).length;
+              const allSelected = selectable.length > 0 && selectedCount === selectable.length;
+              return (
+                <div className="w-full rounded-xl border bg-card shadow-sm overflow-hidden" data-testid="agent-results-table">
+                  <div className="flex items-center justify-between gap-2 border-b bg-muted/40 px-3 py-2">
+                    <p className="text-[11px] font-semibold text-foreground">
+                      {people.length} result{people.length === 1 ? "" : "s"}
+                    </p>
+                    <div className="flex items-center gap-2">
                       <label className="flex cursor-pointer items-center gap-1.5 text-[11px] font-medium text-foreground">
                         <input
                           type="checkbox"
@@ -508,69 +521,142 @@ export default function LeadResearchAgent({ provider: providerProp }: { provider
                         Add {selectedCount > 0 ? `${selectedCount} ` : ""}to CRM
                       </Button>
                     </div>
-                  )}
-                  {people.map((p, j) => {
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[960px] text-xs whitespace-nowrap">
+                      <thead className="border-b bg-muted/30">
+                        <tr className="[&>th]:px-2.5 [&>th]:py-2 [&>th]:text-left [&>th]:font-medium [&>th]:text-muted-foreground">
+                          <th className="w-8" />
+                          <th>Name</th>
+                          <th>Title</th>
+                          <th>Company</th>
+                          <th>Contact Location</th>
+                          <th>Company Location</th>
+                          <th>Email</th>
+                          <th>Phone</th>
+                          <th>LinkedIn</th>
+                          <th>Seniority</th>
+                          <th>Department</th>
+                          <th>Industries</th>
+                          <th>Website</th>
+                          <th>Fit</th>
+                          <th className="sticky right-0 bg-muted/30">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {people.map((p, j) => {
+                          const key = keyOf(p);
+                          const isAdded = isInCrm(p);
+                          const enrolledIn = enrolled.get(key);
+                          const pickerOpen = enrollOpenFor === key;
+                          return (
+                            <tr key={j} className="border-b last:border-0 hover:bg-muted/20 [&>td]:px-2.5 [&>td]:py-1.5 align-top">
+                              <td>
+                                {!isAdded && (
+                                  <input
+                                    type="checkbox"
+                                    className="size-3.5 accent-[hsl(var(--primary))]"
+                                    checked={selected.has(key)}
+                                    onChange={() => toggleSelect(p)}
+                                    aria-label={`Select ${p.fullName}`}
+                                  />
+                                )}
+                              </td>
+                              <td>
+                                <div className="flex flex-col gap-0.5">
+                                  <div className="flex items-center gap-1 font-medium text-foreground">
+                                    <span>{p.fullName}</span>
+                                    {p.inCrm && <span className="rounded-full border border-violet-200 bg-violet-50 px-1 py-0 text-[9px] font-medium text-violet-700">In CRM</span>}
+                                  </div>
+                                  {p.intel?.reasons?.length ? (
+                                    <span className="max-w-[180px] truncate text-[10px] text-muted-foreground" title={p.intel.reasons.join(" · ")}>
+                                      {p.intel.reasons.slice(0, 2).join(" · ")}
+                                    </span>
+                                  ) : null}
+                                </div>
+                              </td>
+                              <td className="max-w-[160px] truncate" title={p.jobTitle || ""}>{cell(p.jobTitle)}</td>
+                              <td className="font-medium text-foreground">{cell(p.companyName)}</td>
+                              <td>{cell(p.contactLocation)}</td>
+                              <td>{cell(p.companyLocation)}</td>
+                              <td>
+                                {p.email ? (
+                                  <span className="inline-flex items-center gap-0.5 text-foreground"><Mail className="size-2.5 shrink-0" />{p.email}</span>
+                                ) : (
+                                  <span className="text-muted-foreground">—</span>
+                                )}
+                              </td>
+                              <td>
+                                {p.phone ? (
+                                  <span className="inline-flex items-center gap-0.5 text-foreground"><Phone className="size-2.5 shrink-0" />{p.phone}</span>
+                                ) : (
+                                  <span className="text-muted-foreground">—</span>
+                                )}
+                              </td>
+                              <td>
+                                {p.linkedinUrl ? (
+                                  <a href={p.linkedinUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-blue-600 hover:underline">
+                                    <Linkedin className="size-2.5" /> Profile
+                                  </a>
+                                ) : (
+                                  <span className="text-muted-foreground">—</span>
+                                )}
+                              </td>
+                              <td>{cell(p.seniority)}</td>
+                              <td>{cell(p.department)}</td>
+                              <td className="max-w-[140px] truncate" title={(p.industries || []).join(", ")}>{cell(p.industries?.join(", "))}</td>
+                              <td>
+                                {p.website ? (
+                                  <a href={p.website} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{p.website.replace(/^https?:\/\//, "")}</a>
+                                ) : (
+                                  <span className="text-muted-foreground">—</span>
+                                )}
+                              </td>
+                              <td>
+                                {p.intel ? (
+                                  <span className={`inline-flex rounded-full border px-1.5 py-0.5 text-[9px] font-semibold ${TIER_STYLE[p.intel.tier]}`} title={`Fit ${p.intel.fitScore} · Intent ${p.intel.intentScore}`}>
+                                    {TIER_LABEL[p.intel.tier]} {p.intel.composite}
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground">—</span>
+                                )}
+                              </td>
+                              <td className="sticky right-0 bg-card">
+                                <div className="flex items-center gap-1">
+                                  <Button size="sm" variant={isAdded ? "outline" : "default"} className="h-7 gap-1 px-2 text-[11px]" disabled={isAdded} onClick={() => addToCrm(p)}>
+                                    {isAdded ? <><Check className="size-3" /> {added.has(key) ? "Added" : "In CRM"}</> : <><UserPlus className="size-3" /> Add</>}
+                                  </Button>
+                                  {enrolledIn ? (
+                                    <span className="inline-flex items-center gap-0.5 rounded border border-green-200 bg-green-50 px-1.5 py-0.5 text-[10px] font-medium text-green-700"><Check className="size-2.5" /> Enrolled</span>
+                                  ) : (
+                                    <Button size="sm" variant="outline" className="h-7 gap-1 px-2 text-[11px]" disabled={campaigns.length === 0 || enrolling === key} onClick={() => setEnrollOpenFor(pickerOpen ? null : key)}>
+                                      {enrolling === key ? <Loader2 className="size-3 animate-spin" /> : <Megaphone className="size-3" />}
+                                    </Button>
+                                  )}
+                                  <Button size="sm" variant="outline" className="h-7 px-2 text-[11px]" disabled={drafting === key} onClick={() => draftOutreach(p, "email")} title="Draft outreach">
+                                    {drafting === key ? <Loader2 className="size-3 animate-spin" /> : <PenLine className="size-3" />}
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  {people.map((p) => {
                     const key = keyOf(p);
-                    const isAdded = isInCrm(p);
                     const enrolledIn = enrolled.get(key);
                     const pickerOpen = enrollOpenFor === key;
+                    if (!drafts.has(key) && !(pickerOpen && !enrolledIn)) return null;
                     return (
-                      <div key={j} className="rounded-lg border bg-card px-2 py-1.5">
-                        <div className="flex items-center gap-2">
-                          {!isAdded && (
-                            <input
-                              type="checkbox"
-                              className="size-3.5 shrink-0 accent-[hsl(var(--primary))]"
-                              checked={selected.has(key)}
-                              onChange={() => toggleSelect(p)}
-                              aria-label={`Select ${p.fullName}`}
-                            />
-                          )}
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5">
-                              <p className="truncate text-xs font-semibold text-foreground">{p.fullName}</p>
-                              {p.intel && (
-                                <span className={`shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] font-semibold ${TIER_STYLE[p.intel.tier]}`} title={`Fit ${p.intel.fitScore} · Intent ${p.intel.intentScore}`}>
-                                  {TIER_LABEL[p.intel.tier]} {p.intel.composite}
-                                </span>
-                              )}
-                              {p.inCrm && <span className="shrink-0 rounded-full border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[9px] font-medium text-violet-700">In CRM</span>}
-                            </div>
-                            <p className="truncate text-[11px] text-muted-foreground">
-                              {[p.jobTitle, p.companyName].filter(Boolean).join(" · ") || p.location || "—"}
-                            </p>
-                            {p.intel && p.intel.reasons.length > 0 && (
-                              <p className="mt-0.5 truncate text-[10px] text-muted-foreground/90" title={p.intel.reasons.join(" · ")}>
-                                Why: {p.intel.reasons.slice(0, 3).join(" · ")}
-                              </p>
-                            )}
-                            <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
-                              {p.email && <span className="inline-flex items-center gap-0.5"><Mail className="size-2.5" />{p.email}</span>}
-                              {p.phone && <span className="inline-flex items-center gap-0.5"><Phone className="size-2.5" />{p.phone}</span>}
-                              {p.linkedinUrl && <a href={p.linkedinUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text-blue-600 hover:underline"><Linkedin className="size-2.5" />in</a>}
-                            </div>
-                          </div>
-                          <div className="flex shrink-0 items-center gap-1">
-                            <Button size="sm" variant={isAdded ? "outline" : "default"} className="h-7 gap-1 px-2 text-[11px]" disabled={isAdded} onClick={() => addToCrm(p)}>
-                              {isAdded ? <><Check className="size-3" /> {added.has(key) ? "Added" : "In CRM"}</> : <><UserPlus className="size-3" /> Add</>}
-                            </Button>
-                            {enrolledIn ? (
-                              <span className="inline-flex items-center gap-0.5 rounded border border-green-200 bg-green-50 px-1.5 py-0.5 text-[10px] font-medium text-green-700"><Check className="size-2.5" /> Enrolled</span>
-                            ) : (
-                              <Button size="sm" variant="outline" className="h-7 gap-1 px-2 text-[11px]" disabled={campaigns.length === 0 || enrolling === key} onClick={() => setEnrollOpenFor(pickerOpen ? null : key)}>
-                                {enrolling === key ? <Loader2 className="size-3 animate-spin" /> : <Megaphone className="size-3" />} Enroll
-                              </Button>
-                            )}
-                            <Button size="sm" variant="outline" className="h-7 gap-1 px-2 text-[11px]" disabled={drafting === key} onClick={() => draftOutreach(p, "email")} title="Draft a personalized email">
-                              {drafting === key ? <Loader2 className="size-3 animate-spin" /> : <PenLine className="size-3" />} Draft
-                            </Button>
-                          </div>
-                        </div>
+                      <div key={`meta-${key}`} className="border-t bg-muted/20 px-3 py-2">
+                        <p className="mb-1 text-[10px] font-semibold text-muted-foreground">{p.fullName}</p>
                         {drafts.has(key) && (() => {
                           const d = drafts.get(key)!;
                           const full = (d.subject ? `Subject: ${d.subject}\n\n` : "") + d.body;
                           return (
-                            <div className="mt-1.5 rounded-md border bg-muted/40 p-2">
+                            <div className="mb-2 rounded-md border bg-card p-2">
                               <div className="mb-1 flex items-center justify-between">
                                 <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{d.channel === "linkedin" ? "LinkedIn message" : "Email draft"}</span>
                                 <div className="flex items-center gap-1">
@@ -588,7 +674,7 @@ export default function LeadResearchAgent({ provider: providerProp }: { provider
                           );
                         })()}
                         {pickerOpen && !enrolledIn && (
-                          <div className="mt-1.5 flex flex-wrap gap-1 border-t pt-1.5">
+                          <div className="flex flex-wrap gap-1">
                             {campaigns.length === 0 ? (
                               <span className="text-[10px] text-muted-foreground">No campaigns yet.</span>
                             ) : (
@@ -609,9 +695,8 @@ export default function LeadResearchAgent({ provider: providerProp }: { provider
                     );
                   })}
                 </div>
-                );
-              })()}
-            </div>
+              );
+            })()}
           </div>
         ))}
         {loading && (

@@ -276,12 +276,47 @@ function mapCompany(org: ApolloOrg): SeamlessCompany {
 const COMPANY_RESOLVE_TIMEOUT_MS = 8000;
 const MAX_COMPANY_RESOLVES = 3;
 
+// Generic words that aren't part of a company's brand/domain. Stripped so
+// "GlobeVisa Consulting" matches the real org "GlobeVisa" and yields a clean
+// domain guess (globevisa.com) instead of failing to resolve.
+const GENERIC_COMPANY_WORDS = new Set([
+  "consulting", "consultancy", "consultants", "inc", "incorporated", "llc", "ltd",
+  "limited", "plc", "group", "co", "corp", "corporation", "company", "global",
+  "international", "worldwide", "holdings", "partners", "ventures", "services",
+  "solutions", "agency", "associates", "the", "and", "of",
+]);
+
+/** Drop generic corporate suffixes/filler so name matching + domain guessing work. */
+function normalizeCompanyName(name: string): string {
+  const cleaned = name
+    .toLowerCase()
+    .replace(/[.,&/()]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w && !GENERIC_COMPANY_WORDS.has(w))
+    .join(" ")
+    .trim();
+  return cleaned || name.trim();
+}
+
+/**
+ * Best-effort domain guess from a company name, e.g. "GlobeVisa Consulting" →
+ * globevisa.com. Used as a fallback when Apollo's (credit-gated, master-key-only)
+ * Organization Search can't resolve a real domain — so a free people-search can
+ * still target the company by domain instead of degrading to a junk keyword match.
+ */
+function guessCompanyDomain(name: string): string | null {
+  const core = normalizeCompanyName(name).replace(/[^a-z0-9]/g, "");
+  return core.length >= 3 ? `${core}.com` : null;
+}
+
 /**
  * api_search targets companies by DOMAIN or organization id — it silently ignores
  * company NAMES. When the caller only has a name (e.g. "GlobeVisa"), resolve it to
- * a domain via Organization Search first. Best-effort: returns [] on any failure.
- * Returns the domains found AND the names it could NOT resolve, so the caller can
- * still bias the search toward an unresolved name instead of dropping it.
+ * a domain via Organization Search first; if that endpoint is unavailable (it
+ * consumes credits and needs a master key, so it can 403 / run dry independently
+ * of the free people search), fall back to a heuristic domain guess so the search
+ * still targets the company. Returns the domains found AND any names for which even
+ * a guess couldn't be formed.
  */
 async function resolveCompanyDomains(
   names: string[],
@@ -293,7 +328,7 @@ async function resolveCompanyDomains(
     top.map(async (name): Promise<{ name: string; domain: string | null }> => {
       try {
         const res = await fetch(
-          `${APOLLO_BASE}/mixed_companies/search?${apolloQuery({ q_organization_name: name, per_page: 1 })}`,
+          `${APOLLO_BASE}/mixed_companies/search?${apolloQuery({ q_organization_name: normalizeCompanyName(name), per_page: 1 })}`,
           {
             method: "POST",
             headers: authHeaders(key),
@@ -301,17 +336,19 @@ async function resolveCompanyDomains(
           },
         );
         if (!res.ok) {
-          console.warn(`[Apollo] company resolve "${name}" failed: HTTP ${res.status}`);
-          return { name, domain: null };
+          // Org Search is unavailable (no master key, out of credits, deprecated…).
+          // Don't give up — guess the domain so the free people-search still runs.
+          console.warn(`[Apollo] company resolve "${name}" failed: HTTP ${res.status} — falling back to domain guess`);
+          return { name, domain: guessCompanyDomain(name) };
         }
         const json = (await res.json()) as { organizations?: ApolloOrg[]; accounts?: ApolloOrg[] };
         const org = (json.organizations || json.accounts || [])[0];
         const domain =
           org?.primary_domain ||
           (org?.website_url ? org.website_url.replace(/^https?:\/\//, "").replace(/\/.*$/, "") : null);
-        return { name, domain: domain ? domain.toLowerCase() : null };
+        return { name, domain: (domain || guessCompanyDomain(name))?.toLowerCase() ?? null };
       } catch {
-        return { name, domain: null };
+        return { name, domain: guessCompanyDomain(name) };
       }
     }),
   );

@@ -25,7 +25,7 @@ import {
   type SeamlessCompanyFilters,
   type ProviderError,
 } from "./seamless-service";
-import { apolloSearchContacts, apolloSearchCompanies } from "./apollo-service";
+import { apolloSearchContacts, apolloSearchCompanies, apolloLookalikeCompaniesWithContacts } from "./apollo-service";
 import { origamiSearchContacts, origamiSearchCompanies } from "./origami-service";
 import { calculateDecisionMakerScore } from "./decision-maker-scorer";
 import { scoreProspect } from "./lead-intelligence";
@@ -70,6 +70,10 @@ export interface LeadSearchFilters {
   pastCompany?: string[];
   newsTypes?: string[];
   jobChangeType?: string; // "New Hire" | "New Promotion"
+  /** Reference company for lookalike search (name or domain, e.g. GlobeVisa or globevisa.com). */
+  lookalikeReference?: string;
+  /** Niche/category for lookalike matching (e.g. immigration consultants). */
+  lookalikeNiche?: string;
 }
 
 function normalizeDomain(raw: string): string {
@@ -386,6 +390,62 @@ export async function apolloCompanySearch(
   return { ...result, error: withProvider(error, "apollo") };
 }
 
+/** Find companies like a reference via Apollo, then return contacts at each. */
+export async function apolloLookalikeContactSearch(
+  filters: LeadSearchFilters,
+): Promise<SearchResult & { lookalikeMeta?: { seedName: string | null; companiesFound: number; keywordTags: string[] } }> {
+  const reference = filters.lookalikeReference?.trim();
+  if (!reference) {
+    return {
+      companies: [], totalContacts: 0, enrichedCount: 0, nextToken: null,
+      error: withProvider({ status: 0, code: "validation", message: "lookalikeReference required" }, "apollo"),
+    };
+  }
+  const { companies, people, seedName, keywordTags, companiesFound, error } =
+    await apolloLookalikeCompaniesWithContacts({
+      referenceCompany: reference,
+      niche: filters.lookalikeNiche || reference,
+      titles: filters.jobTitle,
+      seniorities: filters.seniority,
+      countries: filters.contactCountry,
+      states: filters.contactState,
+    });
+  const result = groupPeopleIntoCompanies(people, filters, "Apollo.io", null);
+  return {
+    ...result,
+    error: withProvider(error, "apollo"),
+    lookalikeMeta: { seedName, companiesFound, keywordTags },
+  };
+}
+
+/** Parse "companies like GlobeVisa immigration consultants" into lookalike fields. */
+export function parseLookalikeFromQuery(query: string): { lookalikeReference: string; lookalikeNiche: string } | null {
+  const q = (query || "").trim();
+  if (!q) return null;
+  const m = q.match(/(?:find\s+(?:me\s+)?)?(?:similar\s+)?companies?\s+like\s+(.+)$/i);
+  if (!m?.[1]) return null;
+  let tail = m[1]
+    .replace(/\b(?:in|from|for|with|located|based|near|around|that|who|which|and|or)\b.*$/i, "")
+    .trim()
+    .replace(/^(?:the|a|an)\s+/i, "")
+    .replace(/[.,!?;:]+$/g, "")
+    .trim();
+  if (!tail) return null;
+
+  const domainMatch = tail.match(/^([a-z0-9][a-z0-9.\-]*\.[a-z]{2,})\s*(.*)$/i);
+  if (domainMatch) {
+    return {
+      lookalikeReference: domainMatch[1].toLowerCase(),
+      lookalikeNiche: domainMatch[2].trim() || tail,
+    };
+  }
+  const words = tail.split(/\s+/);
+  if (words.length >= 2 && /^[A-Z0-9]/.test(words[0])) {
+    return { lookalikeReference: words[0], lookalikeNiche: words.slice(1).join(" ") };
+  }
+  return { lookalikeReference: tail, lookalikeNiche: tail };
+}
+
 // ─── Origami (supplemental) ──────────────────────────────────────────────────
 
 export async function origamiContactSearch(
@@ -503,6 +563,8 @@ function sanitizeFilters(parsed: any): LeadSearchFilters {
     jobChangeType: typeof parsed.jobChangeType === "string" && ["New Hire", "New Promotion"].includes(parsed.jobChangeType)
       ? parsed.jobChangeType
       : undefined,
+    lookalikeReference: typeof parsed.lookalikeReference === "string" ? parsed.lookalikeReference.trim() : undefined,
+    lookalikeNiche: typeof parsed.lookalikeNiche === "string" ? parsed.lookalikeNiche.trim() : undefined,
   };
 }
 
@@ -522,11 +584,14 @@ Use ONLY these keys (omit any you can't infer; never invent other keys):
 - contactCountry: string[]  (FULL country names, e.g. ["United States"])
 - fullName: string[]  (when a specific person is named)
 - keywords: string[]  (industries, skills, niches, or anything that doesn't fit the keys above — e.g. an industry like "property management" goes here)
+- lookalikeReference: string  (reference company name or domain for "companies like X" queries, e.g. "GlobeVisa" or "globevisa.com")
+- lookalikeNiche: string  (niche/category to match, e.g. "immigration consultants")
 - jobChangeType: "New Hire" | "New Promotion"  (ONLY when the user asks for people who recently changed jobs — "new hires", "recently promoted", "just started", "newly appointed")
 
 Rules:
 - "more than 500 employees" → companySize ["501 - 1,000","1,001 - 5,000","5,001 - 10,000","10,001+"].
 - "everyone at/who works at/from <Company>" or "find me everyone that works at <Company>" → companyName ["<Company>"] ONLY. Omit jobTitle/seniority so ALL employees at that company are returned. Strip descriptors like "the Consulting Firm" from the name (e.g. "GlobeVisa the Consulting Firm" → "GlobeVisa"). Infer companyDomain when obvious (globevisa.com).
+- "companies like <Reference> <niche>" (e.g. "companies like GlobeVisa immigration consultants") → lookalikeReference "<Reference>", lookalikeNiche "<niche>". Omit jobTitle unless the user asks for specific roles. This finds similar companies AND their employees.
 - Map an industry/niche to keywords, NOT to a made-up key.
 - For seniority words: "CEO/CFO/CTO/owner/founder/president/chief" → "C-Level"; "VP/vice president" → "VP".
 Example input: "Finance CEOs in Texas with more than 500 employees"
@@ -634,6 +699,13 @@ function heuristicParseFilters(query: string): LeadSearchFilters {
     /(?:find\s+(?:me\s+)?)?(?:all\s+)?(?:the\s+)?(?:everyone|everybody|all\s+(?:the\s+)?(?:people|contacts|employees))(?:\s+(?:who|that)\s+works?)?\s+at\s+(.+)$/i;
   const CATEGORY_TAIL =
     /\b(?:compan(?:y|ies)|firms?|startups?|organi[sz]ations?|businesses?|agenc(?:y|ies)|enterprises?|corporations?|providers?|vendors?|brands?|institutions?|industr(?:y|ies)|equity)\s*$/i;
+  const lookalike = parseLookalikeFromQuery(q);
+  if (lookalike) {
+    out.lookalikeReference = lookalike.lookalikeReference;
+    out.lookalikeNiche = lookalike.lookalikeNiche;
+    return out;
+  }
+
   const cm = q.match(companyGated) || q.match(worksAtGated);
   if (cm && cm[1]) {
     const tail = cm[1]

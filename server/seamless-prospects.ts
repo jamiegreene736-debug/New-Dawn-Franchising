@@ -86,7 +86,7 @@ function clean(arr?: string[]): string[] | undefined {
   return out.length ? out : undefined;
 }
 
-function toContactFilters(f: LeadSearchFilters, limit: number, nextToken?: string | null): SeamlessContactFilters {
+function toContactFilters(f: LeadSearchFilters, limit: number, nextToken?: string | null, maxResults?: number): SeamlessContactFilters {
   return {
     titles: clean(f.jobTitle),
     seniorities: clean(f.seniority),
@@ -109,6 +109,7 @@ function toContactFilters(f: LeadSearchFilters, limit: number, nextToken?: strin
     newsTypes: clean(f.newsTypes),
     jobChangeType: f.jobChangeType || undefined,
     limit,
+    maxResults,
     nextToken: nextToken || undefined,
   };
 }
@@ -364,10 +365,13 @@ export async function seamlessCompanySearch(
 
 export async function apolloContactSearch(
   filters: LeadSearchFilters,
-  opts: { limit?: number; nextToken?: string | null } = {},
+  opts: { limit?: number; maxResults?: number; nextToken?: string | null } = {},
 ): Promise<SearchResult> {
   const limit = Math.min(opts.limit ?? 50, 100);
-  const { people, nextToken, error } = await apolloSearchContacts(toContactFilters(filters, limit, opts.nextToken));
+  // Apollo's api_search is free + paginates cheaply, so pull the full roster
+  // (up to maxResults) in one search instead of stranding the user on page one.
+  const maxResults = opts.maxResults != null ? Math.max(opts.maxResults, limit) : undefined;
+  const { people, nextToken, error } = await apolloSearchContacts(toContactFilters(filters, limit, opts.nextToken, maxResults));
   const result = groupPeopleIntoCompanies(people, filters, "Apollo.io", nextToken);
   return { ...result, error: withProvider(error, "apollo") };
 }
@@ -410,7 +414,7 @@ export async function providerSearch(
   provider: ProviderId,
   mode: "contacts" | "companies",
   filters: LeadSearchFilters,
-  opts: { limit?: number; nextToken?: string | null } = {},
+  opts: { limit?: number; maxResults?: number; nextToken?: string | null } = {},
 ): Promise<SearchResult> {
   if (provider === "apollo") {
     return mode === "companies" ? apolloCompanySearch(filters, opts) : apolloContactSearch(filters, opts);

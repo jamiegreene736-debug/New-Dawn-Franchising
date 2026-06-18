@@ -275,6 +275,8 @@ function mapCompany(org: ApolloOrg): SeamlessCompany {
 // look up and run them concurrently to stay well under the caller's request budget.
 const COMPANY_RESOLVE_TIMEOUT_MS = 8000;
 const MAX_COMPANY_RESOLVES = 3;
+// Safety cap on auto-pagination (100 contacts/page → up to 1,000 per search).
+const MAX_SEARCH_PAGES = 10;
 
 // Generic words that aren't part of a company's brand/domain. Stripped so
 // "GlobeVisa Consulting" matches the real org "GlobeVisa" and yields a clean
@@ -363,8 +365,11 @@ export async function apolloSearchContacts(
   const key = getKey();
   if (!key) return { people: [], nextToken: null };
 
-  const perPage = Math.min(filters.limit || 25, 100);
-  const page = filters.nextToken ? Math.max(1, parseInt(filters.nextToken, 10) || 1) : 1;
+  const startPage = filters.nextToken ? Math.max(1, parseInt(filters.nextToken, 10) || 1) : 1;
+  // How many contacts to gather in total, and the per-request page size. api_search
+  // is free and caps at 100/page, so page at 100 when fetching a big roster.
+  const maxResults = Math.max(filters.maxResults || filters.limit || 25, 1);
+  const perPage = Math.min(maxResults, 100);
 
   const keywords = [
     ...(filters.keywords ? [filters.keywords] : []),
@@ -374,12 +379,14 @@ export async function apolloSearchContacts(
   // api_search reads its filters from URL QUERY PARAMETERS — anything put in the
   // JSON body is ignored, which previously made every search return generic,
   // unfiltered results (e.g. one random person instead of the target company's).
-  const params: Record<string, unknown> = { page, per_page: perPage };
-  if (filters.titles?.length) params.person_titles = filters.titles;
+  // Build the filter params ONCE (incl. resolving company names → domains, which
+  // costs an Apollo round-trip) and reuse them across pages.
+  const baseParams: Record<string, unknown> = {};
+  if (filters.titles?.length) baseParams.person_titles = filters.titles;
   const seniorities = mapSeniorities(filters.seniorities);
-  if (seniorities.length) params.person_seniorities = seniorities;
+  if (seniorities.length) baseParams.person_seniorities = seniorities;
   const locations = buildLocations(filters.states, filters.countries);
-  if (locations.length) params.person_locations = locations;
+  if (locations.length) baseParams.person_locations = locations;
   // Company targeting on api_search is by DOMAIN (or org id) ONLY — it ignores
   // company NAMES (#138 moved this call to the api_search endpoint). Use explicit
   // domains; otherwise resolve names → domains via Organization Search so
@@ -391,37 +398,59 @@ export async function apolloSearchContacts(
     orgDomains.push(...resolved.domains);
     unresolvedNames = resolved.unresolved;
   }
-  if (orgDomains.length) params.q_organization_domains_list = orgDomains;
+  if (orgDomains.length) baseParams.q_organization_domains_list = orgDomains;
   const sizes = mapSizes(filters.companySizes);
-  if (sizes.length) params.organization_num_employees_ranges = sizes;
+  if (sizes.length) baseParams.organization_num_employees_ranges = sizes;
   // Free-text keywords. Only bias toward an unresolved company name when NO domain
   // resolved at all — Apollo ANDs q_keywords with q_organization_domains_list, so
   // adding a name-keyword alongside a resolved domain would prune results to ~zero.
   const nameKeywords = orgDomains.length === 0 ? unresolvedNames : [];
   const qKeywords = [keywords, ...nameKeywords].filter(Boolean).join(" ").trim();
-  if (qKeywords) params.q_keywords = qKeywords;
+  if (qKeywords) baseParams.q_keywords = qKeywords;
 
-  try {
-    const res = await fetch(`${APOLLO_BASE}/mixed_people/api_search?${apolloQuery(params)}`, {
-      method: "POST",
-      headers: authHeaders(key),
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    });
-    if (!res.ok) {
-      const error = await apolloHttpError(res);
-      console.warn(`[Apollo] /mixed_people/api_search ${error.status} ${error.code}: ${error.message}`);
-      return { people: [], nextToken: null, error };
+  async function fetchPage(
+    pageNum: number,
+  ): Promise<{ people: SeamlessPerson[]; nextToken: string | null; error?: ProviderError | null }> {
+    try {
+      const qs = apolloQuery({ ...baseParams, page: pageNum, per_page: perPage });
+      const res = await fetch(`${APOLLO_BASE}/mixed_people/api_search?${qs}`, {
+        method: "POST",
+        headers: authHeaders(key!),
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      });
+      if (!res.ok) {
+        const error = await apolloHttpError(res);
+        console.warn(`[Apollo] /mixed_people/api_search ${error.status} ${error.code}: ${error.message}`);
+        return { people: [], nextToken: null, error };
+      }
+      const json = (await res.json()) as {
+        people?: ApolloPerson[];
+        pagination?: { page?: number; total_pages?: number; total_entries?: number };
+      };
+      const people = Array.isArray(json.people) ? json.people.map(mapPerson) : [];
+      return { people, nextToken: computeNextToken(json.pagination, pageNum, perPage) };
+    } catch {
+      return { people: [], nextToken: null, error: apolloNetworkError() };
     }
-    const json = (await res.json()) as {
-      people?: ApolloPerson[];
-      pagination?: { page?: number; total_pages?: number; total_entries?: number };
-    };
-    const people = Array.isArray(json.people) ? json.people.map(mapPerson) : [];
-    const nextToken = computeNextToken(json.pagination, page, perPage);
-    return { people, nextToken };
-  } catch {
-    return { people: [], nextToken: null, error: apolloNetworkError() };
   }
+
+  // Follow pages until we've gathered maxResults, run out, or hit the safety cap.
+  const all: SeamlessPerson[] = [];
+  let pageNum = startPage;
+  let nextToken: string | null = null;
+  for (let i = 0; i < MAX_SEARCH_PAGES && all.length < maxResults; i++) {
+    const res = await fetchPage(pageNum);
+    // Surface an error only if we have nothing yet; otherwise return what we got.
+    if (res.error) {
+      if (all.length === 0) return { people: [], nextToken: null, error: res.error };
+      break;
+    }
+    all.push(...res.people);
+    nextToken = res.nextToken;
+    if (!nextToken || res.people.length === 0) break;
+    pageNum = parseInt(nextToken, 10) || pageNum + 1;
+  }
+  return { people: all.slice(0, maxResults), nextToken };
 }
 
 /**

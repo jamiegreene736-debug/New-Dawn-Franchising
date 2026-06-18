@@ -22,14 +22,16 @@ interface Entry {
 
 const store = new Map<string, Entry>();
 
-function stableKey(provider: string, mode: string, filters: LeadSearchFilters, nextToken?: string | null): string {
+function stableKey(provider: string, mode: string, filters: LeadSearchFilters, nextToken?: string | null, maxResults?: number): string {
   // Sort keys + array values so semantically-equal filters share a cache key.
   const norm: Record<string, unknown> = {};
   for (const k of Object.keys(filters).sort()) {
     const v = (filters as Record<string, unknown>)[k];
     norm[k] = Array.isArray(v) ? [...v].map((x) => String(x).toLowerCase()).sort() : v;
   }
-  return JSON.stringify({ provider, mode, nextToken: nextToken || null, filters: norm });
+  // maxResults changes how many pages we gather, so a full-roster search must not
+  // reuse a cached single-page result (or vice-versa).
+  return JSON.stringify({ provider, mode, nextToken: nextToken || null, maxResults: maxResults ?? null, filters: norm });
 }
 
 function evictIfNeeded() {
@@ -53,9 +55,9 @@ export async function cachedProviderSearch(
   provider: ProviderId,
   mode: "contacts" | "companies",
   filters: LeadSearchFilters,
-  opts: { limit?: number; nextToken?: string | null } = {},
+  opts: { limit?: number; maxResults?: number; nextToken?: string | null } = {},
 ): Promise<CachedSearch> {
-  const key = stableKey(provider, mode, filters, opts.nextToken);
+  const key = stableKey(provider, mode, filters, opts.nextToken, opts.maxResults);
   const now = Date.now();
   const hit = store.get(key);
   if (hit && hit.expires > now) {

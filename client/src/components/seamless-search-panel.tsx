@@ -4,6 +4,7 @@ import {
   Folder, Bookmark, Clock, Settings2, Info, Star, Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import LeadResearchAgent from "@/components/lead-research-agent";
 
 // ─── Shared filter shape (mirrors server LeadSearchFilters) ──────────────────
 
@@ -315,12 +316,14 @@ interface Props {
   onToggleProvider?: (id: string) => void;
   /** Live per-provider state during a search run. */
   providerRun?: ProviderRunState[];
+  /** Active provider tab id — routes the conversational AI chat to Apollo/Seamless/Origami. */
+  activeProvider?: string;
 }
 
 export default function SeamlessSearchPanel({
   searchTab, setSearchTab, filters, setFilters, aiQuery, setAiQuery,
   onSearch, onAiSearch, isSearching, connected, providerLabel, providerEnv, userName,
-  providers, selectedProviders, onToggleProvider, providerRun,
+  providers, selectedProviders, onToggleProvider, providerRun, activeProvider,
 }: Props) {
   const sourceName = providerLabel || "Lead data source";
   const envName = providerEnv || "SEAMLESS_API_KEY";
@@ -631,6 +634,14 @@ export default function SeamlessSearchPanel({
                   {isSearching ? "Searching…" : `Search ${sourceName}`}
                 </Button>
               </div>
+            </div>
+
+            {/* Conversational AI chat — builds lists, analyzes ICP, drafts outreach. */}
+            <div className="mt-6">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Or chat with the research agent
+              </p>
+              <LeadResearchAgent provider={activeProvider} />
             </div>
 
             <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">

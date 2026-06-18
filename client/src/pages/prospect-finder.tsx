@@ -1797,6 +1797,7 @@ export default function ProspectFinder() {
             connected={!!(activeProvider && providerStatusById.get(activeProvider)?.configured)}
             providerLabel={activeProvider ? PROVIDER_LABELS[activeProvider] : undefined}
             providerEnv={activeProvider ? PROVIDER_ENV[activeProvider] : undefined}
+            activeProvider={activeProvider ?? undefined}
             userName="Dylan"
             providerRun={providerRun}
           />

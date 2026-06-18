@@ -523,6 +523,262 @@ export async function apolloSearchCompanies(
   }
 }
 
+// ─── Lookalike company discovery + contacts ───────────────────────────────────
+// Organization Search supports keyword tags and paginates up to 500 pages
+// (50,000 companies). People Search accepts up to 1,000 domains per request.
+
+/** Apollo's hard display cap for organization-search pagination. */
+export const APOLLO_MAX_COMPANY_PAGES = 500;
+const APOLLO_DOMAIN_BATCH_SIZE = 1000;
+const LOOKALIKE_BUDGET_MS = 45_000;
+
+export interface ApolloLookalikeResult {
+  companies: SeamlessCompany[];
+  people: SeamlessPerson[];
+  seedDomain: string | null;
+  seedName: string | null;
+  keywordTags: string[];
+  companiesFound: number;
+  domainsSearched: number;
+  error?: ProviderError | null;
+}
+
+function parseDomainInput(raw: string): string | null {
+  let s = (raw || "").trim().toLowerCase();
+  if (!s) return null;
+  s = s.replace(/^https?:\/\//i, "").replace(/^www\./i, "").split("/")[0].split("?")[0];
+  return s.includes(".") ? s : null;
+}
+
+/** Build keyword tags from a niche phrase and optional seed-industry hint. */
+export function buildLookalikeKeywordTags(niche: string, seedIndustry?: string | null): string[] {
+  const tags = new Set<string>();
+  const words = (niche || "")
+    .toLowerCase()
+    .replace(/[.,&/()]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 2 && !GENERIC_COMPANY_WORDS.has(w));
+  for (const w of words) tags.add(w);
+  const lower = niche.toLowerCase();
+  if (/immigrat|visa|citizenship|residen|relocation|eb-?5|e-?2/.test(lower)) {
+    ["immigration", "visa", "consulting", "citizenship"].forEach((t) => tags.add(t));
+  }
+  if (seedIndustry) {
+    seedIndustry
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((w) => w.length > 3)
+      .forEach((w) => tags.add(w));
+  }
+  return Array.from(tags).slice(0, 10);
+}
+
+/** Resolve a reference company name or domain via Organization Search. */
+export async function apolloResolveSeedCompany(
+  reference: string,
+): Promise<{ company: SeamlessCompany | null; error?: ProviderError | null }> {
+  const key = getKey();
+  if (!key) return { company: null };
+
+  const domain = parseDomainInput(reference);
+  const params: Record<string, unknown> = { page: 1, per_page: 5 };
+  if (domain) params.q_organization_domains_list = [domain];
+  else params.q_organization_name = normalizeCompanyName(reference);
+
+  try {
+    const res = await fetch(`${APOLLO_BASE}/mixed_companies/search?${apolloQuery(params)}`, {
+      method: "POST",
+      headers: authHeaders(key),
+      signal: AbortSignal.timeout(COMPANY_RESOLVE_TIMEOUT_MS),
+    });
+    if (!res.ok) return { company: null, error: await apolloHttpError(res) };
+    const json = (await res.json()) as { organizations?: ApolloOrg[]; accounts?: ApolloOrg[] };
+    const org = (json.organizations || json.accounts || [])[0];
+    return { company: org ? mapCompany(org) : null };
+  } catch {
+    return { company: null, error: apolloNetworkError() };
+  }
+}
+
+/** Paginate Organization Search — no artificial cap (up to Apollo's 500-page limit). */
+async function apolloSearchCompaniesAll(
+  filters: SeamlessCompanyFilters,
+  opts: { deadline?: number } = {},
+): Promise<{ companies: SeamlessCompany[]; error?: ProviderError | null }> {
+  const key = getKey();
+  if (!key) return { companies: [] };
+
+  const deadline = opts.deadline ?? Date.now() + LOOKALIKE_BUDGET_MS;
+  const perPage = 100;
+  const all: SeamlessCompany[] = [];
+  const seen = new Set<string>();
+
+  const baseParams: Record<string, unknown> = {};
+  if (filters.companyDomains?.length) baseParams.q_organization_domains_list = filters.companyDomains;
+  if (filters.companyNames?.length) baseParams.q_organization_name = normalizeCompanyName(filters.companyNames[0]);
+  if (filters.keywordList?.length) baseParams.q_organization_keyword_tags = filters.keywordList;
+  const locations = buildLocations(filters.states, filters.countries);
+  if (locations.length) baseParams.organization_locations = locations;
+  const sizes = mapSizes(filters.companySizes);
+  if (sizes.length) baseParams.organization_num_employees_ranges = sizes;
+
+  for (let page = 1; page <= APOLLO_MAX_COMPANY_PAGES; page++) {
+    if (Date.now() > deadline) break;
+    try {
+      const qs = apolloQuery({ ...baseParams, page, per_page: perPage });
+      const res = await fetch(`${APOLLO_BASE}/mixed_companies/search?${qs}`, {
+        method: "POST",
+        headers: authHeaders(key),
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      });
+      if (!res.ok) {
+        const error = await apolloHttpError(res);
+        if (all.length === 0) return { companies: [], error };
+        break;
+      }
+      const json = (await res.json()) as {
+        organizations?: ApolloOrg[];
+        accounts?: ApolloOrg[];
+        pagination?: { page?: number; total_pages?: number };
+      };
+      const raw = json.organizations || json.accounts || [];
+      if (!raw.length) break;
+      for (const org of raw) {
+        const co = mapCompany(org);
+        const dedupeKey = (co.domain || co.name).toLowerCase();
+        if (!seen.has(dedupeKey)) {
+          seen.add(dedupeKey);
+          all.push(co);
+        }
+      }
+      const pg = json.pagination;
+      if (!pg || pg.page == null || pg.total_pages == null || pg.page >= pg.total_pages) break;
+    } catch {
+      if (all.length === 0) return { companies: [], error: apolloNetworkError() };
+      break;
+    }
+  }
+  return { companies: all };
+}
+
+/** People search across many domains (batched at 1,000 per Apollo request). */
+async function apolloSearchPeopleAtDomains(
+  domains: string[],
+  opts: {
+    titles?: string[];
+    seniorities?: string[];
+    countries?: string[];
+    states?: string[];
+    deadline?: number;
+    maxResults?: number;
+  } = {},
+): Promise<{ people: SeamlessPerson[]; error?: ProviderError | null }> {
+  const key = getKey();
+  if (!key) return { people: [] };
+
+  const uniqueDomains = [...new Set(domains.map((d) => d.toLowerCase()).filter(Boolean))];
+  if (!uniqueDomains.length) return { people: [] };
+
+  const deadline = opts.deadline ?? Date.now() + LOOKALIKE_BUDGET_MS;
+  const maxResults = opts.maxResults ?? 10_000;
+  const all: SeamlessPerson[] = [];
+  const seen = new Set<string>();
+  let firstError: ProviderError | null = null;
+
+  for (let i = 0; i < uniqueDomains.length && all.length < maxResults; i += APOLLO_DOMAIN_BATCH_SIZE) {
+    if (Date.now() > deadline) break;
+    const batch = uniqueDomains.slice(i, i + APOLLO_DOMAIN_BATCH_SIZE);
+    const { people, error } = await apolloSearchContacts({
+      companyDomains: batch,
+      titles: opts.titles,
+      seniorities: opts.seniorities,
+      countries: opts.countries,
+      states: opts.states,
+      maxResults: maxResults - all.length,
+    });
+    if (error && !firstError) firstError = error;
+    for (const p of people) {
+      const k = (p.email || `${p.fullName}|${p.company}|${p.domain}`).toLowerCase();
+      if (!seen.has(k)) {
+        seen.add(k);
+        all.push(p);
+      }
+    }
+  }
+  return { people: all.slice(0, maxResults), error: firstError };
+}
+
+/**
+ * Find companies like a reference (e.g. GlobeVisa immigration consultants) via
+ * Apollo keyword search, then return contacts at every discovered company.
+ */
+export async function apolloLookalikeCompaniesWithContacts(opts: {
+  referenceCompany: string;
+  niche?: string;
+  titles?: string[];
+  seniorities?: string[];
+  countries?: string[];
+  states?: string[];
+}): Promise<ApolloLookalikeResult> {
+  const key = getKey();
+  const empty: ApolloLookalikeResult = {
+    companies: [],
+    people: [],
+    seedDomain: null,
+    seedName: null,
+    keywordTags: [],
+    companiesFound: 0,
+    domainsSearched: 0,
+  };
+  if (!key) return empty;
+
+  const deadline = Date.now() + LOOKALIKE_BUDGET_MS;
+  const ref = (opts.referenceCompany || "").trim();
+  if (!ref) return empty;
+
+  const { company: seed, error: seedError } = await apolloResolveSeedCompany(ref);
+  if (seedError && !seed) return { ...empty, error: seedError };
+
+  const seedDomain = seed?.domain || parseDomainInput(ref);
+  const seedName = seed?.name || ref;
+  const niche = (opts.niche || "").trim() || ref;
+  const keywordTags = buildLookalikeKeywordTags(niche, seed?.industries?.[0] ?? null);
+
+  const { companies, error: coError } = await apolloSearchCompaniesAll(
+    { keywordList: keywordTags, countries: opts.countries, states: opts.states },
+    { deadline },
+  );
+  if (coError && companies.length === 0) {
+    return { ...empty, seedDomain, seedName, keywordTags, error: coError };
+  }
+
+  const excludeDomain = seedDomain?.toLowerCase() ?? null;
+  const similar = companies.filter((c) => {
+    const d = (c.domain || "").toLowerCase();
+    return d && d !== excludeDomain;
+  });
+  const domains = similar.map((c) => c.domain).filter((d): d is string => !!d);
+
+  const { people, error: peopleError } = await apolloSearchPeopleAtDomains(domains, {
+    titles: opts.titles,
+    seniorities: opts.seniorities,
+    countries: opts.countries,
+    states: opts.states,
+    deadline,
+  });
+
+  return {
+    companies: similar,
+    people,
+    seedDomain,
+    seedName,
+    keywordTags,
+    companiesFound: similar.length,
+    domainsSearched: domains.length,
+    error: peopleError || coError || null,
+  };
+}
+
 // ─── People enrichment / match (POST /people/match) ──────────────────────────
 // Apollo's Enrichment API: given a name + email/domain it returns the person's
 // best work email, title, company, LinkedIn, location, and (when available)

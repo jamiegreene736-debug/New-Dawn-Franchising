@@ -15,7 +15,7 @@
  * errors are caught and surfaced as tool results, never thrown to the caller.
  */
 
-import { type ProviderId, type LeadSearchFilters } from "./seamless-prospects";
+import { type ProviderId, type LeadSearchFilters, apolloLookalikeContactSearch } from "./seamless-prospects";
 import { cachedProviderSearch } from "./search-cache";
 import { apolloConfigured } from "./apollo-service";
 import { scoreProspect, type ProspectIntel } from "./lead-intelligence";
@@ -55,6 +55,7 @@ const MODEL = "claude-sonnet-4-6";
 const MAX_ROUNDS = 4;
 const MAX_PEOPLE_DEFAULT = 60;
 const MAX_PEOPLE_COMPANY = 500;
+const MAX_PEOPLE_LOOKALIKE = 5000;
 
 const SYSTEM_PROMPT = `You are the Lead Research assistant for New Dawn Franchising, an E-2 visa franchise platform (Property Management, Telecom, Insurance) based in El Paso, Texas. You help the team find and reach their ideal customers and referral partners.
 
@@ -69,6 +70,7 @@ Behaviour:
 - Be concise, friendly, and action-oriented — like a sharp SDR teammate.
 - When the user asks to "find" / "build a list" / "get me" prospects, CALL search_people (don't just describe what you would do).
 - To find people who work at a specific company (e.g. "everyone at GlobeVisa" or "find me everyone that works at GlobeVisa the Consulting Firm"), call search_people with companyNames set to the core company name (e.g. "GlobeVisa") and leave titles EMPTY — Apollo will resolve the company and return all employees. Only add titles if the user asks for specific roles.
+- To find COMPANIES LIKE a reference and get contacts at all of them (e.g. "find me companies like GlobeVisa immigration consultants"), call search_companies_like with referenceCompany (GlobeVisa or globevisa.com) and niche (immigration consultants). Leave titles empty unless the user wants specific roles only.
 - If a search returns 0 results with NO error, retry once with a broader query (e.g. drop titles, or use companyDomains instead of companyNames, or vice-versa) before telling the user nothing was found.
 - If a search result has an "error" field, the data provider FAILED — the company was never actually searched. Do NOT retry and do NOT guess that the company is too small, misspelled, or low on public data. Tell the user the real problem plainly. If the error is about credits, say the Seamless lead-data API is out of credits and its public-API credit balance needs topping up (this is separate from the Seamless website's credits).
 - After a search, state how many you found, highlight the 2–3 HIGHEST-scoring matches (name · title · company · why they're a strong fit), and tell them they can save the results to Contacts using the buttons below the list.
@@ -114,6 +116,23 @@ const TOOLS = [
         keywords: { type: "array", items: { type: "string" }, description: "Free-text signals/keywords" },
         mode: { type: "string", enum: ["contacts", "companies"], description: "Search people (contacts) or companies. Default contacts." },
       },
+    },
+  },
+  {
+    name: "search_companies_like",
+    description:
+      "Find companies SIMILAR to a reference company (e.g. GlobeVisa) in a given niche, then return contacts who work at ALL of those companies. Use when the user says 'companies like X', 'similar to X', or 'competitors like X'. Paginates through Apollo with no artificial company cap.",
+    input_schema: {
+      type: "object",
+      properties: {
+        referenceCompany: { type: "string", description: "Reference company name or domain, e.g. GlobeVisa or globevisa.com" },
+        niche: { type: "string", description: "Industry/niche to match, e.g. immigration consultants" },
+        titles: { type: "array", items: { type: "string" }, description: "Optional job-title filter for contacts" },
+        seniorities: { type: "array", items: { type: "string" } },
+        countries: { type: "array", items: { type: "string" } },
+        states: { type: "array", items: { type: "string" } },
+      },
+      required: ["referenceCompany"],
     },
   },
   {
@@ -211,6 +230,7 @@ export async function runLeadResearchAgent(
   const convo: any[] = clean.map((m) => ({ role: m.role, content: m.content }));
   const foundByKey = new Map<string, AgentPerson>();
   let lastSearchWasCompanyWide = false;
+  let lastSearchWasLookalike = false;
 
   async function callClaude(): Promise<any> {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -277,6 +297,63 @@ export async function runLeadResearchAgent(
         return JSON.stringify({ source: "crm", found: matches.length, matchType: matches[0]?.matchType ?? "keyword", sample });
       } catch (e: any) {
         return JSON.stringify({ error: e?.message || "crm search failed" });
+      }
+    }
+    if (name === "search_companies_like") {
+      const referenceCompany = String(input?.referenceCompany || "").trim();
+      const niche = String(input?.niche || "").trim() || referenceCompany;
+      const arr = (v: any): string[] | undefined =>
+        Array.isArray(v) ? v.map((x) => String(x || "").trim()).filter(Boolean) : undefined;
+      if (!referenceCompany) return JSON.stringify({ error: "referenceCompany required" });
+      if (provider !== "apollo" && !apolloConfigured()) {
+        return JSON.stringify({ error: "Lookalike company search requires Apollo.io (select the Apollo tab and set APOLLO_API_KEY)." });
+      }
+      lastSearchWasLookalike = true;
+      const started = Date.now();
+      const filters: LeadSearchFilters = {
+        lookalikeReference: referenceCompany,
+        lookalikeNiche: niche,
+        jobTitle: arr(input?.titles),
+        seniority: arr(input?.seniorities),
+        contactCountry: arr(input?.countries),
+        contactState: arr(input?.states),
+      };
+      try {
+        const result = await apolloLookalikeContactSearch(filters);
+        if (result.error) {
+          void logSearchEvent({ surface: "agent", provider: "apollo", filters, error: `${result.error.code}: ${result.error.message}`, durationMs: Date.now() - started });
+          return JSON.stringify({ provider: "apollo", error: result.error.message, code: result.error.code, found: 0 });
+        }
+        const contacts: EnrichedContact[] = (result.companies || []).flatMap((c) => c.contacts || []);
+        const scored: AgentPerson[] = [];
+        for (const ct of contacts) {
+          const key = (ct.email || `${ct.fullName}|${ct.companyName}`).toLowerCase();
+          if (!foundByKey.has(key)) {
+            const mapped = mapContact(ct);
+            foundByKey.set(key, mapped);
+            scored.push(mapped);
+          }
+        }
+        scored.sort((a, b) => b.intel.composite - a.intel.composite);
+        void logSearchEvent({ surface: "agent", provider: "apollo", filters, resultCount: contacts.length, durationMs: Date.now() - started });
+        const meta = (result as any).lookalikeMeta;
+        const sample = scored.slice(0, 5).map(
+          (p) => `[${p.intel.tier}] ${p.fullName} — ${p.jobTitle || "?"} @ ${p.companyName || "?"}`,
+        );
+        const companySample = (result.companies || []).slice(0, 8).map((c) => c.name);
+        return JSON.stringify({
+          provider: "apollo",
+          searchType: "companies_like",
+          seed: meta?.seedName ?? referenceCompany,
+          keywordTags: meta?.keywordTags ?? [],
+          companiesFound: meta?.companiesFound ?? result.companies?.length ?? 0,
+          contactsFound: contacts.length,
+          sampleCompanies: companySample,
+          top_matches: sample,
+        });
+      } catch (e: any) {
+        void logSearchEvent({ surface: "agent", provider: "apollo", filters, error: e?.message, durationMs: Date.now() - started });
+        return JSON.stringify({ error: e?.message || "lookalike search failed", provider: "apollo" });
       }
     }
     if (name === "search_people") {
@@ -383,7 +460,7 @@ export async function runLeadResearchAgent(
 
     const people = Array.from(foundByKey.values())
       .sort((a, b) => b.intel.composite - a.intel.composite)
-      .slice(0, lastSearchWasCompanyWide ? MAX_PEOPLE_COMPANY : MAX_PEOPLE_DEFAULT);
+      .slice(0, lastSearchWasLookalike ? MAX_PEOPLE_LOOKALIKE : lastSearchWasCompanyWide ? MAX_PEOPLE_COMPANY : MAX_PEOPLE_DEFAULT);
 
     // Flag people we ALREADY have so the UI can badge them "In CRM" and disable
     // their Add button — instead of the user discovering it only when "Add"

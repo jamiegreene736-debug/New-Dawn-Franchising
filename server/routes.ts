@@ -70,6 +70,7 @@ import {
   seamlessRevealContacts,
   providerSearch,
   parseNaturalLanguageToFilters,
+  apolloLookalikeContactSearch,
   type LeadSearchFilters,
   type ProviderId,
 } from "./seamless-prospects";
@@ -1911,9 +1912,12 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
       }
 
       const started = Date.now();
-      // Pull the full roster (auto-paginated) rather than stranding the user on
-      // page one — e.g. "everyone at <company>" should return all ~hundreds, not 50.
-      const result = await cachedProviderSearch(provider, mode === "companies" ? "companies" : "contacts", appliedFilters, { nextToken, maxResults: 500 });
+      // Lookalike: "companies like GlobeVisa immigration consultants" → discover
+      // similar orgs in Apollo (no company cap) then pull contacts at each.
+      const isLookalike = !!(appliedFilters.lookalikeReference?.trim() && provider === "apollo");
+      const result = isLookalike
+        ? await apolloLookalikeContactSearch(appliedFilters)
+        : await cachedProviderSearch(provider, mode === "companies" ? "companies" : "contacts", appliedFilters, { nextToken, maxResults: 500 });
 
       // A provider error (out of credits, rate-limited, unauthorized, network) is
       // NOT an empty result — surface it as a non-2xx so the UI shows the real
@@ -1941,7 +1945,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
         query: aiQuery?.trim() || null,
         filters: appliedFilters,
         resultCount: result.totalContacts ?? result.companies?.length ?? null,
-        cached: result.cached ?? null,
+        cached: "cached" in result ? result.cached ?? null : null,
         durationMs: Date.now() - started,
         userEmail: req.session.adminId ?? null,
       });

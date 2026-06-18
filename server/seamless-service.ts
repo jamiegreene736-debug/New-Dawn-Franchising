@@ -234,6 +234,10 @@ export interface SeamlessContactFilters {
   pastCompanyNames?: string[]; // pastCompany.names
   jobChangeType?: string; // jobChanges.changeType
   limit?: number;
+  // Auto-pagination target: when set (and > limit), the provider adapter follows
+  // pages until it has gathered up to this many contacts (or runs out). Lets a
+  // "everyone at <company>" search return the full roster, not just page one.
+  maxResults?: number;
   nextToken?: string | null;
 }
 

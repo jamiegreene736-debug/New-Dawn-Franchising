@@ -55,7 +55,7 @@ const MODEL = "claude-sonnet-4-6";
 const MAX_ROUNDS = 4;
 const MAX_PEOPLE_DEFAULT = 60;
 const MAX_PEOPLE_COMPANY = 500;
-const MAX_PEOPLE_LOOKALIKE = 5000;
+const MAX_PEOPLE_LOOKALIKE = 500;
 
 const PROVIDER_LABELS: Record<ProviderId, string> = {
   seamless: "Seamless.AI",
@@ -76,7 +76,7 @@ Behaviour:
 - Be concise, friendly, and action-oriented — like a sharp SDR teammate.
 - When the user asks to "find" / "build a list" / "get me" prospects, CALL search_people (don't just describe what you would do).
 - To find people who work at a specific company (e.g. "everyone at GlobeVisa" or "find me everyone that works at GlobeVisa the Consulting Firm"), call search_people with companyNames set to the core company name (e.g. "GlobeVisa") and leave titles EMPTY — Apollo will resolve the company and return all employees. Only add titles if the user asks for specific roles.
-- To find COMPANIES LIKE a reference and get contacts at all of them (e.g. "find me companies like GlobeVisa immigration consultants"), call search_companies_like with referenceCompany (GlobeVisa or globevisa.com) and niche (immigration consultants). Leave titles empty unless the user wants specific roles only.
+- To find COMPANIES LIKE a reference and get contacts at the top matches (e.g. "find me companies like GlobeVisa immigration consultants"), call search_companies_like with referenceCompany (GlobeVisa or globevisa.com) and niche (immigration consultants). Returns the top 50 most relevant companies — NOT the full Apollo index. Report companiesReturned (max 50), never totalMatchesEstimate as "companies found". If totalMatchesEstimate is present, mention it only as "Apollo's broad keyword index has ~X entries, but we ranked and returned the top 50 most relevant."
 - If a search returns 0 results with NO error, retry once with a broader query (e.g. drop titles, or use companyDomains instead of companyNames, or vice-versa) before telling the user nothing was found.
 - If a search result has an "error" field, the data provider FAILED — the company was never actually searched. Do NOT retry and do NOT guess that the company is too small, misspelled, or low on public data. Tell the user the real problem plainly, naming the ACTIVE data source from the tool result's "provider" field. If the error is about credits, say that provider's API is out of credits and its account balance needs topping up.
 - After a search, state how many you found, highlight the 2–3 HIGHEST-scoring matches (name · title · company · why they're a strong fit), and tell them they can save the results to Contacts using the buttons below the list.
@@ -137,7 +137,7 @@ const TOOLS = [
   {
     name: "search_companies_like",
     description:
-      "Find companies SIMILAR to a reference company (e.g. GlobeVisa) in a given niche, then return contacts who work at ALL of those companies. Use when the user says 'companies like X', 'similar to X', or 'competitors like X'. Paginates through Apollo with no artificial company cap.",
+      "Find companies SIMILAR to a reference company (e.g. GlobeVisa) in a given niche, rank by relevance, and return contacts at the TOP 50 matches. Use when the user says 'companies like X', 'similar to X', or 'competitors like X'. Never reports the full Apollo index count — only companiesReturned (max 50).",
     input_schema: {
       type: "object",
       properties: {
@@ -368,15 +368,21 @@ export async function runLeadResearchAgent(
         const sample = scored.slice(0, 5).map(
           (p) => `[${p.intel.tier}] ${p.fullName} — ${p.jobTitle || "?"} @ ${p.companyName || "?"}`,
         );
-        const companySample = (result.companies || []).slice(0, 8).map((c) => c.name);
+        const topCompanies = meta?.topCompanyNames ?? (result.companies || []).slice(0, 50).map((c) => c.name);
+        const companiesReturned = meta?.companiesReturned ?? topCompanies.length;
+        const totalEstimate = meta?.totalMatchesEstimate ?? null;
         return JSON.stringify({
           provider: "apollo",
           searchType: "companies_like",
           seed: meta?.seedName ?? referenceCompany,
           keywordTags: meta?.keywordTags ?? [],
-          companiesFound: meta?.companiesFound ?? result.companies?.length ?? 0,
+          companiesReturned,
+          totalMatchesEstimate: totalEstimate,
+          note: totalEstimate != null
+            ? `Returned top ${companiesReturned} companies ranked by niche relevance. Apollo's broad keyword index estimates ~${totalEstimate.toLocaleString()} total matches — that is NOT the number of immigration consulting firms; do NOT report it as companies found.`
+            : `Returned top ${companiesReturned} companies ranked by niche relevance.`,
           contactsFound: contacts.length,
-          sampleCompanies: companySample,
+          topCompanies,
           top_matches: sample,
         });
       } catch (e: any) {

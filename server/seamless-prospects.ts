@@ -393,7 +393,7 @@ export async function apolloCompanySearch(
 /** Find companies like a reference via Apollo, then return contacts at each. */
 export async function apolloLookalikeContactSearch(
   filters: LeadSearchFilters,
-): Promise<SearchResult & { lookalikeMeta?: { seedName: string | null; companiesFound: number; keywordTags: string[] } }> {
+): Promise<SearchResult & { lookalikeMeta?: { seedName: string | null; companiesReturned: number; totalMatchesEstimate: number | null; keywordTags: string[]; topCompanyNames: string[] } }> {
   const reference = filters.lookalikeReference?.trim();
   if (!reference) {
     return {
@@ -401,7 +401,7 @@ export async function apolloLookalikeContactSearch(
       error: withProvider({ status: 0, code: "validation", message: "lookalikeReference required" }, "apollo"),
     };
   }
-  const { companies, people, seedName, keywordTags, companiesFound, error } =
+  const { companies, people, seedName, keywordTags, companiesReturned, totalMatchesEstimate, error } =
     await apolloLookalikeCompaniesWithContacts({
       referenceCompany: reference,
       niche: filters.lookalikeNiche || reference,
@@ -414,7 +414,13 @@ export async function apolloLookalikeContactSearch(
   return {
     ...result,
     error: withProvider(error, "apollo"),
-    lookalikeMeta: { seedName, companiesFound, keywordTags },
+    lookalikeMeta: {
+      seedName,
+      companiesReturned,
+      totalMatchesEstimate,
+      keywordTags,
+      topCompanyNames: companies.map((c) => c.name).filter(Boolean),
+    },
   };
 }
 
@@ -591,7 +597,7 @@ Use ONLY these keys (omit any you can't infer; never invent other keys):
 Rules:
 - "more than 500 employees" → companySize ["501 - 1,000","1,001 - 5,000","5,001 - 10,000","10,001+"].
 - "everyone at/who works at/from <Company>" or "find me everyone that works at <Company>" → companyName ["<Company>"] ONLY. Omit jobTitle/seniority so ALL employees at that company are returned. Strip descriptors like "the Consulting Firm" from the name (e.g. "GlobeVisa the Consulting Firm" → "GlobeVisa"). Infer companyDomain when obvious (globevisa.com).
-- "companies like <Reference> <niche>" (e.g. "companies like GlobeVisa immigration consultants") → lookalikeReference "<Reference>", lookalikeNiche "<niche>". Omit jobTitle unless the user asks for specific roles. This finds similar companies AND their employees.
+- "companies like <Reference> <niche>" (e.g. "companies like GlobeVisa immigration consultants") → lookalikeReference "<Reference>", lookalikeNiche "<niche>". Omit jobTitle unless the user asks for specific roles. Returns the top 50 ranked similar companies and their employees.
 - Map an industry/niche to keywords, NOT to a made-up key.
 - For seniority words: "CEO/CFO/CTO/owner/founder/president/chief" → "C-Level"; "VP/vice president" → "VP".
 Example input: "Finance CEOs in Texas with more than 500 employees"

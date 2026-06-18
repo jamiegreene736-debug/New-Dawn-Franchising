@@ -529,6 +529,10 @@ export async function apolloSearchCompanies(
 
 /** Apollo's hard display cap for organization-search pagination. */
 export const APOLLO_MAX_COMPANY_PAGES = 500;
+/** Max lookalike companies we return to the user (ranked by niche relevance). */
+export const APOLLO_LOOKALIKE_MAX_COMPANIES = 50;
+/** Pages to scan when building a ranking pool (100/page → up to 500 candidates). */
+const LOOKALIKE_RANKING_POOL_PAGES = 5;
 const APOLLO_DOMAIN_BATCH_SIZE = 1000;
 const LOOKALIKE_BUDGET_MS = 45_000;
 
@@ -538,7 +542,10 @@ export interface ApolloLookalikeResult {
   seedDomain: string | null;
   seedName: string | null;
   keywordTags: string[];
-  companiesFound: number;
+  /** Companies actually returned after relevance ranking (max 50). */
+  companiesReturned: number;
+  /** Apollo's broad keyword-index estimate from pagination — not verified niche matches. */
+  totalMatchesEstimate: number | null;
   domainsSearched: number;
   error?: ProviderError | null;
 }
@@ -550,27 +557,70 @@ function parseDomainInput(raw: string): string | null {
   return s.includes(".") ? s : null;
 }
 
-/** Build keyword tags from a niche phrase and optional seed-industry hint. */
+/** Build focused keyword tags from a niche phrase — avoid bare "consulting" (too broad). */
 export function buildLookalikeKeywordTags(niche: string, seedIndustry?: string | null): string[] {
   const tags = new Set<string>();
-  const words = (niche || "")
-    .toLowerCase()
+  const lower = (niche || "").toLowerCase();
+  const nicheClean = lower
     .replace(/[.,&/()]/g, " ")
+    .replace(/\b(the|a|an|in|of|and|or|like|similar|companies|company|firms|firm|space)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (nicheClean.length > 4) tags.add(nicheClean);
+
+  const words = nicheClean
     .split(/\s+/)
-    .filter((w) => w.length > 2 && !GENERIC_COMPANY_WORDS.has(w));
+    .filter((w) => w.length > 3 && !GENERIC_COMPANY_WORDS.has(w));
   for (const w of words) tags.add(w);
-  const lower = niche.toLowerCase();
+
   if (/immigrat|visa|citizenship|residen|relocation|eb-?5|e-?2/.test(lower)) {
-    ["immigration", "visa", "consulting", "citizenship"].forEach((t) => tags.add(t));
+    ["immigration", "immigration services", "visa consulting", "citizenship"].forEach((t) => tags.add(t));
   }
+
   if (seedIndustry) {
-    seedIndustry
-      .toLowerCase()
-      .split(/\s+/)
-      .filter((w) => w.length > 3)
-      .forEach((w) => tags.add(w));
+    const ind = seedIndustry.toLowerCase().trim();
+    if (ind.length > 3 && !GENERIC_COMPANY_WORDS.has(ind)) tags.add(ind);
   }
-  return Array.from(tags).slice(0, 10);
+
+  return Array.from(tags).slice(0, 6);
+}
+
+/** Score how closely a company matches the lookalike niche (higher = more relevant). */
+export function scoreLookalikeCompanyRelevance(
+  company: SeamlessCompany,
+  niche: string,
+  keywordTags: string[],
+  seed?: SeamlessCompany | null,
+): number {
+  const text = [
+    company.name,
+    company.description,
+    ...(company.industries || []),
+    company.domain,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  const nicheLower = niche.toLowerCase();
+  let score = 0;
+
+  for (const word of nicheLower.split(/\s+/)) {
+    if (word.length > 3 && !GENERIC_COMPANY_WORDS.has(word) && text.includes(word)) score += 3;
+  }
+  for (const tag of keywordTags) {
+    if (tag.length > 3 && text.includes(tag)) score += 2;
+  }
+  if (/immigrat|visa|citizenship|relocation|eb-?5|e-?2/.test(text)) score += 4;
+  if (/consult(ing|ant|ancy)/.test(text) && !/immigrat|visa|citizenship/.test(text)) score -= 3;
+
+  if (seed?.industries?.length) {
+    for (const ind of seed.industries) {
+      if (ind && text.includes(ind.toLowerCase())) score += 2;
+    }
+  }
+
+  return score;
 }
 
 /** Resolve a reference company name or domain via Organization Search. */
@@ -600,18 +650,20 @@ export async function apolloResolveSeedCompany(
   }
 }
 
-/** Paginate Organization Search — no artificial cap (up to Apollo's 500-page limit). */
+/** Paginate Organization Search for lookalike ranking — capped pages, not full index. */
 async function apolloSearchCompaniesAll(
   filters: SeamlessCompanyFilters,
-  opts: { deadline?: number } = {},
-): Promise<{ companies: SeamlessCompany[]; error?: ProviderError | null }> {
+  opts: { deadline?: number; maxPages?: number } = {},
+): Promise<{ companies: SeamlessCompany[]; totalMatchesEstimate: number | null; error?: ProviderError | null }> {
   const key = getKey();
-  if (!key) return { companies: [] };
+  if (!key) return { companies: [], totalMatchesEstimate: null };
 
   const deadline = opts.deadline ?? Date.now() + LOOKALIKE_BUDGET_MS;
+  const maxPages = opts.maxPages ?? LOOKALIKE_RANKING_POOL_PAGES;
   const perPage = 100;
   const all: SeamlessCompany[] = [];
   const seen = new Set<string>();
+  let totalMatchesEstimate: number | null = null;
 
   const baseParams: Record<string, unknown> = {};
   if (filters.companyDomains?.length) baseParams.q_organization_domains_list = filters.companyDomains;
@@ -622,7 +674,7 @@ async function apolloSearchCompaniesAll(
   const sizes = mapSizes(filters.companySizes);
   if (sizes.length) baseParams.organization_num_employees_ranges = sizes;
 
-  for (let page = 1; page <= APOLLO_MAX_COMPANY_PAGES; page++) {
+  for (let page = 1; page <= maxPages; page++) {
     if (Date.now() > deadline) break;
     try {
       const qs = apolloQuery({ ...baseParams, page, per_page: perPage });
@@ -633,14 +685,17 @@ async function apolloSearchCompaniesAll(
       });
       if (!res.ok) {
         const error = await apolloHttpError(res);
-        if (all.length === 0) return { companies: [], error };
+        if (all.length === 0) return { companies: [], totalMatchesEstimate, error };
         break;
       }
       const json = (await res.json()) as {
         organizations?: ApolloOrg[];
         accounts?: ApolloOrg[];
-        pagination?: { page?: number; total_pages?: number };
+        pagination?: { page?: number; total_pages?: number; total_entries?: number };
       };
+      if (page === 1 && json.pagination?.total_entries != null) {
+        totalMatchesEstimate = json.pagination.total_entries;
+      }
       const raw = json.organizations || json.accounts || [];
       if (!raw.length) break;
       for (const org of raw) {
@@ -654,11 +709,11 @@ async function apolloSearchCompaniesAll(
       const pg = json.pagination;
       if (!pg || pg.page == null || pg.total_pages == null || pg.page >= pg.total_pages) break;
     } catch {
-      if (all.length === 0) return { companies: [], error: apolloNetworkError() };
+      if (all.length === 0) return { companies: [], totalMatchesEstimate, error: apolloNetworkError() };
       break;
     }
   }
-  return { companies: all };
+  return { companies: all, totalMatchesEstimate };
 }
 
 /** People search across many domains (batched at 1,000 per Apollo request). */
@@ -727,7 +782,8 @@ export async function apolloLookalikeCompaniesWithContacts(opts: {
     seedDomain: null,
     seedName: null,
     keywordTags: [],
-    companiesFound: 0,
+    companiesReturned: 0,
+    totalMatchesEstimate: null,
     domainsSearched: 0,
   };
   if (!key) return empty;
@@ -744,7 +800,7 @@ export async function apolloLookalikeCompaniesWithContacts(opts: {
   const niche = (opts.niche || "").trim() || ref;
   const keywordTags = buildLookalikeKeywordTags(niche, seed?.industries?.[0] ?? null);
 
-  const { companies, error: coError } = await apolloSearchCompaniesAll(
+  const { companies, totalMatchesEstimate, error: coError } = await apolloSearchCompaniesAll(
     { keywordList: keywordTags, countries: opts.countries, states: opts.states },
     { deadline },
   );
@@ -753,11 +809,18 @@ export async function apolloLookalikeCompaniesWithContacts(opts: {
   }
 
   const excludeDomain = seedDomain?.toLowerCase() ?? null;
-  const similar = companies.filter((c) => {
+  const candidates = companies.filter((c) => {
     const d = (c.domain || "").toLowerCase();
     return d && d !== excludeDomain;
   });
-  const domains = similar.map((c) => c.domain).filter((d): d is string => !!d);
+
+  const ranked = candidates
+    .map((c) => ({ company: c, score: scoreLookalikeCompanyRelevance(c, niche, keywordTags, seed) }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, APOLLO_LOOKALIKE_MAX_COMPANIES)
+    .map((x) => x.company);
+
+  const domains = ranked.map((c) => c.domain).filter((d): d is string => !!d);
 
   const { people, error: peopleError } = await apolloSearchPeopleAtDomains(domains, {
     titles: opts.titles,
@@ -765,15 +828,17 @@ export async function apolloLookalikeCompaniesWithContacts(opts: {
     countries: opts.countries,
     states: opts.states,
     deadline,
+    maxResults: 500,
   });
 
   return {
-    companies: similar,
+    companies: ranked,
     people,
     seedDomain,
     seedName,
     keywordTags,
-    companiesFound: similar.length,
+    companiesReturned: ranked.length,
+    totalMatchesEstimate,
     domainsSearched: domains.length,
     error: peopleError || coError || null,
   };

@@ -100,7 +100,7 @@ type DraftEntry = { channel: string; subject: string | null; body: string };
 
 const GREETING: ChatMsg = {
   role: "assistant",
-  content: "Hi — I'm your Lead Research assistant. Describe who you want to reach and I'll build the list, analyze your ideal customer profile, or draft outreach. What are we looking for?",
+  content: "Hi — I'm your Lead Research assistant. Describe who you want to reach and I'll build the list, analyze your ideal customer profile, or draft outreach. Try \"find companies like GlobeVisa, the immigration-consulting firm\" — I'll suggest similar companies first, then look them up in Seamless once you say go. What are we looking for?",
 };
 
 // The conversation + results live only in component state, so leaving the panel

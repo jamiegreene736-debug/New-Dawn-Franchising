@@ -641,7 +641,7 @@ export default function SeamlessSearchPanel({
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Or chat with the research agent
               </p>
-              <LeadResearchAgent provider={activeProvider} />
+              <LeadResearchAgent key={activeProvider} provider={activeProvider || "seamless"} />
             </div>
 
             <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">

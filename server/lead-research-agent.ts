@@ -57,7 +57,13 @@ const MAX_PEOPLE_DEFAULT = 60;
 const MAX_PEOPLE_COMPANY = 500;
 const MAX_PEOPLE_LOOKALIKE = 5000;
 
-const SYSTEM_PROMPT = `You are the Lead Research assistant for New Dawn Franchising, an E-2 visa franchise platform (Property Management, Telecom, Insurance) based in El Paso, Texas. You help the team find and reach their ideal customers and referral partners.
+const PROVIDER_LABELS: Record<ProviderId, string> = {
+  seamless: "Seamless.AI",
+  apollo: "Apollo.io",
+  origami: "Origami",
+};
+
+const SYSTEM_PROMPT_BASE = `You are the Lead Research assistant for New Dawn Franchising, an E-2 visa franchise platform (Property Management, Telecom, Insurance) based in El Paso, Texas. You help the team find and reach their ideal customers and referral partners.
 
 You can take real actions through tools:
 - Use "search_people" to build prospect lists from external data providers when the user describes who they want to reach. Translate their description into structured filters (titles, seniorities, countries, keywords, etc.).
@@ -72,12 +78,22 @@ Behaviour:
 - To find people who work at a specific company (e.g. "everyone at GlobeVisa" or "find me everyone that works at GlobeVisa the Consulting Firm"), call search_people with companyNames set to the core company name (e.g. "GlobeVisa") and leave titles EMPTY — Apollo will resolve the company and return all employees. Only add titles if the user asks for specific roles.
 - To find COMPANIES LIKE a reference and get contacts at all of them (e.g. "find me companies like GlobeVisa immigration consultants"), call search_companies_like with referenceCompany (GlobeVisa or globevisa.com) and niche (immigration consultants). Leave titles empty unless the user wants specific roles only.
 - If a search returns 0 results with NO error, retry once with a broader query (e.g. drop titles, or use companyDomains instead of companyNames, or vice-versa) before telling the user nothing was found.
-- If a search result has an "error" field, the data provider FAILED — the company was never actually searched. Do NOT retry and do NOT guess that the company is too small, misspelled, or low on public data. Tell the user the real problem plainly. If the error is about credits, say the Seamless lead-data API is out of credits and its public-API credit balance needs topping up (this is separate from the Seamless website's credits).
+- If a search result has an "error" field, the data provider FAILED — the company was never actually searched. Do NOT retry and do NOT guess that the company is too small, misspelled, or low on public data. Tell the user the real problem plainly, naming the ACTIVE data source from the tool result's "provider" field. If the error is about credits, say that provider's API is out of credits and its account balance needs topping up.
 - After a search, state how many you found, highlight the 2–3 HIGHEST-scoring matches (name · title · company · why they're a strong fit), and tell them they can save the results to Contacts using the buttons below the list.
 - If asked to draft/write/personalize outreach to a specific person you found, CALL draft_outreach with their exact fullName and the channel (email or linkedin), then present the returned subject/body. It grounds the message in why they matched.
 - Never invent contacts — only reference what search_people or search_crm returned.
 
 New Dawn targets two audiences: (1) international E-2 investors / high-net-worth individuals from treaty countries (UK, Germany, Japan, South Korea, Mexico, India, UAE, Brazil, Canada…) exploring US business ownership; titles like Owner, Founder, CEO, Investor, Managing Director, Entrepreneur. (2) Referral partners — immigration attorneys, visa consultants, wealth managers, relocation advisors, business brokers who work with international clients.`;
+
+function buildSystemPrompt(provider: ProviderId): string {
+  const label = PROVIDER_LABELS[provider];
+  return `${SYSTEM_PROMPT_BASE}
+
+ACTIVE DATA SOURCE (locked for this session): ${label} (provider id: ${provider}).
+- All search_people calls run ONLY against ${label}. Never say you are searching Seamless.AI, Apollo.io, or Origami unless that is the active source above.
+- Tool results include a "provider" field — always cite that provider when reporting errors or which API was used.
+- search_companies_like is Apollo-only; if the active source is not Apollo, tell the user to switch to the Apollo.io tab.`;
+}
 
 const ICP_SUMMARY = `NEW DAWN FRANCHISING — POSITIONING & IDEAL CUSTOMER PROFILE
 Business: The first franchise platform built from the ground up for E-2 Treaty Investor Visa candidates. Investors own and direct a real US business (Property Management, Telecom/VOIP, or Insurance) while New Dawn's teams + proprietary AI run day-to-day operations. ~$225,000 qualifying investment, funds held in escrow, money-back if the visa is denied, live anywhere in the USA, in-house buy-back exit.
@@ -195,9 +211,20 @@ function mapContact(c: EnrichedContact): AgentPerson {
   };
 }
 
+/** Normalize client/provider aliases ("Apollo.io", "seamless.ai") to a ProviderId. */
+function normalizeProvider(requested?: string): ProviderId | null {
+  const r = (requested || "").toLowerCase().trim();
+  if (!r) return null;
+  if (r === "apollo" || r === "apollo.io" || r.startsWith("apollo")) return "apollo";
+  if (r === "origami") return "origami";
+  if (r === "seamless" || r === "seamless.ai" || r.startsWith("seamless")) return "seamless";
+  return null;
+}
+
+/** Honor the UI tab's provider when set; only fall back when the client omits it. */
 function pickProvider(requested?: string): ProviderId {
-  const r = (requested || "").toLowerCase();
-  if (r === "apollo" || r === "origami" || r === "seamless") return r as ProviderId;
+  const explicit = normalizeProvider(requested);
+  if (explicit) return explicit;
   if (process.env.APOLLO_API_KEY) return "apollo";
   if (process.env.SEAMLESS_API_KEY) return "seamless";
   if (process.env.ORIGAMI_API_KEY) return "origami";
@@ -216,6 +243,7 @@ export async function runLeadResearchAgent(
 ): Promise<AgentResult> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   const provider = pickProvider(requestedProvider);
+  console.info("[LeadResearchAgent] provider=%s requested=%s", provider, requestedProvider ?? "(none)");
 
   if (!apiKey) {
     return { reply: "The AI assistant isn't configured yet (ANTHROPIC_API_KEY is missing). Add it in Railway to enable conversational lead research.", people: [], provider };
@@ -236,7 +264,7 @@ export async function runLeadResearchAgent(
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "x-api-key": apiKey!, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-      body: JSON.stringify({ model: MODEL, max_tokens: 1200, system: SYSTEM_PROMPT, tools: TOOLS, messages: convo }),
+      body: JSON.stringify({ model: MODEL, max_tokens: 1200, system: buildSystemPrompt(provider), tools: TOOLS, messages: convo }),
       signal: AbortSignal.timeout(45000),
     });
     if (!res.ok) throw new Error(`Anthropic ${res.status}: ${await res.text()}`);

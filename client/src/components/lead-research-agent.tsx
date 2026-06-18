@@ -96,6 +96,21 @@ function apiErrorMessage(err: any, fallback: string): string {
 // `.slice(0, 60)` in runLeadResearchAgent). Used for the pre-search credit estimate.
 const MAX_RESULTS = 500;
 
+type LeadProviderId = "seamless" | "apollo" | "origami";
+
+const PROVIDER_LABELS: Record<LeadProviderId, string> = {
+  seamless: "Seamless.AI",
+  apollo: "Apollo.io",
+  origami: "Origami",
+};
+
+function normalizeProviderId(raw?: string): LeadProviderId {
+  const r = (raw || "").toLowerCase().trim();
+  if (r === "apollo" || r === "apollo.io" || r.startsWith("apollo")) return "apollo";
+  if (r === "origami") return "origami";
+  return "seamless";
+}
+
 type DraftEntry = { channel: string; subject: string | null; body: string };
 
 const GREETING: ChatMsg = {
@@ -107,7 +122,7 @@ const GREETING: ChatMsg = {
 // (CRM tab, etc.) used to wipe them. Persist to sessionStorage so they survive
 // unmount/remount and reloads within the tab session. Bump the key whenever the
 // persisted shape changes so stale payloads are ignored rather than mis-read.
-const STORE_KEY = "nd_lead_agent_v2";
+const storeKeyFor = (provider: LeadProviderId) => `nd_lead_agent_v3_${provider}`;
 const SKIP_CREDIT_KEY = "nd_lead_agent_skip_credit_note";
 
 interface PersistedState {
@@ -116,9 +131,9 @@ interface PersistedState {
   enrolled: [string, string][];
   drafts: [string, DraftEntry][];
 }
-function loadAgentState(): PersistedState | null {
+function loadAgentState(provider: LeadProviderId): PersistedState | null {
   try {
-    const raw = sessionStorage.getItem(STORE_KEY);
+    const raw = sessionStorage.getItem(storeKeyFor(provider));
     if (!raw) return null;
     const p = JSON.parse(raw);
     // Validate the shape before trusting it — a wrong-shape payload (e.g. from a
@@ -137,22 +152,26 @@ function loadAgentState(): PersistedState | null {
 function isPair(x: unknown): x is [string, string] {
   return Array.isArray(x) && typeof x[0] === "string" && typeof x[1] === "string";
 }
-function saveAgentState(s: PersistedState) {
+function saveAgentState(provider: LeadProviderId, s: PersistedState) {
   try {
-    sessionStorage.setItem(STORE_KEY, JSON.stringify(s));
+    sessionStorage.setItem(storeKeyFor(provider), JSON.stringify(s));
   } catch {
     /* sessionStorage unavailable / over quota — non-fatal */
   }
 }
 
-export default function LeadResearchAgent({ provider }: { provider?: string }) {
+export default function LeadResearchAgent({ provider: providerProp }: { provider: string }) {
+  const provider = normalizeProviderId(providerProp);
+  const providerLabel = PROVIDER_LABELS[provider];
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const providerRef = useRef(provider);
+  providerRef.current = provider;
   // Restore the prior conversation/results once (sessionStorage) so switching
   // tabs and coming back doesn't wipe them. Guarded so the parse runs once, not
   // on every render (useRef evaluates its argument eagerly each render).
   const restoredRef = useRef<PersistedState | null | undefined>(undefined);
-  if (restoredRef.current === undefined) restoredRef.current = loadAgentState();
+  if (restoredRef.current === undefined) restoredRef.current = loadAgentState(provider);
   const restored = restoredRef.current;
   const [messages, setMessages] = useState<ChatMsg[]>(
     () => (restored?.messages?.length ? restored.messages : [GREETING]),
@@ -189,13 +208,13 @@ export default function LeadResearchAgent({ provider }: { provider?: string }) {
   // leaving the panel and returning restores them instead of resetting. (selected
   // is intentionally transient and resets on return.)
   useEffect(() => {
-    saveAgentState({
+    saveAgentState(provider, {
       messages,
       added: Array.from(added),
       enrolled: Array.from(enrolled.entries()),
       drafts: Array.from(drafts.entries()),
     });
-  }, [messages, added, enrolled, drafts]);
+  }, [provider, messages, added, enrolled, drafts]);
 
   // Live Seamless credit balance for the pre-search estimate; also read whether
   // the user has dismissed the estimate dialog.
@@ -204,8 +223,7 @@ export default function LeadResearchAgent({ provider }: { provider?: string }) {
     apiRequest("GET", "/api/crm/prospects/provider-status")
       .then((r) => r.json())
       .then((d: { providers?: { id: string; credits: number | null }[] }) => {
-        const id = (provider || "seamless").toLowerCase();
-        const p = (d.providers || []).find((x) => x.id === id);
+        const p = (d.providers || []).find((x) => x.id === provider);
         if (p && typeof p.credits === "number") setCredits(p.credits);
       })
       .catch(() => {});
@@ -233,7 +251,7 @@ export default function LeadResearchAgent({ provider }: { provider?: string }) {
     setEnrolled(new Map());
     setDrafts(new Map());
     setInput("");
-    try { sessionStorage.removeItem(STORE_KEY); } catch { /* ignore */ }
+    try { sessionStorage.removeItem(storeKeyFor(provider)); } catch { /* ignore */ }
   }
 
   // Ensure the agent-found person exists as a CRM contact; returns the id.
@@ -257,11 +275,12 @@ export default function LeadResearchAgent({ provider }: { provider?: string }) {
     setMessages(history);
     setLoading(true);
     try {
+      const activeProvider = providerRef.current;
       const res = await apiRequest("POST", "/api/crm/lead-research/agent", {
         messages: history.map((m) => ({ role: m.role, content: m.content })),
-        provider,
+        provider: activeProvider,
       });
-      const data = await res.json() as { reply: string; people?: AgentPerson[] };
+      const data = await res.json() as { reply: string; people?: AgentPerson[]; provider?: string };
       const people = data.people || [];
       // Re-addable after deletion: the server re-checks the CRM on every search,
       // so if it now says a person is NOT in the CRM (e.g. you deleted them),
@@ -273,7 +292,11 @@ export default function LeadResearchAgent({ provider }: { provider?: string }) {
         for (const p of people) if (!p.inCrm && next.delete(keyOf(p))) changed = true;
         return changed ? next : prev;
       });
-      setMessages((prev) => [...prev, { role: "assistant", content: data.reply || "Done.", people }]);
+      const usedProvider = normalizeProviderId(data.provider ?? activeProvider);
+      const prefix = usedProvider !== activeProvider
+        ? `[via ${PROVIDER_LABELS[usedProvider]}] `
+        : "";
+      setMessages((prev) => [...prev, { role: "assistant", content: `${prefix}${data.reply || "Done."}`, people }]);
     } catch {
       setMessages((prev) => [...prev, { role: "assistant", content: "Sorry — I couldn't reach the AI service. Please try again." }]);
     } finally {
@@ -311,8 +334,8 @@ export default function LeadResearchAgent({ provider }: { provider?: string }) {
       toast({
         title: "Added to CRM",
         description: gotContact
-          ? `${p.fullName} added & enriched — email/phone revealed via Seamless.`
-          : `${p.fullName} added. Seamless had no email/phone on file for them.`,
+          ? `${p.fullName} added & enriched — email/phone revealed via ${providerLabel}.`
+          : `${p.fullName} added. ${providerLabel} had no email/phone on file for them.`,
       });
     } catch (err: any) {
       const m = String(err?.message || "");
@@ -374,7 +397,7 @@ export default function LeadResearchAgent({ provider }: { provider?: string }) {
       });
       refreshCrm();
       const parts = [
-        data.enriched ? `${data.enriched} enriched via Seamless` : null,
+        data.enriched ? `${data.enriched} enriched via ${providerLabel}` : null,
         data.skipped > 0 ? `${data.skipped} already in your CRM` : null,
       ].filter(Boolean);
       toast({
@@ -435,7 +458,9 @@ export default function LeadResearchAgent({ provider }: { provider?: string }) {
         <Sparkles className="size-4 text-[hsl(var(--primary))]" />
         <div>
           <p className="text-sm font-semibold leading-tight">AI Lead Research</p>
-          <p className="text-[11px] text-muted-foreground">Build lists, analyze your ICP, and draft outreach — just ask.</p>
+          <p className="text-[11px] text-muted-foreground">
+            Searching via <span className="font-medium text-foreground">{providerLabel}</span> — build lists, analyze ICP, draft outreach.
+          </p>
         </div>
         {messages.length > 1 && (
           <button
@@ -615,7 +640,7 @@ export default function LeadResearchAgent({ provider }: { provider?: string }) {
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); requestSend(); } }}
           rows={1}
-          placeholder="Describe who you want to reach…"
+          placeholder={`Describe who to find on ${providerLabel}…`}
           className="flex-1 resize-none rounded-md border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         />
         <Button size="sm" className="h-9 gap-1.5" disabled={!input.trim() || loading} onClick={() => requestSend()}>
@@ -626,6 +651,7 @@ export default function LeadResearchAgent({ provider }: { provider?: string }) {
       {confirmMsg !== null && (
         <CreditEstimateDialog
           credits={credits}
+          providerLabel={providerLabel}
           onCancel={() => setConfirmMsg(null)}
           onConfirm={confirmSend}
         />
@@ -638,8 +664,9 @@ export default function LeadResearchAgent({ provider }: { provider?: string }) {
 // our own CRM, draft outreach), so the copy is intent-agnostic: it confirms that
 // building a list is free and estimates what REVEALING the results would later
 // cost (~1 credit/contact), and shows the live balance.
-function CreditEstimateDialog({ credits, onCancel, onConfirm }: {
+function CreditEstimateDialog({ credits, providerLabel, onCancel, onConfirm }: {
   credits: number | null;
+  providerLabel: string;
   onCancel: () => void;
   onConfirm: (dontAskAgain: boolean) => void;
 }) {
@@ -666,7 +693,7 @@ function CreditEstimateDialog({ credits, onCancel, onConfirm }: {
           </p>
           {credits != null && (
             <div className="mt-2 flex items-center justify-between border-t pt-2">
-              <span className="text-muted-foreground">Seamless balance</span>
+              <span className="text-muted-foreground">{providerLabel} balance</span>
               <span className="font-semibold text-foreground">{credits.toLocaleString()} credits</span>
             </div>
           )}

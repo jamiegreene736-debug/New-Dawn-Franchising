@@ -76,6 +76,30 @@ function authHeaders(key: string): Record<string, string> {
   };
 }
 
+/**
+ * Apollo's search endpoints (mixed_people/api_search, mixed_companies/search)
+ * read their filters from URL QUERY PARAMETERS, not the JSON body — anything
+ * sent in the body is silently ignored, which makes the search return generic,
+ * unfiltered results. Build a proper query string, repeating array filters with
+ * the `key[]=value` notation Apollo expects (e.g. person_titles[]=CEO).
+ */
+function apolloQuery(params: Record<string, unknown>): string {
+  const qs = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value == null) continue;
+    if (Array.isArray(value)) {
+      for (const v of value) {
+        const s = String(v ?? "").trim();
+        if (s) qs.append(`${key}[]`, s);
+      }
+    } else {
+      const s = String(value).trim();
+      if (s) qs.append(key, s);
+    }
+  }
+  return qs.toString();
+}
+
 export function apolloConfigured(): boolean {
   return !!getKey();
 }
@@ -268,12 +292,14 @@ async function resolveCompanyDomains(
   const results = await Promise.all(
     top.map(async (name): Promise<{ name: string; domain: string | null }> => {
       try {
-        const res = await fetch(`${APOLLO_BASE}/mixed_companies/search`, {
-          method: "POST",
-          headers: authHeaders(key),
-          body: JSON.stringify({ q_organization_name: name, per_page: 1 }),
-          signal: AbortSignal.timeout(COMPANY_RESOLVE_TIMEOUT_MS),
-        });
+        const res = await fetch(
+          `${APOLLO_BASE}/mixed_companies/search?${apolloQuery({ q_organization_name: name, per_page: 1 })}`,
+          {
+            method: "POST",
+            headers: authHeaders(key),
+            signal: AbortSignal.timeout(COMPANY_RESOLVE_TIMEOUT_MS),
+          },
+        );
         if (!res.ok) {
           console.warn(`[Apollo] company resolve "${name}" failed: HTTP ${res.status}`);
           return { name, domain: null };
@@ -308,12 +334,15 @@ export async function apolloSearchContacts(
     ...(filters.keywordList || []),
   ].join(" ").trim();
 
-  const body: Record<string, unknown> = { page, per_page: perPage };
-  if (filters.titles?.length) body.person_titles = filters.titles;
+  // api_search reads its filters from URL QUERY PARAMETERS — anything put in the
+  // JSON body is ignored, which previously made every search return generic,
+  // unfiltered results (e.g. one random person instead of the target company's).
+  const params: Record<string, unknown> = { page, per_page: perPage };
+  if (filters.titles?.length) params.person_titles = filters.titles;
   const seniorities = mapSeniorities(filters.seniorities);
-  if (seniorities.length) body.person_seniorities = seniorities;
+  if (seniorities.length) params.person_seniorities = seniorities;
   const locations = buildLocations(filters.states, filters.countries);
-  if (locations.length) body.person_locations = locations;
+  if (locations.length) params.person_locations = locations;
   // Company targeting on api_search is by DOMAIN (or org id) ONLY — it ignores
   // company NAMES (#138 moved this call to the api_search endpoint). Use explicit
   // domains; otherwise resolve names → domains via Organization Search so
@@ -325,21 +354,20 @@ export async function apolloSearchContacts(
     orgDomains.push(...resolved.domains);
     unresolvedNames = resolved.unresolved;
   }
-  if (orgDomains.length) body.q_organization_domains_list = orgDomains;
+  if (orgDomains.length) params.q_organization_domains_list = orgDomains;
   const sizes = mapSizes(filters.companySizes);
-  if (sizes.length) body.organization_num_employees_ranges = sizes;
+  if (sizes.length) params.organization_num_employees_ranges = sizes;
   // Free-text keywords. Only bias toward an unresolved company name when NO domain
   // resolved at all — Apollo ANDs q_keywords with q_organization_domains_list, so
   // adding a name-keyword alongside a resolved domain would prune results to ~zero.
   const nameKeywords = orgDomains.length === 0 ? unresolvedNames : [];
   const qKeywords = [keywords, ...nameKeywords].filter(Boolean).join(" ").trim();
-  if (qKeywords) body.q_keywords = qKeywords;
+  if (qKeywords) params.q_keywords = qKeywords;
 
   try {
-    const res = await fetch(`${APOLLO_BASE}/mixed_people/api_search`, {
+    const res = await fetch(`${APOLLO_BASE}/mixed_people/api_search?${apolloQuery(params)}`, {
       method: "POST",
       headers: authHeaders(key),
-      body: JSON.stringify(body),
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
     if (!res.ok) {
@@ -389,20 +417,21 @@ export async function apolloSearchCompanies(
   const perPage = Math.min(filters.limit || 25, 100);
   const page = filters.nextToken ? Math.max(1, parseInt(filters.nextToken, 10) || 1) : 1;
 
-  const body: Record<string, unknown> = { page, per_page: perPage };
-  if (filters.companyDomains?.length) body.q_organization_domains_list = filters.companyDomains;
-  if (filters.companyNames?.length) body.q_organization_names = filters.companyNames;
+  // Like api_search, mixed_companies/search reads filters from URL query
+  // parameters, not the JSON body.
+  const params: Record<string, unknown> = { page, per_page: perPage };
+  if (filters.companyDomains?.length) params.q_organization_domains_list = filters.companyDomains;
+  if (filters.companyNames?.length) params.q_organization_names = filters.companyNames;
   const locations = buildLocations(filters.states, filters.countries);
-  if (locations.length) body.organization_locations = locations;
+  if (locations.length) params.organization_locations = locations;
   const sizes = mapSizes(filters.companySizes);
-  if (sizes.length) body.organization_num_employees_ranges = sizes;
-  if (filters.keywordList?.length) body.q_organization_keyword_tags = filters.keywordList;
+  if (sizes.length) params.organization_num_employees_ranges = sizes;
+  if (filters.keywordList?.length) params.q_organization_keyword_tags = filters.keywordList;
 
   try {
-    const res = await fetch(`${APOLLO_BASE}/mixed_companies/search`, {
+    const res = await fetch(`${APOLLO_BASE}/mixed_companies/search?${apolloQuery(params)}`, {
       method: "POST",
       headers: authHeaders(key),
-      body: JSON.stringify(body),
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
     if (!res.ok) {

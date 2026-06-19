@@ -60,7 +60,10 @@ export interface AgentResult {
 
 const MODEL = "claude-sonnet-4-6";
 const MAX_ROUNDS = 4;
-const MAX_PEOPLE_DEFAULT = 60;
+// Per-turn result caps. A normal contacts search now returns up to 100 (was 60)
+// so the UI isn't artificially capped low — searching is free (no credits), only
+// revealing/adding spends them, so a bigger list costs nothing to build.
+const MAX_PEOPLE_DEFAULT = 100;
 const MAX_PEOPLE_COMPANY = 500;
 const MAX_PEOPLE_LOOKALIKE = 500;
 
@@ -428,7 +431,9 @@ export async function runLeadResearchAgent(
       const started = Date.now();
       try {
         const result = await cachedProviderSearch(provider, mode, filters, {
-          limit: 50,
+          // Pull a full page (providers cap at 100) so a normal search can return
+          // up to MAX_PEOPLE_DEFAULT — the UI then pages through them client-side.
+          limit: 100,
           maxResults: companyWide && (provider === "apollo" || apolloConfigured()) ? MAX_PEOPLE_COMPANY : undefined,
         });
         // A provider error (out of credits, rate-limited, unauthorized, network)

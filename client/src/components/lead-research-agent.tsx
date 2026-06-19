@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Sparkles, Send, Loader2, UserPlus, Check, Linkedin, Mail, Phone, Megaphone, PenLine, Copy, Trash2 } from "lucide-react";
+import { Sparkles, Send, Loader2, UserPlus, Check, Linkedin, Mail, Phone, Megaphone, PenLine, Copy, Trash2, ListPlus, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { apiRequest } from "@/lib/queryClient";
@@ -100,8 +100,28 @@ function apiErrorMessage(err: any, fallback: string): string {
 }
 
 // A single agent turn returns up to this many unique people (mirrors the server's
-// `.slice(0, 60)` in runLeadResearchAgent). Used for the pre-search credit estimate.
+// `.slice(0, …)` in runLeadResearchAgent). Used for the pre-search credit estimate.
 const MAX_RESULTS = 500;
+
+// Results table page size — long result sets are paged client-side so the user
+// can step through all of them ("page 2, 3 …") instead of one capped scroll.
+const PAGE_SIZE = 25;
+
+// A CRM list ("Add to list" target). Mirrors GET /api/crm/lists.
+interface LeadList { id: string; name: string; count?: number }
+
+// Compact page list for the pager: 1 … (p-1) p (p+1) … N (no ellipsis ≤ 7 pages).
+function pageNumbers(current: number, total: number): (number | "…")[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const out: (number | "…")[] = [1];
+  const lo = Math.max(2, current - 1);
+  const hi = Math.min(total - 1, current + 1);
+  if (lo > 2) out.push("…");
+  for (let p = lo; p <= hi; p++) out.push(p);
+  if (hi < total - 1) out.push("…");
+  out.push(total);
+  return out;
+}
 
 type LeadProviderId = "seamless" | "apollo" | "origami";
 
@@ -188,6 +208,10 @@ export default function LeadResearchAgent({ provider: providerProp }: { provider
   const [added, setAdded] = useState<Set<string>>(() => new Set(restored?.added ?? []));
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkAdding, setBulkAdding] = useState(false);
+  const [listAdding, setListAdding] = useState(false);
+  const [lists, setLists] = useState<LeadList[]>([]);
+  // Current page per results block, keyed by the message index it belongs to.
+  const [pageByMsg, setPageByMsg] = useState<Map<number, number>>(new Map());
   const [campaigns, setCampaigns] = useState<{ id: string; name: string }[]>([]);
   const [enrollOpenFor, setEnrollOpenFor] = useState<string | null>(null);
   const [enrolling, setEnrolling] = useState<string | null>(null);
@@ -210,6 +234,15 @@ export default function LeadResearchAgent({ provider: providerProp }: { provider
       .then((rows: any[]) => setCampaigns((rows || []).map((c) => ({ id: c.id, name: c.name }))))
       .catch(() => {});
   }, []);
+
+  // CRM lists for the "Add to list" picker. Refetched after we create one.
+  function refreshLists() {
+    apiRequest("GET", "/api/crm/lists")
+      .then((r) => r.json())
+      .then((rows: any[]) => setLists((rows || []).map((l) => ({ id: l.id, name: l.name, count: l.count }))))
+      .catch(() => {});
+  }
+  useEffect(() => { refreshLists(); }, []);
 
   // Persist conversation + results + which were added/enrolled + any drafts, so
   // leaving the panel and returning restores them instead of resetting. (selected
@@ -257,6 +290,7 @@ export default function LeadResearchAgent({ provider: providerProp }: { provider
     setSelected(new Set());
     setEnrolled(new Map());
     setDrafts(new Map());
+    setPageByMsg(new Map());
     setInput("");
     try { sessionStorage.removeItem(storeKeyFor(provider)); } catch { /* ignore */ }
   }
@@ -418,6 +452,76 @@ export default function LeadResearchAgent({ provider: providerProp }: { provider
     }
   }
 
+  // Add the selected (not-yet-added) people to the CRM AND drop them into a list —
+  // either an existing one or a new one created on the fly. Membership references
+  // crm_clients, so this adds them to the CRM first (which reveals email/phone and
+  // therefore spends ~1 credit per contact, exactly like "Add to CRM").
+  async function addSelectedToList(people: AgentPerson[], target: { listId?: string; newName?: string }) {
+    const targets = people.filter((p) => selected.has(keyOf(p)) && !isInCrm(p));
+    if (targets.length === 0) {
+      toast({ title: "Nothing selected", description: "Tick the contacts you want to add first." });
+      return;
+    }
+    setListAdding(true);
+    try {
+      // 1) Add to the CRM (reveals + dedups) and collect the created client ids.
+      const addRes = await apiRequest("POST", "/api/crm/clients/bulk-add", {
+        contacts: targets.map(toContactBody),
+        leadSource: "ai_research",
+        tags: ["lead-research"],
+      });
+      const addData = (await addRes.json()) as { added: number; skipped: number; clients?: { id: string }[] };
+      const clientIds = (addData.clients || []).map((c) => c.id).filter(Boolean);
+
+      // 2) Resolve the target list — create it when the user typed a new name.
+      let listId = target.listId || "";
+      let listName = lists.find((l) => l.id === listId)?.name || target.newName || "list";
+      if (!listId) {
+        const name = (target.newName || "").trim();
+        if (!name) throw new Error("List name is required");
+        const created = await apiRequest("POST", "/api/crm/lists", { name });
+        const list = await created.json();
+        listId = list.id;
+        listName = list.name || name;
+      }
+
+      // 3) Drop the freshly-added clients into the list.
+      let inList = 0;
+      if (clientIds.length) {
+        const memRes = await apiRequest("POST", `/api/crm/lists/${listId}/members`, { clientIds });
+        inList = ((await memRes.json()) as { added?: number }).added ?? clientIds.length;
+      }
+
+      setAdded((s) => {
+        const next = new Set(s);
+        targets.forEach((p) => next.add(keyOf(p)));
+        return next;
+      });
+      setSelected((s) => {
+        const next = new Set(s);
+        targets.forEach((p) => next.delete(keyOf(p)));
+        return next;
+      });
+      refreshCrm();
+      refreshLists();
+      // The list mirrors into a prospect_list so campaigns can target it — refresh
+      // those caches too (global staleTime is Infinity).
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/lists"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/prospect-lists"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/prospects"] });
+
+      const extra = addData.skipped > 0 ? ` · ${addData.skipped} already in your CRM` : "";
+      toast({
+        title: `Added to "${listName}"`,
+        description: `${addData.added} added to the CRM, ${inList} placed in the list${extra}.`,
+      });
+    } catch (err: any) {
+      toast({ title: "Couldn't add to list", description: apiErrorMessage(err, "Please try again."), variant: "destructive" });
+    } finally {
+      setListAdding(false);
+    }
+  }
+
   async function draftOutreach(p: AgentPerson, channel: "email" | "linkedin") {
     const key = (p.email || p.fullName).toLowerCase();
     setDrafting(key);
@@ -494,6 +598,16 @@ export default function LeadResearchAgent({ provider: providerProp }: { provider
               const selectable = people.filter((pp) => !isInCrm(pp));
               const selectedCount = selectable.filter((pp) => selected.has(keyOf(pp))).length;
               const allSelected = selectable.length > 0 && selectedCount === selectable.length;
+              // Client-side pagination of this result set.
+              const totalPages = Math.max(1, Math.ceil(people.length / PAGE_SIZE));
+              const page = Math.min(pageByMsg.get(i) ?? 1, totalPages);
+              const pageStart = (page - 1) * PAGE_SIZE;
+              const pagePeople = people.slice(pageStart, pageStart + PAGE_SIZE);
+              const setPage = (p: number) => setPageByMsg((prev) => {
+                const next = new Map(prev);
+                next.set(i, Math.min(Math.max(1, p), totalPages));
+                return next;
+              });
               return (
                 <div className="w-full rounded-xl border bg-card shadow-sm overflow-hidden" data-testid="agent-results-table">
                   <div className="flex items-center justify-between gap-2 border-b bg-muted/40 px-3 py-2">
@@ -514,12 +628,20 @@ export default function LeadResearchAgent({ provider: providerProp }: { provider
                       <Button
                         size="sm"
                         className="h-7 gap-1 px-2 text-[11px]"
-                        disabled={selectedCount === 0 || bulkAdding}
+                        disabled={selectedCount === 0 || bulkAdding || listAdding}
                         onClick={() => addSelected(people)}
                       >
                         {bulkAdding ? <Loader2 className="size-3 animate-spin" /> : <UserPlus className="size-3" />}
                         Add {selectedCount > 0 ? `${selectedCount} ` : ""}to CRM
                       </Button>
+                      <AddToListMenu
+                        lists={lists}
+                        count={selectedCount}
+                        busy={listAdding}
+                        disabled={selectedCount === 0 || bulkAdding}
+                        onRefresh={refreshLists}
+                        onPick={(target) => addSelectedToList(people, target)}
+                      />
                     </div>
                   </div>
                   <div className="overflow-x-auto">
@@ -544,13 +666,13 @@ export default function LeadResearchAgent({ provider: providerProp }: { provider
                         </tr>
                       </thead>
                       <tbody>
-                        {people.map((p, j) => {
+                        {pagePeople.map((p) => {
                           const key = keyOf(p);
                           const isAdded = isInCrm(p);
                           const enrolledIn = enrolled.get(key);
                           const pickerOpen = enrollOpenFor === key;
                           return (
-                            <tr key={j} className="border-b last:border-0 hover:bg-muted/20 [&>td]:px-2.5 [&>td]:py-1.5 align-top">
+                            <tr key={key} className="border-b last:border-0 hover:bg-muted/20 [&>td]:px-2.5 [&>td]:py-1.5 align-top">
                               <td>
                                 {!isAdded && (
                                   <input
@@ -644,7 +766,43 @@ export default function LeadResearchAgent({ provider: providerProp }: { provider
                       </tbody>
                     </table>
                   </div>
-                  {people.map((p) => {
+                  {totalPages > 1 && (
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-t bg-muted/20 px-3 py-2 text-[11px]">
+                      <span className="text-muted-foreground">
+                        {pageStart + 1}–{Math.min(pageStart + PAGE_SIZE, people.length)} of {people.length}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => setPage(page - 1)}
+                          disabled={page <= 1}
+                          className="inline-flex items-center gap-0.5 rounded border border-input px-1.5 py-0.5 text-muted-foreground hover:text-foreground disabled:opacity-40"
+                        >
+                          <ChevronLeft className="size-3" /> Prev
+                        </button>
+                        {pageNumbers(page, totalPages).map((p, idx) =>
+                          p === "…" ? (
+                            <span key={`gap-${idx}`} className="px-1 text-muted-foreground">…</span>
+                          ) : (
+                            <button
+                              key={p}
+                              onClick={() => setPage(p as number)}
+                              className={`min-w-[1.5rem] rounded border px-1.5 py-0.5 ${p === page ? "border-primary bg-[hsl(var(--primary))] text-primary-foreground" : "border-input text-muted-foreground hover:text-foreground"}`}
+                            >
+                              {p}
+                            </button>
+                          ),
+                        )}
+                        <button
+                          onClick={() => setPage(page + 1)}
+                          disabled={page >= totalPages}
+                          className="inline-flex items-center gap-0.5 rounded border border-input px-1.5 py-0.5 text-muted-foreground hover:text-foreground disabled:opacity-40"
+                        >
+                          Next <ChevronRight className="size-3" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {pagePeople.map((p) => {
                     const key = keyOf(p);
                     const enrolledIn = enrolled.get(key);
                     const pickerOpen = enrollOpenFor === key;
@@ -745,6 +903,99 @@ export default function LeadResearchAgent({ provider: providerProp }: { provider
   );
 }
 
+// "Add to list" dropdown for the results header — pick an existing CRM list or
+// type a new one. Self-contained state (open / search / new-name) so it lives
+// happily inside the results-block render. Adding to a list also adds to the CRM.
+function AddToListMenu({ lists, count, busy, disabled, onPick, onRefresh }: {
+  lists: LeadList[];
+  count: number;
+  busy: boolean;
+  disabled: boolean;
+  onPick: (target: { listId?: string; newName?: string }) => void;
+  onRefresh: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [query, setQuery] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onDoc = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
+  // Refresh the list set whenever the menu opens so newly-created lists show up.
+  useEffect(() => { if (open) onRefresh(); }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const filtered = lists.filter((l) => !query.trim() || l.name.toLowerCase().includes(query.trim().toLowerCase()));
+  const pick = (target: { listId?: string; newName?: string }) => {
+    setOpen(false); setNewName(""); setQuery("");
+    onPick(target);
+  };
+
+  return (
+    <div className="relative" ref={ref}>
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-7 gap-1 px-2 text-[11px]"
+        disabled={disabled || busy}
+        onClick={() => setOpen((o) => !o)}
+        title="Add the selected contacts to a CRM list (also adds them to the CRM)"
+      >
+        {busy ? <Loader2 className="size-3 animate-spin" /> : <ListPlus className="size-3" />}
+        Add {count > 0 ? `${count} ` : ""}to list
+      </Button>
+      {open && (
+        <div className="absolute right-0 z-40 mt-1 w-64 rounded-lg border bg-popover p-2 shadow-md">
+          <p className="px-1 pb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Add to a list</p>
+          {lists.length > 3 && (
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search lists…"
+              className="mb-1 h-7 w-full rounded-md border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          )}
+          <div className="max-h-40 overflow-y-auto">
+            {filtered.length === 0 ? (
+              <p className="px-1 py-1 text-[11px] text-muted-foreground">
+                {lists.length === 0 ? "No lists yet — create one below." : "No match."}
+              </p>
+            ) : (
+              filtered.map((l) => (
+                <button
+                  key={l.id}
+                  onClick={() => pick({ listId: l.id })}
+                  className="flex w-full items-center justify-between gap-2 rounded px-2 py-1 text-left text-xs hover:bg-muted"
+                >
+                  <span className="truncate text-foreground">{l.name}</span>
+                  {typeof l.count === "number" && <span className="shrink-0 text-[10px] text-muted-foreground">{l.count}</span>}
+                </button>
+              ))
+            )}
+          </div>
+          <div className="mt-1 flex items-center gap-1 border-t pt-2">
+            <input
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && newName.trim()) pick({ newName: newName.trim() }); }}
+              placeholder="New list name…"
+              className="h-7 flex-1 rounded-md border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+            <Button size="sm" className="h-7 gap-1 px-2 text-[11px]" disabled={!newName.trim()} onClick={() => pick({ newName: newName.trim() })}>
+              <Plus className="size-3" /> Create
+            </Button>
+          </div>
+          <p className="mt-1.5 px-1 text-[10px] leading-snug text-muted-foreground">
+            Also adds them to the CRM — reveals email &amp; phone (~1 credit each).
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Pre-send dialog. The assistant also answers free intents (analyze ICP, search
 // our own CRM, draft outreach), so the copy is intent-agnostic: it confirms that
 // building a list is free and estimates what REVEALING the results would later
@@ -764,17 +1015,17 @@ function CreditEstimateDialog({ credits, providerLabel, onCancel, onConfirm }: {
           <h3 className="text-sm font-semibold">Send to Lead Research?</h3>
         </div>
         <p className="text-xs text-muted-foreground">
-          Building a list, analyzing your ICP, and drafting are <span className="font-semibold text-foreground">free</span> — they don't use any credits.
+          Searching, building a list, analyzing your ICP, and drafting are <span className="font-semibold text-foreground">free</span> — they don't use any credits.
         </p>
         <div className="mt-3 rounded-lg border bg-muted/40 p-3 text-xs">
           <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">To enrich all results later</span>
+            <span className="text-muted-foreground">Adding all results to the CRM</span>
             <span className="font-semibold text-foreground">up to ~{MAX_RESULTS} credits</span>
           </div>
           <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
-            Net-new prospects come without email or phone, and nothing here spends credits — not even adding them to your CRM.
-            Enriching a contact's details is a separate step that costs about{" "}
-            <span className="font-medium text-foreground">1 credit each</span>, so a full ~{MAX_RESULTS}-person list is up to ~{MAX_RESULTS} credits to enrich.
+            Search results come without email or phone. Revealing a contact's email &amp; phone is what
+            uses credits (about <span className="font-medium text-foreground">1 each</span>), and that
+            happens when you add them to your CRM or a list. Browsing and paging the results costs nothing.
           </p>
           {credits != null && (
             <div className="mt-2 flex items-center justify-between border-t pt-2">

@@ -214,7 +214,10 @@ function mapPerson(p: ApolloPerson, companyFallback?: string | null): SeamlessPe
     "";
   const company = org.name || p.organization_name || companyFallback || null;
   return {
-    searchResultId: null, // Apollo reveal isn't wired to Seamless credits
+    // Carry Apollo's person id (prefixed so the add path tells it apart from a
+    // Seamless searchResultId). It's the reliable handle for revealing this
+    // exact person's email/LinkedIn at add-time via apolloRevealById.
+    searchResultId: p.id ? `apollo:${p.id}` : null,
     firstName,
     lastName,
     fullName: p.name || `${firstName} ${lastName}`.trim(),
@@ -954,6 +957,84 @@ export async function apolloEnrichPerson(opts: {
       city: p.city || org.city || null,
       state: p.state || org.state || null,
       country: p.country || org.country || null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// ─── Reveal by Apollo person id (add-time enrichment) ────────────────────────
+// api_search returns each person's Apollo `id` but masks name/email and omits
+// phone & LinkedIn. Calling /people/match by that id reveals the verified work
+// email + LinkedIn (~1 credit). Apollo CANNOT reveal phone synchronously (it
+// requires an async webhook), so phone stays null — unlike Seamless. The match
+// often still returns only a first name, so we derive the surname from the
+// LinkedIn slug when needed.
+
+/** Derive a surname from a LinkedIn vanity slug, e.g.
+ *  "http://linkedin.com/in/hannah-ma-989521194" + first "Hannah" → "Ma". */
+function lastNameFromLinkedin(url?: string | null, firstName?: string | null): string {
+  if (!url) return "";
+  const m = url.match(/\/in\/([^/?#]+)/i);
+  if (!m) return "";
+  const tokens = m[1]
+    .split("-")
+    .filter((t) => t && !/^\d+$/.test(t)); // drop the trailing numeric disambiguator
+  const first = (firstName || "").toLowerCase();
+  const rest = tokens.filter((t) => t.toLowerCase() !== first);
+  const last = (rest.length ? rest : tokens.slice(1)).join(" ");
+  return last ? last.replace(/\b\w/g, (c) => c.toUpperCase()) : "";
+}
+
+/** Best-effort full name for a matched Apollo person whose surname may be masked. */
+function deriveName(p: ApolloPerson): { firstName: string; lastName: string; fullName: string } {
+  const firstName = p.first_name || (p.name ? p.name.split(/\s+/)[0] : "") || "";
+  let lastName =
+    p.last_name ||
+    (p.name && p.name.split(/\s+/).length > 1 ? p.name.split(/\s+/).slice(1).join(" ") : "") ||
+    "";
+  // api_search/match frequently hand back only a first name — recover the surname
+  // from the LinkedIn handle so the saved contact isn't half a name.
+  if (!lastName || /\*/.test(lastName)) lastName = lastNameFromLinkedin(p.linkedin_url, firstName) || lastName;
+  const fullName = `${firstName} ${lastName}`.trim() || p.name || firstName;
+  return { firstName, lastName, fullName };
+}
+
+/**
+ * Reveal a person Apollo returned during search, by their Apollo person id.
+ * Returns a SeamlessPerson with email + LinkedIn + a best-effort full name.
+ * Phone stays null (Apollo phone reveal is async-webhook-only). Returns null on
+ * any failure (incl. out-of-credits / auth) so callers can react.
+ */
+export async function apolloRevealById(id: string): Promise<SeamlessPerson | null> {
+  const key = getKey();
+  if (!key || !id) return null;
+  try {
+    const res = await fetch(`${APOLLO_BASE}/people/match`, {
+      method: "POST",
+      headers: authHeaders(key),
+      body: JSON.stringify({ id, reveal_personal_emails: true }),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as {
+      person?: ApolloPerson & { phone_numbers?: Array<{ sanitized_number?: string; raw_number?: string }> };
+    };
+    const p = json.person;
+    if (!p) return null;
+    const base = mapPerson(p); // org/domain/title/location + searchResultId=apollo:<id>
+    const { firstName, lastName, fullName } = deriveName(p);
+    const phone =
+      p.phone_numbers?.find((n) => n.sanitized_number)?.sanitized_number ||
+      p.phone_numbers?.[0]?.raw_number ||
+      null;
+    return {
+      ...base,
+      firstName: firstName || base.firstName,
+      lastName: lastName || base.lastName,
+      fullName: fullName || base.fullName,
+      phone,
+      raw: p as unknown as Record<string, unknown>,
     };
   } catch {
     return null;

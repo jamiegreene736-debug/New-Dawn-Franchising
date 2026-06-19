@@ -80,6 +80,7 @@ import {
   type ProviderError,
   type SeamlessPerson,
 } from "./seamless-service";
+import { apolloRevealById } from "./apollo-service";
 import { cachedProviderSearch } from "./search-cache";
 import { logSearchEvent } from "./search-telemetry";
 import { searchCrmContacts } from "./semantic-search";
@@ -470,37 +471,74 @@ function scheduleAgentCrons() {
   console.log("Scheduled jobs runner: every 5 minutes");
 }
 
-// Reveal email/phone for a set of Seamless searchResultIds and key the results
-// by id, so "Add to CRM" can enrich a contact at the moment it's saved. This is
-// the reliable enrich path: Seamless matched the person during search, so its
-// searchResultId is a guaranteed handle (unlike a post-hoc name/company lookup).
-// Surfaces the provider error (e.g. out of credits) so callers stop rather than
-// silently saving a bare row.
+// Reveal email/phone for a set of search-result handles and key the results by
+// handle, so "Add to CRM" can enrich a contact at the moment it's saved. Two
+// handle kinds flow through here:
+//   • Seamless searchResultId (raw)      → reveals email + phone (~1 credit)
+//   • Apollo person id ("apollo:<id>")   → reveals email + LinkedIn (~1 credit);
+//                                          Apollo can't reveal phone synchronously.
+// Either provider matched the person during search, so the handle is a reliable
+// reveal key (unlike a post-hoc name/company lookup). Surfaces a provider error
+// (e.g. out of credits) so callers stop rather than silently saving bare rows.
+type RevealEntry = { person: SeamlessPerson; source: "seamless" | "apollo" };
 async function revealForAdd(
   searchResultIds: Array<string | null | undefined>,
-): Promise<{ byId: Map<string, SeamlessPerson>; error: ProviderError | null }> {
-  const ids = Array.from(new Set(searchResultIds.filter((x): x is string => !!x)));
-  if (ids.length === 0) return { byId: new Map(), error: null };
-  // Generous budget + one retry: an "Add" is user-initiated, so we can wait for
-  // the async research to finish (typically 2-3s, occasionally longer when cold)
-  // instead of giving up at 6s and saving a bare contact.
-  const { results, error } = await seamlessRevealBySearchIdsDetailed(ids, {
-    attempts: 15,
-    intervalMs: 1200,
-    retryOnEmpty: true,
-    label: "add",
-  });
-  const byId = new Map<string, SeamlessPerson>();
-  for (const r of results) if (r.searchResultId) byId.set(r.searchResultId, r.person);
+): Promise<{ byId: Map<string, RevealEntry>; error: ProviderError | null }> {
+  const all = Array.from(new Set(searchResultIds.filter((x): x is string => !!x)));
+  if (all.length === 0) return { byId: new Map(), error: null };
+  const apolloIds = all.filter((x) => x.startsWith("apollo:"));
+  const seamlessIds = all.filter((x) => !x.startsWith("apollo:"));
+  const byId = new Map<string, RevealEntry>();
+
+  // Seamless: one batched reveal with a generous budget + retry — an "Add" is
+  // user-initiated, so we can wait for the async research instead of saving bare.
+  let error: ProviderError | null = null;
+  if (seamlessIds.length) {
+    const { results, error: sErr } = await seamlessRevealBySearchIdsDetailed(seamlessIds, {
+      attempts: 15,
+      intervalMs: 1200,
+      retryOnEmpty: true,
+      label: "add",
+    });
+    error = sErr;
+    for (const r of results) if (r.searchResultId) byId.set(r.searchResultId, { person: r.person, source: "seamless" });
+  }
+
+  // Apollo: reveal each id via /people/match, capped concurrency to stay quick
+  // without hammering the API. If EVERY Apollo reveal fails (and nothing else was
+  // revealed), surface an error so we don't silently re-save a batch of bare rows
+  // — that's the failure mode (out of credits/auth) that stranded the first 100.
+  if (apolloIds.length) {
+    let ok = 0;
+    const CONCURRENCY = 6;
+    for (let i = 0; i < apolloIds.length; i += CONCURRENCY) {
+      const chunk = apolloIds.slice(i, i + CONCURRENCY);
+      const people = await Promise.all(chunk.map((key) => apolloRevealById(key.slice("apollo:".length))));
+      chunk.forEach((key, j) => {
+        const person = people[j];
+        if (person) { byId.set(key, { person, source: "apollo" }); ok++; }
+      });
+    }
+    if (ok === 0 && byId.size === 0) {
+      error = error || {
+        status: 502,
+        code: "providerError",
+        message: "Apollo couldn't reveal any of these contacts (it may be out of credits). No contacts were saved.",
+      };
+    }
+  }
+
   return { byId, error };
 }
 
-/** Build the crm_clients enrichment patch from a revealed Seamless person: the
- * full raw payload as JSONB plus the promoted, displayable columns. */
-function enrichmentPatch(p: SeamlessPerson, now: Date): Record<string, unknown> {
+/** Build the crm_clients enrichment patch from a revealed person: the full raw
+ * payload as JSONB plus the promoted, displayable columns. `source` records which
+ * provider revealed it (Seamless populates the rich company columns; Apollo only
+ * fills email/LinkedIn, the rest stay null). */
+function enrichmentPatch(p: SeamlessPerson, now: Date, source: "seamless" | "apollo" = "seamless"): Record<string, unknown> {
   return {
     enrichmentJson: p.raw ?? null,
-    enrichmentSource: "seamless",
+    enrichmentSource: source,
     enrichedAt: now,
     email2: p.email2 ?? null,
     email3: p.email3 ?? null,
@@ -531,6 +569,15 @@ function enrichmentPatch(p: SeamlessPerson, now: Date): Record<string, unknown> 
     jobChangeAlert: p.jobChangeAlert ?? null,
     stockTicker: p.stockTicker ?? null,
   };
+}
+
+/** Prefer a provider-revealed full name when the supplied one is empty or masked
+ * (Apollo search hands back "Arif Sh***h"); otherwise keep what the client sent. */
+function pickRevealedName(contactName: unknown, person?: SeamlessPerson): string {
+  const supplied = typeof contactName === "string" ? contactName.trim() : "";
+  const revealed = person?.fullName?.trim() || "";
+  if ((!supplied || supplied.includes("*")) && revealed && !revealed.includes("*")) return revealed;
+  return supplied || revealed || "Unknown";
 }
 
 /** Map a Seamless ProviderError to an HTTP status for the add endpoints. */
@@ -1309,10 +1356,13 @@ export async function registerRoutes(
       let skipped = 0;
       let enriched = 0;
       for (const contact of contacts) {
-        const person = typeof contact?.searchResultId === "string" ? byId.get(contact.searchResultId) : undefined;
+        const entry = typeof contact?.searchResultId === "string" ? byId.get(contact.searchResultId) : undefined;
+        const person = entry?.person;
         if (person && ((!contact.email && person.email) || (!contact.phone && person.phone))) enriched++;
         const data = insertCrmClientSchema.parse({
-          fullName: contact.fullName || "Unknown",
+          // Search results can carry a masked name (Apollo "Arif Sh***h") — prefer
+          // the revealed full name once enrichment unmasks it.
+          fullName: pickRevealedName(contact.fullName, person),
           email: contact.email || person?.email || "",
           phone: contact.phone || person?.phone || undefined,
           country: contact.country || person?.country || undefined,
@@ -1332,9 +1382,9 @@ export async function registerRoutes(
           companyName: data.companyName,
         });
         if (existing) { skipped++; continue; }
-        // Persist the full Seamless payload (JSONB) + promoted columns.
+        // Persist the full provider payload (JSONB) + promoted columns.
         const created = await storage.createCrmClient(
-          (person ? { ...data, ...enrichmentPatch(person, now) } : data) as typeof data,
+          (person ? { ...data, ...enrichmentPatch(person, now, entry!.source) } : data) as typeof data,
         );
         results.push(created);
       }
@@ -1376,15 +1426,20 @@ export async function registerRoutes(
       // email/phone from the searchResultId BEFORE saving, so it lands enriched.
       let body = req.body;
       let revealedPerson: SeamlessPerson | undefined;
+      let revealedSource: "seamless" | "apollo" = "seamless";
       const searchResultId = typeof req.body?.searchResultId === "string" ? req.body.searchResultId : null;
       if (searchResultId) {
         const { byId, error } = await revealForAdd([searchResultId]);
         if (error) return res.status(providerErrorStatus(error)).json({ message: error.message, code: error.code });
-        revealedPerson = byId.get(searchResultId);
-        if (revealedPerson) {
-          const person = revealedPerson;
+        const entry = byId.get(searchResultId);
+        revealedPerson = entry?.person;
+        if (entry) {
+          const person = entry.person;
+          revealedSource = entry.source;
           body = {
             ...body,
+            // Prefer the revealed full name when the search name was masked (Apollo).
+            fullName: pickRevealedName(body.fullName, person),
             email: body.email || person.email || "",
             phone: body.phone || person.phone || undefined,
             linkedinUrl: body.linkedinUrl || person.linkedinUrl || undefined,
@@ -1405,9 +1460,9 @@ export async function registerRoutes(
         companyName: data.companyName,
       });
       if (existing) return res.status(200).json(existing);
-      // Persist the full Seamless payload (JSONB) + promoted columns.
+      // Persist the full provider payload (JSONB) + promoted columns.
       const client = await storage.createCrmClient(
-        (revealedPerson ? { ...data, ...enrichmentPatch(revealedPerson, new Date()) } : data) as typeof data,
+        (revealedPerson ? { ...data, ...enrichmentPatch(revealedPerson, new Date(), revealedSource) } : data) as typeof data,
       );
       res.status(201).json(client);
     } catch (err) {

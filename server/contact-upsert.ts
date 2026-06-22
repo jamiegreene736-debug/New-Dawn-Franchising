@@ -271,6 +271,64 @@ function seamlessEnrichmentPatch(p: SeamlessPerson, now: Date): Record<string, u
  * returns the existing row unchanged when the person is already in the pipeline.
  * Used by the Seamless org-contact auto-sync (server/seamless-org-sync.ts).
  */
+function apolloEnrichmentPatch(p: SeamlessPerson, now: Date): Record<string, unknown> {
+  return {
+    enrichmentJson: p.raw ?? null,
+    enrichmentSource: "apollo",
+    enrichedAt: now,
+    emailConfidence: p.emailConfidence ?? null,
+    seniority: p.seniority ?? null,
+    department: p.department ?? null,
+    contactCity: p.city ?? null,
+    contactState: p.state ?? null,
+    companyDomain: p.domain ?? null,
+    companyIndustry: p.industries?.[0] ?? null,
+    companyStaffRange: p.employeeSizeRange ?? null,
+    companyRevenue: p.companyRevenue ?? null,
+    companyCity: p.companyCity ?? null,
+    companyState: p.companyState ?? null,
+    companyCountry: p.companyCountry ?? null,
+  };
+}
+
+/**
+ * Upsert an Apollo saved contact into `crm_clients`. Same dedup as Seamless sync.
+ */
+export async function addCrmClientFromApollo(
+  p: SeamlessPerson,
+  opts: { leadSource?: string } = {},
+): Promise<CrmClientUpsertResult> {
+  const fullName = (p.fullName || `${p.firstName} ${p.lastName}`).trim() || "Unknown";
+  const companyName = normCompany(p.company);
+  const existing = await findExistingCrmClient({ fullName, email: p.email, companyName });
+  if (existing) return { status: "exists", client: existing };
+
+  const now = new Date();
+  const values = {
+    fullName,
+    email: normEmail(p.email) || "",
+    phone: p.phone || null,
+    country: p.country || null,
+    leadSource: opts.leadSource || "apollo_sync",
+    companyName,
+    profession: p.jobTitle || null,
+    linkedinUrl: p.linkedinUrl || null,
+    status: "new" as const,
+    tags: [] as string[],
+    ...apolloEnrichmentPatch(p, now),
+  };
+
+  const [created] = await db
+    .insert(crmClientsTable)
+    .values(values as typeof crmClientsTable.$inferInsert)
+    .returning();
+  if (created) return { status: "created", client: created };
+
+  const raced = await findExistingCrmClient({ fullName, email: p.email, companyName });
+  if (raced) return { status: "exists", client: raced };
+  throw new Error("addCrmClientFromApollo: insert returned no row and no existing match found");
+}
+
 export async function addCrmClientFromSeamless(
   p: SeamlessPerson,
   opts: { leadSource?: string } = {},

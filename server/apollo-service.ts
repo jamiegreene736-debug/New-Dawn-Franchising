@@ -1006,6 +1006,179 @@ function deriveName(p: ApolloPerson): { firstName: string; lastName: string; ful
  * Phone stays null (Apollo phone reveal is async-webhook-only). Returns null on
  * any failure (incl. out-of-credits / auth) so callers can react.
  */
+// ─── Saved contacts + labels (org sync for CRM lists) ───────────────────────
+// POST /contacts/search returns contacts already saved in your Apollo account
+// (unlike api_search which searches the broader database). GET /labels returns
+// the lists ("labels") those contacts belong to.
+
+export interface ApolloLabel {
+  id: string;
+  name: string;
+  modality: string;
+}
+
+interface ApolloSavedContact {
+  id?: string;
+  first_name?: string;
+  last_name?: string;
+  name?: string;
+  title?: string;
+  email?: string;
+  email_status?: string;
+  linkedin_url?: string;
+  organization_name?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  label_ids?: string[];
+  phone_numbers?: Array<{ sanitized_number?: string; raw_number?: string }>;
+  account?: ApolloOrg;
+  organization?: ApolloOrg;
+}
+
+function mapSavedContact(c: ApolloSavedContact): SeamlessPerson {
+  const org = c.account || c.organization || {};
+  const email = realEmail(c.email, c.email_status);
+  const verified = (c.email_status || "").toLowerCase() === "verified";
+  const domain =
+    org.primary_domain ||
+    (org.website_url ? org.website_url.replace(/^https?:\/\//, "").replace(/\/.*$/, "") : null) ||
+    null;
+  const firstName = c.first_name || (c.name ? c.name.split(/\s+/)[0] : "") || "";
+  const lastName =
+    c.last_name || (c.name ? c.name.split(/\s+/).slice(1).join(" ") : "") || "";
+  const phone =
+    c.phone_numbers?.find((n) => n.sanitized_number)?.sanitized_number ||
+    c.phone_numbers?.[0]?.raw_number ||
+    null;
+  const company = org.name || c.organization_name || null;
+  return {
+    searchResultId: c.id ? `apollo:${c.id}` : null,
+    firstName,
+    lastName,
+    fullName: c.name || `${firstName} ${lastName}`.trim(),
+    email,
+    emailConfidence: email ? (verified ? 90 : 70) : 0,
+    emailVerified: verified,
+    emailStatus: email ? (verified ? "valid" : "unverified") : "not_found",
+    phone,
+    jobTitle: c.title || null,
+    seniority: null,
+    department: null,
+    linkedinUrl: c.linkedin_url || null,
+    company,
+    domain,
+    country: c.country || org.country || null,
+    city: c.city || org.city || null,
+    state: c.state || org.state || null,
+    industries: org.industry ? [org.industry] : null,
+    employeeSizeRange: org.estimated_num_employees ? String(org.estimated_num_employees) : null,
+    companyRevenue: org.annual_revenue_printed || null,
+    companyType: null,
+    companyCity: org.city || null,
+    companyState: org.state || null,
+    companyCountry: org.country || null,
+    timeAtCompany: null,
+    startedAtCurrentCompany: null,
+    raw: { ...(c as unknown as Record<string, unknown>), apolloLabelIds: c.label_ids || [] },
+  };
+}
+
+/** All contact lists ("labels") in the Apollo account. Requires a master API key. */
+export async function apolloGetLabels(): Promise<{ labels: ApolloLabel[]; error?: ProviderError | null }> {
+  const key = getKey();
+  if (!key) return { labels: [] };
+  try {
+    const res = await fetch(`${APOLLO_BASE}/labels`, {
+      method: "GET",
+      headers: authHeaders(key),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+    if (!res.ok) {
+      const error = await apolloHttpError(res);
+      console.warn(`[Apollo] GET /labels ${error.status} ${error.code}: ${error.message}`);
+      return { labels: [], error };
+    }
+    const json = (await res.json()) as { labels?: ApolloLabel[] } | ApolloLabel[];
+    const raw = Array.isArray(json) ? json : json.labels || [];
+    const labels = raw
+      .map((l) => ({
+        id: String(l.id || (l as { _id?: string })._id || ""),
+        name: String(l.name || "").trim(),
+        modality: String(l.modality || ""),
+      }))
+      .filter((l) => l.id && l.name);
+    return { labels };
+  } catch {
+    return { labels: [], error: apolloNetworkError() };
+  }
+}
+
+const APOLLO_SYNC_MAX_PAGES = Number(process.env.APOLLO_SYNC_MAX_PAGES || 100);
+
+/**
+ * Fetch every contact saved in the Apollo account (paginated POST /contacts/search).
+ * Returns people normalised to SeamlessPerson plus their label_ids for list mapping.
+ */
+export async function apolloGetOrgContacts(opts: { maxPages?: number } = {}): Promise<{
+  people: SeamlessPerson[];
+  pages: number;
+  error?: ProviderError | null;
+}> {
+  const key = getKey();
+  if (!key) return { people: [], pages: 0 };
+
+  const maxPages = opts.maxPages ?? APOLLO_SYNC_MAX_PAGES;
+  const perPage = 100;
+  const all: SeamlessPerson[] = [];
+  const seen = new Set<string>();
+  let firstError: ProviderError | null = null;
+
+  for (let page = 1; page <= maxPages; page++) {
+    try {
+      const res = await fetch(`${APOLLO_BASE}/contacts/search`, {
+        method: "POST",
+        headers: authHeaders(key),
+        body: JSON.stringify({ page, per_page: perPage }),
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      });
+      if (!res.ok) {
+        const error = await apolloHttpError(res);
+        console.warn(`[Apollo] POST /contacts/search p${page} ${error.status} ${error.code}: ${error.message}`);
+        if (!firstError) firstError = error;
+        if (all.length === 0) return { people: [], pages: page - 1, error };
+        break;
+      }
+      const json = (await res.json()) as {
+        contacts?: ApolloSavedContact[];
+        pagination?: { page?: number; total_pages?: number };
+      };
+      const batch = Array.isArray(json.contacts) ? json.contacts : [];
+      if (batch.length === 0) break;
+      for (const c of batch) {
+        const p = mapSavedContact(c);
+        const dedupeKey = (
+          p.email ||
+          p.searchResultId ||
+          `${p.fullName}|${p.company}|${p.linkedinUrl}`
+        ).toLowerCase();
+        if (seen.has(dedupeKey)) continue;
+        seen.add(dedupeKey);
+        all.push(p);
+      }
+      const pg = json.pagination;
+      if (pg?.page != null && pg.total_pages != null && pg.page >= pg.total_pages) break;
+      if (batch.length < perPage) break;
+    } catch {
+      if (!firstError) firstError = apolloNetworkError();
+      if (all.length === 0) return { people: [], pages: page - 1, error: firstError };
+      break;
+    }
+  }
+
+  return { people: all, pages: Math.min(maxPages, Math.ceil(all.length / perPage) || 1), error: firstError };
+}
+
 export async function apolloRevealById(id: string): Promise<SeamlessPerson | null> {
   const key = getKey();
   if (!key || !id) return null;

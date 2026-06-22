@@ -6,6 +6,7 @@ import { fromZodError } from "zod-validation-error";
 import { calculateLeadScore, rescoreContact } from "./lead-scoring";
 import { seamlessSearch, getSeamlessStatus } from "./seamless-service";
 import { syncSeamlessOrgContacts, getSeamlessSyncConfig, getSeamlessSyncState } from "./seamless-org-sync";
+import { syncApolloOrgContacts, getApolloSyncConfig, getApolloSyncState } from "./apollo-org-sync";
 import { sendEmail } from "./email-service";
 
 function requireAdminAuth(req: Request, res: Response, next: () => void) {
@@ -498,6 +499,32 @@ export function registerContactRoutes(app: Express) {
       res.json({ ...getSeamlessSyncConfig(), last });
     } catch (err: any) {
       res.status(500).json({ message: err?.message || "Failed to fetch Seamless sync status" });
+    }
+  });
+
+  // ─── Apollo.io org-contact sync ───────────────────────────────────────────
+  // Pull saved Apollo contacts into CRM and mirror Apollo lists into CRM lists.
+
+  app.post("/api/apollo/sync", requireAdminAuth, async (req, res) => {
+    try {
+      if (!process.env.APOLLO_API_KEY) {
+        return res.status(503).json({ message: "Apollo.io is not configured (APOLLO_API_KEY missing)." });
+      }
+      const full = req.body?.full === true || req.query?.full === "1";
+      const result = await syncApolloOrgContacts({ full });
+      res.json(result);
+    } catch (err: any) {
+      console.error("POST /api/apollo/sync error:", err);
+      res.status(500).json({ message: err?.message || "Apollo sync failed" });
+    }
+  });
+
+  app.get("/api/apollo/sync/status", requireAdminAuth, async (_req, res) => {
+    try {
+      const last = await getApolloSyncState();
+      res.json({ ...getApolloSyncConfig(), last });
+    } catch (err: any) {
+      res.status(500).json({ message: err?.message || "Failed to fetch Apollo sync status" });
     }
   });
 

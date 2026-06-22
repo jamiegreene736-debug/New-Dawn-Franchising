@@ -14,6 +14,7 @@ import { searchProspects, SEARCH_CATEGORIES } from "./prospect-search";
 import { scheduleDripProcessing, processDripEmails, reprocessStep, fireClickReaction } from "./drip-processor";
 import { scheduleGmailSync, syncFranchisingInbox, getGmailSyncStatus, getGmailSyncLastResult } from "./gmail-sync-service";
 import { scheduleSeamlessOrgSync } from "./seamless-org-sync";
+import { scheduleApolloOrgSync } from "./apollo-org-sync";
 import { seedDefaultCampaign } from "./default-campaign";
 import { seedGrokCampaign } from "./grok-campaign";
 import { seedGlobevisaCampaign } from "./globevisa-campaign";
@@ -5353,6 +5354,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
   scheduleDripProcessing();
   scheduleGmailSync();
   scheduleSeamlessOrgSync();
+  scheduleApolloOrgSync();
   seedDefaultCampaign();
   seedGrokCampaign();
   seedGlobevisaCampaign();

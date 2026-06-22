@@ -999,6 +999,40 @@ export default function CrmPage() {
     onError: (err: Error) => toast({ title: "Seamless sync failed", description: err.message, variant: "destructive" }),
   });
 
+  const { data: apolloSync } = useQuery<{
+    configured: boolean;
+    cron: string;
+    running: boolean;
+    last: { fetched: number; imported: number; skipped: number; listAdded: number; lastRunAt: string | null; error: string | null };
+  }>({
+    queryKey: ["/api/apollo/sync/status"],
+    refetchInterval: 60_000,
+  });
+
+  const syncApolloMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/apollo/sync", { full: true });
+      return res.json() as Promise<{ fetched: number; imported: number; skipped: number; listAdded: number; error: string | null; note?: string }>;
+    },
+    onSuccess: (data) => {
+      if (data.note) {
+        toast({ title: data.note });
+      } else if (data.error) {
+        toast({ title: "Apollo sync finished with an error", description: data.error, variant: "destructive" });
+      } else {
+        toast({
+          title: `Synced ${data.fetched} Apollo contact${data.fetched !== 1 ? "s" : ""}`,
+          description: `${data.imported} new in CRM · ${data.listAdded} list membership${data.listAdded !== 1 ? "s" : ""} added`,
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/clients"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/lists"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/prospect-lists"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/apollo/sync/status"] });
+    },
+    onError: (err: Error) => toast({ title: "Apollo sync failed", description: err.message, variant: "destructive" }),
+  });
+
   // Members of the list currently used as a filter (only fetched when one is active).
   const { data: listMembers = [] } = useQuery<CrmClient[]>({
     queryKey: ["/api/crm/lists", filterListId, "members"],
@@ -1599,6 +1633,30 @@ export default function CrmPage() {
                     <span className="text-[11px] text-muted-foreground mt-0.5">
                       Synced {timeAgo(seamlessSync.last.lastRunAt)}
                       {seamlessSync.last.error ? " · last run errored" : ""}
+                    </span>
+                  )}
+                </div>
+              )}
+              {apolloSync?.configured !== false && (
+                <div className="flex flex-col items-end">
+                  <Button
+                    data-testid="button-sync-apollo"
+                    variant="outline"
+                    className="gap-2"
+                    onClick={() => syncApolloMutation.mutate()}
+                    disabled={syncApolloMutation.isPending || apolloSync?.running}
+                    title="Pull your Apollo.io saved contacts into the CRM and mirror Apollo lists into CRM lists for campaigns."
+                  >
+                    {syncApolloMutation.isPending || apolloSync?.running ? (
+                      <><Loader2 className="size-4 animate-spin" /> Syncing…</>
+                    ) : (
+                      <><RefreshCw className="size-4" /> Sync from Apollo</>
+                    )}
+                  </Button>
+                  {apolloSync?.last?.lastRunAt && (
+                    <span className="text-[11px] text-muted-foreground mt-0.5">
+                      Synced {timeAgo(apolloSync.last.lastRunAt)}
+                      {apolloSync.last.error ? " · last run errored" : ""}
                     </span>
                   )}
                 </div>

@@ -329,6 +329,18 @@ const STATEMENTS: string[] = [
     list_id         varchar,
     updated_at      timestamptz  NOT NULL DEFAULT now()
   )`,
+  // Apollo.io org-contact auto-sync watermark + last-run stats (single row).
+  `CREATE TABLE IF NOT EXISTS apollo_sync_state (
+    id              varchar      PRIMARY KEY DEFAULT 'singleton',
+    last_sync_at    timestamptz,
+    last_run_at     timestamptz,
+    last_fetched    integer      NOT NULL DEFAULT 0,
+    last_imported   integer      NOT NULL DEFAULT 0,
+    last_skipped    integer      NOT NULL DEFAULT 0,
+    last_list_added integer      NOT NULL DEFAULT 0,
+    last_error      text,
+    updated_at      timestamptz  NOT NULL DEFAULT now()
+  )`,
 ];
 
 export async function ensureSchema(): Promise<void> {

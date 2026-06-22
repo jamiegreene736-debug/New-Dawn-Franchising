@@ -6,6 +6,7 @@ import { isOnDnc, removeFromDnc } from "./agent-service";
 import {
   isOptimalEmailWindow,
   smartEmailDelay,
+  smartSmsDelay,
   EMAIL_DAILY_CAP,
   EMAIL_HOURLY_CAP,
   EMAIL_DOMAIN_GAP_MS,
@@ -102,13 +103,21 @@ function channelOf(stepType: string): string {
 // Guard against overlapping runs (a manual "Send Due Now" overlapping the cron,
 // or repeated clicks) so the same enrollments aren't processed twice in parallel.
 let dripRunInProgress = false;
+// A run takes a one-time enrollment snapshot at its start, so contacts enrolled
+// *during* a run (e.g. the post-enroll trigger firing while the cron is mid-drain)
+// are invisible to it. Rather than drop that trigger, remember it and run once more
+// when the current run finishes — otherwise the just-enrolled contacts would strand
+// until the next top-of-hour tick, defeating the prompt-start fix.
+let dripRerunRequested = false;
 
 export async function processDripEmails(opts: { force?: boolean; campaignId?: string } = {}) {
   const { force = false, campaignId } = opts;
   console.log(`[Drip] Processing scheduled emails...${campaignId ? ` (campaign ${campaignId} only)` : ""}${force ? " (manual override — bypassing window + hourly cap)" : ""}`);
 
   if (dripRunInProgress) {
-    console.log("[Drip] A run is already in progress — skipping this trigger.");
+    // Don't silently drop it — queue a follow-up sweep for after the current run.
+    dripRerunRequested = true;
+    console.log("[Drip] A run is already in progress — queued a follow-up sweep.");
     return;
   }
 
@@ -172,46 +181,55 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
       const steps = await storage.getDripSteps(enrollment.campaignId);
       if (steps.length === 0) continue;
 
-      const currentStepIndex = enrollment.currentStep;
-      if (currentStepIndex >= steps.length) {
-        await storage.updateDripEnrollment(enrollment.id, {
-          status: "completed",
-          completedAt: new Date(),
-        } as any);
-        continue;
-      }
-
-      const step = steps[currentStepIndex];
+      // Drain every step that is due *now* for this enrollment in one pass — not
+      // just one step per cron run. A Day-0 sequence (e.g. a LinkedIn task plus
+      // the first email) should all go out in the same window instead of one step
+      // per hour, and an enrollment left behind by a restart should catch up. The
+      // loop stops at the first step that isn't due yet ("wait"), when the
+      // sequence is finished, or when a volume cap is hit; the per-step delayDays
+      // gate plus the daily/hourly caps keep the drain bounded.
       const enrolledAt = new Date(enrollment.enrolledAt);
-      const now = new Date();
-      const daysSinceEnrollment = Math.floor((now.getTime() - enrolledAt.getTime()) / (1000 * 60 * 60 * 24));
+      const firstName = (enrollment.prospectName || "").trim().split(/\s+/)[0] || enrollment.prospectName || "there";
+      const personalize = (s: string | null | undefined): string =>
+        (s || "")
+          .replace(/\[Contact First Name\]/gi, firstName)
+          .replace(/\{\{\s*firstName\s*\}\}/gi, firstName)
+          .replace(/\{\{\s*name\s*\}\}/gi, enrollment.prospectName)
+          .replace(/\{\{\s*email\s*\}\}/gi, enrollment.prospectEmail);
 
-      const existingSends = await storage.getDripSends(enrollment.id);
-      const ready = evaluateTrigger(step, steps, enrolledAt, existingSends, now, !!force);
-      if (ready === "wait") continue;
-      if (ready === "skip") {
-        await storage.updateDripEnrollment(enrollment.id, { currentStep: currentStepIndex + 1 } as any);
-        console.log(`[Drip] Trigger not met within window — skipping step ${currentStepIndex + 1} for ${enrollment.prospectName}`);
-        continue;
-      }
-      {
-        const alreadySent = existingSends.some(s => s.stepId === step.id);
-        if (alreadySent) {
-          await storage.updateDripEnrollment(enrollment.id, {
-            currentStep: currentStepIndex + 1,
-          } as any);
+      // stepIdx strictly increases every iteration (send/skip/already-sent → +1,
+      // wait/cap/bounce → break), so the loop always terminates.
+      let stepIdx = enrollment.currentStep;
+      while (stepIdx < steps.length) {
+        // Re-check the throttles before every send so a multi-step drain can't
+        // burst past the daily/hourly caps.
+        if (sentLast24h >= EMAIL_DAILY_CAP) break;
+        if (!force && sentLastHour >= EMAIL_HOURLY_CAP) break;
+
+        const step = steps[stepIdx];
+        const now = new Date();
+        const existingSends = await storage.getDripSends(enrollment.id);
+        // A force "Send Due Now" pushes the enrollment's CURRENT step immediately
+        // (bypassing the delayDays gate), but the drain must NOT then leap through
+        // every future-dated step — otherwise one click would blast the whole
+        // sequence at one inbox. So force only overrides due-ness for the first
+        // step of the drain; continuation always uses the natural schedule.
+        const forceThisStep = !!force && stepIdx === enrollment.currentStep;
+        const ready = evaluateTrigger(step, steps, enrolledAt, existingSends, now, forceThisStep);
+        if (ready === "wait") break; // not due yet — leave the rest for a later run
+        if (ready === "skip") {
+          stepIdx += 1;
+          await storage.updateDripEnrollment(enrollment.id, { currentStep: stepIdx } as any);
+          console.log(`[Drip] Trigger not met within window — skipping step ${stepIdx} for ${enrollment.prospectName}`);
           continue;
         }
 
-        // Shared personalization — supports Seamless-style [Contact First Name]
-        // as well as the legacy {{name}} / {{email}} tokens.
-        const firstName = (enrollment.prospectName || "").trim().split(/\s+/)[0] || enrollment.prospectName || "there";
-        const personalize = (s: string | null | undefined): string =>
-          (s || "")
-            .replace(/\[Contact First Name\]/gi, firstName)
-            .replace(/\{\{\s*firstName\s*\}\}/gi, firstName)
-            .replace(/\{\{\s*name\s*\}\}/gi, enrollment.prospectName)
-            .replace(/\{\{\s*email\s*\}\}/gi, enrollment.prospectEmail);
+        const alreadySent = existingSends.some(s => s.stepId === step.id);
+        if (alreadySent) {
+          stepIdx += 1;
+          await storage.updateDripEnrollment(enrollment.id, { currentStep: stepIdx } as any);
+          continue;
+        }
 
         const stepType = (step.stepType || "email").toLowerCase();
 
@@ -222,15 +240,17 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
           if (await isOnDnc(enrollment.prospectEmail)) {
             await storage.updateDripEnrollment(enrollment.id, { status: "bounced" } as any);
             console.log(`[Drip] Skipping suppressed/bounced address ${enrollment.prospectEmail} — enrollment stopped`);
-            continue;
+            break; // suppressed mailbox — stop draining this enrollment
           }
 
           // Per-domain pacing: if we sent to this recipient's domain very
           // recently in this run, wait out the remainder of the domain gap
-          // before sending again (avoids rapid bursts to one ISP).
-          // (Manual force runs skip the spacing waits so they finish promptly.)
+          // before sending again (avoids rapid bursts to one ISP). Kept even on a
+          // manual "Send Due Now" — for a varied list it's a no-op (each domain is
+          // seen once), and for a single-domain list it's the spam protection you
+          // most want, so force shouldn't strip it.
           const domain = emailDomain(enrollment.prospectEmail);
-          if (domain && !force) {
+          if (domain) {
             const last = lastSendByDomain.get(domain);
             if (last !== undefined) {
               const wait = EMAIL_DOMAIN_GAP_MS - (Date.now() - last);
@@ -267,15 +287,19 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
             sentLastHour++;
             if (domain) lastSendByDomain.set(domain, Date.now());
             await storage.updateDripSend(send.id, { status: "sent", sentAt: new Date() } as any);
-            console.log(`[Drip] Sent email step ${currentStepIndex + 1} to ${enrollment.prospectEmail} (today: ${sentLast24h}/${EMAIL_DAILY_CAP}, hour: ${sentLastHour}/${EMAIL_HOURLY_CAP})`);
+            console.log(`[Drip] Sent email step ${stepIdx + 1} to ${enrollment.prospectEmail} (today: ${sentLast24h}/${EMAIL_DAILY_CAP}, hour: ${sentLastHour}/${EMAIL_HOURLY_CAP})`);
           } else {
             await storage.updateDripSend(send.id, { status: "failed", errorMessage: result.error } as any);
             console.error(`[Drip] Failed to email ${enrollment.prospectEmail}: ${result.error}`);
           }
 
-          // Organic jitter between emails — avoids burst-send spam signals.
-          // Skipped on manual force runs (snappy) and once the daily cap is hit.
-          if (!force && sentThisRun > 0 && sentLast24h < EMAIL_DAILY_CAP && sentLastHour < EMAIL_HOURLY_CAP) {
+          // Organic jitter between emails — avoids burst-send spam signals. Applied
+          // even on a manual "Send Due Now" so a one-click whole-list send still
+          // paces itself (~5–18s/email): force skips only the optimal-window and
+          // hourly-cap GATES, not the spacing. Stops once the daily cap is hit
+          // (no point pacing when we're about to stop), and — on a normal run —
+          // once the hourly cap is hit (force ignores the hourly cap).
+          if (sentThisRun > 0 && sentLast24h < EMAIL_DAILY_CAP && (force || sentLastHour < EMAIL_HOURLY_CAP)) {
             const jitter = smartEmailDelay(sentThisRun);
             console.log(`[Drip] Waiting ${Math.round(jitter / 1000)}s before next send...`);
             await sleep(jitter);
@@ -300,7 +324,11 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
             const result = await sendSmsViaQuo(phone, personalize(step.bodyHtml));
             if (result.success) {
               await storage.updateDripSend(send.id, { status: "sent", sentAt: new Date() } as any);
-              console.log(`[Drip] Sent SMS step ${currentStepIndex + 1} to ${phone}`);
+              console.log(`[Drip] Sent SMS step ${stepIdx + 1} to ${phone}`);
+              // Carrier-safe spacing between texts. The email caps/jitter don't cover
+              // SMS, and the drain can fire multiple same-day SMS steps for one
+              // contact back-to-back — so pace each text (skipped on a force run).
+              if (!force) await sleep(smartSmsDelay(activeEnrollments.length));
             } else {
               await storage.updateDripSend(send.id, { status: "failed", errorMessage: result.error } as any);
               console.error(`[Drip] Failed to text ${phone}: ${result.error}`);
@@ -334,8 +362,15 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
           }
         }
 
+        stepIdx += 1;
+        await storage.updateDripEnrollment(enrollment.id, { currentStep: stepIdx } as any);
+      }
+
+      // A fully-drained enrollment (every step handled) is complete.
+      if (stepIdx >= steps.length) {
         await storage.updateDripEnrollment(enrollment.id, {
-          currentStep: currentStepIndex + 1,
+          status: "completed",
+          completedAt: new Date(),
         } as any);
       }
     }
@@ -345,6 +380,16 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
     console.error("[Drip] Processing error:", err);
   } finally {
     dripRunInProgress = false;
+    // If a trigger arrived mid-run, sweep once more (globally, non-force) to pick
+    // up any enrollments that weren't in this run's snapshot. Deferred slightly so
+    // the flag/in-progress state settles; each sweep makes progress, so this
+    // converges rather than looping.
+    if (dripRerunRequested) {
+      dripRerunRequested = false;
+      setTimeout(() => {
+        processDripEmails().catch((e) => console.error("[Drip] Queued follow-up sweep error:", e));
+      }, 1500);
+    }
   }
 }
 

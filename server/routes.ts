@@ -3154,7 +3154,16 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
 
   app.patch("/api/crm/campaigns/:id", requireAdminAuth, async (req, res) => {
     try {
-      const updated = await storage.updateDripCampaign(String(req.params.id) as string, req.body);
+      const campaignId = String(req.params.id);
+      const updated = await storage.updateDripCampaign(campaignId, req.body);
+      // Turning a campaign ON shouldn't wait for the next top-of-hour cron tick —
+      // kick off a processing pass now (still gated by the optimal send window +
+      // caps, so it's a no-op outside business hours).
+      if (req.body?.isActive === true) {
+        processDripEmails({ campaignId }).catch((err) =>
+          console.error("[Drip] post-activate process error:", err),
+        );
+      }
       res.json(updated);
     } catch (err) {
       res.status(500).json({ message: "Failed to update campaign" });
@@ -3361,6 +3370,14 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
         });
         results.push(enrollment);
       }
+      // Start the sequence promptly instead of waiting for the next in-window cron
+      // tick (which can be hours away — or overnight — if the enrollment lands just
+      // after one). Non-force, so the optimal send window + caps still apply.
+      if (results.length > 0) {
+        processDripEmails({ campaignId }).catch((err) =>
+          console.error("[Drip] post-enroll process error:", err),
+        );
+      }
       res.status(201).json(results);
     } catch (err) {
       res.status(500).json({ message: "Failed to enroll prospects" });
@@ -3416,6 +3433,13 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
         });
         enrolled.add(prospect.id);
         results.push(enrollment);
+      }
+      // Start the sequence promptly instead of waiting for the next in-window cron
+      // tick. Non-force, so the optimal send window + caps still apply.
+      if (results.length > 0) {
+        processDripEmails({ campaignId }).catch((err) =>
+          console.error("[Drip] post-enroll process error:", err),
+        );
       }
       res.status(201).json({ enrolled: results, count: results.length, skippedNoEmail });
     } catch (err) {

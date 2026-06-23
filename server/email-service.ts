@@ -219,7 +219,15 @@ ${innerHtml}
 }
 
 export function getTrackingPixelUrl(baseUrl: string, sendId: string): string {
-  return `${baseUrl}/api/track/open/${sendId}`;
+  // First-party tracking domain: if EMAIL_TRACKING_DOMAIN is set (e.g.
+  // link.send.newdawnfranchising.com, a CNAME → this app), open/click links ride
+  // the sending org's own domain instead of the brand root — better trust and it
+  // isolates link reputation. Falls back to baseUrl so behaviour is unchanged
+  // until the DNS + env are in place. The click URL is derived from this in
+  // sendEmailFromSender (…/track/open/<id> → …/track/click/<id>).
+  const td = process.env.EMAIL_TRACKING_DOMAIN?.trim();
+  const base = td ? (/^https?:\/\//i.test(td) ? td.replace(/\/$/, "") : `https://${td.replace(/\/$/, "")}`) : baseUrl;
+  return `${base}/api/track/open/${sendId}`;
 }
 
 // ─── Email Signature Builder ───────────────────────────────────────────────────

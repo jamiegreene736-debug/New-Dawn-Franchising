@@ -359,6 +359,80 @@ const STATEMENTS: string[] = [
     last_error      text,
     updated_at      timestamptz  NOT NULL DEFAULT now()
   )`,
+
+  // ─── Deliverability + warmup (Instantly/Smartlead-mimic stack) ───────────────
+  // Persisted results of the on-demand spam-content checker (one row per check),
+  // so the admin tab can show a short history.
+  `CREATE TABLE IF NOT EXISTS spam_check_results (
+    id          varchar      PRIMARY KEY DEFAULT gen_random_uuid(),
+    subject     text         NOT NULL DEFAULT '',
+    score       numeric      NOT NULL DEFAULT 0,
+    health      integer      NOT NULL DEFAULT 100,
+    verdict     text         NOT NULL DEFAULT 'clean',
+    hits        jsonb        NOT NULL DEFAULT '[]'::jsonb,
+    created_at  timestamptz  NOT NULL DEFAULT now()
+  )`,
+
+  // Warmup engine — single settings row (id='singleton'); ships OFF by default.
+  `CREATE TABLE IF NOT EXISTS warmup_settings (
+    id                 varchar      PRIMARY KEY DEFAULT 'singleton',
+    enabled            boolean      NOT NULL DEFAULT false,
+    provider           text         NOT NULL DEFAULT 'owned',
+    daily_target       integer      NOT NULL DEFAULT 10,
+    ramp_start         integer      NOT NULL DEFAULT 2,
+    ramp_increment     integer      NOT NULL DEFAULT 2,
+    reply_rate_pct     integer      NOT NULL DEFAULT 30,
+    mark_important_pct integer      NOT NULL DEFAULT 30,
+    spam_rescue_pct    integer      NOT NULL DEFAULT 100,
+    weekdays_only      boolean      NOT NULL DEFAULT true,
+    filter_tag         text         NOT NULL DEFAULT 'ndf-warmup',
+    started_at         timestamptz,
+    updated_at         timestamptz  NOT NULL DEFAULT now()
+  )`,
+
+  // Mailboxes participating in warmup. type='owned_imap' = a Gmail mailbox we
+  // control (reuses the sender app passwords); type='external' = a provider seam.
+  `CREATE TABLE IF NOT EXISTS warmup_pool_members (
+    id            varchar      PRIMARY KEY DEFAULT gen_random_uuid(),
+    email         text         NOT NULL UNIQUE,
+    name          text,
+    type          text         NOT NULL DEFAULT 'owned_imap',
+    imap_pass_env text,
+    provider      text,
+    active        boolean      NOT NULL DEFAULT true,
+    created_at    timestamptz  NOT NULL DEFAULT now()
+  )`,
+
+  // One row per warmup email sent; `landed` is set by the IMAP engagement loop.
+  `CREATE TABLE IF NOT EXISTS warmup_sends (
+    id                 varchar      PRIMARY KEY DEFAULT gen_random_uuid(),
+    from_email         text         NOT NULL,
+    to_email           text         NOT NULL,
+    subject            text         NOT NULL DEFAULT '',
+    tag                text         NOT NULL DEFAULT '',
+    token              text         NOT NULL,
+    landed             text         NOT NULL DEFAULT 'pending',
+    sent_at            timestamptz  NOT NULL DEFAULT now(),
+    checked_at         timestamptz,
+    replied_at         timestamptz,
+    rescued_at         timestamptz,
+    marked_important_at timestamptz
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_warmup_sends_token ON warmup_sends (token)`,
+  `CREATE INDEX IF NOT EXISTS idx_warmup_sends_to ON warmup_sends (to_email, landed)`,
+
+  // Daily per-mailbox warmup health snapshot (inbox-placement score).
+  `CREATE TABLE IF NOT EXISTS warmup_health (
+    id          varchar      PRIMARY KEY DEFAULT gen_random_uuid(),
+    mailbox     text         NOT NULL,
+    day         date         NOT NULL DEFAULT CURRENT_DATE,
+    sent        integer      NOT NULL DEFAULT 0,
+    inboxed     integer      NOT NULL DEFAULT 0,
+    spam        integer      NOT NULL DEFAULT 0,
+    score       numeric,
+    created_at  timestamptz  NOT NULL DEFAULT now(),
+    UNIQUE (mailbox, day)
+  )`,
 ];
 
 export async function ensureSchema(): Promise<void> {

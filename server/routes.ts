@@ -14,6 +14,14 @@ import { searchProspects, SEARCH_CATEGORIES } from "./prospect-search";
 import { scheduleDripProcessing, processDripEmails, reprocessStep, fireClickReaction } from "./drip-processor";
 import { scheduleGmailSync, syncFranchisingInbox, getGmailSyncStatus, getGmailSyncLastResult } from "./gmail-sync-service";
 import { getDomainAuth, getDeliverabilityMetrics, getChecklist, updateChecklistItem, type ChecklistStatus } from "./deliverability-service";
+import { getDnsSetupReport } from "./dns-setup-service";
+import { checkSpamContent } from "./spam-content-service";
+import { getBlacklistReport } from "./blacklist-service";
+import {
+  getWarmupSettings, updateWarmupSettings, listMembers, addMember, removeMember, setMemberActive,
+  seedOwnedMembersFromSenders, getWarmupOverview, runWarmupTick, computeWarmupHealth,
+} from "./warmup-service";
+import { runWarmupEngagement } from "./warmup-engagement-service";
 import { scheduleSeamlessOrgSync } from "./seamless-org-sync";
 import { scheduleApolloOrgSync } from "./apollo-org-sync";
 import { seedDefaultCampaign } from "./default-campaign";
@@ -56,7 +64,7 @@ import {
 import { pollAllRenderingVideos, runHeygenPreparation } from "./heygen-service";
 import { heygenVideos, prospectLists } from "../shared/schema";
 import { eq, desc } from "drizzle-orm";
-import { db } from "./db";
+import { db, pool } from "./db";
 import { runAllHealthChecks, runHealthCheckWithAlerts } from "./api-health";
 import cron from "node-cron";
 import { planDailyIntelligence, getRecentPlans, getTodaysPlan } from "./outreach-intelligence-service";
@@ -305,6 +313,30 @@ async function autoSyncPhoneCalls(): Promise<void> {
   } catch (err: any) {
     console.error("[PhoneSync] Hourly sync error:", err.message);
   }
+}
+
+// Warmup crons — all no-op cheaply when warmup is disabled (the services check
+// settings.enabled first), so they're safe to register unconditionally.
+function scheduleWarmupCrons() {
+  // Send slow-ramp warmup mail across active owned mailboxes, every 30 min during
+  // business hours on weekdays (the send loop is probabilistic so volume is
+  // jittered and respects the daily ramp ceiling).
+  cron.schedule("*/30 8-18 * * 1-5", () => {
+    runWarmupTick().catch((e) => console.error("[Warmup Cron] send tick error:", e?.message));
+  }, { timezone: "America/New_York" });
+
+  // Engagement (IMAP read/reply/star/spam-rescue) every 20 min, 7 days — warmup
+  // mail still arrives on weekends and should be engaged.
+  cron.schedule("*/20 7-22 * * *", () => {
+    runWarmupEngagement().catch((e) => console.error("[Warmup Cron] engagement error:", e?.message));
+  }, { timezone: "America/New_York" });
+
+  // Nightly health-score snapshot.
+  cron.schedule("30 2 * * *", () => {
+    computeWarmupHealth().catch((e) => console.error("[Warmup Cron] health error:", e?.message));
+  }, { timezone: "America/New_York" });
+
+  console.log("[Warmup] crons scheduled (send 30m business hrs, engage 20m, health nightly) — idle until enabled");
 }
 
 function scheduleAgentCrons() {
@@ -5500,6 +5532,114 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
     }
   });
 
+  // ─── DNS / subdomain setup: generated records + live verification ────────────
+  app.get("/api/admin/deliverability/dns-setup", requireAdminAuth, async (_req, res) => {
+    try {
+      res.json(await getDnsSetupReport());
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "DNS setup report failed" });
+    }
+  });
+
+  // ─── Spam-content checker ────────────────────────────────────────────────────
+  app.post("/api/admin/deliverability/spam-check", requireAdminAuth, async (req, res) => {
+    try {
+      const subject = String(req.body?.subject || "");
+      const html = String(req.body?.html || req.body?.body || "");
+      if (!subject && !html) return res.status(400).json({ message: "Provide subject and/or html" });
+      const result = checkSpamContent(subject, html);
+      // Best-effort history (don't fail the check if the insert errors).
+      try {
+        await pool.query(
+          `INSERT INTO spam_check_results (subject, score, health, verdict, hits) VALUES ($1,$2,$3,$4,$5::jsonb)`,
+          [subject.slice(0, 300), result.score, result.health, result.verdict, JSON.stringify(result.hits)],
+        );
+      } catch {}
+      res.json(result);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Spam check failed" });
+    }
+  });
+
+  // ─── DNSBL / blacklist monitor ───────────────────────────────────────────────
+  app.get("/api/admin/deliverability/blacklist", requireAdminAuth, async (req, res) => {
+    try {
+      const domain = typeof req.query.domain === "string" && req.query.domain.trim() ? req.query.domain.trim() : undefined;
+      res.json(await getBlacklistReport(domain));
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Blacklist check failed" });
+    }
+  });
+
+  // ─── Warmup engine ───────────────────────────────────────────────────────────
+  app.get("/api/admin/warmup/overview", requireAdminAuth, async (_req, res) => {
+    try {
+      res.json(await getWarmupOverview());
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Warmup overview failed" });
+    }
+  });
+  app.patch("/api/admin/warmup/settings", requireAdminAuth, async (req, res) => {
+    try {
+      res.json(await updateWarmupSettings(req.body || {}));
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Warmup settings update failed" });
+    }
+  });
+  app.get("/api/admin/warmup/members", requireAdminAuth, async (_req, res) => {
+    try {
+      res.json(await listMembers(false));
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "List members failed" });
+    }
+  });
+  app.post("/api/admin/warmup/members", requireAdminAuth, async (req, res) => {
+    try {
+      const email = String(req.body?.email || "").trim();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return res.status(400).json({ message: "Valid email required" });
+      res.json(await addMember({ email, name: req.body?.name, type: req.body?.type, imapPassEnv: req.body?.imapPassEnv, provider: req.body?.provider }));
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Add member failed" });
+    }
+  });
+  app.post("/api/admin/warmup/members/seed-owned", requireAdminAuth, async (_req, res) => {
+    try {
+      res.json(await seedOwnedMembersFromSenders());
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Seed members failed" });
+    }
+  });
+  app.patch("/api/admin/warmup/members/:id", requireAdminAuth, async (req, res) => {
+    try {
+      const ok = await setMemberActive(String(req.params.id), !!req.body?.active);
+      if (!ok) return res.status(404).json({ message: "Member not found" });
+      res.json({ ok: true });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Update member failed" });
+    }
+  });
+  app.delete("/api/admin/warmup/members/:id", requireAdminAuth, async (req, res) => {
+    try {
+      const ok = await removeMember(String(req.params.id));
+      if (!ok) return res.status(404).json({ message: "Member not found" });
+      res.json({ ok: true });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Remove member failed" });
+    }
+  });
+  // Manual triggers (the same work the crons do) so the admin can run a cycle now.
+  app.post("/api/admin/warmup/run-now", requireAdminAuth, async (_req, res) => {
+    try {
+      const send = await runWarmupTick();
+      const engage = await runWarmupEngagement();
+      await computeWarmupHealth();
+      res.json({ send, engage });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Warmup run failed" });
+    }
+  });
+
+  scheduleWarmupCrons();
   scheduleDripProcessing();
   scheduleGmailSync();
   scheduleSeamlessOrgSync();

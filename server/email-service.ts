@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer";
 import type { CrmTemplateGroup } from "@shared/crm-template-groups";
+import { buildUnsubscribeHeaders, htmlToPlainText, unsubscribeUrl } from "./unsubscribe-service";
 
 // ─── Sender Profiles ──────────────────────────────────────────────────────────
 // Each profile maps an email address to its Gmail App Password env var name.
@@ -86,9 +87,10 @@ export async function sendEmail(
   subject: string,
   html: string,
   trackingPixelUrl?: string,
-  attachments?: EmailAttachment[]
+  attachments?: EmailAttachment[],
+  options?: { skipSignature?: boolean; skipUnsubscribe?: boolean }
 ): Promise<{ success: boolean; error?: string }> {
-  return sendEmailFromSender(DEFAULT_SENDER, to, subject, html, trackingPixelUrl, attachments);
+  return sendEmailFromSender(DEFAULT_SENDER, to, subject, html, trackingPixelUrl, attachments, options);
 }
 
 export async function sendEmailFromSender(
@@ -98,7 +100,10 @@ export async function sendEmailFromSender(
   html: string,
   trackingPixelUrl?: string,
   attachments?: EmailAttachment[],
-  options?: { skipSignature?: boolean }
+  // skipUnsubscribe: omit List-Unsubscribe headers + the text-part unsubscribe
+  // line. Pass this for genuinely transactional 1:1 mail (FDD receipts, wire
+  // instructions, internal alerts) where an "unsubscribe" affordance is wrong.
+  options?: { skipSignature?: boolean; skipUnsubscribe?: boolean }
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const profile = getSenderProfile(fromEmail);
@@ -163,11 +168,30 @@ ${innerHtml}
 </html>`;
     }
 
+    // Deliverability headers. A real From-aligned Reply-To, a plain-text part
+    // (multipart/alternative), and one-click List-Unsubscribe (RFC 8058) — the
+    // latter is effectively required by Gmail/Yahoo bulk-sender rules.
+    const recipientAddr = (to.match(/<([^>]+)>/)?.[1] || to).trim();
+    // Only a single, well-formed recipient gets an unsubscribe link: the token is
+    // bound to ONE address, so a comma-list send would hand every recipient the
+    // first one's (invalid-for-them) link. The regex also rejects malformed
+    // addresses that only contain "@".
+    const oneRecipient = /^[^@\s,]+@[^@\s,]+\.[^@\s,]+$/.test(recipientAddr);
+    let textBody = htmlToPlainText(finalHtml);
+    const extraHeaders: Record<string, string> = {};
+    if (!options?.skipUnsubscribe && oneRecipient) {
+      Object.assign(extraHeaders, buildUnsubscribeHeaders(recipientAddr));
+      textBody += `\n\n—\nNot interested? Unsubscribe: ${unsubscribeUrl(recipientAddr)}`;
+    }
+
     const info = await transport.sendMail({
       from: `"${profile?.name || "New Dawn Franchising"}" <${fromEmail}>`,
       to,
+      replyTo: fromEmail,
       subject,
       html: finalHtml,
+      text: textBody,
+      ...(Object.keys(extraHeaders).length ? { headers: extraHeaders } : {}),
       attachments: attachments?.map((a) => ({
         filename: a.filename,
         content: a.content,

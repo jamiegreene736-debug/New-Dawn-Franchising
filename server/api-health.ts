@@ -368,7 +368,7 @@ async function sendApiAlertEmail(failures: ApiHealthResult[], allChecks: ApiHeal
 </div>`;
 
   try {
-    await sendEmailFromSender(ALERT_FROM, ALERT_TO, subject, html);
+    await sendEmailFromSender(ALERT_FROM, ALERT_TO, subject, html, undefined, undefined, { skipUnsubscribe: true });
     console.log(`[ApiHealth] Alert email sent to ${ALERT_TO} for ${failures.length} failure(s)`);
   } catch (e) {
     console.error("[ApiHealth] Failed to send alert email:", e);
@@ -398,7 +398,7 @@ export async function sendRecoveryAlert(recovered: ApiHealthResult[]) {
 </div>`;
 
   try {
-    await sendEmailFromSender(ALERT_FROM, ALERT_TO, subject, html);
+    await sendEmailFromSender(ALERT_FROM, ALERT_TO, subject, html, undefined, undefined, { skipUnsubscribe: true });
   } catch (e) {
     console.error("[ApiHealth] Failed to send recovery email:", e);
   }

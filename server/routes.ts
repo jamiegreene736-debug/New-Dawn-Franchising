@@ -13,6 +13,7 @@ import { generateBrokerAgreementPDF } from "./broker-agreement-pdf";
 import { searchProspects, SEARCH_CATEGORIES } from "./prospect-search";
 import { scheduleDripProcessing, processDripEmails, reprocessStep, fireClickReaction } from "./drip-processor";
 import { scheduleGmailSync, syncFranchisingInbox, getGmailSyncStatus, getGmailSyncLastResult } from "./gmail-sync-service";
+import { getDomainAuth, getDeliverabilityMetrics, getChecklist, updateChecklistItem, type ChecklistStatus } from "./deliverability-service";
 import { scheduleSeamlessOrgSync } from "./seamless-org-sync";
 import { scheduleApolloOrgSync } from "./apollo-org-sync";
 import { seedDefaultCampaign } from "./default-campaign";
@@ -39,7 +40,8 @@ import franchiseeRouter from "./franchisee-routes";
 import heygenRouter from "./heygen-routes";
 import partnerRouter from "./partner-routes";
 import { processPartnerSequence } from "./partner-sequence-service";
-import { runDailyPreparation, runDailyBrief, pollForApprovalReply, runApprovalDeadlineCheck } from "./agent-service";
+import { runDailyPreparation, runDailyBrief, pollForApprovalReply, runApprovalDeadlineCheck, addToDnc } from "./agent-service";
+import { verifyUnsubToken, unsubscribeConfirmPage, unsubscribedPage, invalidUnsubscribeLinkPage } from "./unsubscribe-service";
 import { hunterFindEmail, hunterDomainPattern, buildEmailFromPattern, hunterVerifyEmail, getHunterStatus } from "./hunter-service";
 import { runLeadResearchAgent } from "./lead-research-agent";
 import {
@@ -934,7 +936,7 @@ export async function registerRoutes(
           </div>
         </div>`;
 
-      sendEmail(NOTIFY_TO, `New Lead: ${lead.fullName}`, internalHtml).catch((e) =>
+      sendEmail(NOTIFY_TO, `New Lead: ${lead.fullName}`, internalHtml, undefined, undefined, { skipUnsubscribe: true }).catch((e) =>
         console.error("Failed to send internal lead notification:", e)
       );
 
@@ -5375,6 +5377,78 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
   console.log("Weekly strategy brief scheduled: Monday 8:00 AM EST");
 
   scheduleWeeklyBlogGeneration();
+  // ─── Public unsubscribe (List-Unsubscribe target) ──────────────────────────
+  // GET shows a confirm page and intentionally does NOT suppress (link scanners
+  // issue GETs). POST suppresses — this is the RFC 8058 one-click target that
+  // Gmail/Yahoo POST to, and the confirm-page form posts here too.
+  app.get("/api/unsubscribe", async (req, res) => {
+    const email = String(req.query.e || "").trim().toLowerCase();
+    const token = String(req.query.t || "");
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    if (!email || !verifyUnsubToken(email, token)) {
+      return res.status(400).send(invalidUnsubscribeLinkPage());
+    }
+    res.send(unsubscribeConfirmPage(email, token));
+  });
+  app.post("/api/unsubscribe", async (req, res) => {
+    const email = String(req.query.e || "").trim().toLowerCase();
+    const token = String(req.query.t || "");
+    if (!email || !verifyUnsubToken(email, token)) {
+      return res.status(400).json({ message: "Invalid unsubscribe link" });
+    }
+    try {
+      await addToDnc(email, undefined, undefined, "Unsubscribed (List-Unsubscribe)");
+      console.log(`[Unsubscribe] ${email} suppressed via List-Unsubscribe`);
+    } catch (e: any) {
+      console.error(`[Unsubscribe] failed for ${email}:`, e?.message);
+    }
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.status(200).send(unsubscribedPage(email));
+  });
+
+  // ─── Email Deliverability tab ───────────────────────────────────────────────
+  // Live domain-auth checks (SPF/DKIM/DMARC/MX/BIMI) against real DNS.
+  app.get("/api/admin/deliverability/auth", requireAdminAuth, async (req, res) => {
+    try {
+      const domain = typeof req.query.domain === "string" && req.query.domain.trim()
+        ? req.query.domain.trim()
+        : undefined;
+      res.json(await getDomainAuth(domain));
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Auth check failed" });
+    }
+  });
+  // Live deliverability metrics aggregated from drip_sends / agent_dnc / enrollments.
+  app.get("/api/admin/deliverability/metrics", requireAdminAuth, async (_req, res) => {
+    try {
+      res.json(await getDeliverabilityMetrics());
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Metrics failed" });
+    }
+  });
+  // Persisted remediation roadmap.
+  app.get("/api/admin/deliverability/checklist", requireAdminAuth, async (_req, res) => {
+    try {
+      res.json(await getChecklist());
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Checklist failed" });
+    }
+  });
+  app.patch("/api/admin/deliverability/checklist/:id", requireAdminAuth, async (req, res) => {
+    try {
+      const { status, notes } = req.body || {};
+      const allowed: ChecklistStatus[] = ["todo", "in_progress", "done", "not_applicable"];
+      if (status !== undefined && !allowed.includes(status)) {
+        return res.status(400).json({ message: "Invalid status" });
+      }
+      const ok = await updateChecklistItem(String(req.params.id), { status, notes });
+      if (!ok) return res.status(404).json({ message: "Item not found" });
+      res.json({ ok: true });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Update failed" });
+    }
+  });
+
   scheduleDripProcessing();
   scheduleGmailSync();
   scheduleSeamlessOrgSync();

@@ -65,7 +65,7 @@ export async function sendSignatureRequestEmail(
 </body>
 </html>`;
 
-  return sendEmail(toEmail, `Action Required: Please Sign Your ${docLabel}`, html);
+  return sendEmail(toEmail, `Action Required: Please Sign Your ${docLabel}`, html, undefined, undefined, { skipUnsubscribe: true });
 }
 
 export async function sendWelcomeEmail(
@@ -118,7 +118,7 @@ export async function sendWelcomeEmail(
 </body>
 </html>`;
 
-  return sendEmail(toEmail, `Welcome to the New Dawn Franchising Family, ${firstName}!`, html);
+  return sendEmail(toEmail, `Welcome to the New Dawn Franchising Family, ${firstName}!`, html, undefined, undefined, { skipUnsubscribe: true });
 }
 
 export async function sendWireReceiptEmail(
@@ -169,5 +169,5 @@ export async function sendWireReceiptEmail(
 </body>
 </html>`;
 
-  return sendEmail(toEmail, "Wire Transfer Confirmation — New Dawn Franchising", html);
+  return sendEmail(toEmail, "Wire Transfer Confirmation — New Dawn Franchising", html, undefined, undefined, { skipUnsubscribe: true });
 }

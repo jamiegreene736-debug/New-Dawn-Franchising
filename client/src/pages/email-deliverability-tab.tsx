@@ -661,12 +661,141 @@ function WarmupPanel() {
   );
 }
 
+// ─── Sending & Safety panel (Phase 2) ────────────────────────────────────────
+interface SafetySettings {
+  verifyBeforeSend: boolean; senderRotation: boolean; domainGuard: boolean;
+  domainBounceThresholdPct: number; domainBounceMin: number;
+  campaignPauseEnabled: boolean; campaignBounceThresholdPct: number; campaignBounceMin: number;
+  softBounceSkipDnc: boolean;
+  dailyCapOverride: number | null; hourlyCapOverride: number | null; domainGapOverrideSeconds: number | null;
+  effectiveDailyCap: number; effectiveHourlyCap: number; effectiveDomainGapMs: number;
+}
+interface SafetyData {
+  settings: SafetySettings;
+  senders: { email: string; name: string }[];
+  senderStats: { email: string; sentTotal: number; lastSentAt: string | null }[];
+  lastGuard: { ran: boolean; domainsSuppressed: { domain: string; rate: number }[]; campaignsPaused: { campaignId: string; rate: number }[]; at: string };
+}
+
+function BoolRow({ label, desc, value, onChange }: { label: string; desc?: string; value: boolean; onChange: (b: boolean) => void }) {
+  return (
+    <label className="flex items-start justify-between gap-3 rounded border p-2.5 text-sm">
+      <span>
+        <span className="font-medium">{label}</span>
+        {desc && <span className="mt-0.5 block text-xs text-muted-foreground">{desc}</span>}
+      </span>
+      <input type="checkbox" className="mt-1 size-4 shrink-0" checked={value} onChange={(e) => onChange(e.target.checked)} />
+    </label>
+  );
+}
+
+function OverrideField({ label, value, effective, unit, onSave }: { label: string; value: number | null; effective: string; unit: string; onSave: (v: number | null) => void }) {
+  const [v, setV] = useState(value == null ? "" : String(value));
+  return (
+    <label className="flex items-center justify-between gap-2 text-sm">
+      <span className="text-foreground/80">{label} <span className="text-xs text-muted-foreground">(now {effective})</span></span>
+      <span className="flex items-center gap-1">
+        <input
+          className="w-24 rounded border px-2 py-1 text-right text-sm" placeholder="default" value={v}
+          onChange={(e) => setV(e.target.value)}
+          onBlur={() => { const t = v.trim(); const n = t === "" ? null : Number(t); if (t === "" || !Number.isNaN(n as number)) onSave(n); }}
+        />
+        <span className="text-xs text-muted-foreground">{unit}</span>
+      </span>
+    </label>
+  );
+}
+
+function SendingSafetyPanel() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const q = useQuery<SafetyData>({ queryKey: ["/api/admin/deliverability/settings"] });
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["/api/admin/deliverability/settings"] });
+  const patch = useMutation({
+    mutationFn: async (body: any) => apiRequest("PATCH", "/api/admin/deliverability/settings", body),
+    onSuccess: invalidate,
+    onError: (e: any) => toast({ title: "Update failed", description: e.message, variant: "destructive" }),
+  });
+  const guard = useMutation({
+    mutationFn: async () => { const res = await apiRequest("POST", "/api/admin/deliverability/bounce-guard/run", {}); return res.json(); },
+    onSuccess: (r: any) => { invalidate(); toast({ title: "Bounce guard ran", description: `${r?.domainsSuppressed?.length || 0} domain(s) suppressed, ${r?.campaignsPaused?.length || 0} campaign(s) paused` }); },
+    onError: (e: any) => toast({ title: "Failed", description: e.message, variant: "destructive" }),
+  });
+  const d = q.data;
+  const s = d?.settings;
+  return (
+    <div className="space-y-4">
+      <div>
+        <h3 className="flex items-center gap-2 font-semibold"><Server className="size-4" /> Sending &amp; safety</h3>
+        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Opt-in guards on the live send path. Defaults preserve current behaviour — verify-gate and rotation are off; the domain bounce-guard is on (protective, high threshold); transient soft bounces are no longer auto-suppressed.</p>
+      </div>
+      {q.isLoading ? (
+        <div className="text-sm text-muted-foreground">Loading…</div>
+      ) : !d || !s ? (
+        <div className="text-sm text-red-600">Could not load settings.</div>
+      ) : (
+        <>
+          <div className="grid gap-3 md:grid-cols-2">
+            <Card className="p-4 space-y-2">
+              <h4 className="text-sm font-semibold">Send-path guards</h4>
+              <BoolRow label="Verify before send" desc="Drop & suppress addresses ZeroBounce flags INVALID at send time (needs ZEROBOUNCE_API_KEY)." value={s.verifyBeforeSend} onChange={(b) => patch.mutate({ verifyBeforeSend: b })} />
+              <BoolRow label="Sender rotation" desc="Spread sends across all configured mailboxes; sticky per contact to preserve threading." value={s.senderRotation} onChange={(b) => patch.mutate({ senderRotation: b })} />
+              <BoolRow label="Skip DNC on soft bounces" desc="Don't suppress transient 4.x.x bounces (full mailbox, greylisting) — let them retry." value={s.softBounceSkipDnc} onChange={(b) => patch.mutate({ softBounceSkipDnc: b })} />
+            </Card>
+
+            <Card className="p-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-semibold">Bounce guard</h4>
+                <Button size="sm" variant="outline" onClick={() => guard.mutate()} disabled={guard.isPending}><Play className="mr-2 size-4" /> Run now</Button>
+              </div>
+              <BoolRow label="Auto-suppress hard-blocking domains" value={s.domainGuard} onChange={(b) => patch.mutate({ domainGuard: b })} />
+              <NumField label="Domain bounce threshold" value={s.domainBounceThresholdPct} onSave={(n) => patch.mutate({ domainBounceThresholdPct: n })} suffix="%" />
+              <NumField label="Min sends before judging a domain" value={s.domainBounceMin} onSave={(n) => patch.mutate({ domainBounceMin: n })} />
+              <BoolRow label="Auto-pause runaway campaigns" desc="Off by default — pauses a whole campaign over the bounce threshold." value={s.campaignPauseEnabled} onChange={(b) => patch.mutate({ campaignPauseEnabled: b })} />
+              <NumField label="Campaign bounce threshold" value={s.campaignBounceThresholdPct} onSave={(n) => patch.mutate({ campaignBounceThresholdPct: n })} suffix="%" />
+              <NumField label="Min sends before judging a campaign" value={s.campaignBounceMin} onSave={(n) => patch.mutate({ campaignBounceMin: n })} />
+              {d.lastGuard?.ran && (
+                <p className="text-xs text-muted-foreground">Last run {new Date(d.lastGuard.at).toLocaleString()}: {d.lastGuard.domainsSuppressed.length} domain(s), {d.lastGuard.campaignsPaused.length} campaign(s).</p>
+              )}
+            </Card>
+          </div>
+
+          <Card className="p-4">
+            <h4 className="mb-2 text-sm font-semibold">Volume cap overrides <span className="font-normal text-muted-foreground">— blank = use the env default</span></h4>
+            <div className="grid gap-2 md:grid-cols-3">
+              <OverrideField label="Daily cap / sender" value={s.dailyCapOverride} effective={String(s.effectiveDailyCap)} unit="/day" onSave={(v) => patch.mutate({ dailyCapOverride: v })} />
+              <OverrideField label="Hourly cap" value={s.hourlyCapOverride} effective={String(s.effectiveHourlyCap)} unit="/hr" onSave={(v) => patch.mutate({ hourlyCapOverride: v })} />
+              <OverrideField label="Same-domain gap" value={s.domainGapOverrideSeconds} effective={`${Math.round(s.effectiveDomainGapMs / 1000)}s`} unit="s" onSave={(v) => patch.mutate({ domainGapOverrideSeconds: v })} />
+            </div>
+          </Card>
+
+          <Card className="p-4">
+            <h4 className="mb-2 text-sm font-semibold">Sender rotation {s.senderRotation ? "(active)" : "(off)"}</h4>
+            <div className="space-y-1 text-sm">
+              {d.senders.map((sender) => {
+                const st = d.senderStats.find((x) => x.email === sender.email);
+                return (
+                  <div key={sender.email} className="flex items-center justify-between gap-2 border-b py-1 last:border-0">
+                    <span className="truncate">{sender.email}</span>
+                    <span className="text-xs text-muted-foreground">{st ? `${st.sentTotal} sent` : "—"}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── Main tab ─────────────────────────────────────────────────────────────────
-type DeliverabilitySection = "health" | "dns" | "warmup" | "content" | "blacklist";
+type DeliverabilitySection = "health" | "dns" | "warmup" | "content" | "blacklist" | "safety";
 const SECTION_TABS: { id: DeliverabilitySection; label: string; Icon: any }[] = [
   { id: "health", label: "Health & roadmap", Icon: Activity },
   { id: "dns", label: "Subdomain & DNS", Icon: Globe },
   { id: "warmup", label: "Warmup", Icon: Flame },
+  { id: "safety", label: "Sending & safety", Icon: Server },
   { id: "content", label: "Content checker", Icon: Search },
   { id: "blacklist", label: "Blacklist", Icon: Ban },
 ];
@@ -734,6 +863,7 @@ export default function EmailDeliverabilityTab() {
 
       {section === "dns" && <DnsSetupPanel />}
       {section === "warmup" && <WarmupPanel />}
+      {section === "safety" && <SendingSafetyPanel />}
       {section === "content" && <ContentCheckerPanel />}
       {section === "blacklist" && <BlacklistPanel />}
 

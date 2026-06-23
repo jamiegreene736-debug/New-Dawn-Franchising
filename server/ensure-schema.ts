@@ -433,6 +433,34 @@ const STATEMENTS: string[] = [
     created_at  timestamptz  NOT NULL DEFAULT now(),
     UNIQUE (mailbox, day)
   )`,
+
+  // ─── Phase 2: send-path safety settings + sender rotation stats ──────────────
+  // Single settings row (id='singleton'). Every flag defaults to current
+  // behaviour, so existing sends are unaffected until an admin opts in.
+  `CREATE TABLE IF NOT EXISTS deliverability_settings (
+    id                          varchar      PRIMARY KEY DEFAULT 'singleton',
+    verify_before_send          boolean      NOT NULL DEFAULT false,
+    sender_rotation             boolean      NOT NULL DEFAULT false,
+    domain_guard                boolean      NOT NULL DEFAULT true,
+    domain_bounce_threshold_pct integer      NOT NULL DEFAULT 40,
+    domain_bounce_min           integer      NOT NULL DEFAULT 8,
+    campaign_pause_enabled      boolean      NOT NULL DEFAULT false,
+    campaign_bounce_threshold_pct integer    NOT NULL DEFAULT 12,
+    campaign_bounce_min         integer      NOT NULL DEFAULT 50,
+    soft_bounce_skip_dnc        boolean      NOT NULL DEFAULT true,
+    daily_cap_override          integer,
+    hourly_cap_override         integer,
+    domain_gap_override_seconds integer,
+    updated_at                  timestamptz  NOT NULL DEFAULT now()
+  )`,
+
+  // Per-sender send counters (rotation visibility).
+  `CREATE TABLE IF NOT EXISTS sender_stats (
+    email        text         PRIMARY KEY,
+    sent_total   integer      NOT NULL DEFAULT 0,
+    last_sent_at timestamptz,
+    updated_at   timestamptz  NOT NULL DEFAULT now()
+  )`,
 ];
 
 export async function ensureSchema(): Promise<void> {

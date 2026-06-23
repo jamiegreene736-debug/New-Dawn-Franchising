@@ -13,7 +13,8 @@ import cron from "node-cron";
 import { storage } from "./storage";
 import { addToDnc } from "./agent-service";
 import { isAutomatedOrBulkEmail } from "./crm-email-filter";
-import { sendEmail } from "./email-service";
+import { sendEmail, ALL_SENDER_PROFILES, getSenderPassword } from "./email-service";
+import { getDeliverabilitySettings } from "./deliverability-settings-service";
 
 const FRANCHISING_EMAIL = "franchising@newdawnfranchising.com";
 
@@ -99,6 +100,20 @@ function extractBouncedRecipients(raw: string): string[] {
   return [...out];
 }
 
+// Classify a bounce as permanent (hard) vs transient (soft) from the NDR body.
+// DSN Status / SMTP reply codes: 5.x.x / 5xx = permanent, 4.x.x / 4xx = transient.
+// Only HARD bounces should auto-suppress; soft ones (full mailbox, greylisting,
+// rate limit) are temporary and the contact should keep its enrollment.
+// Defaults to "hard" when nothing is parseable — matches prior behaviour.
+function classifyBounce(raw: string): "hard" | "soft" {
+  const status = raw.match(/^status:\s*([45])\.\d+\.\d+/im);
+  if (status) return status[1] === "4" ? "soft" : "hard";
+  const diag = raw.match(/(?:diagnostic-code:[^\n]*?|\bsmtp;\s*)([45]\d\d)\b/i) || raw.match(/\b([45]\d\d)\s+\d\.\d\.\d/);
+  if (diag) return diag[1].startsWith("4") ? "soft" : "hard";
+  if (/quota|mailbox (is )?full|over quota|temporar|try again|greylist|rate.?limit|deferred|throttl/i.test(raw)) return "soft";
+  return "hard";
+}
+
 /**
  * Poll the franchising@ inbox once and import any new client replies.
  * No-ops (with a clear reason) when the app password isn't configured.
@@ -131,6 +146,8 @@ export async function syncFranchisingInbox(): Promise<SyncResult> {
     try {
       // Look back 7 days so recent bounces are caught even after a restart.
       const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      // Whether transient (4.x.x) bounces are left alone instead of suppressed.
+      const softSkipDnc = (await getDeliverabilitySettings()).softBounceSkipDnc;
 
       // Fetch full raw source too — bounce parsing needs headers + all MIME
       // parts (the decoded TEXT part alone is often MIME-encoded).
@@ -147,15 +164,23 @@ export async function syncFranchisingInbox(): Promise<SyncResult> {
         // the in-memory dedup, so a manual "Check for bounces" always re-scans.
         // markDripSendBounced is idempotent (returns null once already bounced).
         if (isBounceNotification(fromAddr, subject, rawSource.slice(0, 4000))) {
+          const kind = classifyBounce(rawSource || subject);
+          // Transient (soft) bounce: don't suppress — it's temporary and the
+          // contact should keep its enrollment to retry on the next cycle.
+          if (kind === "soft" && softSkipDnc) {
+            console.log(`[GmailSync] soft bounce (transient) — not suppressing (${subject})`);
+            processedMessageIds.add(msgId);
+            continue;
+          }
           const candidates = extractBouncedRecipients(rawSource || subject);
           for (const addr of candidates) {
-            const marked = await storage.markDripSendBounced(addr, `Bounced: ${subject}`.slice(0, 200));
+            const marked = await storage.markDripSendBounced(addr, `Bounced (${kind}): ${subject}`.slice(0, 200));
             if (marked) {
               bounced++;
               stored++;
               // Suppress the address so future drip steps skip it, and stop the
               // enrollment so it doesn't keep retrying a dead mailbox.
-              try { await addToDnc(addr, undefined, undefined, "Email hard-bounced"); } catch {}
+              try { await addToDnc(addr, undefined, undefined, `Email hard-bounced (${kind})`); } catch {}
               try {
                 if (marked.enrollmentId) {
                   await storage.updateDripEnrollment(marked.enrollmentId, { status: "bounced" } as any);
@@ -319,4 +344,68 @@ export function scheduleGmailSync(): void {
     syncFranchisingInbox().catch((e) => console.error("[GmailSync] scheduled run failed:", e?.message || e));
   });
   console.log("[GmailSync] franchising@ inbox sync scheduled (every 2 min)");
+}
+
+// ─── Bounce scanning for the OTHER sender inboxes ──────────────────────────────
+// franchising@ gets the full reply+bounce sync above. dylan@/info@/support@ also
+// send mail, so their bounce NDRs must be caught too — but we only want the
+// bounce-suppression half here (not the full CRM reply import), so this is a
+// lightweight, bounce-only scan.
+export async function syncInboxBounces(email: string, password: string): Promise<{ scanned: number; bounced: number }> {
+  let client: ImapFlow | null = null;
+  let scanned = 0;
+  let bounced = 0;
+  try {
+    const softSkipDnc = (await getDeliverabilitySettings()).softBounceSkipDnc;
+    client = new ImapFlow({ host: "imap.gmail.com", port: 993, secure: true, auth: { user: email, pass: password }, logger: false });
+    await client.connect();
+    const lock = await client.getMailboxLock("INBOX");
+    try {
+      const since = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+      for await (const msg of client.fetch({ since }, { envelope: true, source: true })) {
+        scanned++;
+        const fromAddr = msg.envelope?.from?.[0]?.address?.toLowerCase() || "";
+        const subject = msg.envelope?.subject || "(no subject)";
+        const rawSource = msg.source ? msg.source.toString("utf8") : "";
+        if (!isBounceNotification(fromAddr, subject, rawSource.slice(0, 4000))) continue;
+        const kind = classifyBounce(rawSource || subject);
+        if (kind === "soft" && softSkipDnc) continue;
+        for (const addr of extractBouncedRecipients(rawSource || subject)) {
+          const marked = await storage.markDripSendBounced(addr, `Bounced (${kind}) @${email}: ${subject}`.slice(0, 200));
+          if (marked) {
+            bounced++;
+            try { await addToDnc(addr, undefined, undefined, `Email hard-bounced (${kind})`); } catch {}
+            try {
+              if (marked.enrollmentId) await storage.updateDripEnrollment(marked.enrollmentId, { status: "bounced" } as any);
+            } catch {}
+            console.log(`[GmailSync] bounce @${email} — marked ${addr} bounced + suppressed (${subject})`);
+          }
+        }
+      }
+    } finally {
+      lock.release();
+    }
+  } catch (e: any) {
+    console.error(`[GmailSync] bounce scan ${email} failed:`, e?.message || e);
+  } finally {
+    if (client) { try { await client.logout(); } catch {} }
+  }
+  if (bounced > 0) console.log(`[GmailSync] ${email} — bounce scan found ${bounced} bounce(s) in ${scanned} msgs`);
+  return { scanned, bounced };
+}
+
+let allInboxScheduled = false;
+
+/** Register a recurring bounce-only scan of the non-franchising sender inboxes. */
+export function scheduleAllInboxBounceScan(): void {
+  if (allInboxScheduled) return;
+  allInboxScheduled = true;
+  const others = () => ALL_SENDER_PROFILES.filter((p) => p.email !== FRANCHISING_EMAIL && !!getSenderPassword(p));
+  cron.schedule("*/15 * * * *", async () => {
+    for (const p of others()) {
+      const pass = getSenderPassword(p);
+      if (pass) await syncInboxBounces(p.email, pass).catch((e) => console.error("[GmailSync] all-inbox scan error:", e?.message || e));
+    }
+  });
+  console.log(`[GmailSync] all-inbox bounce scan scheduled (every 15 min) for ${others().length} other sender(s)`);
 }

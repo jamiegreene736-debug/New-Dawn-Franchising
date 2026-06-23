@@ -74,6 +74,20 @@ function getTransporter(senderEmail: string): nodemailer.Transporter {
 // Default sender for system emails (signatures, drip campaigns, etc.)
 const DEFAULT_SENDER = "franchising@newdawnfranchising.com";
 
+// Pick the From address for a drip send. When rotation is OFF we always return
+// DEFAULT_SENDER (unchanged behaviour). When ON we deterministically map a stable
+// key (the enrollment id) to one of the configured senders — so a given contact's
+// whole sequence always threads from the SAME mailbox (preserving threading) while
+// volume is spread evenly across mailboxes to protect any single one's reputation.
+export function chooseSenderForKey(key: string, rotate: boolean): string {
+  if (!rotate) return DEFAULT_SENDER;
+  const senders = getAvailableSenders();
+  if (senders.length <= 1) return DEFAULT_SENDER;
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) | 0;
+  return senders[Math.abs(h) % senders.length].email;
+}
+
 // ─── Email Attachment ─────────────────────────────────────────────────────────
 interface EmailAttachment {
   filename: string;

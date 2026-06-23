@@ -22,6 +22,10 @@ import {
   seedOwnedMembersFromSenders, getWarmupOverview, runWarmupTick, computeWarmupHealth,
 } from "./warmup-service";
 import { runWarmupEngagement } from "./warmup-engagement-service";
+import {
+  getDeliverabilitySettings, updateDeliverabilitySettings, runBounceGuard, getLastBounceGuard, getSenderStats,
+} from "./deliverability-settings-service";
+import { scheduleAllInboxBounceScan } from "./gmail-sync-service";
 import { scheduleSeamlessOrgSync } from "./seamless-org-sync";
 import { scheduleApolloOrgSync } from "./apollo-org-sync";
 import { seedDefaultCampaign } from "./default-campaign";
@@ -336,7 +340,14 @@ function scheduleWarmupCrons() {
     computeWarmupHealth().catch((e) => console.error("[Warmup Cron] health error:", e?.message));
   }, { timezone: "America/New_York" });
 
-  console.log("[Warmup] crons scheduled (send 30m business hrs, engage 20m, health nightly) — idle until enabled");
+  // Bounce guard — auto-suppress hard-blocking domains (and optionally pause
+  // runaway campaigns) every 6 hours. Domain guard is on by default; campaign
+  // auto-pause is opt-in via settings.
+  cron.schedule("15 */6 * * *", () => {
+    runBounceGuard().catch((e) => console.error("[BounceGuard Cron] error:", e?.message));
+  });
+
+  console.log("[Warmup] crons scheduled (send 30m business hrs, engage 20m, health nightly) + bounce guard 6h — warmup idle until enabled");
 }
 
 function scheduleAgentCrons() {
@@ -5639,7 +5650,36 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
     }
   });
 
+  // ─── Sending & Safety settings (verify-gate, rotation, bounce guard, caps) ───
+  app.get("/api/admin/deliverability/settings", requireAdminAuth, async (_req, res) => {
+    try {
+      const [settings, senders, senderStats] = await Promise.all([
+        getDeliverabilitySettings(),
+        Promise.resolve(getAvailableSenders()),
+        getSenderStats(),
+      ]);
+      res.json({ settings, senders, senderStats, lastGuard: getLastBounceGuard() });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Settings load failed" });
+    }
+  });
+  app.patch("/api/admin/deliverability/settings", requireAdminAuth, async (req, res) => {
+    try {
+      res.json(await updateDeliverabilitySettings(req.body || {}));
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Settings update failed" });
+    }
+  });
+  app.post("/api/admin/deliverability/bounce-guard/run", requireAdminAuth, async (_req, res) => {
+    try {
+      res.json(await runBounceGuard());
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Bounce guard failed" });
+    }
+  });
+
   scheduleWarmupCrons();
+  scheduleAllInboxBounceScan();
   scheduleDripProcessing();
   scheduleGmailSync();
   scheduleSeamlessOrgSync();

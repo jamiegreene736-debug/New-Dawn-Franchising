@@ -1,15 +1,14 @@
 import cron from "node-cron";
 import { storage } from "./storage";
-import { sendEmail, getTrackingPixelUrl } from "./email-service";
+import { sendEmail, sendEmailFromSender, getTrackingPixelUrl, chooseSenderForKey } from "./email-service";
 import { sendSmsViaQuo } from "./quo-service";
-import { isOnDnc, removeFromDnc } from "./agent-service";
+import { isOnDnc, addToDnc, removeFromDnc } from "./agent-service";
+import { getDeliverabilitySettings, recordSenderUse } from "./deliverability-settings-service";
+import { verifyEmail } from "./zerobounce-service";
 import {
   isOptimalEmailWindow,
   smartEmailDelay,
   smartSmsDelay,
-  EMAIL_DAILY_CAP,
-  EMAIL_HOURLY_CAP,
-  EMAIL_DOMAIN_GAP_MS,
   emailDomain,
   nextWindowDescription,
 } from "./smart-scheduler";
@@ -130,6 +129,14 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
 
   dripRunInProgress = true;
   try {
+    // Effective throttles: "Sending & Safety" DB overrides win over the env-var
+    // defaults, fetched fresh each run so changes apply without a restart. Falls
+    // back to the env caps (EMAIL_DAILY_CAP etc.) when no override is set.
+    const delivSettings = await getDeliverabilitySettings();
+    const dailyCap = delivSettings.effectiveDailyCap;
+    const hourlyCap = delivSettings.effectiveHourlyCap;
+    const domainGapMs = delivSettings.effectiveDomainGapMs;
+
     // DB-backed rolling-window counters so throttles survive process restarts
     // (Railway redeploys) instead of resetting an in-memory counter mid-day.
     const now = Date.now();
@@ -137,15 +144,15 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
     let sentLastHour = await storage.countSentEmailsSince(new Date(now - 60 * 60 * 1000));
 
     // Respect daily volume cap (a hard safety even on a manual override)
-    if (sentLast24h >= EMAIL_DAILY_CAP) {
-      console.log(`[Drip] Daily email cap reached (${sentLast24h}/${EMAIL_DAILY_CAP} in last 24h). Deferring.`);
+    if (sentLast24h >= dailyCap) {
+      console.log(`[Drip] Daily email cap reached (${sentLast24h}/${dailyCap} in last 24h). Deferring.`);
       return;
     }
     // Respect hourly cap — spreads the day's volume across business hours so we
     // never burst the whole quota in one run (a classic bulk-sender spam signal).
     // Skipped on a manual override.
-    if (!force && sentLastHour >= EMAIL_HOURLY_CAP) {
-      console.log(`[Drip] Hourly email cap reached (${sentLastHour}/${EMAIL_HOURLY_CAP} in last hour). Resuming next hour.`);
+    if (!force && sentLastHour >= hourlyCap) {
+      console.log(`[Drip] Hourly email cap reached (${sentLastHour}/${hourlyCap} in last hour). Resuming next hour.`);
       return;
     }
 
@@ -162,15 +169,15 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
     let sentThisRun = 0;
     // Last send time per recipient domain, to pace bursts to one ISP/domain.
     const lastSendByDomain = new Map<string, number>();
-    console.log(`[Drip] ${activeEnrollments.length} active enrollments · ${EMAIL_DAILY_CAP - sentLast24h} left today · ${EMAIL_HOURLY_CAP - sentLastHour} left this hour`);
+    console.log(`[Drip] ${activeEnrollments.length} active enrollments · ${dailyCap - sentLast24h} left today · ${hourlyCap - sentLastHour} left this hour`);
 
     for (const enrollment of activeEnrollments) {
       // Stop if either throttle is hit mid-run
-      if (sentLast24h >= EMAIL_DAILY_CAP) {
+      if (sentLast24h >= dailyCap) {
         console.log("[Drip] Daily cap hit mid-run. Stopping early.");
         break;
       }
-      if (!force && sentLastHour >= EMAIL_HOURLY_CAP) {
+      if (!force && sentLastHour >= hourlyCap) {
         console.log("[Drip] Hourly cap hit mid-run. Stopping — will resume next hour.");
         break;
       }
@@ -203,8 +210,8 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
       while (stepIdx < steps.length) {
         // Re-check the throttles before every send so a multi-step drain can't
         // burst past the daily/hourly caps.
-        if (sentLast24h >= EMAIL_DAILY_CAP) break;
-        if (!force && sentLastHour >= EMAIL_HOURLY_CAP) break;
+        if (sentLast24h >= dailyCap) break;
+        if (!force && sentLastHour >= hourlyCap) break;
 
         const step = steps[stepIdx];
         const now = new Date();
@@ -237,10 +244,29 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
           // Skip addresses that are suppressed (e.g. hard-bounced). Stop the
           // enrollment so it doesn't keep retrying a dead mailbox — the user
           // can fix the email from the Activity tab to resume it.
-          if (await isOnDnc(enrollment.prospectEmail)) {
+          // Suppression check now also covers DOMAIN-level DNC (set by the bounce
+          // guard when a whole domain hard-blocks), so a suppressed domain stops
+          // every address under it — not just individually-listed emails.
+          const recipientDomain = emailDomain(enrollment.prospectEmail);
+          if (await isOnDnc(enrollment.prospectEmail, null, recipientDomain || null)) {
             await storage.updateDripEnrollment(enrollment.id, { status: "bounced" } as any);
             console.log(`[Drip] Skipping suppressed/bounced address ${enrollment.prospectEmail} — enrollment stopped`);
-            break; // suppressed mailbox — stop draining this enrollment
+            break; // suppressed mailbox/domain — stop draining this enrollment
+          }
+
+          // Optional pre-send verification gate (off by default). Only a clearly
+          // INVALID address is dropped + suppressed; unknown/catch-all/valid still
+          // send, so a soft verifier result never burns a deliverable contact.
+          if (delivSettings.verifyBeforeSend) {
+            try {
+              const v = await verifyEmail(enrollment.prospectEmail);
+              if (v.status === "invalid") {
+                await addToDnc(enrollment.prospectEmail, undefined, undefined, "Failed pre-send verification (invalid)");
+                await storage.updateDripEnrollment(enrollment.id, { status: "bounced" } as any);
+                console.log(`[Drip] Pre-send verify: ${enrollment.prospectEmail} is invalid — suppressed, enrollment stopped`);
+                break;
+              }
+            } catch { /* verifier hiccup — never block a send on it */ }
           }
 
           // Per-domain pacing: if we sent to this recipient's domain very
@@ -249,11 +275,11 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
           // manual "Send Due Now" — for a varied list it's a no-op (each domain is
           // seen once), and for a single-domain list it's the spam protection you
           // most want, so force shouldn't strip it.
-          const domain = emailDomain(enrollment.prospectEmail);
+          const domain = recipientDomain;
           if (domain) {
             const last = lastSendByDomain.get(domain);
             if (last !== undefined) {
-              const wait = EMAIL_DOMAIN_GAP_MS - (Date.now() - last);
+              const wait = domainGapMs - (Date.now() - last);
               if (wait > 0) {
                 console.log(`[Drip] Pacing ${domain}: waiting ${Math.round(wait / 1000)}s before next send to same domain...`);
                 await sleep(wait);
@@ -274,7 +300,11 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
           const baseUrl = getBaseUrl();
           const trackingUrl = getTrackingPixelUrl(baseUrl, send.id);
 
-          const result = await sendEmail(
+          // Sender rotation (off by default → always DEFAULT_SENDER). Sticky per
+          // enrollment so a contact's whole sequence threads from one mailbox.
+          const fromEmail = chooseSenderForKey(enrollment.id, delivSettings.senderRotation);
+          const result = await sendEmailFromSender(
+            fromEmail,
             enrollment.prospectEmail,
             personalize(step.subject),
             personalize(step.bodyHtml),
@@ -287,7 +317,8 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
             sentLastHour++;
             if (domain) lastSendByDomain.set(domain, Date.now());
             await storage.updateDripSend(send.id, { status: "sent", sentAt: new Date() } as any);
-            console.log(`[Drip] Sent email step ${stepIdx + 1} to ${enrollment.prospectEmail} (today: ${sentLast24h}/${EMAIL_DAILY_CAP}, hour: ${sentLastHour}/${EMAIL_HOURLY_CAP})`);
+            recordSenderUse(fromEmail).catch(() => {});
+            console.log(`[Drip] Sent email step ${stepIdx + 1} to ${enrollment.prospectEmail} from ${fromEmail} (today: ${sentLast24h}/${dailyCap}, hour: ${sentLastHour}/${hourlyCap})`);
           } else {
             await storage.updateDripSend(send.id, { status: "failed", errorMessage: result.error } as any);
             console.error(`[Drip] Failed to email ${enrollment.prospectEmail}: ${result.error}`);
@@ -299,7 +330,7 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
           // hourly-cap GATES, not the spacing. Stops once the daily cap is hit
           // (no point pacing when we're about to stop), and — on a normal run —
           // once the hourly cap is hit (force ignores the hourly cap).
-          if (sentThisRun > 0 && sentLast24h < EMAIL_DAILY_CAP && (force || sentLastHour < EMAIL_HOURLY_CAP)) {
+          if (sentThisRun > 0 && sentLast24h < dailyCap && (force || sentLastHour < hourlyCap)) {
             const jitter = smartEmailDelay(sentThisRun);
             console.log(`[Drip] Waiting ${Math.round(jitter / 1000)}s before next send...`);
             await sleep(jitter);
@@ -375,7 +406,7 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
       }
     }
 
-    console.log(`[Drip] Run complete. Sent ${sentThisRun} emails this run (today: ${sentLast24h}/${EMAIL_DAILY_CAP}, hour: ${sentLastHour}/${EMAIL_HOURLY_CAP}).`);
+    console.log(`[Drip] Run complete. Sent ${sentThisRun} emails this run (today: ${sentLast24h}/${dailyCap}, hour: ${sentLastHour}/${hourlyCap}).`);
   } catch (err) {
     console.error("[Drip] Processing error:", err);
   } finally {

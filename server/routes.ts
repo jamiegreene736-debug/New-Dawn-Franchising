@@ -19,7 +19,8 @@ import { scheduleApolloOrgSync } from "./apollo-org-sync";
 import { seedDefaultCampaign } from "./default-campaign";
 import { seedGrokCampaign } from "./grok-campaign";
 import { seedGlobevisaCampaign } from "./globevisa-campaign";
-import { sendEmail, sendEmailFromSender, getTrackingPixelUrl, getAvailableSenders, CRM_EMAIL_TEMPLATES, cacheDylanCalendlyUrl } from "./email-service";
+import { sendEmail, sendEmailFromSender, getTrackingPixelUrl, getAvailableSenders, getSenderProfile, CRM_EMAIL_TEMPLATES, cacheDylanCalendlyUrl } from "./email-service";
+import { analyzeEmail } from "./spam-test-service";
 import { isAutomatedOrBulkEmail, shouldShowInCrmEmailHistory } from "./crm-email-filter";
 import { generateFacebookPost } from "./facebook-generator";
 import { postToFacebook, getAutoPostStatus, setAutoPostEnabled, scheduleDailyFacebookPosting } from "./facebook-poster";
@@ -5497,6 +5498,57 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
       res.json({ ok: true });
     } catch (e: any) {
       res.status(500).json({ error: e.message || "Update failed" });
+    }
+  });
+
+  // Inbox-placement / spam-score test. Lists campaign email steps so the user can
+  // test real content, and runs the deterministic analyzer (+ optional live send).
+  app.get("/api/admin/deliverability/email-samples", requireAdminAuth, async (_req, res) => {
+    try {
+      // Cap the number of campaigns scanned so this stays bounded regardless of
+      // how many campaigns exist (each adds a getDripSteps query + its HTML).
+      const campaigns = (await storage.getDripCampaigns()).slice(0, 100);
+      const out: any[] = [];
+      for (const c of campaigns) {
+        const steps = (await storage.getDripSteps(c.id))
+          .filter((s) => (s.stepType || "email") === "email" && (s.bodyHtml || "").trim())
+          .map((s) => ({ id: s.id, stepOrder: s.stepOrder, subject: s.subject || "", bodyHtml: s.bodyHtml }));
+        if (steps.length) out.push({ id: c.id, name: c.name, steps });
+      }
+      res.json(out);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Failed to load samples" });
+    }
+  });
+  app.post("/api/admin/deliverability/spam-test", requireAdminAuth, async (req, res) => {
+    try {
+      const subject = String(req.body?.subject || "");
+      const html = String(req.body?.html || "");
+      const senderEmail = req.body?.senderEmail ? String(req.body.senderEmail) : undefined;
+      const liveSendTo = req.body?.liveSendTo ? String(req.body.liveSendTo).trim() : "";
+      if (!subject.trim() && !html.trim()) {
+        return res.status(400).json({ message: "Provide a subject and/or HTML body to test" });
+      }
+      // Real, live authentication status feeds the analyzer's auth checks.
+      const authReport = await getDomainAuth();
+      const statusOf = (k: string) => authReport.checks.find((c) => c.key === k)?.status || "info";
+      const auth = { spf: statusOf("spf"), dkim: statusOf("dkim"), dmarc: statusOf("dmarc") } as const;
+      // Cold campaign sends go through sendEmailFromSender, which adds a one-click
+      // List-Unsubscribe header — so the analyzer shouldn't penalise a missing body link.
+      const report = analyzeEmail(subject, html, auth, { hasListUnsubHeader: true });
+
+      let liveSend: { sent: boolean; to: string; from: string; error?: string } | undefined;
+      if (liveSendTo) {
+        if (!/^[^@\s,]+@[^@\s,]+\.[^@\s,]+$/.test(liveSendTo)) {
+          return res.status(400).json({ message: "Invalid live-send address" });
+        }
+        const from = senderEmail && getSenderProfile(senderEmail) ? senderEmail : "franchising@newdawnfranchising.com";
+        const r = await sendEmailFromSender(from, liveSendTo, subject || "(no subject) — deliverability test", html || "<p>(empty body)</p>");
+        liveSend = { sent: r.success, to: liveSendTo, from, error: r.error };
+      }
+      res.json({ ...report, sendingDomain: authReport.domain, liveSend });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Spam test failed" });
     }
   });
 

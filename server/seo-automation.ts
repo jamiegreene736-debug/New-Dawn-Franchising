@@ -712,7 +712,7 @@ export async function sendSeoDigestEmail(): Promise<void> {
 </div>`;
 
   const subject = `📊 New Dawn SEO Daily Briefing — ${dateLabel}`;
-  await sendEmailFromSender(DIGEST_FROM, DIGEST_TO, subject, html);
+  await sendEmailFromSender(DIGEST_FROM, DIGEST_TO, subject, html, undefined, undefined, { skipUnsubscribe: true });
   console.log(`[SEO Digest] Daily briefing sent to ${DIGEST_TO}`);
 }
 

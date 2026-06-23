@@ -12,6 +12,24 @@ import { pool } from "./db";
  */
 const STATEMENTS: string[] = [
   `CREATE EXTENSION IF NOT EXISTS pgcrypto`,
+  // Email-deliverability remediation roadmap. One row per action item; the admin
+  // portal's Email Deliverability tab reads/writes `status` so progress persists.
+  // Seed content is (re)inserted by deliverability-service on first read; this
+  // table only needs to exist + retain user-set status/notes.
+  `CREATE TABLE IF NOT EXISTS deliverability_checklist (
+    id          text       PRIMARY KEY,
+    category    text       NOT NULL,
+    title       text       NOT NULL,
+    detail      text       NOT NULL DEFAULT '',
+    priority    text       NOT NULL DEFAULT 'medium',
+    owner       text       NOT NULL DEFAULT 'dev',
+    effort      text       NOT NULL DEFAULT 'medium',
+    impact      text       NOT NULL DEFAULT 'medium',
+    sort_order  integer    NOT NULL DEFAULT 0,
+    status      text       NOT NULL DEFAULT 'todo',
+    notes       text,
+    updated_at  timestamp  NOT NULL DEFAULT now()
+  )`,
   `CREATE TABLE IF NOT EXISTS blog_posts (
     id              varchar    PRIMARY KEY DEFAULT gen_random_uuid(),
     title           text       NOT NULL,

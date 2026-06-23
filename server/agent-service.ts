@@ -616,7 +616,7 @@ export async function sendDailyBrief(batchId: string): Promise<boolean> {
   </div>
 </div>`;
 
-  await sendEmailFromSender(DYLAN_EMAIL, toEmail, subject, html);
+  await sendEmailFromSender(DYLAN_EMAIL, toEmail, subject, html, undefined, undefined, { skipUnsubscribe: true });
   await db.update(agentDailyBatches).set({
     briefEmailSentAt: new Date(),
     briefSubject: subject,
@@ -881,7 +881,7 @@ async function sendExecutionConfirmation(batchId: string, sent: number, failed: 
   </div>
 </div>`;
 
-  await sendEmailFromSender(DYLAN_EMAIL, toEmail, subject, html);
+  await sendEmailFromSender(DYLAN_EMAIL, toEmail, subject, html, undefined, undefined, { skipUnsubscribe: true });
   await db.update(agentDailyBatches).set({ confirmationSentAt: new Date() }).where(eq(agentDailyBatches.id, batchId));
 }
 

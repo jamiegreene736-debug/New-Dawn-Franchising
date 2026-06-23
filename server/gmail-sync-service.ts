@@ -207,6 +207,8 @@ export async function syncFranchisingInbox(): Promise<SyncResult> {
                 `Reply from ${fromName} — campaign paused`,
                 `<p><strong>${escapeHtml(fromName)}</strong> (${escapeHtml(fromAddr)}) just replied — their campaign has been paused so they get a personal response.</p><p><strong>Subject:</strong> ${escapeHtml(subject)}</p><p><strong>Message:</strong></p>${bodyHtml}`,
                 undefined,
+                undefined,
+                { skipUnsubscribe: true },
               );
             } catch { /* alert is best-effort */ }
           }

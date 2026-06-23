@@ -37,6 +37,7 @@ import {
   Tag,
   Phone,
   Sparkles,
+  ShieldCheck,
   ListPlus,
   ListChecks,
 } from "lucide-react";
@@ -46,6 +47,7 @@ import AiSearchInsights from "@/components/ai-search-insights";
 import EmailCampaigns from "./email-campaigns";
 import FacebookTab from "./facebook-tab";
 import PhoneCallsTab from "./phone-calls-tab";
+import EmailDeliverabilityTab from "./email-deliverability-tab";
 import { CrmPlaybook } from "./crm-playbook";
 import { BulkEnrichDialog } from "@/components/bulk-enrich-dialog";
 import { Button } from "@/components/ui/button";
@@ -917,9 +919,9 @@ export default function CrmPage() {
   const [newListName, setNewListName] = useState("");
 
   const urlParams = new URLSearchParams(search);
-  const urlTab = urlParams.get("tab") as "clients" | "prospects" | "emails" | "facebook" | "reports" | "api-status" | "franchisees" | "phone-calls" | null;
+  const urlTab = urlParams.get("tab") as "clients" | "prospects" | "emails" | "facebook" | "reports" | "deliverability" | "api-status" | "franchisees" | "phone-calls" | null;
 
-  const [crmTab, setCrmTab] = useState<"clients" | "prospects" | "ai-insights" | "emails" | "facebook" | "reports" | "api-status" | "franchisees" | "phone-calls">(
+  const [crmTab, setCrmTab] = useState<"clients" | "prospects" | "ai-insights" | "emails" | "facebook" | "reports" | "deliverability" | "api-status" | "franchisees" | "phone-calls">(
     urlTab || "clients"
   );
 
@@ -1352,6 +1354,13 @@ export default function CrmPage() {
               <Mail className="size-4" /> Campaigns
             </button>
             <button
+              data-testid="tab-crm-deliverability"
+              className={`shrink-0 whitespace-nowrap px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${crmTab === "deliverability" ? "border-[hsl(var(--primary))] text-[hsl(var(--primary))]" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+              onClick={() => setCrmTab("deliverability")}
+            >
+              <ShieldCheck className="size-4" /> Deliverability
+            </button>
+            <button
               data-testid="tab-crm-facebook"
               className={`shrink-0 whitespace-nowrap px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${crmTab === "facebook" ? "border-[hsl(var(--primary))] text-[hsl(var(--primary))]" : "border-transparent text-muted-foreground hover:text-foreground"}`}
               onClick={() => setCrmTab("facebook")}
@@ -1422,6 +1431,14 @@ export default function CrmPage() {
         <section className="py-6">
           <div className="nh-container">
             <EmailCampaigns />
+          </div>
+        </section>
+      )}
+
+      {crmTab === "deliverability" && (
+        <section className="py-6">
+          <div className="nh-container">
+            <EmailDeliverabilityTab />
           </div>
         </section>
       )}

@@ -361,18 +361,6 @@ const STATEMENTS: string[] = [
   )`,
 
   // ─── Deliverability + warmup (Instantly/Smartlead-mimic stack) ───────────────
-  // Persisted results of the on-demand spam-content checker (one row per check),
-  // so the admin tab can show a short history.
-  `CREATE TABLE IF NOT EXISTS spam_check_results (
-    id          varchar      PRIMARY KEY DEFAULT gen_random_uuid(),
-    subject     text         NOT NULL DEFAULT '',
-    score       numeric      NOT NULL DEFAULT 0,
-    health      integer      NOT NULL DEFAULT 100,
-    verdict     text         NOT NULL DEFAULT 'clean',
-    hits        jsonb        NOT NULL DEFAULT '[]'::jsonb,
-    created_at  timestamptz  NOT NULL DEFAULT now()
-  )`,
-
   // Warmup engine — single settings row (id='singleton'); ships OFF by default.
   `CREATE TABLE IF NOT EXISTS warmup_settings (
     id                 varchar      PRIMARY KEY DEFAULT 'singleton',

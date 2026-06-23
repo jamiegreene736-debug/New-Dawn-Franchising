@@ -6,6 +6,7 @@ import {
   getSenderProfile,
   sendEmailFromSender,
 } from "./email-service";
+import { getInstantlyOverview } from "./warmup-instantly-service";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Warmup engine — a scoped, Instantly/Smartlead-style mailbox warmup.
@@ -408,10 +409,15 @@ export async function getWarmupOverview() {
      FROM warmup_sends`,
   );
 
+  // When the provider is Instantly, surface its connected accounts + warmup
+  // scores (Instantly's network does the actual warming).
+  const instantly = settings.provider === "instantly" ? await getInstantlyOverview().catch(() => null) : null;
+
   return {
     settings,
     members,
     health,
+    instantly,
     todayTarget: target,
     lastTick: getLastWarmupTick(),
     totals: totals[0] || {},

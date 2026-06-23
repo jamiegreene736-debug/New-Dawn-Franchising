@@ -21,6 +21,7 @@ import {
   seedOwnedMembersFromSenders, getWarmupOverview, runWarmupTick, computeWarmupHealth,
 } from "./warmup-service";
 import { runWarmupEngagement } from "./warmup-engagement-service";
+import { syncInstantlyWarmup } from "./warmup-instantly-service";
 import {
   getDeliverabilitySettings, updateDeliverabilitySettings, runBounceGuard, getLastBounceGuard, getSenderStats,
 } from "./deliverability-settings-service";
@@ -351,6 +352,12 @@ function scheduleWarmupCrons() {
   // auto-pause is opt-in via settings.
   cron.schedule("15 */6 * * *", () => {
     runBounceGuard().catch((e) => console.error("[BounceGuard Cron] error:", e?.message));
+  });
+
+  // Instantly warmup sync (every 2h) — pulls warmup scores when provider is
+  // 'instantly'; self-gates (no-op otherwise / when the key isn't set).
+  cron.schedule("25 */2 * * *", () => {
+    syncInstantlyWarmup().catch((e) => console.error("[Instantly Cron] error:", e?.message));
   });
 
   console.log("[Warmup] crons scheduled (send 30m business hrs, engage 20m, health nightly) + bounce guard 6h — warmup idle until enabled");
@@ -5643,12 +5650,15 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
     }
   });
   // Manual triggers (the same work the crons do) so the admin can run a cycle now.
+  // Owned-pool send/engage are no-ops when the provider is external; the Instantly
+  // sync is a no-op unless the provider is 'instantly' + the key is set.
   app.post("/api/admin/warmup/run-now", requireAdminAuth, async (_req, res) => {
     try {
       const send = await runWarmupTick();
       const engage = await runWarmupEngagement();
+      const instantly = await syncInstantlyWarmup();
       await computeWarmupHealth();
-      res.json({ send, engage });
+      res.json({ send, engage, instantly });
     } catch (e: any) {
       res.status(500).json({ error: e.message || "Warmup run failed" });
     }

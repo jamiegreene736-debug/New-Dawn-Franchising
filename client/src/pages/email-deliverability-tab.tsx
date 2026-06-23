@@ -416,8 +416,14 @@ interface WarmupSettings {
 }
 interface WarmupMember { id: string; email: string; name: string | null; type: string; active: boolean; }
 interface WarmupHealth { mailbox: string; score: number | null; sent: number; inboxed: number; spam: number; }
+interface InstantlyOverview {
+  configured: boolean;
+  syncStatus: { at: string; accounts: number; error: string | null };
+  accounts: { email: string; warmupActive: boolean; warmupScore: number | null }[];
+}
 interface WarmupOverview {
   settings: WarmupSettings; members: WarmupMember[]; health: WarmupHealth[]; todayTarget: number;
+  instantly?: InstantlyOverview | null;
   totals: { today?: number; week?: number; inbox_week?: number; spam_week?: number; replied_week?: number };
   recent: { from: string; to: string; subject: string; landed: string; sentAt: string | null }[];
   lastTick: { ran: boolean; reason?: string; sent: number; at: string };
@@ -504,8 +510,31 @@ function WarmupPanel() {
         <>
           {!s.enabled && (
             <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-              Warmup is off. Add at least 2 owned mailboxes (with their Gmail app passwords configured), then enable it. Note: warming across your own org's mailboxes maintains reputation but is lower-signal than a real stranger-inbox network — switch the provider to an external pool later for that.
+              Warmup is off. Add at least 2 owned mailboxes (with their Gmail app passwords configured), then enable it. Note: warming across your own org's mailboxes maintains reputation but is lower-signal than a real stranger-inbox network — switch the provider to an external pool (e.g. Instantly) for that.
             </div>
+          )}
+
+          {/* Instantly (external pool) — its network does the warming; we mirror its scores. */}
+          {s.provider === "instantly" && (
+            <Card className="p-4">
+              <h4 className="mb-2 flex items-center gap-2 text-sm font-semibold"><Flame className="size-4" /> Instantly warmup network</h4>
+              {!d.instantly?.configured ? (
+                <div className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Set <code>INSTANTLY_API_KEY</code> in Railway. Instantly's network handles the actual sending/engagement; this mirrors its warmup scores here.</div>
+              ) : (d.instantly.accounts.length === 0) ? (
+                <div className="text-sm text-muted-foreground">{d.instantly.syncStatus.error ? `Last sync: ${d.instantly.syncStatus.error}` : "No connected accounts found in Instantly yet. Connect your mailboxes + enable warmup inside Instantly."}</div>
+              ) : (
+                <div className="space-y-1.5">
+                  {d.instantly.accounts.map((a) => (
+                    <div key={a.email} className="flex items-center gap-2 rounded border p-2 text-sm">
+                      <span className={`size-2 rounded-full ${a.warmupActive ? "bg-emerald-500" : "bg-slate-300"}`} title={a.warmupActive ? "Warmup active" : "Warmup off"} />
+                      <span className="flex-1 truncate">{a.email}</span>
+                      {a.warmupScore != null && <span className={`font-semibold ${scoreColorClass(a.warmupScore)}`}>{a.warmupScore}%</span>}
+                    </div>
+                  ))}
+                  <p className="pt-1 text-xs text-muted-foreground">Enable/disable warmup per account inside Instantly. Synced every 2h (or “Run a cycle now”).</p>
+                </div>
+              )}
+            </Card>
           )}
 
           {/* Stats */}

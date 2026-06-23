@@ -74,6 +74,20 @@ function getTransporter(senderEmail: string): nodemailer.Transporter {
 // Default sender for system emails (signatures, drip campaigns, etc.)
 const DEFAULT_SENDER = "franchising@newdawnfranchising.com";
 
+// Pick the From address for a drip send. When rotation is OFF we always return
+// DEFAULT_SENDER (unchanged behaviour). When ON we deterministically map a stable
+// key (the enrollment id) to one of the configured senders — so a given contact's
+// whole sequence always threads from the SAME mailbox (preserving threading) while
+// volume is spread evenly across mailboxes to protect any single one's reputation.
+export function chooseSenderForKey(key: string, rotate: boolean): string {
+  if (!rotate) return DEFAULT_SENDER;
+  const senders = getAvailableSenders();
+  if (senders.length <= 1) return DEFAULT_SENDER;
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) | 0;
+  return senders[Math.abs(h) % senders.length].email;
+}
+
 // ─── Email Attachment ─────────────────────────────────────────────────────────
 interface EmailAttachment {
   filename: string;
@@ -219,7 +233,15 @@ ${innerHtml}
 }
 
 export function getTrackingPixelUrl(baseUrl: string, sendId: string): string {
-  return `${baseUrl}/api/track/open/${sendId}`;
+  // First-party tracking domain: if EMAIL_TRACKING_DOMAIN is set (e.g.
+  // link.send.newdawnfranchising.com, a CNAME → this app), open/click links ride
+  // the sending org's own domain instead of the brand root — better trust and it
+  // isolates link reputation. Falls back to baseUrl so behaviour is unchanged
+  // until the DNS + env are in place. The click URL is derived from this in
+  // sendEmailFromSender (…/track/open/<id> → …/track/click/<id>).
+  const td = process.env.EMAIL_TRACKING_DOMAIN?.trim();
+  const base = td ? (/^https?:\/\//i.test(td) ? td.replace(/\/$/, "") : `https://${td.replace(/\/$/, "")}`) : baseUrl;
+  return `${base}/api/track/open/${sendId}`;
 }
 
 // ─── Email Signature Builder ───────────────────────────────────────────────────

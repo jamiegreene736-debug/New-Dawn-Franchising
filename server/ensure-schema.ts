@@ -359,6 +359,174 @@ const STATEMENTS: string[] = [
     last_error      text,
     updated_at      timestamptz  NOT NULL DEFAULT now()
   )`,
+
+  // ─── Deliverability + warmup (Instantly/Smartlead-mimic stack) ───────────────
+  // Warmup engine — single settings row (id='singleton'); ships OFF by default.
+  `CREATE TABLE IF NOT EXISTS warmup_settings (
+    id                 varchar      PRIMARY KEY DEFAULT 'singleton',
+    enabled            boolean      NOT NULL DEFAULT false,
+    provider           text         NOT NULL DEFAULT 'owned',
+    daily_target       integer      NOT NULL DEFAULT 10,
+    ramp_start         integer      NOT NULL DEFAULT 2,
+    ramp_increment     integer      NOT NULL DEFAULT 2,
+    reply_rate_pct     integer      NOT NULL DEFAULT 30,
+    mark_important_pct integer      NOT NULL DEFAULT 30,
+    spam_rescue_pct    integer      NOT NULL DEFAULT 100,
+    weekdays_only      boolean      NOT NULL DEFAULT true,
+    filter_tag         text         NOT NULL DEFAULT 'ndf-warmup',
+    started_at         timestamptz,
+    updated_at         timestamptz  NOT NULL DEFAULT now()
+  )`,
+
+  // Mailboxes participating in warmup. type='owned_imap' = a Gmail mailbox we
+  // control (reuses the sender app passwords); type='external' = a provider seam.
+  `CREATE TABLE IF NOT EXISTS warmup_pool_members (
+    id            varchar      PRIMARY KEY DEFAULT gen_random_uuid(),
+    email         text         NOT NULL UNIQUE,
+    name          text,
+    type          text         NOT NULL DEFAULT 'owned_imap',
+    imap_pass_env text,
+    provider      text,
+    active        boolean      NOT NULL DEFAULT true,
+    created_at    timestamptz  NOT NULL DEFAULT now()
+  )`,
+
+  // One row per warmup email sent; `landed` is set by the IMAP engagement loop.
+  `CREATE TABLE IF NOT EXISTS warmup_sends (
+    id                 varchar      PRIMARY KEY DEFAULT gen_random_uuid(),
+    from_email         text         NOT NULL,
+    to_email           text         NOT NULL,
+    subject            text         NOT NULL DEFAULT '',
+    tag                text         NOT NULL DEFAULT '',
+    token              text         NOT NULL,
+    landed             text         NOT NULL DEFAULT 'pending',
+    sent_at            timestamptz  NOT NULL DEFAULT now(),
+    checked_at         timestamptz,
+    replied_at         timestamptz,
+    rescued_at         timestamptz,
+    marked_important_at timestamptz
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_warmup_sends_token ON warmup_sends (token)`,
+  `CREATE INDEX IF NOT EXISTS idx_warmup_sends_to ON warmup_sends (to_email, landed)`,
+
+  // Daily per-mailbox warmup health snapshot (inbox-placement score).
+  `CREATE TABLE IF NOT EXISTS warmup_health (
+    id          varchar      PRIMARY KEY DEFAULT gen_random_uuid(),
+    mailbox     text         NOT NULL,
+    day         date         NOT NULL DEFAULT CURRENT_DATE,
+    sent        integer      NOT NULL DEFAULT 0,
+    inboxed     integer      NOT NULL DEFAULT 0,
+    spam        integer      NOT NULL DEFAULT 0,
+    score       numeric,
+    created_at  timestamptz  NOT NULL DEFAULT now(),
+    UNIQUE (mailbox, day)
+  )`,
+
+  // ─── Phase 2: send-path safety settings + sender rotation stats ──────────────
+  // Single settings row (id='singleton'). Every flag defaults to current
+  // behaviour, so existing sends are unaffected until an admin opts in.
+  `CREATE TABLE IF NOT EXISTS deliverability_settings (
+    id                          varchar      PRIMARY KEY DEFAULT 'singleton',
+    verify_before_send          boolean      NOT NULL DEFAULT false,
+    sender_rotation             boolean      NOT NULL DEFAULT false,
+    domain_guard                boolean      NOT NULL DEFAULT true,
+    domain_bounce_threshold_pct integer      NOT NULL DEFAULT 40,
+    domain_bounce_min           integer      NOT NULL DEFAULT 8,
+    campaign_pause_enabled      boolean      NOT NULL DEFAULT false,
+    campaign_bounce_threshold_pct integer    NOT NULL DEFAULT 12,
+    campaign_bounce_min         integer      NOT NULL DEFAULT 50,
+    soft_bounce_skip_dnc        boolean      NOT NULL DEFAULT true,
+    daily_cap_override          integer,
+    hourly_cap_override         integer,
+    domain_gap_override_seconds integer,
+    updated_at                  timestamptz  NOT NULL DEFAULT now()
+  )`,
+
+  // Per-sender send counters (rotation visibility).
+  `CREATE TABLE IF NOT EXISTS sender_stats (
+    email        text         PRIMARY KEY,
+    sent_total   integer      NOT NULL DEFAULT 0,
+    last_sent_at timestamptz,
+    updated_at   timestamptz  NOT NULL DEFAULT now()
+  )`,
+
+  // ─── Phase 3: linear ramp columns (added to the Phase 2 settings row) ────────
+  `ALTER TABLE deliverability_settings ADD COLUMN IF NOT EXISTS ramp_mode text NOT NULL DEFAULT 'off'`,
+  `ALTER TABLE deliverability_settings ADD COLUMN IF NOT EXISTS ramp_start_cap integer NOT NULL DEFAULT 20`,
+  `ALTER TABLE deliverability_settings ADD COLUMN IF NOT EXISTS ramp_days integer NOT NULL DEFAULT 14`,
+  `ALTER TABLE deliverability_settings ADD COLUMN IF NOT EXISTS ramp_started_at timestamptz`,
+
+  // ─── Phase 3: seed inbox-placement test ──────────────────────────────────────
+  `CREATE TABLE IF NOT EXISTS seed_inboxes (
+    id            varchar      PRIMARY KEY DEFAULT gen_random_uuid(),
+    provider      text         NOT NULL DEFAULT 'other',
+    email         text         NOT NULL UNIQUE,
+    imap_host     text,
+    imap_user     text,
+    imap_pass_env text,
+    active        boolean      NOT NULL DEFAULT true,
+    created_at    timestamptz  NOT NULL DEFAULT now()
+  )`,
+  `CREATE TABLE IF NOT EXISTS seed_tests (
+    id           varchar      PRIMARY KEY DEFAULT gen_random_uuid(),
+    token        text         NOT NULL,
+    subject      text         NOT NULL DEFAULT '',
+    status       text         NOT NULL DEFAULT 'sending',
+    total        integer      NOT NULL DEFAULT 0,
+    sent         integer      NOT NULL DEFAULT 0,
+    inbox        integer      NOT NULL DEFAULT 0,
+    spam         integer      NOT NULL DEFAULT 0,
+    missing      integer      NOT NULL DEFAULT 0,
+    started_at   timestamptz  NOT NULL DEFAULT now(),
+    completed_at timestamptz
+  )`,
+  `CREATE TABLE IF NOT EXISTS seed_test_results (
+    id         varchar      PRIMARY KEY DEFAULT gen_random_uuid(),
+    test_id    varchar      NOT NULL,
+    seed_email text         NOT NULL,
+    provider   text         NOT NULL DEFAULT 'other',
+    placement  text         NOT NULL DEFAULT 'pending',
+    checked_at timestamptz
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_seed_results_test ON seed_test_results (test_id)`,
+
+  // ─── Phase 3: DMARC aggregate (rua) reports ──────────────────────────────────
+  `CREATE TABLE IF NOT EXISTS dmarc_reports (
+    id          varchar      PRIMARY KEY DEFAULT gen_random_uuid(),
+    report_id   text         NOT NULL UNIQUE,
+    org         text         NOT NULL DEFAULT 'unknown',
+    domain      text         NOT NULL DEFAULT '',
+    date_begin  timestamptz,
+    date_end    timestamptz,
+    received_at timestamptz  NOT NULL DEFAULT now()
+  )`,
+  `CREATE TABLE IF NOT EXISTS dmarc_records (
+    id          varchar      PRIMARY KEY DEFAULT gen_random_uuid(),
+    report_id   text         NOT NULL,
+    source_ip   text         NOT NULL DEFAULT '',
+    count       integer      NOT NULL DEFAULT 0,
+    disposition text         NOT NULL DEFAULT 'none',
+    dkim_pass   boolean      NOT NULL DEFAULT false,
+    spf_pass    boolean      NOT NULL DEFAULT false,
+    dkim_domain text,
+    spf_domain  text
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_dmarc_records_report ON dmarc_records (report_id)`,
+
+  // ─── Phase 3: Google Postmaster Tools daily snapshots ────────────────────────
+  `CREATE TABLE IF NOT EXISTS postmaster_stats (
+    id                varchar      PRIMARY KEY DEFAULT gen_random_uuid(),
+    domain            text         NOT NULL,
+    day               date         NOT NULL,
+    spam_rate         numeric,
+    domain_reputation text,
+    dkim_ratio        numeric,
+    spf_ratio         numeric,
+    dmarc_ratio       numeric,
+    raw               jsonb,
+    created_at        timestamptz  NOT NULL DEFAULT now(),
+    UNIQUE (domain, day)
+  )`,
 ];
 
 export async function ensureSchema(): Promise<void> {

@@ -14,6 +14,24 @@ import { searchProspects, SEARCH_CATEGORIES } from "./prospect-search";
 import { scheduleDripProcessing, processDripEmails, reprocessStep, fireClickReaction } from "./drip-processor";
 import { scheduleGmailSync, syncFranchisingInbox, getGmailSyncStatus, getGmailSyncLastResult } from "./gmail-sync-service";
 import { getDomainAuth, getDeliverabilityMetrics, getChecklist, updateChecklistItem, type ChecklistStatus } from "./deliverability-service";
+import { getDnsSetupReport } from "./dns-setup-service";
+import { getBlacklistReport } from "./blacklist-service";
+import {
+  getWarmupSettings, updateWarmupSettings, listMembers, addMember, removeMember, setMemberActive,
+  seedOwnedMembersFromSenders, getWarmupOverview, runWarmupTick, computeWarmupHealth,
+} from "./warmup-service";
+import { runWarmupEngagement } from "./warmup-engagement-service";
+import { syncInstantlyWarmup } from "./warmup-instantly-service";
+import {
+  getDeliverabilitySettings, updateDeliverabilitySettings, runBounceGuard, getLastBounceGuard, getSenderStats,
+} from "./deliverability-settings-service";
+import {
+  addSeed, removeSeed, setSeedActive, startSeedTest, checkSeedTest, checkPendingSeedTests, getSeedOverview,
+} from "./seed-test-service";
+import { getDmarcOverview, syncDmarcReports } from "./dmarc-report-service";
+import { getPostmasterOverview, syncPostmaster } from "./postmaster-service";
+import { getDeliverabilityScore } from "./deliverability-score-service";
+import { scheduleAllInboxBounceScan } from "./gmail-sync-service";
 import { scheduleSeamlessOrgSync } from "./seamless-org-sync";
 import { scheduleApolloOrgSync } from "./apollo-org-sync";
 import { seedDefaultCampaign } from "./default-campaign";
@@ -306,6 +324,61 @@ async function autoSyncPhoneCalls(): Promise<void> {
   } catch (err: any) {
     console.error("[PhoneSync] Hourly sync error:", err.message);
   }
+}
+
+// Warmup crons — all no-op cheaply when warmup is disabled (the services check
+// settings.enabled first), so they're safe to register unconditionally.
+function scheduleWarmupCrons() {
+  // Send slow-ramp warmup mail across active owned mailboxes, every 30 min during
+  // business hours on weekdays (the send loop is probabilistic so volume is
+  // jittered and respects the daily ramp ceiling).
+  cron.schedule("*/30 8-18 * * 1-5", () => {
+    runWarmupTick().catch((e) => console.error("[Warmup Cron] send tick error:", e?.message));
+  }, { timezone: "America/New_York" });
+
+  // Engagement (IMAP read/reply/star/spam-rescue) every 20 min, 7 days — warmup
+  // mail still arrives on weekends and should be engaged.
+  cron.schedule("*/20 7-22 * * *", () => {
+    runWarmupEngagement().catch((e) => console.error("[Warmup Cron] engagement error:", e?.message));
+  }, { timezone: "America/New_York" });
+
+  // Nightly health-score snapshot.
+  cron.schedule("30 2 * * *", () => {
+    computeWarmupHealth().catch((e) => console.error("[Warmup Cron] health error:", e?.message));
+  }, { timezone: "America/New_York" });
+
+  // Bounce guard — auto-suppress hard-blocking domains (and optionally pause
+  // runaway campaigns) every 6 hours. Domain guard is on by default; campaign
+  // auto-pause is opt-in via settings.
+  cron.schedule("15 */6 * * *", () => {
+    runBounceGuard().catch((e) => console.error("[BounceGuard Cron] error:", e?.message));
+  });
+
+  // Instantly warmup sync (every 2h) — pulls warmup scores when provider is
+  // 'instantly'; self-gates (no-op otherwise / when the key isn't set).
+  cron.schedule("25 */2 * * *", () => {
+    syncInstantlyWarmup().catch((e) => console.error("[Instantly Cron] error:", e?.message));
+  });
+
+  console.log("[Warmup] crons scheduled (send 30m business hrs, engage 20m, health nightly) + bounce guard 6h — warmup idle until enabled");
+}
+
+// Phase 3 monitoring crons — all no-op cheaply when their inputs aren't present
+// (no pending seed tests / DMARC + Postmaster gated on env), so safe to register.
+function scheduleDeliverabilityMonitoringCrons() {
+  // Finish any seed test that's been awaiting placement long enough to read.
+  cron.schedule("*/5 * * * *", () => {
+    checkPendingSeedTests().catch((e) => console.error("[SeedTest Cron] error:", e?.message));
+  });
+  // Ingest new DMARC aggregate reports (gated on DMARC_IMAP_* env).
+  cron.schedule("40 */6 * * *", () => {
+    syncDmarcReports().catch((e) => console.error("[DMARC Cron] error:", e?.message));
+  });
+  // Pull Google Postmaster Tools daily snapshot (gated on POSTMASTER_* env).
+  cron.schedule("20 5 * * *", () => {
+    syncPostmaster().catch((e) => console.error("[Postmaster Cron] error:", e?.message));
+  });
+  console.log("[Deliverability] monitoring crons scheduled (seed-test 5m, DMARC 6h, Postmaster daily)");
 }
 
 function scheduleAgentCrons() {
@@ -5501,8 +5574,127 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
     }
   });
 
-  // Inbox-placement / spam-score test. Lists campaign email steps so the user can
-  // test real content, and runs the deterministic analyzer (+ optional live send).
+  // ─── DNS / subdomain setup: generated records + live verification ────────────
+  app.get("/api/admin/deliverability/dns-setup", requireAdminAuth, async (_req, res) => {
+    try {
+      res.json(await getDnsSetupReport());
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "DNS setup report failed" });
+    }
+  });
+
+  // ─── DNSBL / blacklist monitor ───────────────────────────────────────────────
+  app.get("/api/admin/deliverability/blacklist", requireAdminAuth, async (req, res) => {
+    try {
+      const domain = typeof req.query.domain === "string" && req.query.domain.trim() ? req.query.domain.trim() : undefined;
+      res.json(await getBlacklistReport(domain));
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Blacklist check failed" });
+    }
+  });
+
+  // ─── Warmup engine ───────────────────────────────────────────────────────────
+  app.get("/api/admin/warmup/overview", requireAdminAuth, async (_req, res) => {
+    try {
+      res.json(await getWarmupOverview());
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Warmup overview failed" });
+    }
+  });
+  app.patch("/api/admin/warmup/settings", requireAdminAuth, async (req, res) => {
+    try {
+      res.json(await updateWarmupSettings(req.body || {}));
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Warmup settings update failed" });
+    }
+  });
+  app.get("/api/admin/warmup/members", requireAdminAuth, async (_req, res) => {
+    try {
+      res.json(await listMembers(false));
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "List members failed" });
+    }
+  });
+  app.post("/api/admin/warmup/members", requireAdminAuth, async (req, res) => {
+    try {
+      const email = String(req.body?.email || "").trim();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return res.status(400).json({ message: "Valid email required" });
+      res.json(await addMember({ email, name: req.body?.name, type: req.body?.type, imapPassEnv: req.body?.imapPassEnv, provider: req.body?.provider }));
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Add member failed" });
+    }
+  });
+  app.post("/api/admin/warmup/members/seed-owned", requireAdminAuth, async (_req, res) => {
+    try {
+      res.json(await seedOwnedMembersFromSenders());
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Seed members failed" });
+    }
+  });
+  app.patch("/api/admin/warmup/members/:id", requireAdminAuth, async (req, res) => {
+    try {
+      const ok = await setMemberActive(String(req.params.id), !!req.body?.active);
+      if (!ok) return res.status(404).json({ message: "Member not found" });
+      res.json({ ok: true });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Update member failed" });
+    }
+  });
+  app.delete("/api/admin/warmup/members/:id", requireAdminAuth, async (req, res) => {
+    try {
+      const ok = await removeMember(String(req.params.id));
+      if (!ok) return res.status(404).json({ message: "Member not found" });
+      res.json({ ok: true });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Remove member failed" });
+    }
+  });
+  // Manual triggers (the same work the crons do) so the admin can run a cycle now.
+  // Owned-pool send/engage are no-ops when the provider is external; the Instantly
+  // sync is a no-op unless the provider is 'instantly' + the key is set.
+  app.post("/api/admin/warmup/run-now", requireAdminAuth, async (_req, res) => {
+    try {
+      const send = await runWarmupTick();
+      const engage = await runWarmupEngagement();
+      const instantly = await syncInstantlyWarmup();
+      await computeWarmupHealth();
+      res.json({ send, engage, instantly });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Warmup run failed" });
+    }
+  });
+
+  // ─── Sending & Safety settings (verify-gate, rotation, bounce guard, caps) ───
+  app.get("/api/admin/deliverability/settings", requireAdminAuth, async (_req, res) => {
+    try {
+      const [settings, senders, senderStats] = await Promise.all([
+        getDeliverabilitySettings(),
+        Promise.resolve(getAvailableSenders()),
+        getSenderStats(),
+      ]);
+      res.json({ settings, senders, senderStats, lastGuard: getLastBounceGuard() });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Settings load failed" });
+    }
+  });
+  app.patch("/api/admin/deliverability/settings", requireAdminAuth, async (req, res) => {
+    try {
+      res.json(await updateDeliverabilitySettings(req.body || {}));
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Settings update failed" });
+    }
+  });
+  app.post("/api/admin/deliverability/bounce-guard/run", requireAdminAuth, async (_req, res) => {
+    try {
+      res.json(await runBounceGuard());
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Bounce guard failed" });
+    }
+  });
+
+  // Inbox-placement / spam-score test (#156). Lists campaign email steps so the
+  // user can test real content, and runs the deterministic analyzer (+ optional
+  // live send).
   app.get("/api/admin/deliverability/email-samples", requireAdminAuth, async (_req, res) => {
     try {
       // Cap the number of campaigns scanned so this stays bounded regardless of
@@ -5552,6 +5744,72 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
     }
   });
 
+  // ─── Phase 3: composite score ────────────────────────────────────────────────
+  app.get("/api/admin/deliverability/score", requireAdminAuth, async (_req, res) => {
+    try {
+      res.json(await getDeliverabilityScore());
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Score failed" });
+    }
+  });
+
+  // ─── Phase 3: seed inbox-placement test ──────────────────────────────────────
+  app.get("/api/admin/deliverability/seed/overview", requireAdminAuth, async (_req, res) => {
+    try { res.json(await getSeedOverview()); } catch (e: any) { res.status(500).json({ error: e.message || "Seed overview failed" }); }
+  });
+  app.post("/api/admin/deliverability/seed/seeds", requireAdminAuth, async (req, res) => {
+    try {
+      const email = String(req.body?.email || "").trim();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return res.status(400).json({ message: "Valid email required" });
+      res.json(await addSeed({ email, provider: req.body?.provider, imapHost: req.body?.imapHost, imapUser: req.body?.imapUser, imapPassEnv: req.body?.imapPassEnv }));
+    } catch (e: any) { res.status(500).json({ error: e.message || "Add seed failed" }); }
+  });
+  app.patch("/api/admin/deliverability/seed/seeds/:id", requireAdminAuth, async (req, res) => {
+    try {
+      const ok = await setSeedActive(String(req.params.id), !!req.body?.active);
+      if (!ok) return res.status(404).json({ message: "Seed not found" });
+      res.json({ ok: true });
+    } catch (e: any) { res.status(500).json({ error: e.message || "Update seed failed" }); }
+  });
+  app.delete("/api/admin/deliverability/seed/seeds/:id", requireAdminAuth, async (req, res) => {
+    try {
+      const ok = await removeSeed(String(req.params.id));
+      if (!ok) return res.status(404).json({ message: "Seed not found" });
+      res.json({ ok: true });
+    } catch (e: any) { res.status(500).json({ error: e.message || "Remove seed failed" }); }
+  });
+  app.post("/api/admin/deliverability/seed/test", requireAdminAuth, async (req, res) => {
+    try {
+      const subject = String(req.body?.subject || "");
+      const html = String(req.body?.html || "");
+      const fromEmail = req.body?.fromEmail ? String(req.body.fromEmail) : undefined;
+      res.json(await startSeedTest(subject, html, fromEmail));
+    } catch (e: any) { res.status(400).json({ error: e.message || "Seed test failed" }); }
+  });
+  app.post("/api/admin/deliverability/seed/test/:id/check", requireAdminAuth, async (req, res) => {
+    try { await checkSeedTest(String(req.params.id)); res.json(await getSeedOverview()); }
+    catch (e: any) { res.status(500).json({ error: e.message || "Check failed" }); }
+  });
+
+  // ─── Phase 3: DMARC aggregate reports ────────────────────────────────────────
+  app.get("/api/admin/deliverability/dmarc", requireAdminAuth, async (_req, res) => {
+    try { res.json(await getDmarcOverview()); } catch (e: any) { res.status(500).json({ error: e.message || "DMARC overview failed" }); }
+  });
+  app.post("/api/admin/deliverability/dmarc/sync", requireAdminAuth, async (_req, res) => {
+    try { res.json(await syncDmarcReports()); } catch (e: any) { res.status(500).json({ error: e.message || "DMARC sync failed" }); }
+  });
+
+  // ─── Phase 3: Google Postmaster Tools ────────────────────────────────────────
+  app.get("/api/admin/deliverability/postmaster", requireAdminAuth, async (_req, res) => {
+    try { res.json(await getPostmasterOverview()); } catch (e: any) { res.status(500).json({ error: e.message || "Postmaster overview failed" }); }
+  });
+  app.post("/api/admin/deliverability/postmaster/sync", requireAdminAuth, async (_req, res) => {
+    try { res.json(await syncPostmaster()); } catch (e: any) { res.status(500).json({ error: e.message || "Postmaster sync failed" }); }
+  });
+
+  scheduleWarmupCrons();
+  scheduleDeliverabilityMonitoringCrons();
+  scheduleAllInboxBounceScan();
   scheduleDripProcessing();
   scheduleGmailSync();
   scheduleSeamlessOrgSync();

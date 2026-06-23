@@ -3882,6 +3882,57 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
     }
   });
 
+  // Send a one-off test of a single step to an arbitrary recipient. Uses the
+  // exact same send path the campaign uses (sendEmail / sendSmsViaQuo) so the
+  // user can preview each step in a real inbox/phone. No enrollment is touched
+  // and nothing is logged as a campaign send.
+  app.post("/api/crm/campaigns/:campaignId/steps/:stepId/send-test", requireAdminAuth, async (req, res) => {
+    try {
+      const campaignId = String(req.params.campaignId);
+      const stepId = String(req.params.stepId);
+      const recipient = String(req.body?.recipient || "").trim();
+      if (!recipient) return res.status(400).json({ message: "A recipient email or phone number is required." });
+
+      const steps = await storage.getDripSteps(campaignId);
+      const step = steps.find((s) => s.id === stepId);
+      if (!step) return res.status(404).json({ message: "Step not found" });
+
+      const stepType = (step.stepType || "email").toLowerCase();
+      const channel = stepType === "sms" ? "sms" : (stepType === "email" || stepType === "manual_email") ? "email" : "task";
+      if (channel === "task") {
+        return res.status(400).json({ message: "Only email and text steps can be test-sent." });
+      }
+
+      // Swap merge fields for friendly test values so the message reads naturally.
+      const personalize = (s: string | null | undefined): string =>
+        (s || "")
+          .replace(/\[Contact First Name\]/gi, "there")
+          .replace(/\{\{\s*firstName\s*\}\}/gi, "there")
+          .replace(/\{\{\s*name\s*\}\}/gi, "there")
+          .replace(/\{\{\s*email\s*\}\}/gi, recipient);
+
+      if (channel === "email") {
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) {
+          return res.status(400).json({ message: "Enter a valid email address for this email step." });
+        }
+        const result = await sendEmail(recipient, personalize(step.subject) || "(no subject)", personalize(step.bodyHtml));
+        if (result.success) return res.json({ success: true, channel, recipient });
+        return res.status(500).json({ message: result.error || "Failed to send test email" });
+      }
+
+      // SMS — sendSmsViaQuo normalizes the number to E.164 internally.
+      if (!/\d/.test(recipient)) {
+        return res.status(400).json({ message: "Enter a valid phone number for this text step." });
+      }
+      const result = await sendSmsViaQuo(recipient, personalize(step.bodyHtml));
+      if (result.success) return res.json({ success: true, channel, recipient });
+      return res.status(500).json({ message: result.error || "Failed to send test text" });
+    } catch (err: any) {
+      console.error("[Send Test] route failed:", err?.message || err);
+      res.status(500).json({ message: err?.message || "Failed to send test" });
+    }
+  });
+
   // --- Test email ---
   app.post("/api/crm/drip/test-email", requireAdminAuth, async (req, res) => {
     try {

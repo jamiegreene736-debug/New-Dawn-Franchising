@@ -281,6 +281,17 @@ function previewMerge(text: string): string {
     .replace(/\{\{\s*email\s*\}\}/gi, "john.carter@example.com");
 }
 
+// Mirror the server's send-test substitution so the Send Test dialog preview
+// matches exactly what the recipient receives (server uses "there" + the typed
+// address, not the previewMerge sample values).
+function testMerge(text: string, recipient: string): string {
+  return (text || "")
+    .replace(/\[Contact First Name\]/gi, "there")
+    .replace(/\{\{\s*firstName\s*\}\}/gi, "there")
+    .replace(/\{\{\s*name\s*\}\}/gi, "there")
+    .replace(/\{\{\s*email\s*\}\}/gi, recipient || "you@example.com");
+}
+
 function EmailCampaignTab() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -306,6 +317,10 @@ function EmailCampaignTab() {
   const [contactSearch, setContactSearch] = useState("");
   const [openSchedule, setOpenSchedule] = useState<Set<string>>(new Set());
   const [showSendConfirm, setShowSendConfirm] = useState(false);
+  // "Send test" of one step to a one-off recipient — which step + its channel,
+  // and the email/phone the user types in.
+  const [testStep, setTestStep] = useState<{ step: Step; channel: "email" | "sms" } | null>(null);
+  const [testRecipient, setTestRecipient] = useState("");
 
   const [filterText, setFilterText] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -554,6 +569,26 @@ function EmailCampaignTab() {
     },
     onError: (err: Error) => {
       toast({ title: "Reprocess failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  // Send a one-off test of a single step to a typed-in email/phone — a real
+  // email/text, just to the tester. Doesn't touch any enrolled contact.
+  const sendTestStepMutation = useMutation({
+    mutationFn: async ({ stepId, recipient }: { stepId: string; recipient: string }) => {
+      const res = await apiRequest("POST", `/api/crm/campaigns/${selectedCampaign}/steps/${stepId}/send-test`, { recipient });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Test sent",
+        description: `Test ${data?.channel === "sms" ? "text" : "email"} sent to ${data?.recipient || testRecipient}.`,
+      });
+      setTestStep(null);
+      setTestRecipient("");
+    },
+    onError: (err: Error) => {
+      toast({ title: "Test failed", description: err.message, variant: "destructive" });
     },
   });
 
@@ -1063,6 +1098,17 @@ function EmailCampaignTab() {
                                         <Button
                                           size="sm"
                                           variant="outline"
+                                          data-testid={`button-sendtest-${step.id}`}
+                                          className="h-7 gap-1 px-2 text-[11px]"
+                                          onClick={() => { setTestStep({ step, channel }); setTestRecipient(""); }}
+                                        >
+                                          <Send className="size-3" /> Send Test
+                                        </Button>
+                                      )}
+                                      {(channel === "email" || channel === "sms") && (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
                                           data-testid={`button-reprocess-${step.id}`}
                                           className="h-7 gap-1 px-2 text-[11px]"
                                           disabled={reprocessStepMutation.isPending}
@@ -1285,6 +1331,67 @@ function EmailCampaignTab() {
                     <Send className="size-4" /> Send now
                   </Button>
                 </div>
+              </Card>
+            </div>
+          )}
+
+          {/* Send a one-off test of a single step to a typed-in email/phone */}
+          {testStep && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => { if (!sendTestStepMutation.isPending) setTestStep(null); }}>
+              <Card className="w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {testStep.channel === "sms"
+                      ? <Smartphone className="size-5 text-[hsl(var(--primary))]" />
+                      : <Mail className="size-5 text-[hsl(var(--primary))]" />}
+                    <h3 className="text-lg font-semibold">Send test {testStep.channel === "sms" ? "text" : "email"}</h3>
+                  </div>
+                  <Button size="sm" variant="ghost" onClick={() => setTestStep(null)}><X className="size-4" /></Button>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Sends this step's {testStep.channel === "sms" ? "message" : "email"} once to the {testStep.channel === "sms" ? "number" : "address"} below — a real {testStep.channel === "sms" ? "text" : "email"}, just to you. No enrolled contacts are affected.
+                </p>
+                <div className="mt-3 rounded-md border bg-muted/40 p-3 text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">{testStep.step.stepName || stepMeta(testStep.step.stepType).label}</span>
+                  {testStep.channel === "email" && testStep.step.subject && (
+                    <div className="mt-0.5 truncate">Subject: {testMerge(testStep.step.subject, testRecipient)}</div>
+                  )}
+                  {testStep.step.bodyHtml && (
+                    <div className="mt-1 line-clamp-3">
+                      {testMerge(testStep.step.bodyHtml, testRecipient).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()}
+                    </div>
+                  )}
+                </div>
+                <form
+                  className="mt-4 space-y-3"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const r = testRecipient.trim();
+                    if (!r) return;
+                    sendTestStepMutation.mutate({ stepId: testStep.step.id, recipient: r });
+                  }}
+                >
+                  <div className="space-y-1.5">
+                    <Label htmlFor="test-recipient">{testStep.channel === "sms" ? "Phone number" : "Email address"}</Label>
+                    <Input
+                      id="test-recipient"
+                      data-testid="input-test-recipient"
+                      type={testStep.channel === "sms" ? "tel" : "email"}
+                      value={testRecipient}
+                      onChange={(e) => setTestRecipient(e.target.value)}
+                      placeholder={testStep.channel === "sms" ? "+1 555 123 4567" : "you@example.com"}
+                      autoFocus
+                      required
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2 pt-1">
+                    <Button type="button" variant="outline" size="sm" onClick={() => setTestStep(null)} disabled={sendTestStepMutation.isPending}>Cancel</Button>
+                    <Button type="submit" size="sm" className="gap-1" data-testid="button-send-test-confirm" disabled={!testRecipient.trim() || sendTestStepMutation.isPending}>
+                      {sendTestStepMutation.isPending ? <Loader2 className="size-3 animate-spin" /> : <Send className="size-3" />}
+                      Send test
+                    </Button>
+                  </div>
+                </form>
               </Card>
             </div>
           )}

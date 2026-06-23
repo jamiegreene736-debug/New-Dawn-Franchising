@@ -169,6 +169,11 @@ async function verifyTracking(): Promise<TrackingVerification> {
   }
 }
 
+// Additional sending domains/subdomains to verify — a separate SLD (Path B) or
+// extra subdomains for rotation. Comma-separated in EXTRA_SENDING_DOMAINS.
+export const EXTRA_SENDING_DOMAINS = (process.env.EXTRA_SENDING_DOMAINS || "")
+  .split(",").map((d) => d.trim().toLowerCase()).filter(Boolean);
+
 export interface DnsSetupReport {
   generatedAt: string;
   config: {
@@ -178,20 +183,23 @@ export interface DnsSetupReport {
     trackingTarget: string;
     dmarcRua: string;
     trackingDomainActive: boolean; // is EMAIL_TRACKING_DOMAIN actually set?
+    extraDomains: string[];
   };
   records: DnsRecord[];
   verification: {
     root: DomainAuthReport;
     subdomain: DomainAuthReport;
     tracking: TrackingVerification;
+    extra: DomainAuthReport[]; // additional sending domains (separate SLDs etc.)
   };
 }
 
 export async function getDnsSetupReport(): Promise<DnsSetupReport> {
-  const [root, subdomain, tracking] = await Promise.all([
+  const [root, subdomain, tracking, extra] = await Promise.all([
     getDomainAuth(ROOT_DOMAIN),
     getDomainAuth(SENDING_SUBDOMAIN),
     verifyTracking(),
+    Promise.all(EXTRA_SENDING_DOMAINS.map((d) => getDomainAuth(d))),
   ]);
   return {
     generatedAt: new Date().toISOString(),
@@ -202,8 +210,9 @@ export async function getDnsSetupReport(): Promise<DnsSetupReport> {
       trackingTarget: TRACKING_TARGET,
       dmarcRua: DMARC_RUA,
       trackingDomainActive: !!process.env.EMAIL_TRACKING_DOMAIN,
+      extraDomains: EXTRA_SENDING_DOMAINS,
     },
     records: generateRecords(),
-    verification: { root, subdomain, tracking },
+    verification: { root, subdomain, tracking, extra },
   };
 }

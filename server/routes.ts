@@ -24,6 +24,12 @@ import { runWarmupEngagement } from "./warmup-engagement-service";
 import {
   getDeliverabilitySettings, updateDeliverabilitySettings, runBounceGuard, getLastBounceGuard, getSenderStats,
 } from "./deliverability-settings-service";
+import {
+  addSeed, removeSeed, setSeedActive, startSeedTest, checkSeedTest, checkPendingSeedTests, getSeedOverview,
+} from "./seed-test-service";
+import { getDmarcOverview, syncDmarcReports } from "./dmarc-report-service";
+import { getPostmasterOverview, syncPostmaster } from "./postmaster-service";
+import { getDeliverabilityScore } from "./deliverability-score-service";
 import { scheduleAllInboxBounceScan } from "./gmail-sync-service";
 import { scheduleSeamlessOrgSync } from "./seamless-org-sync";
 import { scheduleApolloOrgSync } from "./apollo-org-sync";
@@ -348,6 +354,24 @@ function scheduleWarmupCrons() {
   });
 
   console.log("[Warmup] crons scheduled (send 30m business hrs, engage 20m, health nightly) + bounce guard 6h — warmup idle until enabled");
+}
+
+// Phase 3 monitoring crons — all no-op cheaply when their inputs aren't present
+// (no pending seed tests / DMARC + Postmaster gated on env), so safe to register.
+function scheduleDeliverabilityMonitoringCrons() {
+  // Finish any seed test that's been awaiting placement long enough to read.
+  cron.schedule("*/5 * * * *", () => {
+    checkPendingSeedTests().catch((e) => console.error("[SeedTest Cron] error:", e?.message));
+  });
+  // Ingest new DMARC aggregate reports (gated on DMARC_IMAP_* env).
+  cron.schedule("40 */6 * * *", () => {
+    syncDmarcReports().catch((e) => console.error("[DMARC Cron] error:", e?.message));
+  });
+  // Pull Google Postmaster Tools daily snapshot (gated on POSTMASTER_* env).
+  cron.schedule("20 5 * * *", () => {
+    syncPostmaster().catch((e) => console.error("[Postmaster Cron] error:", e?.message));
+  });
+  console.log("[Deliverability] monitoring crons scheduled (seed-test 5m, DMARC 6h, Postmaster daily)");
 }
 
 function scheduleAgentCrons() {
@@ -5710,7 +5734,71 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
     }
   });
 
+  // ─── Phase 3: composite score ────────────────────────────────────────────────
+  app.get("/api/admin/deliverability/score", requireAdminAuth, async (_req, res) => {
+    try {
+      res.json(await getDeliverabilityScore());
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Score failed" });
+    }
+  });
+
+  // ─── Phase 3: seed inbox-placement test ──────────────────────────────────────
+  app.get("/api/admin/deliverability/seed/overview", requireAdminAuth, async (_req, res) => {
+    try { res.json(await getSeedOverview()); } catch (e: any) { res.status(500).json({ error: e.message || "Seed overview failed" }); }
+  });
+  app.post("/api/admin/deliverability/seed/seeds", requireAdminAuth, async (req, res) => {
+    try {
+      const email = String(req.body?.email || "").trim();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return res.status(400).json({ message: "Valid email required" });
+      res.json(await addSeed({ email, provider: req.body?.provider, imapHost: req.body?.imapHost, imapUser: req.body?.imapUser, imapPassEnv: req.body?.imapPassEnv }));
+    } catch (e: any) { res.status(500).json({ error: e.message || "Add seed failed" }); }
+  });
+  app.patch("/api/admin/deliverability/seed/seeds/:id", requireAdminAuth, async (req, res) => {
+    try {
+      const ok = await setSeedActive(String(req.params.id), !!req.body?.active);
+      if (!ok) return res.status(404).json({ message: "Seed not found" });
+      res.json({ ok: true });
+    } catch (e: any) { res.status(500).json({ error: e.message || "Update seed failed" }); }
+  });
+  app.delete("/api/admin/deliverability/seed/seeds/:id", requireAdminAuth, async (req, res) => {
+    try {
+      const ok = await removeSeed(String(req.params.id));
+      if (!ok) return res.status(404).json({ message: "Seed not found" });
+      res.json({ ok: true });
+    } catch (e: any) { res.status(500).json({ error: e.message || "Remove seed failed" }); }
+  });
+  app.post("/api/admin/deliverability/seed/test", requireAdminAuth, async (req, res) => {
+    try {
+      const subject = String(req.body?.subject || "");
+      const html = String(req.body?.html || "");
+      const fromEmail = req.body?.fromEmail ? String(req.body.fromEmail) : undefined;
+      res.json(await startSeedTest(subject, html, fromEmail));
+    } catch (e: any) { res.status(400).json({ error: e.message || "Seed test failed" }); }
+  });
+  app.post("/api/admin/deliverability/seed/test/:id/check", requireAdminAuth, async (req, res) => {
+    try { await checkSeedTest(String(req.params.id)); res.json(await getSeedOverview()); }
+    catch (e: any) { res.status(500).json({ error: e.message || "Check failed" }); }
+  });
+
+  // ─── Phase 3: DMARC aggregate reports ────────────────────────────────────────
+  app.get("/api/admin/deliverability/dmarc", requireAdminAuth, async (_req, res) => {
+    try { res.json(await getDmarcOverview()); } catch (e: any) { res.status(500).json({ error: e.message || "DMARC overview failed" }); }
+  });
+  app.post("/api/admin/deliverability/dmarc/sync", requireAdminAuth, async (_req, res) => {
+    try { res.json(await syncDmarcReports()); } catch (e: any) { res.status(500).json({ error: e.message || "DMARC sync failed" }); }
+  });
+
+  // ─── Phase 3: Google Postmaster Tools ────────────────────────────────────────
+  app.get("/api/admin/deliverability/postmaster", requireAdminAuth, async (_req, res) => {
+    try { res.json(await getPostmasterOverview()); } catch (e: any) { res.status(500).json({ error: e.message || "Postmaster overview failed" }); }
+  });
+  app.post("/api/admin/deliverability/postmaster/sync", requireAdminAuth, async (_req, res) => {
+    try { res.json(await syncPostmaster()); } catch (e: any) { res.status(500).json({ error: e.message || "Postmaster sync failed" }); }
+  });
+
   scheduleWarmupCrons();
+  scheduleDeliverabilityMonitoringCrons();
   scheduleAllInboxBounceScan();
   scheduleDripProcessing();
   scheduleGmailSync();

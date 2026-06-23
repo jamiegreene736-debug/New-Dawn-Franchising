@@ -235,9 +235,9 @@ interface DnsRecord {
 interface TrackingVerification { host: string; expectedTarget: string; status: AuthStatus; summary: string; resolved?: string[]; }
 interface DnsSetupReport {
   generatedAt: string;
-  config: { rootDomain: string; sendingSubdomain: string; trackingDomain: string; trackingTarget: string; dmarcRua: string; trackingDomainActive: boolean };
+  config: { rootDomain: string; sendingSubdomain: string; trackingDomain: string; trackingTarget: string; dmarcRua: string; trackingDomainActive: boolean; extraDomains: string[] };
   records: DnsRecord[];
-  verification: { root: AuthReport; subdomain: AuthReport; tracking: TrackingVerification };
+  verification: { root: AuthReport; subdomain: AuthReport; tracking: TrackingVerification; extra: AuthReport[] };
 }
 
 function VerifyChip({ status }: { status: AuthStatus }) {
@@ -302,6 +302,21 @@ function DnsSetupPanel() {
               </Card>
             </div>
           </div>
+
+          {/* Additional sending domains (separate SLD / extra subdomains) */}
+          {d.verification.extra.length > 0 && (
+            <Card className="p-4">
+              <h4 className="mb-2 text-sm font-semibold">Additional sending domains <span className="font-normal text-muted-foreground">(EXTRA_SENDING_DOMAINS)</span></h4>
+              <div className="space-y-1.5">
+                {d.verification.extra.map((x) => (
+                  <div key={x.domain} className="flex items-center justify-between gap-2 border-b py-1 text-sm last:border-0">
+                    <span className="font-medium">{x.domain}</span>
+                    <span className={`font-semibold ${scoreColorClass(x.score)}`}>{x.score}/100</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
 
           {/* Records to add */}
           <div className="space-y-4">
@@ -601,6 +616,7 @@ interface SafetySettings {
   campaignPauseEnabled: boolean; campaignBounceThresholdPct: number; campaignBounceMin: number;
   softBounceSkipDnc: boolean;
   dailyCapOverride: number | null; hourlyCapOverride: number | null; domainGapOverrideSeconds: number | null;
+  rampMode: string; rampStartCap: number; rampDays: number;
   effectiveDailyCap: number; effectiveHourlyCap: number; effectiveDomainGapMs: number;
 }
 interface SafetyData {
@@ -699,6 +715,21 @@ function SendingSafetyPanel() {
               <OverrideField label="Daily cap / sender" value={s.dailyCapOverride} effective={String(s.effectiveDailyCap)} unit="/day" onSave={(v) => patch.mutate({ dailyCapOverride: v })} />
               <OverrideField label="Hourly cap" value={s.hourlyCapOverride} effective={String(s.effectiveHourlyCap)} unit="/hr" onSave={(v) => patch.mutate({ hourlyCapOverride: v })} />
               <OverrideField label="Same-domain gap" value={s.domainGapOverrideSeconds} effective={`${Math.round(s.effectiveDomainGapMs / 1000)}s`} unit="s" onSave={(v) => patch.mutate({ domainGapOverrideSeconds: v })} />
+            </div>
+            <div className="mt-3 border-t pt-3">
+              <label className="flex items-center justify-between gap-2 text-sm">
+                <span className="text-foreground/80">Linear ramp <span className="text-xs text-muted-foreground">(grow the daily cap to target over N days — today: {s.effectiveDailyCap}/day)</span></span>
+                <select className="rounded border px-2 py-1 text-sm" value={s.rampMode} onChange={(e) => patch.mutate({ rampMode: e.target.value })}>
+                  <option value="off">Off</option>
+                  <option value="linear">Linear</option>
+                </select>
+              </label>
+              {s.rampMode === "linear" && (
+                <div className="mt-2 grid gap-2 md:grid-cols-2">
+                  <NumField label="Start cap (day 1)" value={s.rampStartCap} onSave={(n) => patch.mutate({ rampStartCap: n })} suffix="/day" />
+                  <NumField label="Ramp over" value={s.rampDays} onSave={(n) => patch.mutate({ rampDays: n })} suffix="days" />
+                </div>
+              )}
             </div>
           </Card>
 
@@ -933,14 +964,247 @@ function InboxPlacementTest() {
   );
 }
 
+// ─── Composite health score (Phase 3) ────────────────────────────────────────
+interface ScoreFactor { key: string; label: string; score: number; weight: number; detail: string }
+interface ScoreData { overall: number; grade: string; factors: ScoreFactor[]; topIssues: { label: string; score: number; detail: string }[] }
+
+function ScoreCard() {
+  const q = useQuery<ScoreData>({ queryKey: ["/api/admin/deliverability/score"] });
+  const d = q.data;
+  if (q.isLoading) return <Card className="p-4 text-sm text-muted-foreground">Computing composite score…</Card>;
+  if (!d) return null;
+  const gradeColor = d.overall >= 80 ? "text-emerald-600" : d.overall >= 65 ? "text-amber-600" : "text-red-600";
+  return (
+    <Card className="p-4">
+      <div className="flex flex-wrap items-center gap-5">
+        <div className="text-center">
+          <div className={`text-5xl font-extrabold ${gradeColor}`}>{d.overall}</div>
+          <div className="text-xs text-muted-foreground">composite /100 · grade {d.grade}</div>
+        </div>
+        <div className="flex-1 space-y-1.5">
+          {d.factors.map((f) => (
+            <div key={f.key} className="flex items-center gap-2 text-xs">
+              <span className="w-44 shrink-0 truncate text-foreground/80">{f.label}</span>
+              <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                <div className={`h-full ${f.score >= 80 ? "bg-emerald-500" : f.score >= 60 ? "bg-amber-500" : "bg-red-500"}`} style={{ width: `${f.score}%` }} />
+              </div>
+              <span className="w-9 shrink-0 text-right font-semibold tabular-nums">{f.score}</span>
+              <span className="w-8 shrink-0 text-right text-[10px] text-muted-foreground">{f.weight}%</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      {d.topIssues.length > 0 && (
+        <div className="mt-3 border-t pt-2 text-sm">
+          <span className="font-medium">Top factors to fix:</span>{" "}
+          {d.topIssues.map((i) => i.label).join(" · ")}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+// ─── Seed inbox-placement test (Phase 3) ──────────────────────────────────────
+interface SeedInbox { id: string; provider: string; email: string; active: boolean }
+interface SeedTestRow { id: string; subject: string; status: string; total: number; sent: number; inbox: number; spam: number; missing: number; inboxRate: number; startedAt: string | null }
+interface SeedOverview {
+  seeds: SeedInbox[];
+  tests: SeedTestRow[];
+  latestResults: { email: string; provider: string; placement: string; checkedAt: string | null }[];
+}
+
+function SeedTestPanel() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const q = useQuery<SeedOverview>({ queryKey: ["/api/admin/deliverability/seed/overview"] });
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["/api/admin/deliverability/seed/overview"] });
+  const [email, setEmail] = useState("");
+  const [passEnv, setPassEnv] = useState("");
+  const [subject, setSubject] = useState("");
+  const [html, setHtml] = useState("");
+
+  const addSeed = useMutation({
+    mutationFn: async () => apiRequest("POST", "/api/admin/deliverability/seed/seeds", { email, imapPassEnv: passEnv || undefined }),
+    onSuccess: () => { setEmail(""); setPassEnv(""); invalidate(); },
+    onError: (e: any) => toast({ title: "Add failed", description: e.message, variant: "destructive" }),
+  });
+  const toggleSeed = useMutation({ mutationFn: async ({ id, active }: { id: string; active: boolean }) => apiRequest("PATCH", `/api/admin/deliverability/seed/seeds/${id}`, { active }), onSuccess: invalidate });
+  const delSeed = useMutation({ mutationFn: async (id: string) => apiRequest("DELETE", `/api/admin/deliverability/seed/seeds/${id}`), onSuccess: invalidate });
+  const runTest = useMutation({
+    mutationFn: async () => { const r = await apiRequest("POST", "/api/admin/deliverability/seed/test", { subject, html }); return r.json(); },
+    onSuccess: (r: any) => { invalidate(); toast({ title: "Seed test sent", description: `${r?.sent || 0} seed(s) — placement read in ~3 min, or check now.` }); },
+    onError: (e: any) => toast({ title: "Test failed", description: e.message, variant: "destructive" }),
+  });
+  const checkNow = useMutation({
+    mutationFn: async (id: string) => apiRequest("POST", `/api/admin/deliverability/seed/test/${id}/check`, {}),
+    onSuccess: invalidate,
+    onError: (e: any) => toast({ title: "Check failed", description: e.message, variant: "destructive" }),
+  });
+
+  const d = q.data;
+  const latest = d?.tests?.[0];
+  const placeColor = (p: string) => p === "inbox" ? "text-emerald-600" : p === "spam" ? "text-red-600" : "text-muted-foreground";
+  return (
+    <Card className="p-4">
+      <h3 className="mb-1 flex items-center gap-2 font-semibold"><Inbox className="size-4" /> Seed inbox-placement test</h3>
+      <p className="mb-3 text-xs text-muted-foreground">Sends your real content to seed inboxes you control, then reads each over IMAP to show where it actually landed per provider. Add seeds on Gmail/Outlook/Yahoo (each needs an app password set as an env var, named below).</p>
+
+      {/* Seeds */}
+      <div className="mb-3 space-y-1.5">
+        {(d?.seeds || []).length === 0 ? <div className="text-sm text-muted-foreground">No seed inboxes yet.</div> : d!.seeds.map((s) => (
+          <div key={s.id} className="flex items-center gap-2 rounded border p-2 text-sm">
+            <button onClick={() => toggleSeed.mutate({ id: s.id, active: !s.active })}><Power className={`size-4 ${s.active ? "text-emerald-600" : "text-muted-foreground"}`} /></button>
+            <span className="flex-1 truncate">{s.email}</span>
+            <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] uppercase text-slate-600">{s.provider}</span>
+            <button onClick={() => delSeed.mutate(s.id)} className="text-muted-foreground hover:text-red-600"><Trash2 className="size-3.5" /></button>
+          </div>
+        ))}
+        <div className="flex flex-wrap gap-2">
+          <input className="flex-1 rounded border px-2 py-1 text-sm" placeholder="seed email (gmail/outlook/yahoo)" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <input className="w-48 rounded border px-2 py-1 text-sm" placeholder="app-password ENV var name" value={passEnv} onChange={(e) => setPassEnv(e.target.value)} />
+          <Button size="sm" variant="outline" onClick={() => addSeed.mutate()} disabled={addSeed.isPending || !email}><Plus className="mr-1 size-3" /> Add seed</Button>
+        </div>
+      </div>
+
+      {/* Run */}
+      <div className="space-y-2 border-t pt-3">
+        <input className="w-full rounded-md border px-2 py-1.5 text-sm" placeholder="Subject" value={subject} onChange={(e) => setSubject(e.target.value)} />
+        <textarea className="h-24 w-full rounded-md border px-2 py-1.5 font-mono text-xs" placeholder="Email HTML body" value={html} onChange={(e) => setHtml(e.target.value)} />
+        <Button size="sm" onClick={() => runTest.mutate()} disabled={runTest.isPending || !(d?.seeds || []).some((s) => s.active)}>
+          {runTest.isPending ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Send className="mr-2 size-4" />} Send seed test
+        </Button>
+      </div>
+
+      {/* Latest result */}
+      {latest && (
+        <div className="mt-4 border-t pt-3">
+          <div className="mb-2 flex items-center justify-between">
+            <div className="text-sm"><span className="font-semibold">{latest.inboxRate}%</span> inbox · {latest.inbox} inbox / {latest.spam} spam / {latest.missing} missing <span className="text-xs text-muted-foreground">({latest.status})</span></div>
+            {latest.status !== "complete" && <Button size="sm" variant="outline" onClick={() => checkNow.mutate(latest.id)} disabled={checkNow.isPending}><RefreshCw className={`mr-1 size-3 ${checkNow.isPending ? "animate-spin" : ""}`} /> Check now</Button>}
+          </div>
+          <div className="space-y-1">
+            {(d?.latestResults || []).map((r, i) => (
+              <div key={i} className="flex items-center gap-2 text-sm">
+                <span className="flex-1 truncate">{r.email}</span>
+                <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] uppercase text-slate-600">{r.provider}</span>
+                <span className={`w-16 text-right font-medium ${placeColor(r.placement)}`}>{r.placement}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+// ─── Monitoring: DMARC + Postmaster (Phase 3) ─────────────────────────────────
+interface DmarcOverview {
+  config: { configured: boolean; user: string | null };
+  syncStatus: { at: string; error: string | null };
+  summary: { total: number; alignedPass: number; passRate: number };
+  sources: { sourceIp: string; volume: number; pass: number; passRate: number; dkimDomain: string | null }[];
+  reports: { org: string; domain: string; receivedAt: string | null }[];
+}
+interface PostmasterOverview {
+  config: { configured: boolean; domains: string[] };
+  syncStatus: { at: string; stored: number; error: string | null };
+  latest: { domain: string; day: string; spamRate: number | null; domainReputation: string | null; dkimRatio: number | null; spfRatio: number | null; dmarcRatio: number | null }[];
+}
+
+function MonitoringPanel() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const dmarc = useQuery<DmarcOverview>({ queryKey: ["/api/admin/deliverability/dmarc"] });
+  const pm = useQuery<PostmasterOverview>({ queryKey: ["/api/admin/deliverability/postmaster"] });
+  const syncDmarc = useMutation({ mutationFn: async () => apiRequest("POST", "/api/admin/deliverability/dmarc/sync", {}), onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/admin/deliverability/dmarc"] }), onError: (e: any) => toast({ title: "Sync failed", description: e.message, variant: "destructive" }) });
+  const syncPm = useMutation({ mutationFn: async () => apiRequest("POST", "/api/admin/deliverability/postmaster/sync", {}), onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/admin/deliverability/postmaster"] }), onError: (e: any) => toast({ title: "Sync failed", description: e.message, variant: "destructive" }) });
+  const dd = dmarc.data;
+  const pp = pm.data;
+  const repColor = (r: string | null) => r === "HIGH" ? "text-emerald-600" : r === "MEDIUM" ? "text-amber-600" : r === "LOW" || r === "BAD" ? "text-red-600" : "text-muted-foreground";
+
+  return (
+    <div className="space-y-4">
+      {/* DMARC */}
+      <Card className="p-4">
+        <div className="mb-2 flex items-center justify-between">
+          <h3 className="flex items-center gap-2 font-semibold"><ShieldCheck className="size-4" /> DMARC aggregate reports</h3>
+          <Button size="sm" variant="outline" onClick={() => syncDmarc.mutate()} disabled={syncDmarc.isPending}><RefreshCw className={`mr-2 size-4 ${syncDmarc.isPending ? "animate-spin" : ""}`} /> Sync now</Button>
+        </div>
+        {!dd?.config.configured ? (
+          <div className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Not configured. Point your DMARC <code>rua=</code> at a mailbox and set <code>DMARC_IMAP_USER</code> + <code>DMARC_IMAP_PASSWORD</code> so reports are ingested.</div>
+        ) : (
+          <>
+            <div className="grid grid-cols-3 gap-3">
+              <StatCard label="DMARC pass rate (30d)" value={`${dd.summary.passRate}%`} valueClass={dd.summary.passRate >= 95 ? "text-emerald-600" : dd.summary.passRate >= 80 ? "text-amber-600" : "text-red-600"} />
+              <StatCard label="Messages reported" value={`${dd.summary.total}`} />
+              <StatCard label="Aligned/pass" value={`${dd.summary.alignedPass}`} />
+            </div>
+            {dd.sources.length > 0 && (
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead><tr className="text-left text-xs uppercase text-muted-foreground"><th className="py-1 pr-3">Source IP</th><th className="py-1 pr-3">DKIM domain</th><th className="py-1 pr-3 text-right">Volume</th><th className="py-1 text-right">Pass</th></tr></thead>
+                  <tbody>
+                    {dd.sources.map((s) => (
+                      <tr key={s.sourceIp} className="border-t">
+                        <td className="py-1 pr-3 font-mono text-xs">{s.sourceIp}</td>
+                        <td className="py-1 pr-3 text-xs text-muted-foreground">{s.dkimDomain || "—"}</td>
+                        <td className="py-1 pr-3 text-right tabular-nums">{s.volume}</td>
+                        <td className={`py-1 text-right font-semibold tabular-nums ${s.passRate >= 95 ? "text-emerald-600" : s.passRate >= 80 ? "text-amber-600" : "text-red-600"}`}>{s.passRate}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {dd.summary.total === 0 && <div className="mt-2 text-sm text-muted-foreground">No reports ingested yet — they arrive ~daily once rua is set.</div>}
+            {dd.syncStatus.error && <div className="mt-2 text-xs text-red-600">Last sync: {dd.syncStatus.error}</div>}
+          </>
+        )}
+      </Card>
+
+      {/* Postmaster */}
+      <Card className="p-4">
+        <div className="mb-2 flex items-center justify-between">
+          <h3 className="flex items-center gap-2 font-semibold"><Activity className="size-4" /> Google Postmaster Tools</h3>
+          <Button size="sm" variant="outline" onClick={() => syncPm.mutate()} disabled={syncPm.isPending}><RefreshCw className={`mr-2 size-4 ${syncPm.isPending ? "animate-spin" : ""}`} /> Sync now</Button>
+        </div>
+        {!pp?.config.configured ? (
+          <div className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Not configured. Add the domain in Google Postmaster Tools and set <code>POSTMASTER_ACCESS_TOKEN</code> or a service-account <code>POSTMASTER_SA_KEY</code>.</div>
+        ) : pp.latest.length === 0 ? (
+          <div className="text-sm text-muted-foreground">No data yet — Postmaster needs sustained volume before Gmail publishes stats.</div>
+        ) : (
+          <div className="space-y-2">
+            {pp.latest.map((l) => (
+              <div key={l.domain} className="rounded border p-2 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">{l.domain}</span>
+                  <span className={`font-semibold ${repColor(l.domainReputation)}`}>{l.domainReputation || "—"}</span>
+                </div>
+                <div className="mt-1 flex flex-wrap gap-3 text-xs text-muted-foreground">
+                  <span>spam {l.spamRate == null ? "—" : `${(l.spamRate * 100).toFixed(2)}%`}</span>
+                  <span>SPF {l.spfRatio == null ? "—" : `${Math.round(l.spfRatio * 100)}%`}</span>
+                  <span>DKIM {l.dkimRatio == null ? "—" : `${Math.round(l.dkimRatio * 100)}%`}</span>
+                  <span>DMARC {l.dmarcRatio == null ? "—" : `${Math.round(l.dmarcRatio * 100)}%`}</span>
+                  <span>· {l.day}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
 // ─── Main tab ─────────────────────────────────────────────────────────────────
-type DeliverabilitySection = "health" | "dns" | "warmup" | "content" | "blacklist" | "safety";
+type DeliverabilitySection = "health" | "dns" | "warmup" | "content" | "blacklist" | "safety" | "monitoring";
 const SECTION_TABS: { id: DeliverabilitySection; label: string; Icon: any }[] = [
   { id: "health", label: "Health & roadmap", Icon: Activity },
   { id: "dns", label: "Subdomain & DNS", Icon: Globe },
   { id: "warmup", label: "Warmup", Icon: Flame },
   { id: "safety", label: "Sending & safety", Icon: Server },
   { id: "content", label: "Inbox placement", Icon: FlaskConical },
+  { id: "monitoring", label: "Monitoring", Icon: ShieldCheck },
   { id: "blacklist", label: "Blacklist", Icon: Ban },
 ];
 
@@ -1008,11 +1272,18 @@ export default function EmailDeliverabilityTab() {
       {section === "dns" && <DnsSetupPanel />}
       {section === "warmup" && <WarmupPanel />}
       {section === "safety" && <SendingSafetyPanel />}
-      {section === "content" && <InboxPlacementTest />}
+      {section === "content" && (
+        <div className="space-y-4">
+          <InboxPlacementTest />
+          <SeedTestPanel />
+        </div>
+      )}
+      {section === "monitoring" && <MonitoringPanel />}
       {section === "blacklist" && <BlacklistPanel />}
 
       {section === "health" && (
       <>
+      <ScoreCard />
       {/* Auth score + checks */}
       <Card className="p-4">
         <div className="mb-3 flex items-center justify-between">

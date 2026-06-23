@@ -33,7 +33,12 @@ export interface DeliverabilitySettings {
   dailyCapOverride: number | null;
   hourlyCapOverride: number | null;
   domainGapOverrideSeconds: number | null;
-  // Derived (overrides merged with the env defaults) for the send path + UI.
+  // Linear ramp: grow the daily cap from rampStartCap to the target over rampDays.
+  rampMode: string; // 'off' | 'linear'
+  rampStartCap: number;
+  rampDays: number;
+  rampStartedAt: string | null;
+  // Derived (overrides + ramp merged with the env defaults) for the send path + UI.
   effectiveDailyCap: number;
   effectiveHourlyCap: number;
   effectiveDomainGapMs: number;
@@ -50,12 +55,31 @@ const DEFAULTS = {
   campaign_bounce_threshold_pct: 12,
   campaign_bounce_min: 50,
   soft_bounce_skip_dnc: true,
+  ramp_mode: "off",
+  ramp_start_cap: 20,
+  ramp_days: 14,
 };
 
 function rowToSettings(r: any): DeliverabilitySettings {
   const dailyCapOverride = r.daily_cap_override == null ? null : Number(r.daily_cap_override);
   const hourlyCapOverride = r.hourly_cap_override == null ? null : Number(r.hourly_cap_override);
   const domainGapOverrideSeconds = r.domain_gap_override_seconds == null ? null : Number(r.domain_gap_override_seconds);
+  const rampMode = r.ramp_mode || "off";
+  const rampStartCap = Number(r.ramp_start_cap ?? DEFAULTS.ramp_start_cap);
+  const rampDays = Number(r.ramp_days ?? DEFAULTS.ramp_days);
+  const rampStartedAt = r.ramp_started_at ? new Date(r.ramp_started_at).toISOString() : null;
+
+  // Target cap = override, else env default. Linear ramp climbs from rampStartCap
+  // to that target over rampDays, then holds.
+  const targetDaily = dailyCapOverride ?? EMAIL_DAILY_CAP;
+  let effectiveDailyCap = targetDaily;
+  if (rampMode === "linear" && rampStartedAt) {
+    const days = Math.max(0, Math.floor((Date.now() - new Date(rampStartedAt).getTime()) / 86_400_000));
+    const start = Math.min(rampStartCap, targetDaily);
+    const inc = rampDays > 0 ? (targetDaily - start) / rampDays : targetDaily - start;
+    effectiveDailyCap = Math.max(start, Math.min(targetDaily, Math.round(start + inc * days)));
+  }
+
   return {
     verifyBeforeSend: !!r.verify_before_send,
     senderRotation: !!r.sender_rotation,
@@ -69,7 +93,11 @@ function rowToSettings(r: any): DeliverabilitySettings {
     dailyCapOverride,
     hourlyCapOverride,
     domainGapOverrideSeconds,
-    effectiveDailyCap: dailyCapOverride ?? EMAIL_DAILY_CAP,
+    rampMode,
+    rampStartCap,
+    rampDays,
+    rampStartedAt,
+    effectiveDailyCap,
     effectiveHourlyCap: hourlyCapOverride ?? EMAIL_HOURLY_CAP,
     effectiveDomainGapMs: domainGapOverrideSeconds != null ? domainGapOverrideSeconds * 1000 : EMAIL_DOMAIN_GAP_MS,
     updatedAt: r.updated_at ? new Date(r.updated_at).toISOString() : new Date().toISOString(),
@@ -115,6 +143,9 @@ const PATCH_COLS: Record<string, string> = {
   dailyCapOverride: "daily_cap_override",
   hourlyCapOverride: "hourly_cap_override",
   domainGapOverrideSeconds: "domain_gap_override_seconds",
+  rampMode: "ramp_mode",
+  rampStartCap: "ramp_start_cap",
+  rampDays: "ramp_days",
 };
 
 export async function updateDeliverabilitySettings(patch: Record<string, any>): Promise<DeliverabilitySettings> {
@@ -131,6 +162,9 @@ export async function updateDeliverabilitySettings(patch: Record<string, any>): 
       sets.push(`${col}=$${params.length}`);
     }
   }
+  // Starting the linear ramp stamps ramp_started_at so the climb begins now.
+  if (patch.rampMode === "linear") sets.push(`ramp_started_at=COALESCE(ramp_started_at, now())`);
+  if (patch.rampMode === "off") sets.push(`ramp_started_at=NULL`);
   if (!sets.length) return getDeliverabilitySettings();
   sets.push(`updated_at=now()`);
   await pool.query(`UPDATE deliverability_settings SET ${sets.join(", ")} WHERE id='singleton'`, params);

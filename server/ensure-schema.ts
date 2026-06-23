@@ -449,6 +449,84 @@ const STATEMENTS: string[] = [
     last_sent_at timestamptz,
     updated_at   timestamptz  NOT NULL DEFAULT now()
   )`,
+
+  // ─── Phase 3: linear ramp columns (added to the Phase 2 settings row) ────────
+  `ALTER TABLE deliverability_settings ADD COLUMN IF NOT EXISTS ramp_mode text NOT NULL DEFAULT 'off'`,
+  `ALTER TABLE deliverability_settings ADD COLUMN IF NOT EXISTS ramp_start_cap integer NOT NULL DEFAULT 20`,
+  `ALTER TABLE deliverability_settings ADD COLUMN IF NOT EXISTS ramp_days integer NOT NULL DEFAULT 14`,
+  `ALTER TABLE deliverability_settings ADD COLUMN IF NOT EXISTS ramp_started_at timestamptz`,
+
+  // ─── Phase 3: seed inbox-placement test ──────────────────────────────────────
+  `CREATE TABLE IF NOT EXISTS seed_inboxes (
+    id            varchar      PRIMARY KEY DEFAULT gen_random_uuid(),
+    provider      text         NOT NULL DEFAULT 'other',
+    email         text         NOT NULL UNIQUE,
+    imap_host     text,
+    imap_user     text,
+    imap_pass_env text,
+    active        boolean      NOT NULL DEFAULT true,
+    created_at    timestamptz  NOT NULL DEFAULT now()
+  )`,
+  `CREATE TABLE IF NOT EXISTS seed_tests (
+    id           varchar      PRIMARY KEY DEFAULT gen_random_uuid(),
+    token        text         NOT NULL,
+    subject      text         NOT NULL DEFAULT '',
+    status       text         NOT NULL DEFAULT 'sending',
+    total        integer      NOT NULL DEFAULT 0,
+    sent         integer      NOT NULL DEFAULT 0,
+    inbox        integer      NOT NULL DEFAULT 0,
+    spam         integer      NOT NULL DEFAULT 0,
+    missing      integer      NOT NULL DEFAULT 0,
+    started_at   timestamptz  NOT NULL DEFAULT now(),
+    completed_at timestamptz
+  )`,
+  `CREATE TABLE IF NOT EXISTS seed_test_results (
+    id         varchar      PRIMARY KEY DEFAULT gen_random_uuid(),
+    test_id    varchar      NOT NULL,
+    seed_email text         NOT NULL,
+    provider   text         NOT NULL DEFAULT 'other',
+    placement  text         NOT NULL DEFAULT 'pending',
+    checked_at timestamptz
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_seed_results_test ON seed_test_results (test_id)`,
+
+  // ─── Phase 3: DMARC aggregate (rua) reports ──────────────────────────────────
+  `CREATE TABLE IF NOT EXISTS dmarc_reports (
+    id          varchar      PRIMARY KEY DEFAULT gen_random_uuid(),
+    report_id   text         NOT NULL UNIQUE,
+    org         text         NOT NULL DEFAULT 'unknown',
+    domain      text         NOT NULL DEFAULT '',
+    date_begin  timestamptz,
+    date_end    timestamptz,
+    received_at timestamptz  NOT NULL DEFAULT now()
+  )`,
+  `CREATE TABLE IF NOT EXISTS dmarc_records (
+    id          varchar      PRIMARY KEY DEFAULT gen_random_uuid(),
+    report_id   text         NOT NULL,
+    source_ip   text         NOT NULL DEFAULT '',
+    count       integer      NOT NULL DEFAULT 0,
+    disposition text         NOT NULL DEFAULT 'none',
+    dkim_pass   boolean      NOT NULL DEFAULT false,
+    spf_pass    boolean      NOT NULL DEFAULT false,
+    dkim_domain text,
+    spf_domain  text
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_dmarc_records_report ON dmarc_records (report_id)`,
+
+  // ─── Phase 3: Google Postmaster Tools daily snapshots ────────────────────────
+  `CREATE TABLE IF NOT EXISTS postmaster_stats (
+    id                varchar      PRIMARY KEY DEFAULT gen_random_uuid(),
+    domain            text         NOT NULL,
+    day               date         NOT NULL,
+    spam_rate         numeric,
+    domain_reputation text,
+    dkim_ratio        numeric,
+    spf_ratio         numeric,
+    dmarc_ratio       numeric,
+    raw               jsonb,
+    created_at        timestamptz  NOT NULL DEFAULT now(),
+    UNIQUE (domain, day)
+  )`,
 ];
 
 export async function ensureSchema(): Promise<void> {

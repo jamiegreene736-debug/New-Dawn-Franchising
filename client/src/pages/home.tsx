@@ -29,6 +29,7 @@ import {
   RotateCcw,
   Shield,
   ShieldCheck,
+  Sparkles,
   TrendingUp,
   Users,
   Volume2,
@@ -980,6 +981,55 @@ export default function Home() {
                 title="Three recurring-revenue lanes"
                 desc="Select the franchise vertical that fits your strategy: Property Management, Telecom, or Insurance."
               />
+            </div>
+          </div>
+        </section>
+
+        {/* ── Standalone offering: the E-2 SnapOn ── */}
+        <section data-testid="section-snapon" id="e2-snapon" className="border-y bg-[linear-gradient(180deg,#eef4fb_0%,#ffffff_60%)] pb-10 pt-8 md:pb-16 md:pt-14">
+          <div className="nh-container">
+            <div className="mx-auto max-w-4xl overflow-hidden rounded-3xl border bg-white/70 shadow-sm backdrop-blur">
+              <div className="grid gap-0 md:grid-cols-[1.4fr_1fr]">
+                <div className="p-7 md:p-9">
+                  <Pill testId="pill-snapon">
+                    <Sparkles className="size-4 text-[hsl(var(--accent))]" /> Standalone E-2 offering
+                  </Pill>
+                  <h3 className="mt-4 text-balance text-2xl font-semibold leading-tight md:text-3xl">
+                    Already have a business in mind? Meet the E-2 SnapOn.
+                  </h3>
+                  <p className="mt-3 text-pretty text-sm leading-relaxed text-muted-foreground md:text-base">
+                    For treaty investors whose target sits outside our three franchise verticals. You acquire your own
+                    operating business; New Dawn snaps a standardized management and compliance layer onto it — taking
+                    the daily grind off your plate and packaging the evidence to support a strong E-2 petition filed by
+                    your immigration counsel.
+                  </p>
+                  <div className="mt-5">
+                    <Button data-testid="button-snapon-explore" className="gap-2" asChild>
+                      <Link href="/e2-snapon">
+                        Explore the E-2 SnapOn
+                        <ArrowRight className="size-4" />
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+                <div className="border-t bg-[hsl(var(--primary))]/5 p-7 md:border-l md:border-t-0 md:p-9">
+                  <div className="text-sm font-semibold">You Choose It. You Direct It. We Run It.</div>
+                  <ul className="mt-4 space-y-3">
+                    <li className="flex gap-2 text-sm leading-relaxed text-muted-foreground">
+                      <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[hsl(var(--primary))]" />
+                      <span>Bring your own target, or we source qualified candidates.</span>
+                    </li>
+                    <li className="flex gap-2 text-sm leading-relaxed text-muted-foreground">
+                      <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[hsl(var(--primary))]" />
+                      <span>A snap-on operations layer runs the day-to-day under your direction.</span>
+                    </li>
+                    <li className="flex gap-2 text-sm leading-relaxed text-muted-foreground">
+                      <ShieldCheck className="mt-0.5 size-4 shrink-0 text-[hsl(var(--primary))]" />
+                      <span>Purchase capital held in escrow — released only on E-2 approval.</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
             </div>
           </div>
         </section>

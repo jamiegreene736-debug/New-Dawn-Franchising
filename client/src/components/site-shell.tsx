@@ -287,6 +287,7 @@ const DESKTOP_NAV: DesktopNavEntry[] = [
       { href: "/e2-fit", label: "Why E-2?", id: "e2" },
     ],
   },
+  { href: "/partners", label: "Partners", id: "partners" },
   {
     label: "Services", id: "services-group",
     items: [
@@ -332,7 +333,7 @@ const MOBILE_NAV: DesktopNavEntry[] = [
   },
   { href: "/legal", label: "Legal & Disclaimers", id: "legal" },
   { href: "/quiz", label: "Quiz", id: "quiz" },
-  { href: "/brokers", label: "Referral Partners", id: "brokers" },
+  { href: "/partners", label: "Partners", id: "partners" },
   {
     label: "Services", id: "services-group",
     items: [
@@ -1202,6 +1203,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
 
             <div className="mt-6 flex flex-wrap items-center gap-4 border-t pt-6 text-xs text-muted-foreground/60">
               <span>&copy; {new Date().getFullYear()} New Dawn Franchising LLC. {t.rightsReserved}</span>
+              <Link href="/partners" data-testid="link-footer-partners" className="hover:text-muted-foreground transition-colors">Partners</Link>
               <Link href="/privacy-policy" data-testid="link-footer-privacy" className="hover:text-muted-foreground transition-colors">{t.privacy}</Link>
               <Link href="/terms" data-testid="link-footer-terms" className="hover:text-muted-foreground transition-colors">{t.terms}</Link>
               <Link href="/legal" data-testid="link-footer-legal" className="hover:text-muted-foreground transition-colors">{t.legal}</Link>

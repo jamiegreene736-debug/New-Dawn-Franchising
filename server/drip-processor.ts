@@ -1,7 +1,7 @@
 import cron from "node-cron";
 import { storage } from "./storage";
 import { sendEmail, sendEmailFromSender, getTrackingPixelUrl, chooseSenderForKey } from "./email-service";
-import { sendSmsViaQuo } from "./quo-service";
+import { sendSmsViaQuo, toSmsE164 } from "./quo-service";
 import { isOnDnc, addToDnc, removeFromDnc } from "./agent-service";
 import { getDeliverabilitySettings, recordSenderUse } from "./deliverability-settings-service";
 import { verifyEmail } from "./zerobounce-service";
@@ -337,32 +337,38 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
           }
         } else if (stepType === "sms") {
           const prospect = await storage.getProspect(enrollment.prospectId);
-          const phone = prospect?.phone || "";
+          // Validate + normalize the prospect's phone to E.164 BEFORE attempting a
+          // send, so a missing/invalid number fails with a clear, actionable reason
+          // instead of a cryptic carrier rejection — and a valid local-format number
+          // (e.g. "416.800.7213") is normalized to "+14168007213" and actually sends.
+          const phoneCheck = toSmsE164(prospect?.phone);
           const send = await storage.createDripSend({
             enrollmentId: enrollment.id,
             stepId: step.id,
             channel: "sms",
-            recipientEmail: phone || enrollment.prospectEmail,
+            // Store what we'll actually text (E.164) when valid, else the raw value
+            // so the bad data stays visible in the Activity feed.
+            recipientEmail: phoneCheck.ok ? phoneCheck.e164 : (prospect?.phone || enrollment.prospectEmail),
             recipientName: enrollment.prospectName,
             subject: step.stepName || "Text message",
             status: "pending",
           });
 
-          if (!phone) {
-            await storage.updateDripSend(send.id, { status: "failed", errorMessage: "Prospect has no phone number" } as any);
-            console.error(`[Drip] SMS step skipped for ${enrollment.prospectName}: no phone`);
+          if (!phoneCheck.ok) {
+            await storage.updateDripSend(send.id, { status: "failed", errorMessage: phoneCheck.error } as any);
+            console.error(`[Drip] SMS step skipped for ${enrollment.prospectName}: ${phoneCheck.error}`);
           } else {
-            const result = await sendSmsViaQuo(phone, personalize(step.bodyHtml));
+            const result = await sendSmsViaQuo(phoneCheck.e164, personalize(step.bodyHtml));
             if (result.success) {
               await storage.updateDripSend(send.id, { status: "sent", sentAt: new Date() } as any);
-              console.log(`[Drip] Sent SMS step ${stepIdx + 1} to ${phone}`);
+              console.log(`[Drip] Sent SMS step ${stepIdx + 1} to ${phoneCheck.e164}`);
               // Carrier-safe spacing between texts. The email caps/jitter don't cover
               // SMS, and the drain can fire multiple same-day SMS steps for one
               // contact back-to-back — so pace each text (skipped on a force run).
               if (!force) await sleep(smartSmsDelay(activeEnrollments.length));
             } else {
               await storage.updateDripSend(send.id, { status: "failed", errorMessage: result.error } as any);
-              console.error(`[Drip] Failed to text ${phone}: ${result.error}`);
+              console.error(`[Drip] Failed to text ${phoneCheck.e164}: ${result.error}`);
             }
           }
         } else {
@@ -453,18 +459,18 @@ export async function reprocessStep(campaignId: string, stepId: string): Promise
     try {
       if (stepType === "sms") {
         const prospect = await storage.getProspect(enrollment.prospectId);
-        const phone = prospect?.phone || "";
+        const phoneCheck = toSmsE164(prospect?.phone);
         const send = await storage.createDripSend({
           enrollmentId: enrollment.id, stepId: step.id, channel: "sms",
-          recipientEmail: phone || enrollment.prospectEmail, recipientName: enrollment.prospectName,
+          recipientEmail: phoneCheck.ok ? phoneCheck.e164 : (prospect?.phone || enrollment.prospectEmail), recipientName: enrollment.prospectName,
           subject: step.stepName || "Text message", status: "pending",
         });
-        if (!phone) {
-          await storage.updateDripSend(send.id, { status: "failed", errorMessage: "Prospect has no phone number" } as any);
+        if (!phoneCheck.ok) {
+          await storage.updateDripSend(send.id, { status: "failed", errorMessage: phoneCheck.error } as any);
           result.skipped++;
           continue;
         }
-        const r = await sendSmsViaQuo(phone, personalize(step.bodyHtml));
+        const r = await sendSmsViaQuo(phoneCheck.e164, personalize(step.bodyHtml));
         if (r.success) { await storage.updateDripSend(send.id, { status: "sent", sentAt: new Date() } as any); result.sent++; }
         else { await storage.updateDripSend(send.id, { status: "failed", errorMessage: r.error } as any); result.failed++; }
       } else {

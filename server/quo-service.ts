@@ -27,7 +27,17 @@ export async function sendSmsViaQuo(
     return { success: false, error: "QUO_PHONE_NUMBER_ID not configured. Add it in Secrets." };
   }
 
-  const phone = to.startsWith("+") ? to : `+${to.replace(/\D/g, "")}`;
+  // Normalize + validate to E.164 before hitting the provider. Previously this
+  // only stripped non-digits and prepended "+", so a US/Canada number entered as
+  // "416.800.7213" became "+4168007213" (no country code) and OpenPhone rejected
+  // it as invalid. toSmsE164 turns that into "+14168007213" and rejects clearly
+  // unsendable values (e.g. an email address sitting in the phone field) with a
+  // readable error instead of a cryptic provider rejection.
+  const check = toSmsE164(to);
+  if (!check.ok) {
+    return { success: false, error: check.error };
+  }
+  const phone = check.e164;
 
   try {
     const res = await fetch(`${QUO_API_BASE}/messages`, {
@@ -65,6 +75,34 @@ export function normalizePhoneE164(phone: string): string {
   if (digits.length === 10) return `+1${digits}`;
   if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
   return digits ? `+${digits}` : phone;
+}
+
+/**
+ * Normalize a raw contact value to a sendable E.164 number, validating along the
+ * way. Returns the E.164 string when textable, or a human-readable reason when
+ * not. Catches the two real-world failure modes seen in production: an email
+ * address sitting in the phone field, and local/short numbers with no usable
+ * country code (e.g. "416.800.7213" → "+14168007213").
+ */
+export function toSmsE164(
+  raw: string | null | undefined,
+): { ok: true; e164: string } | { ok: false; error: string } {
+  const value = (raw || "").trim();
+  if (!value) return { ok: false, error: "No phone number" };
+  // Letters/@ mean it isn't a phone number at all (almost always an email that
+  // was mirrored into the phone field) — it can never be texted.
+  if (/[a-zA-Z@]/.test(value)) {
+    return { ok: false, error: `Not a phone number: "${value}"` };
+  }
+  const e164 = normalizePhoneE164(value);
+  const digits = e164.replace(/\D/g, "");
+  // E.164 is a leading "+" and up to 15 digits. A dialable number needs the
+  // national number plus a country code; under 11 digits after normalization
+  // (e.g. a bare 7-digit local number) is incomplete and the carrier rejects it.
+  if (digits.length < 11 || digits.length > 15) {
+    return { ok: false, error: `Invalid phone number format: "${value}"` };
+  }
+  return { ok: true, e164 };
 }
 
 export function phoneLast10(phone: string): string {

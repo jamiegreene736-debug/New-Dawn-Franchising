@@ -11,6 +11,7 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2, FileText, Mail, MapPin, Phone, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BrochureDownload } from "@/components/brochure-download";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -267,6 +268,10 @@ export default function RequestFddPage() {
                   <div className="max-w-sm text-xl font-semibold">
                     Thank you — we'll send your FDD and follow up shortly.
                   </div>
+                  <p className="max-w-sm text-sm text-muted-foreground">
+                    While you wait, download our investor brochure for a quick overview of the opportunity.
+                  </p>
+                  <BrochureDownload kind="investor" variant="outline" label="Download the investor brochure" testId="button-fdd-success-brochure" />
                 </div>
               ) : (
                 <form onSubmit={onSubmit} className="grid gap-4" noValidate>

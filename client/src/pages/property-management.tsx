@@ -24,6 +24,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BrochureDownload } from "@/components/brochure-download";
 import { Card } from "@/components/ui/card";
 import {
   Accordion,
@@ -785,6 +786,7 @@ export default function PropertyManagementPage() {
                   Call {COMPANY.phone}
                 </a>
               </Button>
+              <BrochureDownload kind="investor" variant="outline" testId="button-pm-cta-brochure" />
             </div>
 
             <div className="mt-8 flex flex-col items-center gap-2 border-t pt-6 text-sm text-muted-foreground">

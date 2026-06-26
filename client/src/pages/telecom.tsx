@@ -25,6 +25,7 @@ import {
   Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BrochureDownload } from "@/components/brochure-download";
 import { Card } from "@/components/ui/card";
 import { Link } from "wouter";
 
@@ -486,6 +487,7 @@ export default function TelecomPage() {
                   Call {COMPANY.phone}
                 </a>
               </Button>
+              <BrochureDownload kind="investor" variant="outline" testId="button-telecom-cta-brochure" />
             </div>
           </div>
         </div>

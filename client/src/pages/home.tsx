@@ -35,6 +35,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BrochureDownload } from "@/components/brochure-download";
 import { Card } from "@/components/ui/card";
 import { Link } from "wouter";
 import { EmbassyCheckerModal } from "@/components/embassy-checker";
@@ -716,18 +717,14 @@ export default function Home() {
                     Immigration attorney inquiry <ArrowRight className="size-3.5" />
                   </a>
                   <span className="hidden text-muted-foreground/40 sm:inline">•</span>
-                  <Button
-                    data-testid="button-hero-brochure"
+                  <BrochureDownload
+                    kind="investor"
+                    label="Download investor brochure"
                     variant="ghost"
                     size="sm"
-                    className="h-auto w-fit gap-2 p-0 text-muted-foreground hover:bg-transparent hover:text-[hsl(var(--primary))]"
-                    asChild
-                  >
-                    <a href="/api/brochure" download>
-                      <FileDown className="size-4" />
-                      Download investor brochure
-                    </a>
-                  </Button>
+                    className="h-auto w-fit p-0 text-muted-foreground hover:bg-transparent hover:text-[hsl(var(--primary))]"
+                    testId="button-hero-brochure"
+                  />
                 </div>
 
                 <div data-testid="text-fdd-credibility" className="mt-auto flex flex-col items-start gap-2 pt-4">
@@ -1666,6 +1663,7 @@ export default function Home() {
                     I'm an Immigration Attorney
                   </a>
                 </Button>
+                <BrochureDownload kind="investor" variant="outline" testId="button-contact-brochure" />
               </div>
             </div>
           </div>

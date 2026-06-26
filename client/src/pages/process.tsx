@@ -16,6 +16,7 @@ import {
   Timer,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BrochureDownload } from "@/components/brochure-download";
 import { Card } from "@/components/ui/card";
 import { Link } from "wouter";
 
@@ -213,12 +214,7 @@ export default function ProcessPage() {
                   <ArrowRight className="size-4" />
                 </Link>
               </Button>
-              <Button data-testid="button-process-brochure" variant="secondary" className="gap-2" asChild>
-                <a href="/api/brochure" download>
-                  <FileText className="size-4" />
-                  Download brochure
-                </a>
-              </Button>
+              <BrochureDownload kind="investor" variant="secondary" testId="button-process-brochure" />
             </div>
           </div>
         </div>

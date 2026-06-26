@@ -781,6 +781,7 @@ export async function registerRoutes(
     { path: "/blog", priority: "0.7", changefreq: "daily" },
     { path: "/quiz", priority: "0.6", changefreq: "monthly" },
     { path: "/contact", priority: "0.8", changefreq: "monthly" },
+    { path: "/partners", priority: "0.6", changefreq: "monthly" },
   ];
 
   app.get("/sitemap.xml", async (_req, res) => {
@@ -904,6 +905,7 @@ export async function registerRoutes(
       ["/real-estate", "Real estate referral income via Star Spangled Banner Realty"],
       ["/blog", "Insights on E-2 visas, franchising, and U.S. business ownership for international investors"],
       ["/contact", "Request the FDD, overview deck, or an intro call"],
+      ["/partners", "Partner / referral program — franchise brokers, immigration attorneys, and advisors earn a partner fee for introducing qualified E-2 investors who become franchisees"],
     ];
 
     const lines: string[] = [
@@ -959,6 +961,17 @@ export async function registerRoutes(
       const lead = await storage.createLead(data);
       res.status(201).json(lead);
 
+      // Optional `leadType` (sent by the gated brochure forms — not a leads column,
+      // so read it straight off the body) tags the CRM client distinctly so the
+      // investor-brochure and partner/broker journeys stay separate from generic
+      // website leads. Unknown / absent values fall back to "website".
+      const LEAD_SOURCE_BY_TYPE: Record<string, string> = {
+        "investor-brochure": "brochure-investor",
+        "partner-broker": "partner-broker",
+      };
+      const leadType = typeof req.body?.leadType === "string" ? req.body.leadType.trim() : "";
+      const leadSource = LEAD_SOURCE_BY_TYPE[leadType] ?? "website";
+
       // Auto-create a CRM client from the website lead (fire-and-forget)
       storage.createCrmClient({
         fullName: lead.fullName,
@@ -966,7 +979,7 @@ export async function registerRoutes(
         phone: lead.phone || null,
         country: lead.country || null,
         status: "new",
-        leadSource: "website",
+        leadSource,
         notes: lead.message || null,
       }).catch((e) => console.error("Failed to auto-create CRM client from lead:", e));
 

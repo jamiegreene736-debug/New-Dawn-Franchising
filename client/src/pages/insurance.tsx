@@ -23,6 +23,7 @@ import {
   UserCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { BrochureDownload } from "@/components/brochure-download";
 import { Card } from "@/components/ui/card";
 import {
   Accordion,
@@ -804,6 +805,7 @@ export default function InsurancePage() {
                   Call {COMPANY.phone}
                 </a>
               </Button>
+              <BrochureDownload kind="investor" variant="outline" testId="button-insurance-cta-brochure" />
             </div>
 
             <div className="mt-8 flex flex-col items-center gap-2 border-t pt-6 text-sm text-muted-foreground">

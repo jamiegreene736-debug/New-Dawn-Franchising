@@ -35,6 +35,7 @@ import TelecomPage from "@/pages/telecom";
 import PropertyManagementPage from "@/pages/property-management";
 import InsurancePage from "@/pages/insurance";
 import WhyNewDawnPage from "@/pages/why-new-dawn";
+import PartnersPage from "@/pages/partners";
 import PrivacyPolicyPage from "@/pages/privacy-policy";
 import TermsPage from "@/pages/terms";
 
@@ -111,6 +112,7 @@ function Router() {
               <Route path="/property-management" component={PropertyManagementPage} />
               <Route path="/insurance" component={InsurancePage} />
               <Route path="/why-new-dawn" component={WhyNewDawnPage} />
+              <Route path="/partners" component={PartnersPage} />
               <Route path="/crm/contacts/:id" component={CrmContactProfilePage} />
               <Route path="/crm/contacts" component={CrmContactsPage} />
               <Route path="/crm/pipeline" component={CrmPipelinePage} />

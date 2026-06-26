@@ -876,6 +876,45 @@ const shells: Record<string, PageShell> = {
   <p>La información de esta página es material de marketing y no constituye asesoría legal ni migratoria.</p>
 </main>`,
   },
+  "/partners": {
+    title: `Partner Program — Refer & Earn | ${SITE}`,
+    description:
+      "Partner with New Dawn Franchising. Franchise brokers, immigration attorneys, and advisors earn a partner fee for every qualified E-2 investor they introduce who becomes a franchisee.",
+    html: `
+<main>
+  <h1>New Dawn Franchising Partner Program — Refer &amp; Earn</h1>
+  <p>Franchise brokers, immigration attorneys, and wealth or relocation advisors partner with New Dawn Franchising to introduce qualified E-2 Treaty Investor Visa prospects to a real, operating U.S. business. When a referred client becomes a franchisee, the partner earns a partner fee under a written Referring Partner agreement.</p>
+  <section>
+    <h2>Who partners with New Dawn</h2>
+    <ul>
+      <li>Franchise brokers and consultants presenting opportunities to international clients.</li>
+      <li>Immigration attorneys advising E-2 Treaty Investor Visa clients.</li>
+      <li>Wealth and relocation advisors whose clients are exploring U.S. residency through investment.</li>
+    </ul>
+  </section>
+  <section>
+    <h2>How the partnership works</h2>
+    <ol>
+      <li>Introduce a qualified investor from your network.</li>
+      <li>New Dawn manages the FDD, discovery process, and onboarding through signing.</li>
+      <li>You earn a partner fee when your referred client funds their franchise; the rate is set out in the Partner Commission Schedule provided on agreement.</li>
+    </ol>
+  </section>
+  <p>This page describes a referral relationship for professionals and is not an offer to sell a franchise. Franchises are offered solely through a Franchise Disclosure Document under the FTC Franchise Rule and applicable state law.</p>
+</main>`,
+    faq: [
+      {
+        question: "Who can become a New Dawn referral partner?",
+        answer:
+          "Franchise brokers, immigration attorneys, and wealth or relocation advisors who introduce qualified E-2 investors can partner with New Dawn Franchising.",
+      },
+      {
+        question: "How are referral partners paid?",
+        answer:
+          "Partners earn a partner fee when a referred client becomes a franchisee, paid under a written Referring Partner agreement. The applicable rate is set out in the Partner Commission Schedule provided on agreement execution.",
+      },
+    ],
+  },
 };
 
 export function getPageShell(pathname: string): PageShell | null {

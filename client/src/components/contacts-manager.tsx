@@ -3,13 +3,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import {
   Search, Filter, Plus, Download, ChevronDown, ChevronUp,
-  X, Tag, UserCheck, BookmarkPlus, Loader2, RefreshCw, ListPlus,
+  X, Tag, UserCheck, BookmarkPlus, Loader2, RefreshCw, ListPlus, MailCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { EmailStatusBadge } from "@/components/email-status-badge";
 
 const PERSONA_LABELS: Record<string, string> = {
   immigration_attorney: "Immigration Attorney",
@@ -72,6 +73,7 @@ interface ContactRow {
   status: string;
   tags: string[];
   source?: string | null;
+  emailStatus?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -339,6 +341,33 @@ export function ContactsManager() {
     },
   });
 
+  // Scrub the selected contacts for deliverability (Hunter). Stamps a red-X
+  // "will bounce" badge on undeliverable addresses and suppresses them, without
+  // enrolling anyone — so a list can be cleaned before it's added to a campaign.
+  const verifyEmailsMutation = useMutation({
+    mutationFn: async () => {
+      const ids = Array.from(selected).map((id) => `contact:${id}`);
+      const res = await apiRequest("POST", "/api/crm/verify-emails", { ids });
+      return res.json() as Promise<{ valid: number; invalid: number; risky: number; unknown: number; unverified: number; configured: boolean }>;
+    },
+    onSuccess: (d) => {
+      const total = d.valid + d.invalid + d.risky + d.unknown + d.unverified;
+      const bad = d.invalid + d.risky;
+      toast({
+        title: `Verified ${total} contact${total === 1 ? "" : "s"}`,
+        description: bad > 0
+          ? `${d.invalid} will bounce, ${d.risky} risky — flagged & suppressed. ${d.valid} valid.`
+          : d.configured ? `${d.valid} valid, ${d.unverified} couldn't be checked.` : "Hunter is not configured — nothing was verified.",
+        variant: bad > 0 ? "destructive" : undefined,
+      });
+      setSelected(new Set());
+      queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Verification failed", description: err.message, variant: "destructive" });
+    },
+  });
+
   const saveSegmentMutation = useMutation({
     mutationFn: async () => {
       const segFilters: Record<string, unknown> = {};
@@ -590,6 +619,11 @@ export function ContactsManager() {
                   <ListPlus className="size-3" /> Add
                 </Button>
               </div>
+              <Button size="sm" variant="outline" className="h-7 text-xs gap-1"
+                onClick={() => verifyEmailsMutation.mutate()} disabled={verifyEmailsMutation.isPending}
+                title="Check deliverability (Hunter) and flag addresses that will bounce">
+                {verifyEmailsMutation.isPending ? <Loader2 className="size-3 animate-spin" /> : <MailCheck className="size-3" />} Verify emails
+              </Button>
               <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setSelected(new Set())}>
                 <X className="size-3 mr-1" /> Clear
               </Button>
@@ -643,7 +677,12 @@ export function ContactsManager() {
                             {c.firstName} {c.lastName}
                           </a>
                         </Link>
-                        {c.email && <div className="text-xs text-muted-foreground truncate max-w-[180px]">{c.email}</div>}
+                        {c.email && (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs text-muted-foreground truncate max-w-[180px]">{c.email}</span>
+                            <EmailStatusBadge status={c.emailStatus} />
+                          </div>
+                        )}
                       </td>
                       <td className="py-3 px-3 text-muted-foreground">{c.firmName || "—"}</td>
                       <td className="py-3 px-3 text-muted-foreground">{c.country || "—"}</td>

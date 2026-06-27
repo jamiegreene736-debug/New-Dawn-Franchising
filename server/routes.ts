@@ -59,7 +59,8 @@ import franchiseeRouter from "./franchisee-routes";
 import heygenRouter from "./heygen-routes";
 import partnerRouter from "./partner-routes";
 import { processPartnerSequence } from "./partner-sequence-service";
-import { runDailyPreparation, runDailyBrief, pollForApprovalReply, runApprovalDeadlineCheck, addToDnc } from "./agent-service";
+import { runDailyPreparation, runDailyBrief, pollForApprovalReply, runApprovalDeadlineCheck, addToDnc, isOnDnc } from "./agent-service";
+import { verifyEmailForEnrollment, isFreshVerification, decisionFromStoredStatus } from "./email-verification-service";
 import { verifyUnsubToken, unsubscribeConfirmPage, unsubscribedPage, invalidUnsubscribeLinkPage } from "./unsubscribe-service";
 import { hunterFindEmail, hunterDomainPattern, buildEmailFromPattern, hunterVerifyEmail, getHunterStatus } from "./hunter-service";
 import { runLeadResearchAgent } from "./lead-research-agent";
@@ -137,6 +138,53 @@ import {
 import { generateWeeklyBrief } from "./strategy-brief";
 import { briefs, systemNotifications, contacts } from "@shared/schema";
 import { callClaude } from "./chat-service";
+
+// Run `fn` over `items` with at most `concurrency` in flight, preserving order.
+// Used to parallelize the (network-bound) Hunter verification of a list so a
+// large enroll doesn't make N sequential calls and time the request out.
+async function mapPool<T, R>(items: T[], concurrency: number, fn: (item: T, index: number) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  const workers = Array.from({ length: Math.max(1, Math.min(concurrency, items.length)) }, async () => {
+    while (true) {
+      const i = next++;
+      if (i >= items.length) break;
+      results[i] = await fn(items[i], i);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
+
+// Verify one address for campaign enrollment, with a 30-day cache on the source
+// record. `persist` stamps the resolved status back onto the row (the caller
+// also mirrors it onto the prospect). STRICT policy: only "valid" enrolls;
+// undeliverable is auto-suppressed (DNC); a verify *failure* fails open (enrolls
+// unverified) so a Hunter outage can't silently drop a good list. Returns the
+// bucket so the route can tally why each address was skipped.
+type EnrollVerifyBucket = "valid" | "invalid" | "risky" | "unknown" | "unverified" | "dnc";
+async function verifyAddressForEnroll(
+  email: string,
+  cachedStatus: string | null | undefined,
+  cachedAt: Date | string | null | undefined,
+  persist: (status: string, at: Date) => Promise<void>,
+): Promise<{ shouldEnroll: boolean; status: string | null; bucket: EnrollVerifyBucket }> {
+  // Cache hit — reuse the stored verdict without spending a Hunter credit.
+  if (cachedStatus && isFreshVerification(cachedAt)) {
+    const d = decisionFromStoredStatus(cachedStatus);
+    return { shouldEnroll: d.shouldEnroll, status: cachedStatus, bucket: d.bucket };
+  }
+  const r = await verifyEmailForEnrollment(email);
+  if (r.status) {
+    try { await persist(r.status, new Date()); } catch { /* non-fatal: verdict still applied */ }
+    if (r.shouldDnc) {
+      try { await addToDnc(email, undefined, undefined, `Hunter verify: ${r.reason}`); } catch { /* non-fatal */ }
+    }
+    return { shouldEnroll: r.shouldEnroll, status: r.status, bucket: r.status as EnrollVerifyBucket };
+  }
+  // Could not verify (no key / rate-limited / network) — fail open.
+  return { shouldEnroll: true, status: null, bucket: "unverified" };
+}
 
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "dylan@newdawnfranchising.com").toLowerCase().trim();
 const ADMIN_PASSWORD = (process.env.ADMIN_PASSWORD || "NewHorizons@12").trim();
@@ -3441,22 +3489,55 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
       if (!campaignId || !Array.isArray(prospectIds)) {
         return res.status(400).json({ message: "campaignId and prospectIds are required" });
       }
+      const allProspects = await storage.getProspects();
+      const existingEnrollments = await storage.getDripEnrollments(campaignId);
+      const enrolled = new Set(existingEnrollments.map(e => e.prospectId));
       const results = [];
+      let skippedNoEmail = 0, skippedInvalid = 0, skippedRisky = 0, skippedUnknown = 0, skippedDnc = 0, enrolledUnverified = 0;
+
+      // Resolve the prospects worth verifying (have email, not already enrolled).
+      const toVerify = [];
       for (const prospectId of prospectIds) {
-        const prospects = await storage.getProspects();
-        const prospect = prospects.find(p => p.id === prospectId);
-        if (!prospect || !prospect.email) continue;
-        const existingEnrollments = await storage.getDripEnrollments(campaignId);
-        const alreadyEnrolled = existingEnrollments.some(e => e.prospectId === prospectId);
-        if (alreadyEnrolled) continue;
+        const prospect = allProspects.find(p => p.id === prospectId);
+        if (!prospect) continue;
+        if (!prospect.email) { skippedNoEmail++; continue; }
+        if (enrolled.has(prospectId)) continue;
+        toVerify.push(prospect);
+      }
+
+      // Verify deliverability in parallel (bounded) so a large list doesn't make
+      // N sequential Hunter calls. Each verdict is cached on the prospect and
+      // undeliverable ones are auto-DNC'd; the UI badge reads email_status.
+      const verdicts = await mapPool(toVerify, 5, async (prospect) => {
+        if (await isOnDnc(prospect.email!)) return { shouldEnroll: false, status: null, bucket: "dnc" as EnrollVerifyBucket };
+        return verifyAddressForEnroll(
+          prospect.email!,
+          (prospect as any).emailStatus,
+          (prospect as any).emailVerifiedAt,
+          (status, at) => storage.updateProspect(prospect.id, { emailStatus: status, emailVerifiedAt: at } as any).then(() => {}),
+        );
+      });
+
+      for (let i = 0; i < toVerify.length; i++) {
+        const prospect = toVerify[i];
+        const v = verdicts[i];
+        if (v.bucket === "dnc") { skippedDnc++; continue; }
+        if (!v.shouldEnroll) {
+          if (v.bucket === "invalid") skippedInvalid++;
+          else if (v.bucket === "risky") skippedRisky++;
+          else skippedUnknown++;
+          continue;
+        }
+        if (v.bucket === "unverified") enrolledUnverified++;
         const enrollment = await storage.createDripEnrollment({
           campaignId,
-          prospectId,
-          prospectEmail: prospect.email,
+          prospectId: prospect.id,
+          prospectEmail: prospect.email!,
           prospectName: prospect.name,
           currentStep: 0,
           status: "active",
         });
+        enrolled.add(prospect.id);
         results.push(enrollment);
       }
       // Start the sequence promptly instead of waiting for the next in-window cron
@@ -3467,7 +3548,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
           console.error("[Drip] post-enroll process error:", err),
         );
       }
-      res.status(201).json(results);
+      res.status(201).json({ enrolled: results, count: results.length, skippedNoEmail, skippedInvalid, skippedRisky, skippedUnknown, skippedDnc, enrolledUnverified });
     } catch (err) {
       res.status(500).json({ message: "Failed to enroll prospects" });
     }
@@ -3485,37 +3566,83 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
       const existing = await storage.getDripEnrollments(campaignId);
       const enrolled = new Set(existing.map((e) => e.prospectId));
       const results = [];
-      let skippedNoEmail = 0;
+      let skippedNoEmail = 0, skippedInvalid = 0, skippedRisky = 0, skippedUnknown = 0, skippedDnc = 0, enrolledUnverified = 0;
+
+      // Pass 1 — resolve each id to its source record + how to persist/enroll it.
+      // IDs may be prefixed to indicate which CRM store they come from:
+      //   "client:<id>"  → crm_clients (the main CRM tab)
+      //   "contact:<id>" → contacts (attorney/lead contacts)
+      // Bare ids default to a contact for backward compatibility.
+      type Resolved = {
+        email: string;
+        cachedStatus: string | null | undefined;
+        cachedAt: Date | string | null | undefined;
+        persist: (status: string, at: Date) => Promise<void>;
+        makeProspect: () => Promise<{ id: string; email: string | null; name: string }>;
+      };
+      const items: Resolved[] = [];
       for (const rawId of contactIds) {
-        // IDs may be prefixed to indicate which CRM store they come from:
-        //   "client:<id>"  → crm_clients (the main CRM tab)
-        //   "contact:<id>" → contacts (attorney/lead contacts)
-        // Bare ids default to a contact for backward compatibility.
         const id = String(rawId);
         const isClient = id.startsWith("client:");
         const bareId = id.includes(":") ? id.slice(id.indexOf(":") + 1) : id;
-
-        let prospect;
-        let email: string | null;
         if (isClient) {
           const client = await storage.getCrmClient(bareId);
           if (!client) continue;
           if (!client.email) { skippedNoEmail++; continue; }
-          email = client.email;
-          prospect = await storage.findOrCreateProspectForClient(client);
+          items.push({
+            email: client.email,
+            cachedStatus: (client as any).emailStatus,
+            cachedAt: (client as any).emailVerifiedAt,
+            persist: (status, at) => storage.updateCrmClient(bareId, { emailStatus: status, emailVerifiedAt: at } as any).then(() => {}),
+            makeProspect: () => storage.findOrCreateProspectForClient(client),
+          });
         } else {
           const contact = await storage.getContact(bareId);
           if (!contact) continue;
           if (!contact.email) { skippedNoEmail++; continue; }
-          email = contact.email;
-          prospect = await storage.findOrCreateProspectForContact(contact);
+          items.push({
+            email: contact.email,
+            cachedStatus: (contact as any).emailStatus,
+            cachedAt: (contact as any).emailVerifiedAt,
+            persist: (status, at) => storage.updateContact(bareId, { emailStatus: status, emailVerifiedAt: at } as any).then(() => {}),
+            makeProspect: () => storage.findOrCreateProspectForContact(contact),
+          });
         }
+      }
 
+      // Pass 2 — verify deliverability in parallel (bounded) so a large list
+      // doesn't make N sequential Hunter calls. Persists the verdict to the
+      // SOURCE record (drives the red-X badge + caches the credit) and auto-DNCs
+      // undeliverable addresses.
+      const verdicts = await mapPool(items, 5, async (it) => {
+        if (await isOnDnc(it.email)) return { shouldEnroll: false, status: null, bucket: "dnc" as EnrollVerifyBucket };
+        return verifyAddressForEnroll(it.email, it.cachedStatus, it.cachedAt, it.persist);
+      });
+
+      // Pass 3 — enroll the addresses that passed strict verification.
+      for (let i = 0; i < items.length; i++) {
+        const it = items[i];
+        const v = verdicts[i];
+        if (v.bucket === "dnc") { skippedDnc++; continue; }
+        if (!v.shouldEnroll) {
+          if (v.bucket === "invalid") skippedInvalid++;
+          else if (v.bucket === "risky") skippedRisky++;
+          else skippedUnknown++;
+          continue;
+        }
+        if (v.bucket === "unverified") enrolledUnverified++;
+
+        const prospect = await it.makeProspect();
         if (enrolled.has(prospect.id)) continue;
+        // Mirror the verdict onto the prospect so campaign/enrollment views show
+        // the same badge.
+        if (v.status) {
+          try { await storage.updateProspect(prospect.id, { emailStatus: v.status, emailVerifiedAt: new Date() } as any); } catch { /* non-fatal */ }
+        }
         const enrollment = await storage.createDripEnrollment({
           campaignId,
           prospectId: prospect.id,
-          prospectEmail: prospect.email || email,
+          prospectEmail: prospect.email || it.email,
           prospectName: prospect.name,
           currentStep: 0,
           status: "active",
@@ -3530,7 +3657,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
           console.error("[Drip] post-enroll process error:", err),
         );
       }
-      res.status(201).json({ enrolled: results, count: results.length, skippedNoEmail });
+      res.status(201).json({ enrolled: results, count: results.length, skippedNoEmail, skippedInvalid, skippedRisky, skippedUnknown, skippedDnc, enrolledUnverified });
     } catch (err) {
       res.status(500).json({ message: "Failed to enroll contacts" });
     }
@@ -3551,6 +3678,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
       const candidates: Array<{
         id: string; firstName: string; lastName: string;
         email: string | null; firmName: string | null; jobTitle: string | null; source: string;
+        emailStatus: string | null;
       }> = [];
 
       // Clients first (this is what the main CRM tab writes to).
@@ -3566,6 +3694,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
           firmName: c.companyName || null,
           jobTitle: c.profession || null,
           source: "CRM",
+          emailStatus: (c as any).emailStatus || null,
         });
       }
 
@@ -3583,6 +3712,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
           firmName: c.firmName || null,
           jobTitle: c.jobTitle || null,
           source: "Contacts",
+          emailStatus: (c as any).emailStatus || null,
         });
       }
 
@@ -3590,6 +3720,70 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
     } catch (err) {
       console.error("GET /api/crm/enroll-candidates error:", err);
       res.status(500).json({ message: "Failed to load enrollment candidates" });
+    }
+  });
+
+  // Scrub a list of CRM contacts/clients for deliverability WITHOUT enrolling.
+  // Same strict Hunter verification as enrollment: stamps email_status on each
+  // source record (driving the red-X badge) and auto-DNCs undeliverable ones.
+  // Body: { ids: string[] } where ids are "client:<id>" / "contact:<id>".
+  // Returns aggregate counts + a per-id { id: status } map for the enroll picker.
+  app.post("/api/crm/verify-emails", requireAdminAuth, async (req, res) => {
+    try {
+      const ids = Array.isArray(req.body?.ids) ? (req.body.ids as string[]) : [];
+      if (!ids.length) return res.status(400).json({ message: "ids[] is required" });
+      const force = req.body?.force === true; // re-verify even if cached
+      let valid = 0, invalid = 0, risky = 0, unknown = 0, unverified = 0, noEmail = 0;
+
+      // Resolve each id to its source record + persist fn (keeping the original
+      // prefixed id so the client can map verdicts back to its rows).
+      const items: Array<{ id: string; email: string; cachedStatus: string | null | undefined; cachedAt: Date | string | null | undefined; persist: (s: string, a: Date) => Promise<void> }> = [];
+      for (const rawId of ids) {
+        const id = String(rawId);
+        const isClient = id.startsWith("client:");
+        const bareId = id.includes(":") ? id.slice(id.indexOf(":") + 1) : id;
+        if (isClient) {
+          const client = await storage.getCrmClient(bareId);
+          if (!client) continue;
+          if (!client.email) { noEmail++; continue; }
+          items.push({
+            id, email: client.email,
+            cachedStatus: (client as any).emailStatus,
+            cachedAt: (client as any).emailVerifiedAt,
+            persist: (s, a) => storage.updateCrmClient(bareId, { emailStatus: s, emailVerifiedAt: a } as any).then(() => {}),
+          });
+        } else {
+          const contact = await storage.getContact(bareId);
+          if (!contact) continue;
+          if (!contact.email) { noEmail++; continue; }
+          items.push({
+            id, email: contact.email,
+            cachedStatus: (contact as any).emailStatus,
+            cachedAt: (contact as any).emailVerifiedAt,
+            persist: (s, a) => storage.updateContact(bareId, { emailStatus: s, emailVerifiedAt: a } as any).then(() => {}),
+          });
+        }
+      }
+
+      const verdicts = await mapPool(items, 5, (it) =>
+        verifyAddressForEnroll(it.email, force ? null : it.cachedStatus, force ? null : it.cachedAt, it.persist),
+      );
+      const statuses: Record<string, string> = {};
+      for (let i = 0; i < items.length; i++) {
+        const v = verdicts[i];
+        statuses[items[i].id] = v.status || "unverified";
+        switch (v.bucket) {
+          case "valid": valid++; break;
+          case "invalid": invalid++; break;
+          case "risky": risky++; break;
+          case "unknown": unknown++; break;
+          default: unverified++; break;
+        }
+      }
+      res.json({ valid, invalid, risky, unknown, unverified, noEmail, total: ids.length, statuses, configured: getHunterStatus().configured });
+    } catch (err: any) {
+      console.error("POST /api/crm/verify-emails error:", err?.message || err);
+      res.status(500).json({ message: "Failed to verify emails" });
     }
   });
 

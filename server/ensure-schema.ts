@@ -332,6 +332,12 @@ const STATEMENTS: string[] = [
   `ALTER TABLE crm_clients ADD COLUMN IF NOT EXISTS email_verified_at timestamp`,
   `ALTER TABLE crm_clients ADD COLUMN IF NOT EXISTS email_score integer`,
   `ALTER TABLE crm_clients ADD COLUMN IF NOT EXISTS suggested_email text`,
+  // Same deliverability flag on contacts + prospects so enroll-time verification
+  // can flag/cache them and the red-X "will bounce" badge shows in the enroll picker.
+  `ALTER TABLE contacts ADD COLUMN IF NOT EXISTS email_status text`,
+  `ALTER TABLE contacts ADD COLUMN IF NOT EXISTS email_verified_at timestamp`,
+  `ALTER TABLE prospects ADD COLUMN IF NOT EXISTS email_status text`,
+  `ALTER TABLE prospects ADD COLUMN IF NOT EXISTS email_verified_at timestamp`,
   // Seamless.AI org-contact auto-sync watermark + last-run stats (single row).
   // Lets the scheduled sync (server/seamless-org-sync.ts) resume incrementally
   // across restarts and powers the "last synced …" status in the Contacts UI.

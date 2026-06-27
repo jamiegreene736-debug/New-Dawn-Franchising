@@ -14,6 +14,7 @@ import {
   RefreshCw,
   Search,
   Mail,
+  MailCheck,
   MailOpen,
   MessageSquare,
   Pause,
@@ -36,6 +37,19 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { EmailStatusBadge } from "@/components/email-status-badge";
+
+// One-line "Removed N — will bounce" summary from an enrollment response, so the
+// user sees which addresses were excluded by pre-send verification.
+function enrolledRemovedNote(d: any): string {
+  const bits: string[] = [];
+  if (d?.skippedInvalid) bits.push(`${d.skippedInvalid} will bounce`);
+  if (d?.skippedRisky) bits.push(`${d.skippedRisky} risky/catch-all`);
+  if (d?.skippedUnknown) bits.push(`${d.skippedUnknown} unverifiable`);
+  if (d?.skippedDnc) bits.push(`${d.skippedDnc} suppressed`);
+  if (d?.skippedNoEmail) bits.push(`${d.skippedNoEmail} no email`);
+  return bits.length ? ` Removed ${bits.join(", ")}.` : "";
+}
 
 interface Campaign {
   id: string;
@@ -181,6 +195,7 @@ interface ContactLite {
   firmName: string | null;
   jobTitle: string | null;
   source?: string;
+  emailStatus?: string | null;
 }
 
 interface SmsCampaignData {
@@ -462,12 +477,12 @@ function EmailCampaignTab() {
       });
       return res.json();
     },
-    onSuccess: (data: Enrollment[]) => {
+    onSuccess: (data: { count: number } & Record<string, number>) => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/enrollments"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/campaigns", selectedCampaign] });
       setShowEnrollListModal(false);
       setEnrollListId("");
-      toast({ title: `${data.length} prospects enrolled from list`, description: "They will start receiving campaign emails." });
+      toast({ title: `${data.count} prospect${data.count === 1 ? "" : "s"} enrolled from list`, description: `Verified deliverable addresses will start receiving emails.${enrolledRemovedNote(data)}` });
     },
     onError: (err: Error) => {
       toast({ title: "Enrollment failed", description: err.message, variant: "destructive" });
@@ -489,12 +504,12 @@ function EmailCampaignTab() {
       });
       return res.json();
     },
-    onSuccess: (data: Enrollment[]) => {
+    onSuccess: (data: { count: number } & Record<string, number>) => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/enrollments"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/campaigns", selectedCampaign] });
       setShowEnrollModal(false);
       setSelectedProspects(new Set());
-      toast({ title: `${data.length} prospects enrolled`, description: "They will start receiving campaign emails." });
+      toast({ title: `${data.count} prospect${data.count === 1 ? "" : "s"} enrolled`, description: `Verified deliverable addresses will start receiving emails.${enrolledRemovedNote(data)}` });
     },
     onError: (err: Error) => {
       toast({ title: "Enrollment failed", description: err.message, variant: "destructive" });
@@ -510,17 +525,49 @@ function EmailCampaignTab() {
       });
       return res.json();
     },
-    onSuccess: (data: { count: number; skippedNoEmail: number }) => {
+    onSuccess: (data: { count: number } & Record<string, number>) => {
       queryClient.invalidateQueries({ queryKey: ["/api/crm/enrollments"] });
       queryClient.invalidateQueries({ queryKey: ["/api/crm/campaigns", selectedCampaign] });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/enroll-candidates"] });
       setShowEnrollContacts(false);
       setSelectedContacts(new Set());
       setContactSearch("");
-      const skip = data.skippedNoEmail ? ` (${data.skippedNoEmail} skipped — no email)` : "";
-      toast({ title: `${data.count} contact${data.count === 1 ? "" : "s"} enrolled`, description: `They'll start receiving the sequence.${skip}` });
+      toast({ title: `${data.count} contact${data.count === 1 ? "" : "s"} enrolled`, description: `They'll start receiving the sequence.${enrolledRemovedNote(data)}` });
     },
     onError: (err: Error) => {
       toast({ title: "Enrollment failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  // Pre-flight deliverability check inside the enroll picker: verifies the listed
+  // contacts (Hunter, cached server-side), refreshes their badges, and drops any
+  // now-undeliverable address from the current selection so the user can't enroll
+  // a known bouncer.
+  const verifyPickerMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const res = await apiRequest("POST", "/api/crm/verify-emails", { ids });
+      return res.json() as Promise<{ valid: number; invalid: number; risky: number; unknown: number; unverified: number; configured: boolean; statuses: Record<string, string> }>;
+    },
+    onSuccess: (d) => {
+      setSelectedContacts((prev) => {
+        const next = new Set(prev);
+        for (const [id, st] of Object.entries(d.statuses || {})) {
+          if (st === "invalid" || st === "risky" || st === "unknown") next.delete(id);
+        }
+        return next;
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/enroll-candidates"] });
+      const bad = d.invalid + d.risky + d.unknown;
+      toast({
+        title: d.configured ? `Checked ${d.valid + bad + d.unverified} address${d.valid + bad + d.unverified === 1 ? "" : "es"}` : "Hunter not configured",
+        description: d.configured
+          ? `✓ ${d.valid} deliverable · ✗ ${d.invalid} will bounce · ⚠ ${d.risky + d.unknown} risky. Undeliverable addresses are flagged and excluded.`
+          : "Set HUNTER_API_KEY in the environment to enable deliverability checks.",
+        variant: bad > 0 ? "destructive" : undefined,
+      });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Verification failed", description: err.message, variant: "destructive" });
     },
   });
 
@@ -1467,40 +1514,81 @@ function EmailCampaignTab() {
                     const full = `${c.firstName} ${c.lastName}`.toLowerCase();
                     return !q || full.includes(q) || (c.email || "").toLowerCase().includes(q) || (c.firmName || "").toLowerCase().includes(q);
                   });
-                  const selectableIds = filtered.filter((c) => c.email).map((c) => c.id);
+                  // Strict policy: invalid / risky / unknown are undeliverable and
+                  // excluded — same non-selectable treatment as no-email / already
+                  // enrolled. null ("unverified") stays selectable (fail-open).
+                  const isBad = (s?: string | null) => s === "invalid" || s === "risky" || s === "unknown";
+                  const withEmail = filtered.filter((c) => c.email);
+                  const selectableIds = withEmail
+                    .filter((c) => !isBad(c.emailStatus) && !enrolledEmails.has((c.email || "").toLowerCase()))
+                    .map((c) => c.id);
                   const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selectedContacts.has(id));
+                  // Deliverability tally across the listed contacts (with email).
+                  const counts = withEmail.reduce(
+                    (a, c) => {
+                      const s = c.emailStatus;
+                      if (s === "valid") a.deliverable++;
+                      else if (s === "invalid") a.willBounce++;
+                      else if (s === "risky" || s === "unknown") a.risky++;
+                      else a.unchecked++;
+                      return a;
+                    },
+                    { deliverable: 0, willBounce: 0, risky: 0, unchecked: 0 },
+                  );
+                  const verifiedAny = counts.deliverable + counts.willBounce + counts.risky > 0;
                   return (
                     <>
-                      <div className="flex items-center justify-between mb-2">
+                      <div className="mb-2 flex items-center justify-between gap-2">
                         <span className="text-xs text-muted-foreground">{filtered.length} contact{filtered.length === 1 ? "" : "s"}</span>
-                        <button
-                          className="text-xs text-[hsl(var(--primary))] hover:underline"
-                          onClick={() => {
-                            const next = new Set(selectedContacts);
-                            if (allSelected) selectableIds.forEach((id) => next.delete(id));
-                            else selectableIds.forEach((id) => next.add(id));
-                            setSelectedContacts(next);
-                          }}
-                        >
-                          {allSelected ? "Clear all" : "Select all"}
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            data-testid="button-verify-picker"
+                            size="sm" variant="outline" className="h-7 text-xs gap-1"
+                            disabled={verifyPickerMutation.isPending || withEmail.length === 0}
+                            onClick={() => verifyPickerMutation.mutate(withEmail.map((c) => c.id))}
+                            title="Check deliverability with Hunter and flag addresses that will bounce"
+                          >
+                            {verifyPickerMutation.isPending ? <Loader2 className="size-3 animate-spin" /> : <MailCheck className="size-3" />} Check deliverability
+                          </Button>
+                          <button
+                            className="text-xs text-[hsl(var(--primary))] hover:underline"
+                            onClick={() => {
+                              const next = new Set(selectedContacts);
+                              if (allSelected) selectableIds.forEach((id) => next.delete(id));
+                              else selectableIds.forEach((id) => next.add(id));
+                              setSelectedContacts(next);
+                            }}
+                          >
+                            {allSelected ? "Clear all" : "Select all"}
+                          </button>
+                        </div>
                       </div>
+                      {verifiedAny && (
+                        <div data-testid="picker-deliverability-summary" className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-medium">
+                          <span className="text-green-700">✓ {counts.deliverable} deliverable</span>
+                          {counts.willBounce > 0 && <span className="text-red-700">✗ {counts.willBounce} will bounce</span>}
+                          {counts.risky > 0 && <span className="text-amber-700">⚠ {counts.risky} risky</span>}
+                          {counts.unchecked > 0 && <span className="text-muted-foreground">— {counts.unchecked} unchecked</span>}
+                        </div>
+                      )}
                       <div className="space-y-1 max-h-72 overflow-y-auto">
                         {filtered.length === 0 ? (
                           <p className="text-sm text-muted-foreground py-4 text-center">No contacts match.</p>
                         ) : filtered.map((c) => {
                           const noEmail = !c.email;
                           const already = c.email ? enrolledEmails.has(c.email.toLowerCase()) : false;
+                          const bad = isBad(c.emailStatus);
+                          const disabled = noEmail || already || bad;
                           const checked = selectedContacts.has(c.id);
                           return (
                             <div
                               key={c.id}
                               data-testid={`enroll-contact-${c.id}`}
-                              className={`flex items-center gap-3 p-2 rounded ${noEmail || already ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-gray-50"} ${checked ? "bg-[hsl(var(--primary))]/5" : ""}`}
-                              onClick={() => { if (noEmail || already) return; const next = new Set(selectedContacts); checked ? next.delete(c.id) : next.add(c.id); setSelectedContacts(next); }}
+                              className={`flex items-center gap-3 p-2 rounded ${disabled ? "opacity-60 cursor-not-allowed" : "cursor-pointer hover:bg-gray-50"} ${bad ? "bg-red-50/60" : ""} ${checked ? "bg-[hsl(var(--primary))]/5" : ""}`}
+                              onClick={() => { if (disabled) return; const next = new Set(selectedContacts); checked ? next.delete(c.id) : next.add(c.id); setSelectedContacts(next); }}
                             >
-                              <div className={`flex size-5 items-center justify-center rounded border ${checked ? "border-[hsl(var(--primary))] bg-[hsl(var(--primary))] text-white" : "border-gray-300"}`}>
-                                {checked && <Check className="size-3" />}
+                              <div className={`flex size-5 items-center justify-center rounded border ${bad ? "border-red-300 bg-red-100 text-red-500" : checked ? "border-[hsl(var(--primary))] bg-[hsl(var(--primary))] text-white" : "border-gray-300"}`}>
+                                {bad ? <X className="size-3" /> : checked ? <Check className="size-3" /> : null}
                               </div>
                               <div className="min-w-0">
                                 <div className="flex items-center gap-1.5 text-sm font-medium truncate">
@@ -1512,13 +1600,17 @@ function EmailCampaignTab() {
                                     </span>
                                   )}
                                 </div>
-                                <div className="text-xs text-muted-foreground truncate">{c.email || "no email"}{already ? " · already enrolled" : ""}</div>
+                                <div className="flex items-center gap-1.5">
+                                  <span className={`text-xs truncate ${bad ? "text-red-600 line-through" : "text-muted-foreground"}`}>{c.email || "no email"}{already ? " · already enrolled" : ""}</span>
+                                  <EmailStatusBadge status={c.emailStatus} />
+                                </div>
                               </div>
                             </div>
                           );
                         })}
                       </div>
-                      <div className="mt-4 flex justify-end">
+                      <div className="mt-4 flex items-center justify-between gap-2">
+                        <span className="text-[11px] text-muted-foreground">Undeliverable addresses are excluded automatically.</span>
                         <Button
                           data-testid="button-confirm-enroll-contacts"
                           onClick={() => enrollContactsMutation.mutate()}

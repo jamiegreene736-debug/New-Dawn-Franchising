@@ -274,6 +274,11 @@ export const prospects = pgTable("prospects", {
   source: text("source"),
   sourceUrl: text("source_url"),
   notes: text("notes"),
+  // Email deliverability verification (Hunter), mirrored from the source
+  // contact/client at enroll time. Mirrors crm_clients.emailStatus so campaign
+  // views can show the same red-X "will bounce" badge.
+  emailStatus: text("email_status"), // valid | risky | invalid | unknown
+  emailVerifiedAt: timestamp("email_verified_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -531,6 +536,10 @@ export const contacts = pgTable("contacts", {
   icpReasons: text("icp_reasons").array(),
   icpExplanation: text("icp_explanation"),
   icpScoredAt: timestamp("icp_scored_at"),
+  // Email deliverability verification (Hunter), stamped at enroll time. Mirrors
+  // crm_clients.emailStatus so the contact list can show the red-X badge.
+  emailStatus: text("email_status"), // valid | risky | invalid | unknown
+  emailVerifiedAt: timestamp("email_verified_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

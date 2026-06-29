@@ -66,6 +66,54 @@ export function withSpacing(html: string): string {
     .replace(/<h3 style="([^"]*)">/g, '<h3 style="$1; margin:24px 0 10px 0; font-size:17px;">');
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// BROCHURE LINKS — multilingual download links for the email steps.
+//
+// DELIVERABILITY: we LINK to the hosted PDFs, we never ATTACH them. These steps
+// send as cold drip mail over Gmail SMTP on a domain that's being actively warmed
+// (see the DNSBL monitor, List-Unsubscribe headers, and warmup engine). A binary
+// PDF attachment on cold outreach is one of the strongest spam/quarantine signals
+// there is — corporate mail gateways routinely defang or block it — and it would
+// undermine all of that warmup work. A first-party https:// link to a PDF on the
+// SAME domain we send from carries sender trust instead of risk, keeps the message
+// light, and lets the recipient open the brochure on their terms.
+//
+// The six brochures are already published at /brochures (see client/public/brochures)
+// in the three languages New Dawn translates — English, Spanish, and Traditional
+// Chinese. We surface all three inline (mirroring the EN · ES · 中文 selector on the
+// site) so the reader self-selects rather than us guessing their language.
+//   • investor — the 6-page E-2 investor brochure (end-consumer / forward-to-client)
+//   • partner  — the 1-page broker / referral-partner one-pager
+export type BrochureEmailKind = "investor" | "partner";
+
+const BROCHURE_EMAIL_LANGS: { code: "en" | "es" | "zh-TW"; label: string }[] = [
+  { code: "en", label: "English" },
+  { code: "es", label: "Español" },
+  { code: "zh-TW", label: "中文" },
+];
+
+/** Absolute URL of a hosted brochure PDF (first-party, on the sending domain). */
+export function brochureFileUrl(kind: BrochureEmailKind, code: "en" | "es" | "zh-TW"): string {
+  return `${WEBSITE}/brochures/${kind}-brochure-${code}.pdf`;
+}
+
+/** Inline HTML brochure block — a labeled row of EN · ES · 中文 download links. */
+export function brochureLinksHtml(kind: BrochureEmailKind, label: string): string {
+  const links = BROCHURE_EMAIL_LANGS
+    .map(
+      (l) =>
+        `<a href="${brochureFileUrl(kind, l.code)}" style="color:#1a1a2e; font-weight:600; text-decoration:underline;">${l.label}</a>`,
+    )
+    .join(' &nbsp;·&nbsp; ');
+  return `<p style="margin:16px 0; padding:12px 16px; background:#f6f7fb; border-left:3px solid #c9a227; border-radius:4px;"><strong>${label}:</strong> ${links}</p>`;
+}
+
+/** Plain-text equivalent for the override compose box / text part of the email. */
+export function brochureLinksText(kind: BrochureEmailKind, label: string): string {
+  const links = BROCHURE_EMAIL_LANGS.map((l) => `  ${l.label}: ${brochureFileUrl(kind, l.code)}`).join('\n');
+  return `${label}:\n${links}`;
+}
+
 /** Replace the {{name}} / {{firstName}} merge tokens with a concrete value. */
 export function renderTrackText(text: string, name: string): string {
   return (text || "")
@@ -534,6 +582,8 @@ Suggested note (300 chars max):
     <li><strong>Escrow protection</strong> — your funds held safely until your visa is approved</li>
   </ul>
   <p>New Dawn was designed around exactly that checklist. You choose one of three recurring-revenue verticals — Property Management, Insurance, or Telecom (VOIP) — and direct the business as the executive while our approved teams handle daily operations.</p>
+  <p>Here's our investor brochure with the full overview — open it in whichever language you prefer:</p>
+  ${brochureLinksHtml("investor", "Investor brochure (PDF)")}
   <p>Would you be open to a 15-minute call to see whether it fits what you're looking for?</p>
   <p>Best regards,<br/><strong>Dylan Delaney</strong><br/>New Dawn Franchising<br/><a href="${WEBSITE}">www.newdawnfranchising.com</a><br/>dylan@newdawnfranchising.com</p>
 </div>`,
@@ -551,6 +601,9 @@ Most E-2 candidates we speak with want the same things:
 - Escrow protection — your funds held safely until your visa is approved
 
 New Dawn was designed around exactly that checklist. You choose one of three recurring-revenue verticals — Property Management, Insurance, or Telecom (VOIP) — and direct the business as the executive while our approved teams handle daily operations.
+
+Here's our investor brochure with the full overview — open it in whichever language you prefer:
+${brochureLinksText("investor", "Investor brochure (PDF)")}
 
 Would you be open to a 15-minute call to see whether it fits what you're looking for?
 
@@ -978,6 +1031,8 @@ Suggested note (300 chars max):
   </ul>
   <p>New Dawn delivers all of that across three recurring-revenue verticals — <strong>Property Management, Insurance, or Telecom</strong> — while your client directs the business and our approved teams handle daily execution.</p>
   <p>For referring brokers, every qualified placement earns <strong>12.5% commission — $28,125</strong> on our standard $225,000 package, paid when the visa clears and funds are released from escrow.</p>
+  <p>Here's the broker one-pager — open it in whichever language suits you:</p>
+  ${brochureLinksHtml("partner", "Broker one-pager (PDF)")}
   <p>Would you be open to a 15-minute call to see whether this fits your practice?</p>
   <p>Best regards,<br/><strong>Dylan Delaney</strong><br/>New Dawn Franchising<br/><a href="${WEBSITE}">www.newdawnfranchising.com</a> · <a href="${WEBSITE}/broker-portal">Broker Portal</a><br/>dylan@newdawnfranchising.com</p>
 </div>`,
@@ -997,6 +1052,9 @@ When your E-2 candidates ask what they actually want, the checklist is usually t
 New Dawn delivers all of that across three recurring-revenue verticals — Property Management, Insurance, or Telecom — while your client directs the business and our approved teams handle daily execution.
 
 For referring brokers, every qualified placement earns 12.5% commission — $28,125 on our standard $225,000 package, paid when the visa clears and funds are released from escrow.
+
+Here's the broker one-pager — open it in whichever language suits you:
+${brochureLinksText("partner", "Broker one-pager (PDF)")}
 
 Would you be open to a 15-minute call to see whether this fits your practice?
 
@@ -1094,6 +1152,8 @@ New Dawn Franchising`,
   </ul>
   <p>Proprietary technology — owner dashboards, automated client communication, marketing, and workflow automation — gives your client full visibility without being on-site every day. This isn't off-the-shelf software; it's infrastructure built for E-2 investor oversight.</p>
   <p>Each vertical meets E-2 requirements: a real, operating enterprise with documented revenue, active management, and renewal-ready reporting.</p>
+  <p>Here's the client-facing investor brochure you can forward straight to a candidate — in their language:</p>
+  ${brochureLinksHtml("investor", "Investor brochure (PDF)")}
   <p>Would a 15-minute walkthrough help you present this to your next E-2 client? <a href="${CALENDLY}">Book here</a>.</p>
   <p>Best,<br/><strong>Dylan Delaney</strong><br/>New Dawn Franchising</p>
 </div>`,
@@ -1108,6 +1168,9 @@ Live Anywhere in the U.S.: your client is the Director — strategy, performance
 Proven Day-to-Day Operating Systems: approved local teams handle Property Management, Insurance, or Telecom execution. Proprietary technology (dashboards, automation, marketing) gives full visibility without being on-site.
 
 Each vertical meets E-2 requirements: real operating enterprise, documented revenue, active management, renewal-ready reporting.
+
+Here's the client-facing investor brochure you can forward straight to a candidate — in their language:
+${brochureLinksText("investor", "Investor brochure (PDF)")}
 
 Would a 15-minute walkthrough help you present this to your next E-2 client? ${CALENDLY}
 

@@ -22,7 +22,7 @@ const openai = createLazyOpenAIClient();
 
 const DYLAN_EMAIL = "dylan@newdawnfranchising.com";
 const FROM_EMAIL = "dylan@newdawnfranchising.com";
-const BASE_URL = process.env.APP_BASE_URL || process.env.BASE_URL || "https://newdawnfranchising.replit.app";
+const BASE_URL = process.env.APP_BASE_URL || process.env.BASE_URL || "https://www.newdawnfranchising.com";
 const AGENT_PORTAL = `${BASE_URL}/agent`;
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -1001,8 +1001,8 @@ export async function runDailyPreparation(): Promise<void> {
     // SMS status to Dylan — always send so he knows the agent ran
     const dateLabel = new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
     const prepSms = staged > 0
-      ? `🤖 Outreach Agent prep done — ${dateLabel}\n✅ ${staged} message${staged !== 1 ? "s" : ""} staged for approval (${discovered} leads found, ${forumPosts} forum posts).\nFull brief sent to email. Approve at:\nnewdawnfranchising.replit.app/agent`
-      : `🤖 Outreach Agent prep done — ${dateLabel}\n⚠️ 0 messages staged today (${discovered} leads found, ${forumPosts} forum posts).\nSeamless may need more credits for new lead discovery. Existing leads checked.\nnewdawnfranchising.replit.app/agent`;
+      ? `🤖 Outreach Agent prep done — ${dateLabel}\n✅ ${staged} message${staged !== 1 ? "s" : ""} staged for approval (${discovered} leads found, ${forumPosts} forum posts).\nFull brief sent to email. Approve at:\nwww.newdawnfranchising.com/agent`
+      : `🤖 Outreach Agent prep done — ${dateLabel}\n⚠️ 0 messages staged today (${discovered} leads found, ${forumPosts} forum posts).\nSeamless may need more credits for new lead discovery. Existing leads checked.\nwww.newdawnfranchising.com/agent`;
     sendAgentSms("outreach", prepSms, { triggerType: "prep_complete" }).catch(() => {});
   } catch (e: any) {
     runLog.push(`[${new Date().toISOString()}] ERROR: ${e.message}`);
@@ -1010,7 +1010,7 @@ export async function runDailyPreparation(): Promise<void> {
     await db.update(agentDailyBatches).set({ approvalStatus: "failed" }).where(eq(agentDailyBatches.id, batch.id));
     // Notify Dylan of failure
     sendAgentSms("outreach",
-      `⚠️ Outreach Agent prep FAILED — ${new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}\nError: ${e.message?.slice(0, 120) ?? "Unknown error"}\nCheck logs at: newdawnfranchising.replit.app/agent`,
+      `⚠️ Outreach Agent prep FAILED — ${new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}\nError: ${e.message?.slice(0, 120) ?? "Unknown error"}\nCheck logs at: www.newdawnfranchising.com/agent`,
       { triggerType: "prep_error" }
     ).catch(() => {});
   }

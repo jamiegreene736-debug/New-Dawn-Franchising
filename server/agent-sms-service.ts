@@ -199,11 +199,37 @@ export async function notifyDraftPending(
   return sendAgentSms(agentType, body, { triggerType: "draft_pending" });
 }
 
+// External B2B contact databases the platform does NOT integrate and does not
+// need — its lead-sourcing + email/phone enrichment is already covered by
+// Seamless + Hunter + SerpAPI + People Data Labs + Apollo + Proxycurl + Origami.
+// The agent should never ask Dylan to go sign up for one of these. Guarding here
+// stops stray "Access needed: ZoomInfo" texts regardless of which planner emits
+// them. NOTE: this list deliberately excludes the vendors we DO use (Seamless,
+// Hunter, Apollo, PDL, Proxycurl) so a legitimate "credits exhausted — top up"
+// blocker on an integrated vendor still reaches Dylan.
+const REDUNDANT_DATA_VENDORS = [
+  "zoominfo", "zoom info", "lusha", "cognism", "rocketreach", "rocket reach",
+  "lead411", "uplead", "clearbit", "snov", "kaspr", "datanyze", "adapt.io",
+  "signalhire", "contactout", "swordfish", "sales navigator", "salesnavigator",
+  "b2b database", "b2b data", "contact database", "verified contact",
+];
+
+/** True when a blocker is just a request to onboard an external data vendor we don't need. */
+export function isRedundantDataVendorBlocker(...parts: (string | undefined | null)[]): boolean {
+  const hay = parts.filter(Boolean).join(" ").toLowerCase();
+  return REDUNDANT_DATA_VENDORS.some(v => hay.includes(v));
+}
+
 export async function notifyBlocker(
   agentType: "seo" | "outreach",
   blockerTitle: string,
   detail: string,
 ) {
+  // Safety net: never text Dylan to sign up for a redundant external B2B database.
+  if (agentType === "outreach" && isRedundantDataVendorBlocker(blockerTitle, detail)) {
+    console.log(`[AgentSMS] Suppressed redundant data-vendor blocker: "${blockerTitle}"`);
+    return { success: true, suppressed: true } as const;
+  }
   const agentLabel = agentType === "seo" ? "SEO Agent" : "Outreach Agent";
   const body = `${agentLabel}: Blocked and needs your help.\n\n⚠️ ${blockerTitle}\n\n${detail.slice(0, 300)}\n\nReply with instructions to unblock.`;
   return sendAgentSms(agentType, body, { triggerType: "blocker" });

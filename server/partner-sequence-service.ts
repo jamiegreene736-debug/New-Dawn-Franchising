@@ -27,7 +27,7 @@ import { sendAgentSms } from "./agent-sms-service";
 
 const CALENDLY = "https://calendly.com/dylan-newdawnfranchising";
 const FDD_LINK = "https://www.newdawnfranchising.com/fdd-request";
-const APP_BASE = () => process.env.APP_BASE_URL ?? "https://newdawnfranchising.replit.app";
+const APP_BASE = () => process.env.APP_BASE_URL ?? "https://www.newdawnfranchising.com";
 
 // ─── Claude helper ────────────────────────────────────────────────────────────
 

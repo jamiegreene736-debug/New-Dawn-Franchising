@@ -15,7 +15,7 @@ import { buildLanguageInstructions, getLanguageLabel } from "./language-detectio
 import { seamlessFindPeople, type SeamlessPerson } from "./seamless-service";
 import { randomUUID } from "crypto";
 
-const APP_BASE = () => process.env.APP_BASE_URL ?? "https://newdawnfranchising.replit.app";
+const APP_BASE = () => process.env.APP_BASE_URL ?? "https://www.newdawnfranchising.com";
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const CLAUDE_MODEL = "claude-sonnet-4-5";
@@ -73,7 +73,7 @@ STRATEGY PRINCIPLES:
 - Positive replies ALWAYS surface to the human before sending the booking message — never auto-book.
 - When a channel is underperforming (low reply rate over the last 14 days), shift budget away from it and propose testing a new angle.
 - When reply volume is high, prioritize handle_reply actions over sourcing new first touches.
-- If you lack a resource (Seamless credits, approved WhatsApp template, compliance clearance for a new geo), emit request_blocker instead of guessing.
+- If you lack a resource (Seamless credits, approved WhatsApp template, compliance clearance for a new geo), emit request_blocker instead of guessing. Do NOT request additional B2B contact databases (ZoomInfo, Apollo, Lusha, Cognism, RocketReach, Sales Navigator, etc.) — lead sourcing and email/phone enrichment are already provided via Seamless, Hunter, SerpAPI, People Data Labs, Apollo and Proxycurl.
 
 Given campaign state, recent performance, and today's top-scored leads, return a JSON array of 1–25 actions for today. Respond with ONLY valid JSON — no prose, no markdown fences.
 

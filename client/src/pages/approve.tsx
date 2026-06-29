@@ -829,7 +829,7 @@ function LoadingScreen() {
 }
 
 function ErrorScreen({ message }: { message: string }) {
-  const PORTAL = "https://newdawnfranchising.replit.app/agent";
+  const PORTAL = "https://www.newdawnfranchising.com/agent";
   const isNotFound = /not found|expired|no longer valid/i.test(message);
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-6">

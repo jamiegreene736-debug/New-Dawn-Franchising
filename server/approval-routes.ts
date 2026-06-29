@@ -25,7 +25,7 @@ import { executeApprovedPlan } from "./outreach-intelligence-service";
 
 const router = Router();
 
-const APP_BASE_URL = () => process.env.APP_BASE_URL ?? "https://newdawnfranchising.replit.app";
+const APP_BASE_URL = () => process.env.APP_BASE_URL ?? "https://www.newdawnfranchising.com";
 
 // ── SEO Draft: preview ────────────────────────────────────────────────────────
 router.get("/seo/:token", async (req, res) => {

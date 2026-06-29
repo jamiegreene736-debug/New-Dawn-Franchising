@@ -88,7 +88,7 @@ async function sendEmail(opts: {
 }
 
 function trackingPixel(token: string): string {
-  const base = process.env.APP_BASE_URL ?? "https://newdawnfranchising.replit.app";
+  const base = process.env.APP_BASE_URL ?? "https://www.newdawnfranchising.com";
   return `<img src="${base}/api/track/open/${token}" width="1" height="1" style="display:none" alt="" />`;
 }
 
@@ -406,7 +406,7 @@ async function executeEvent(event: OutreachSequenceEvent, lead: OutreachLead): P
     const isConnectionRequest = event.day === 0;
     const actionType = isConnectionRequest ? "connection_request" : "dm";
     const token = randomUUID().replace(/-/g, "");
-    const base = process.env.APP_BASE_URL ?? "https://newdawnfranchising.replit.app";
+    const base = process.env.APP_BASE_URL ?? "https://www.newdawnfranchising.com";
     const approvalUrl = `${base}/approve/linkedin/${token}`;
 
     // Queue in DB
@@ -526,7 +526,7 @@ ${trackingPixel(token)}
     // Embed tracking token into HTML (for email open pixel)
     const htmlWithTracking = html.replace(
       /src="[^"]*\/api\/track\/open\/[^"]*"/,
-      `src="${process.env.APP_BASE_URL ?? "https://newdawnfranchising.replit.app"}/api/track/open/${token}"`
+      `src="${process.env.APP_BASE_URL ?? "https://www.newdawnfranchising.com"}/api/track/open/${token}"`
     );
 
     // Find matching SMS trigger event and link it

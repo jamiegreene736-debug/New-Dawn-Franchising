@@ -186,6 +186,14 @@ router.post("/plan/:token", async (req, res) => {
   await db.update(outreachDailyPlans).set({ status: "approved", reviewNotes: notes ?? null, updatedAt: new Date() })
     .where(eq(outreachDailyPlans.approvalToken, req.params.token));
 
+  // Immediate confirmation SMS — every other approval action sends one, and
+  // lead discovery can run for several minutes, so don't leave the user waiting
+  // on the end-of-run summary with no acknowledgement that the tap registered.
+  try {
+    await sendAgentSms("outreach",
+      `✅ Today's lead plan approved — the agent is now searching for leads. You'll get a summary text when it's done.${notes ? `\nNotes: ${notes}` : ""}`);
+  } catch { /* silent — execution proceeds regardless */ }
+
   res.json({ ok: true, status: "approved", message: "Plan approved — lead discovery is running in the background." });
 
   // Execute async (don't block the response)

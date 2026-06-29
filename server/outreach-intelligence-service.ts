@@ -10,11 +10,11 @@
 import { db } from "./db";
 import { outreachDailyPlans, outreachLeads } from "@shared/schema";
 import { eq, and, desc } from "drizzle-orm";
-import { notifyBlocker, sendAgentSms } from "./agent-sms-service";
+import { notifyBlocker, sendAgentSms, isRedundantDataVendorBlocker } from "./agent-sms-service";
 import { seamlessFindPeople } from "./seamless-service";
 import { randomUUID } from "crypto";
 
-const APP_BASE = () => process.env.APP_BASE_URL ?? "https://newdawnfranchising.replit.app";
+const APP_BASE = () => process.env.APP_BASE_URL ?? "https://www.newdawnfranchising.com";
 const SERPAPI_KEY = process.env.SERPAPI_KEY ?? "";
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY ?? "";
 
@@ -102,11 +102,14 @@ IMPORTANT: The system will automatically detect the lead's country and send all 
 
 Think about timing and strategy: What country or category has the most active deal flow right now? Which professional category is most likely to have a wealthy international client looking for US residency today?
 
-AVAILABLE TOOLS:
+AVAILABLE TOOLS (you already have full B2B contact-data coverage — do NOT request more):
 - SerpAPI: Google Search (use for finding specific people, firms, associations, contact info)
 - Seamless: B2B lead database with email enrichment (use for finding specific job titles at companies)
 - Hunter.io: Email finder for domains
-- Note: LinkedIn scraping NOT available. If needed, flag as a blocker request.
+- People Data Labs, Apollo, Proxycurl, Origami: additional contact discovery + email/phone enrichment, applied automatically
+- Note: LinkedIn scraping NOT available.
+
+DO NOT emit blockerRequests for B2B contact databases (e.g. ZoomInfo, Apollo, Lusha, Cognism, RocketReach, Sales Navigator, "verified contact data", "B2B database"). The platform already aggregates the equivalent capability via the tools above, so requesting them only creates noise. Only flag a blocker for a genuinely missing, non-overlapping capability (e.g. an approved WhatsApp template, a new-geo compliance clearance, or exhausted Seamless credits that need a top-up). When in doubt, leave blockerRequests empty.
 
 You MUST respond with valid JSON only (no markdown, no explanation outside the JSON):
 {
@@ -301,6 +304,18 @@ Based on this context, generate today's outreach intelligence plan. Be strategic
     plan = JSON.parse(cleaned);
   } catch {
     throw new Error(`Claude returned invalid JSON: ${raw.slice(0, 300)}`);
+  }
+
+  // Drop blocker requests for paid B2B contact databases — the platform already
+  // sources & enriches leads (Seamless + Hunter + SerpAPI + PDL + Apollo +
+  // Proxycurl), so the agent must not ask Dylan to sign up for ZoomInfo et al.
+  if (plan.blockerRequests?.length) {
+    const before = plan.blockerRequests.length;
+    plan.blockerRequests = plan.blockerRequests.filter(
+      b => !isRedundantDataVendorBlocker(b.tool, b.reason, b.url),
+    );
+    const dropped = before - plan.blockerRequests.length;
+    if (dropped > 0) console.log(`[OutreachIntel] Filtered ${dropped} redundant data-vendor blocker request(s).`);
   }
 
   const token = randomUUID();

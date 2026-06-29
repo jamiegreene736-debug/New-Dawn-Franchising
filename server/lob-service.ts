@@ -5,7 +5,7 @@
 
 const LOB_KEY = () => process.env.LOB_API_KEY ?? "";
 const LOB_BASE = "https://api.lob.com/v1";
-const APP_BASE = () => process.env.APP_BASE_URL ?? "https://newdawnfranchising.replit.app";
+const APP_BASE = () => process.env.APP_BASE_URL ?? "https://www.newdawnfranchising.com";
 
 const DYLAN = {
   name: "Dylan Delaney",

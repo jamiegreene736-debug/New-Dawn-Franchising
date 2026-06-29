@@ -156,7 +156,7 @@ export async function scanForumsForOpportunities(): Promise<number> {
         if (!reply) continue;
 
         const approvalToken = randomUUID();
-        const base = process.env.APP_BASE_URL ?? "https://newdawnfranchising.replit.app";
+        const base = process.env.APP_BASE_URL ?? "https://www.newdawnfranchising.com";
         const approvalUrl = `${base}/approve/forum/${approvalToken}`;
 
         await db.insert(agentForumPosts).values({

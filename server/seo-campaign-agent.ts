@@ -8,7 +8,7 @@ import { notifyDraftPending, notifyBlocker, notifyError, sendAgentSms } from "./
 import { randomUUID } from "crypto";
 import { z } from "zod";
 
-const APP_BASE = () => process.env.APP_BASE_URL ?? "https://newdawnfranchising.replit.app";
+const APP_BASE = () => process.env.APP_BASE_URL ?? "https://www.newdawnfranchising.com";
 
 const SERPAPI_KEY = process.env.SERPAPI_KEY || "";
 const ANTHROPIC_API_KEY = () => process.env.ANTHROPIC_API_KEY || "";
@@ -1143,7 +1143,7 @@ export async function runAllActiveCampaigns(): Promise<void> {
     .from(seoContentDrafts).where(eq(seoContentDrafts.status, "awaiting_approval"));
 
   if (pendingDrafts.length > 0) {
-    const base = process.env.APP_BASE_URL ?? "https://newdawnfranchising.replit.app";
+    const base = process.env.APP_BASE_URL ?? "https://www.newdawnfranchising.com";
     summaryLines.push(`\n📝 ${pendingDrafts.length} draft(s) awaiting approval:`);
     for (const d of pendingDrafts.slice(0, 3)) {
       const url = d.approvalToken ? `${base}/approve/seo/${d.approvalToken}` : `${base}/seo`;

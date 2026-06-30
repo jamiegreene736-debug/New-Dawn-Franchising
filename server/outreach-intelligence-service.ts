@@ -11,6 +11,7 @@ import { db } from "./db";
 import { outreachDailyPlans, outreachLeads } from "@shared/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { notifyBlocker, sendAgentSms, isRedundantDataVendorBlocker } from "./agent-sms-service";
+import { buildDailyCampaignFromLeads, type DiscoveredLeadInput } from "./daily-campaign-service";
 import { seamlessFindPeople } from "./seamless-service";
 import { randomUUID } from "crypto";
 
@@ -189,7 +190,7 @@ async function seamlessSearch(opts: {
   locations?: string[];
   keywords?: string;
   limit?: number;
-}): Promise<{ name: string; title: string; company: string; email?: string; linkedinUrl?: string; location?: string }[]> {
+}): Promise<{ name: string; title: string; company: string; email?: string; linkedinUrl?: string; location?: string; city?: string }[]> {
   if (!process.env.SEAMLESS_API_KEY) return [];
   // enrich=true runs the research+poll step so emails come back.
   const people = await seamlessFindPeople(
@@ -209,6 +210,7 @@ async function seamlessSearch(opts: {
       email: p.email ?? undefined,
       linkedinUrl: p.linkedinUrl ?? undefined,
       location: [p.city, p.country].filter(Boolean).join(" "),
+      city: p.city ?? undefined,
     }))
     .filter((p) => p.name);
 }
@@ -281,12 +283,29 @@ export async function planDailyIntelligence(): Promise<{ planId: string; approva
     if (l.category) categoryCounts[l.category] = (categoryCounts[l.category] ?? 0) + 1;
   }
 
+  // Recent plan history so Claude diversifies instead of re-targeting the same
+  // country + category + geo it already covered on prior days.
+  const recentPlans = await getRecentPlans(7);
+  const recentTargetLines: string[] = [];
+  for (const p of recentPlans) {
+    if (p.planDate === today) continue; // skip an in-progress same-day record
+    for (const c of (p.leadCategories ?? [])) {
+      recentTargetLines.push(`- ${p.planDate}: ${c.category.replace(/_/g, " ")} · ${c.country}${c.geoFocus ? ` (${c.geoFocus})` : ""}`);
+    }
+  }
+  const recentTargetsBlock = recentTargetLines.length
+    ? recentTargetLines.slice(0, 40).join("\n")
+    : "- None yet — this is the first plan.";
+
   const contextMessage = `Today is ${today} (${new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}).
 
 Current pipeline composition (last 100 leads):
 ${Object.entries(categoryCounts).map(([cat, count]) => `- ${cat}: ${count}`).join("\n") || "- Pipeline is empty — any category is welcome"}
 
-Based on this context, generate today's outreach intelligence plan. Be strategic about what's missing from the pipeline and what's timely today.`;
+ALREADY TARGETED in the last 7 days (category · country · geo) — DO NOT repeat these exact combinations; pick fresh countries, cities, or professional categories so each day explores genuinely new ground:
+${recentTargetsBlock}
+
+Based on this context, generate today's outreach intelligence plan. Deliberately DIVERSIFY away from the combinations listed above — rotate to different treaty countries, cities, and partner categories that the recent plans have NOT covered, while still fitting the E-2 referral-partner strategy. Be strategic about what's missing from the pipeline and what's timely today.`;
 
   const raw = await callClaude(INTELLIGENCE_SYSTEM_PROMPT, contextMessage, 3000);
   const cleaned = raw.replace(/```json\n?|\n?```/g, "").trim();
@@ -384,12 +403,15 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
   let totalDiscovered = 0;
   let totalAdded = 0;
   const updatedQueries: NonNullable<typeof plan.searchQueries> = [];
+  // Newly-added leads this run, carried forward to build the day's list + campaign.
+  const discoveredForCampaign: DiscoveredLeadInput[] = [];
 
   // Execute each search query
   for (const query of (plan.searchQueries ?? [])) {
     try {
       let discovered: { fullName: string; company: string; website?: string; category: string; notes: string }[] = [];
-      let seamlessLeads: { name: string; title: string; company: string; email?: string; linkedinUrl?: string; location?: string }[] = [];
+      let seamlessLeads: { name: string; title: string; company: string; email?: string; linkedinUrl?: string; location?: string; city?: string }[] = [];
+      let queryCountry: string | undefined;
 
       if (query.source === "serpapi") {
         const results = await serpSearch(query.query);
@@ -399,12 +421,14 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
           query.purpose.toLowerCase().includes(c.country.toLowerCase()) ||
           query.query.toLowerCase().includes(c.country.toLowerCase())
         ) ?? matchedCategory;
+        queryCountry = cat?.country;
         discovered = await extractLeadsFromSerp(results, cat?.category ?? "other", cat?.country ?? "");
       } else if (query.source === "seamless") {
         // Parse Seamless query into titles + locations
         const cat = plan.leadCategories.find(c =>
           query.purpose.toLowerCase().includes(c.country.toLowerCase())
         ) ?? plan.leadCategories[0];
+        queryCountry = cat?.country;
         const titles = cat ? [cat.category.replace(/_/g, " ")] : ["immigration attorney"];
         const locations = cat ? [cat.geoFocus] : [];
         seamlessLeads = await seamlessSearch({ titles, locations, keywords: "E-2 visa", limit: 20 });
@@ -447,6 +471,16 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
           });
           addedFromQuery++;
           totalAdded++;
+          discoveredForCampaign.push({
+            fullName: lead.fullName,
+            company: lead.company ?? "",
+            email: seamlessMatch?.email ?? null,
+            linkedinUrl: seamlessMatch?.linkedinUrl ?? null,
+            jobTitle: seamlessMatch?.title ?? null,
+            category: lead.category,
+            country: queryCountry ?? null,
+            city: seamlessMatch?.city ?? null,
+          });
         } catch {
           // ignore duplicate key errors
         }
@@ -472,10 +506,33 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
     updatedAt: new Date(),
   }).where(eq(outreachDailyPlans.id, planId));
 
+  // Build the day's custom list + a fresh clone of the Grok 2.0 broker campaign,
+  // enrol the list, and set it live. Failure here must NOT lose the saved leads,
+  // so it's isolated — the pipeline is already persisted above.
+  let campaign: Awaited<ReturnType<typeof buildDailyCampaignFromLeads>> = null;
+  try {
+    campaign = await buildDailyCampaignFromLeads({
+      planDate: plan.planDate,
+      planSummary: plan.planSummary,
+      topCategories: (plan.leadCategories ?? []).map(c => c.category),
+      leads: discoveredForCampaign,
+    });
+  } catch (e) {
+    console.error("[OutreachIntel] Daily campaign build failed:", (e as Error).message);
+    await sendAgentSms(
+      "outreach",
+      `⚠️ ${totalAdded} leads saved, but today's auto-campaign couldn't be built.\n\nError: ${(e as Error).message.slice(0, 180)}\n\nYou can still enroll them manually: ${APP_BASE()}/crm`,
+      { triggerType: "plan_executed" },
+    ).catch(() => {});
+  }
+
   // Notify Dylan of results
+  const campaignLine = campaign
+    ? `\n\n🎯 New campaign "${campaign.campaignName}" is LIVE — ${campaign.enrolled} enrolled from list "${campaign.listName}"${campaign.skippedDuplicate ? ` (${campaign.skippedDuplicate} skipped as already-contacted)` : ""}.\nTrack it: ${APP_BASE()}/crm`
+    : "";
   await sendAgentSms(
     "outreach",
-    `✅ Today's lead plan executed!\n\nSearched ${updatedQueries.length} sources → found ${totalDiscovered} profiles → added ${totalAdded} new leads to your pipeline.\n\nView pipeline: ${APP_BASE()}/agent`,
+    `✅ Today's lead plan executed!\n\nSearched ${updatedQueries.length} sources → found ${totalDiscovered} profiles → added ${totalAdded} new leads to your pipeline.${campaignLine}\n\nView pipeline: ${APP_BASE()}/agent`,
     { triggerType: "plan_executed" },
   ).catch(() => {});
 

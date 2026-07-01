@@ -11,7 +11,7 @@ import { db } from "./db";
 import { outreachDailyPlans, outreachLeads } from "@shared/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { notifyBlocker, sendAgentSms, isRedundantDataVendorBlocker } from "./agent-sms-service";
-import { buildDailyCampaignFromLeads, type DiscoveredLeadInput } from "./daily-campaign-service";
+import { buildDailyCampaignFromLeads, type DiscoveredLeadInput, type DailyCampaignResult } from "./daily-campaign-service";
 import { seamlessFindPeople } from "./seamless-service";
 import { randomUUID } from "crypto";
 
@@ -388,6 +388,65 @@ Based on this context, generate today's outreach intelligence plan. Deliberately
   return { planId, approvalUrl };
 }
 
+// ─── Completion SMS builder ───────────────────────────────────────────────────
+
+/**
+ * Build the "Today's lead plan executed!" summary SMS. Pure + exported so the
+ * exact operator-facing text can be asserted in tests. It surfaces WHY the leads
+ * were chosen, the contacts-vs-enrolled breakdown (so "0 enrolled" is never a
+ * silent failure), and the no-duplicate guarantee.
+ */
+export function buildPlanExecutedSms(opts: {
+  base: string;
+  why?: string | null;
+  sourcesSearched: number;
+  profilesFound: number;
+  leadsAdded: number;
+  campaign: DailyCampaignResult | null;
+}): string {
+  const { base, campaign } = opts;
+  const why = (opts.why ?? "").trim();
+  const whyLine = why ? `\n\n🧭 Why these leads: ${why.slice(0, 320)}` : "";
+
+  let campaignLine = "";
+  if (campaign) {
+    const parts: string[] = [];
+    parts.push(`\n\n🎯 Campaign "${campaign.campaignName}" is LIVE.`);
+    parts.push(
+      `List "${campaign.listName}" — ${campaign.contactsAdded} contacts, ${campaign.enrolled} enrolled` +
+        `${campaign.emailsEnriched ? ` (${campaign.emailsEnriched} work emails found via Hunter)` : ""}.`,
+    );
+    // Always explain the gap between contacts and enrollments so "0 enrolled"
+    // never looks like a silent failure.
+    const skips: string[] = [];
+    if (campaign.skippedNoEmail) skips.push(`${campaign.skippedNoEmail} no email`);
+    if (campaign.skippedDuplicate) skips.push(`${campaign.skippedDuplicate} already contacted`);
+    if (campaign.skippedUndeliverable) skips.push(`${campaign.skippedUndeliverable} undeliverable`);
+    if (campaign.enrolled === 0) {
+      parts.push(
+        `⚠️ 0 enrolled${skips.length ? ` — ${skips.join(", ")}` : ""}. ` +
+          `Add or verify emails on those contacts in the CRM to start sending.`,
+      );
+    } else if (skips.length) {
+      parts.push(`(skipped ${skips.join(", ")})`);
+    }
+    // Dedup reassurance — the user asked to know duplicate research is prevented.
+    parts.push(
+      `🔁 No-duplicate system is active: anyone already in a campaign is skipped, and today's plan was ` +
+        `steered away from the last 7 days of targets so the same people/segments aren't researched twice.`,
+    );
+    parts.push(`Track it: ${base}/crm`);
+    campaignLine = parts.join("\n");
+  }
+
+  return (
+    `✅ Today's lead plan executed!${whyLine}\n\n` +
+    `Searched ${opts.sourcesSearched} sources → found ${opts.profilesFound} profiles → ` +
+    `added ${opts.leadsAdded} new leads to your pipeline.${campaignLine}\n\n` +
+    `View pipeline: ${base}/agent`
+  );
+}
+
 // ─── Execute Approved Plan ────────────────────────────────────────────────────
 
 export async function executeApprovedPlan(planId: string): Promise<{ discovered: number; added: number }> {
@@ -535,49 +594,15 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
   }
 
   // Notify Dylan of results.
-  const base = APP_BASE();
-
-  // Why these leads were chosen — surface the agent's own strategic reasoning so
-  // the summary explains the day's targeting, not just the counts.
-  const why = (plan.planSummary || plan.strategicReasoning || "").trim();
-  const whyLine = why ? `\n\n🧭 Why these leads: ${why.slice(0, 320)}` : "";
-
-  let campaignLine = "";
-  if (campaign) {
-    const parts: string[] = [];
-    parts.push(`\n\n🎯 Campaign "${campaign.campaignName}" is LIVE.`);
-    parts.push(
-      `List "${campaign.listName}" — ${campaign.contactsAdded} contacts, ${campaign.enrolled} enrolled` +
-        `${campaign.emailsEnriched ? ` (${campaign.emailsEnriched} work emails found via Hunter)` : ""}.`,
-    );
-    // Always explain the gap between contacts and enrollments so "0 enrolled"
-    // never looks like a silent failure.
-    const skips: string[] = [];
-    if (campaign.skippedNoEmail) skips.push(`${campaign.skippedNoEmail} no email`);
-    if (campaign.skippedDuplicate) skips.push(`${campaign.skippedDuplicate} already contacted`);
-    if (campaign.skippedUndeliverable) skips.push(`${campaign.skippedUndeliverable} undeliverable`);
-    if (campaign.enrolled === 0) {
-      parts.push(
-        `⚠️ 0 enrolled${skips.length ? ` — ${skips.join(", ")}` : ""}. ` +
-          `Add or verify emails on those contacts in the CRM to start sending.`,
-      );
-    } else if (skips.length) {
-      parts.push(`(skipped ${skips.join(", ")})`);
-    }
-    // Dedup reassurance — the user asked to know duplicate research is prevented.
-    parts.push(
-      `🔁 No-duplicate system is active: anyone already in a campaign is skipped, and today's plan was ` +
-        `steered away from the last 7 days of targets so the same people/segments aren't researched twice.`,
-    );
-    parts.push(`Track it: ${base}/crm`);
-    campaignLine = parts.join("\n");
-  }
-
-  await sendAgentSms(
-    "outreach",
-    `✅ Today's lead plan executed!${whyLine}\n\nSearched ${updatedQueries.length} sources → found ${totalDiscovered} profiles → added ${totalAdded} new leads to your pipeline.${campaignLine}\n\nView pipeline: ${base}/agent`,
-    { triggerType: "plan_executed" },
-  ).catch(() => {});
+  const smsBody = buildPlanExecutedSms({
+    base: APP_BASE(),
+    why: plan.planSummary || plan.strategicReasoning,
+    sourcesSearched: updatedQueries.length,
+    profilesFound: totalDiscovered,
+    leadsAdded: totalAdded,
+    campaign,
+  });
+  await sendAgentSms("outreach", smsBody, { triggerType: "plan_executed" }).catch(() => {});
 
   console.log(`[OutreachIntel] Plan ${planId} complete. ${totalAdded} leads added.`);
   return { discovered: totalDiscovered, added: totalAdded };

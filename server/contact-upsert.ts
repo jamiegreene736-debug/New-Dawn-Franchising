@@ -28,6 +28,7 @@ export interface ProspectContactInput {
   email?: string | null;
   phone?: string | null;
   linkedinUrl?: string | null;
+  websiteUrl?: string | null;
   jobTitle?: string | null;
   bio?: string | null;
   country?: string | null;
@@ -388,7 +389,7 @@ export async function addProspectContact(
     jobTitle: input.jobTitle || null,
     personaType: PERSONA_MAP[category || ""] || "immigration_attorney",
     linkedinUrl: input.linkedinUrl || null,
-    websiteUrl: null,
+    websiteUrl: input.websiteUrl || null,
     status: "new" as const,
     tags: [] as string[],
     notes: input.bio?.slice(0, 300) || null,

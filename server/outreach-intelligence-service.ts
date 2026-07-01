@@ -475,6 +475,7 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
             fullName: lead.fullName,
             company: lead.company ?? "",
             email: seamlessMatch?.email ?? null,
+            website: lead.website ?? null,
             linkedinUrl: seamlessMatch?.linkedinUrl ?? null,
             jobTitle: seamlessMatch?.title ?? null,
             category: lead.category,
@@ -509,10 +510,17 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
   // Build the day's custom list + a fresh clone of the Grok 2.0 broker campaign,
   // enrol the list, and set it live. Failure here must NOT lose the saved leads,
   // so it's isolated — the pipeline is already persisted above.
+  // Name the list/campaign by the day it actually runs, not the day the plan was
+  // drafted — a stale plan approved days later should read as today's campaign.
+  // Use ET (not UTC) to match the rest of the outreach system (6AM-ET cron,
+  // morning-digest day boundary): an evening-ET approval is still "today" locally
+  // even though UTC has already rolled to tomorrow. en-CA gives YYYY-MM-DD.
+  const runDate = new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
   let campaign: Awaited<ReturnType<typeof buildDailyCampaignFromLeads>> = null;
   try {
     campaign = await buildDailyCampaignFromLeads({
       planDate: plan.planDate,
+      runDate,
       planSummary: plan.planSummary,
       topCategories: (plan.leadCategories ?? []).map(c => c.category),
       leads: discoveredForCampaign,
@@ -526,13 +534,48 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
     ).catch(() => {});
   }
 
-  // Notify Dylan of results
-  const campaignLine = campaign
-    ? `\n\n🎯 New campaign "${campaign.campaignName}" is LIVE — ${campaign.enrolled} enrolled from list "${campaign.listName}"${campaign.skippedDuplicate ? ` (${campaign.skippedDuplicate} skipped as already-contacted)` : ""}.\nTrack it: ${APP_BASE()}/crm`
-    : "";
+  // Notify Dylan of results.
+  const base = APP_BASE();
+
+  // Why these leads were chosen — surface the agent's own strategic reasoning so
+  // the summary explains the day's targeting, not just the counts.
+  const why = (plan.planSummary || plan.strategicReasoning || "").trim();
+  const whyLine = why ? `\n\n🧭 Why these leads: ${why.slice(0, 320)}` : "";
+
+  let campaignLine = "";
+  if (campaign) {
+    const parts: string[] = [];
+    parts.push(`\n\n🎯 Campaign "${campaign.campaignName}" is LIVE.`);
+    parts.push(
+      `List "${campaign.listName}" — ${campaign.contactsAdded} contacts, ${campaign.enrolled} enrolled` +
+        `${campaign.emailsEnriched ? ` (${campaign.emailsEnriched} work emails found via Hunter)` : ""}.`,
+    );
+    // Always explain the gap between contacts and enrollments so "0 enrolled"
+    // never looks like a silent failure.
+    const skips: string[] = [];
+    if (campaign.skippedNoEmail) skips.push(`${campaign.skippedNoEmail} no email`);
+    if (campaign.skippedDuplicate) skips.push(`${campaign.skippedDuplicate} already contacted`);
+    if (campaign.skippedUndeliverable) skips.push(`${campaign.skippedUndeliverable} undeliverable`);
+    if (campaign.enrolled === 0) {
+      parts.push(
+        `⚠️ 0 enrolled${skips.length ? ` — ${skips.join(", ")}` : ""}. ` +
+          `Add or verify emails on those contacts in the CRM to start sending.`,
+      );
+    } else if (skips.length) {
+      parts.push(`(skipped ${skips.join(", ")})`);
+    }
+    // Dedup reassurance — the user asked to know duplicate research is prevented.
+    parts.push(
+      `🔁 No-duplicate system is active: anyone already in a campaign is skipped, and today's plan was ` +
+        `steered away from the last 7 days of targets so the same people/segments aren't researched twice.`,
+    );
+    parts.push(`Track it: ${base}/crm`);
+    campaignLine = parts.join("\n");
+  }
+
   await sendAgentSms(
     "outreach",
-    `✅ Today's lead plan executed!\n\nSearched ${updatedQueries.length} sources → found ${totalDiscovered} profiles → added ${totalAdded} new leads to your pipeline.${campaignLine}\n\nView pipeline: ${APP_BASE()}/agent`,
+    `✅ Today's lead plan executed!${whyLine}\n\nSearched ${updatedQueries.length} sources → found ${totalDiscovered} profiles → added ${totalAdded} new leads to your pipeline.${campaignLine}\n\nView pipeline: ${base}/agent`,
     { triggerType: "plan_executed" },
   ).catch(() => {});
 

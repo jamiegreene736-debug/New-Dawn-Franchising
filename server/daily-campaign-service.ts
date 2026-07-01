@@ -27,6 +27,7 @@ import {
   decisionFromStoredStatus,
 } from "./email-verification-service";
 import { processDripEmails } from "./drip-processor";
+import { hunterFindEmail } from "./hunter-service";
 import { BROKER_2_CAMPAIGN_NAME } from "@shared/campaign-tracks";
 import type { DripCampaign, Prospect } from "@shared/schema";
 
@@ -34,6 +35,7 @@ export interface DiscoveredLeadInput {
   fullName: string;
   company?: string | null;
   email?: string | null;
+  website?: string | null;
   linkedinUrl?: string | null;
   jobTitle?: string | null;
   category?: string | null;
@@ -47,10 +49,79 @@ export interface DailyCampaignResult {
   campaignName: string;
   campaignId: string;
   contactsAdded: number;
+  emailsEnriched: number;
   enrolled: number;
   skippedDuplicate: number;
   skippedUndeliverable: number;
   skippedNoEmail: number;
+}
+
+// Public directories / social sites / webmail whose domain would never yield a
+// person's work email via Hunter — skip enrichment for these so we don't waste
+// calls or mint a bogus address (e.g. "jane.doe@linkedin.com").
+const NON_FIRM_DOMAINS = new Set([
+  "linkedin.com", "facebook.com", "twitter.com", "x.com", "instagram.com",
+  "youtube.com", "google.com", "goo.gl", "yelp.com", "wikipedia.org",
+  "crunchbase.com", "bloomberg.com", "glassdoor.com", "indeed.com", "avvo.com",
+  "justia.com", "martindale.com", "lawyers.com", "yellowpages.com", "bbb.org",
+  "medium.com", "wordpress.com", "blogspot.com", "gmail.com", "yahoo.com",
+  "hotmail.com", "outlook.com",
+]);
+
+// Generic leading sub-domains to peel off a deep-page URL so it still resolves to
+// the firm's mail domain (careers.smithlaw.com → smithlaw.com). Kept to a known
+// list so we stay correct for multi-part TLDs (we never blindly drop a label).
+const GENERIC_SUBDOMAINS = new Set([
+  "www", "blog", "careers", "jobs", "info", "mail", "news", "shop", "store",
+  "app", "go", "get", "m", "en", "us", "about", "team", "home", "web", "portal",
+  "support", "help",
+]);
+
+// Tokens that mark a firm / organisation name rather than a person. Hunter's
+// email-finder needs a human first + last name, so a name carrying one of these
+// is skipped instead of guessing a bogus address (e.g. "Smith Immigration Law").
+const ORG_NAME_TOKENS =
+  /\b(llc|llp|pllc|inc|incorporated|corp|corporation|ltd|co|group|firm|law|legal|associates|partners|partnership|association|chamber|bureau|holdings|capital|realty|ventures|advisory)\b|&|,/i;
+
+/** Derive a firm domain from a website URL, or null if it's blank/non-firm. */
+function domainFromWebsite(website?: string | null): string | null {
+  const raw = (website ?? "").trim();
+  if (!raw) return null;
+  const withScheme = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+  try {
+    const labels = new URL(withScheme).hostname.toLowerCase().split(".");
+    // Peel a single known generic sub-domain, but only while a domain.tld remains.
+    if (labels.length >= 3 && GENERIC_SUBDOMAINS.has(labels[0])) labels.shift();
+    const host = labels.join(".");
+    if (!host.includes(".")) return null;
+    const base = labels.slice(-2).join(".");
+    if (NON_FIRM_DOMAINS.has(host) || NON_FIRM_DOMAINS.has(base)) return null;
+    return host;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Best-effort discover a work email for a person lead via Hunter's email-finder.
+ * Discovery (SerpAPI) returns a name + firm website but no email, and the Grok
+ * broker sequence is email-led — so without this step the whole day's list is
+ * un-enrollable. Only attempts leads that look like a real person (2+ name parts
+ * and no firm/org token) on a real firm domain; returns null otherwise.
+ */
+async function enrichLeadEmail(lead: DiscoveredLeadInput): Promise<string | null> {
+  const domain = domainFromWebsite(lead.website);
+  if (!domain) return null;
+  const name = (lead.fullName ?? "").trim();
+  const parts = name.split(/\s+/).filter(Boolean);
+  // Need a plausible person: 2+ name parts that don't read as an org/firm name.
+  if (parts.length < 2 || ORG_NAME_TOKENS.test(name)) return null;
+  try {
+    const r = await hunterFindEmail(parts[0], parts[parts.length - 1], domain);
+    return r?.email ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /** Short, human label for the day's dominant strategy, used in list/campaign names. */
@@ -189,6 +260,12 @@ async function enrolProspect(
  */
 export async function buildDailyCampaignFromLeads(opts: {
   planDate: string;
+  /**
+   * The date the campaign is actually built & goes live — used for the list /
+   * campaign display names. Defaults to planDate, but a stale plan approved days
+   * later should surface the run date (today), not the day it was drafted.
+   */
+  runDate?: string;
   planSummary?: string | null;
   topCategories?: string[];
   leads: DiscoveredLeadInput[];
@@ -196,15 +273,25 @@ export async function buildDailyCampaignFromLeads(opts: {
   const leads = opts.leads.filter((l) => l.fullName && l.fullName.trim().length >= 3);
   if (leads.length === 0) return null;
 
-  // 1. Discovered leads → deduped CRM contacts.
+  // 1. Discovered leads → deduped CRM contacts. SerpAPI gives us a name + firm
+  //    website but no email; enrich a work email via Hunter first so the
+  //    email-led campaign actually has someone to send to.
   const contactIds: string[] = [];
+  let emailsEnriched = 0;
   for (const l of leads) {
+    let email = l.email?.trim() || null;
+    let enrichedEmail: string | null = null;
+    if (!email) {
+      enrichedEmail = await enrichLeadEmail(l);
+      if (enrichedEmail) email = enrichedEmail;
+    }
     try {
       const { contact } = await addProspectContact(
         {
           fullName: l.fullName,
           companyName: l.company,
-          email: l.email,
+          email,
+          websiteUrl: l.website,
           linkedinUrl: l.linkedinUrl,
           jobTitle: l.jobTitle,
           country: l.country,
@@ -214,6 +301,13 @@ export async function buildDailyCampaignFromLeads(opts: {
         { source: "Outreach Agent — Daily Plan" },
       );
       contactIds.push(contact.id);
+      // Only count an enrichment once the address has actually landed on the
+      // persisted contact — so the SMS never claims a Hunter email that didn't
+      // stick (a pre-existing row can keep its own address, and a throw above
+      // skips this line entirely).
+      if (enrichedEmail && (contact.email ?? "").toLowerCase() === enrichedEmail.toLowerCase()) {
+        emailsEnriched++;
+      }
     } catch (e) {
       console.warn(`[DailyCampaign] Could not add contact "${l.fullName}":`, (e as Error).message);
     }
@@ -221,16 +315,18 @@ export async function buildDailyCampaignFromLeads(opts: {
   if (contactIds.length === 0) return null;
 
   // 2. Per-day custom list (auto-mirrored into a campaign-audience prospect list).
+  const runDate = opts.runDate || opts.planDate;
   const label = strategyLabel(opts.topCategories);
   const suffix = label ? ` · ${label}` : "";
-  const listName = `Daily Leads — ${opts.planDate}${suffix}`;
+  const listName = `Daily Leads — ${runDate}${suffix}`;
   const list = await storage.createCrmList(listName);
   await storage.addContactsToList(list.id, contactIds);
 
   // 3. Clone the Grok 2.0 broker sequence into a fresh live campaign for today.
-  const campaignName = `Grok 2.0 Brokers — ${opts.planDate}${suffix}`;
+  const campaignName = `Grok 2.0 Brokers — ${runDate}${suffix}`;
+  const plannedNote = opts.planDate && opts.planDate !== runDate ? ` (planned ${opts.planDate})` : "";
   const description =
-    `Auto-generated ${opts.planDate} from the approved outreach plan. ` +
+    `Auto-generated ${runDate}${plannedNote} from the approved outreach plan. ` +
     `Audience: "${listName}" (${contactIds.length} contacts). ` +
     `${opts.planSummary ?? ""}`.trim().slice(0, 500);
   const campaign = await cloneGrokBrokerCampaign(campaignName, description);
@@ -267,7 +363,7 @@ export async function buildDailyCampaignFromLeads(opts: {
   }
 
   console.log(
-    `[DailyCampaign] ${opts.planDate}: list "${listName}" (${contactIds.length}), ` +
+    `[DailyCampaign] ${runDate}: list "${listName}" (${contactIds.length}, ${emailsEnriched} emails enriched), ` +
       `campaign "${campaignName}" — enrolled ${enrolled}, dup ${skippedDuplicate}, ` +
       `undeliverable ${skippedUndeliverable}, no-email ${skippedNoEmail}.`,
   );
@@ -278,6 +374,7 @@ export async function buildDailyCampaignFromLeads(opts: {
     campaignName,
     campaignId: campaign.id,
     contactsAdded: contactIds.length,
+    emailsEnriched,
     enrolled,
     skippedDuplicate,
     skippedUndeliverable,

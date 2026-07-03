@@ -27,7 +27,7 @@ import {
   decisionFromStoredStatus,
 } from "./email-verification-service";
 import { processDripEmails } from "./drip-processor";
-import { hunterFindEmail } from "./hunter-service";
+import { enrichLeadEmail } from "./lead-email-enrichment";
 import { BROKER_2_CAMPAIGN_NAME } from "@shared/campaign-tracks";
 import type { DripCampaign, Prospect } from "@shared/schema";
 
@@ -54,74 +54,6 @@ export interface DailyCampaignResult {
   skippedDuplicate: number;
   skippedUndeliverable: number;
   skippedNoEmail: number;
-}
-
-// Public directories / social sites / webmail whose domain would never yield a
-// person's work email via Hunter — skip enrichment for these so we don't waste
-// calls or mint a bogus address (e.g. "jane.doe@linkedin.com").
-const NON_FIRM_DOMAINS = new Set([
-  "linkedin.com", "facebook.com", "twitter.com", "x.com", "instagram.com",
-  "youtube.com", "google.com", "goo.gl", "yelp.com", "wikipedia.org",
-  "crunchbase.com", "bloomberg.com", "glassdoor.com", "indeed.com", "avvo.com",
-  "justia.com", "martindale.com", "lawyers.com", "yellowpages.com", "bbb.org",
-  "medium.com", "wordpress.com", "blogspot.com", "gmail.com", "yahoo.com",
-  "hotmail.com", "outlook.com",
-]);
-
-// Generic leading sub-domains to peel off a deep-page URL so it still resolves to
-// the firm's mail domain (careers.smithlaw.com → smithlaw.com). Kept to a known
-// list so we stay correct for multi-part TLDs (we never blindly drop a label).
-const GENERIC_SUBDOMAINS = new Set([
-  "www", "blog", "careers", "jobs", "info", "mail", "news", "shop", "store",
-  "app", "go", "get", "m", "en", "us", "about", "team", "home", "web", "portal",
-  "support", "help",
-]);
-
-// Tokens that mark a firm / organisation name rather than a person. Hunter's
-// email-finder needs a human first + last name, so a name carrying one of these
-// is skipped instead of guessing a bogus address (e.g. "Smith Immigration Law").
-const ORG_NAME_TOKENS =
-  /\b(llc|llp|pllc|inc|incorporated|corp|corporation|ltd|co|group|firm|law|legal|associates|partners|partnership|association|chamber|bureau|holdings|capital|realty|ventures|advisory)\b|&|,/i;
-
-/** Derive a firm domain from a website URL, or null if it's blank/non-firm. */
-function domainFromWebsite(website?: string | null): string | null {
-  const raw = (website ?? "").trim();
-  if (!raw) return null;
-  const withScheme = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
-  try {
-    const labels = new URL(withScheme).hostname.toLowerCase().split(".");
-    // Peel a single known generic sub-domain, but only while a domain.tld remains.
-    if (labels.length >= 3 && GENERIC_SUBDOMAINS.has(labels[0])) labels.shift();
-    const host = labels.join(".");
-    if (!host.includes(".")) return null;
-    const base = labels.slice(-2).join(".");
-    if (NON_FIRM_DOMAINS.has(host) || NON_FIRM_DOMAINS.has(base)) return null;
-    return host;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Best-effort discover a work email for a person lead via Hunter's email-finder.
- * Discovery (SerpAPI) returns a name + firm website but no email, and the Grok
- * broker sequence is email-led — so without this step the whole day's list is
- * un-enrollable. Only attempts leads that look like a real person (2+ name parts
- * and no firm/org token) on a real firm domain; returns null otherwise.
- */
-async function enrichLeadEmail(lead: DiscoveredLeadInput): Promise<string | null> {
-  const domain = domainFromWebsite(lead.website);
-  if (!domain) return null;
-  const name = (lead.fullName ?? "").trim();
-  const parts = name.split(/\s+/).filter(Boolean);
-  // Need a plausible person: 2+ name parts that don't read as an org/firm name.
-  if (parts.length < 2 || ORG_NAME_TOKENS.test(name)) return null;
-  try {
-    const r = await hunterFindEmail(parts[0], parts[parts.length - 1], domain);
-    return r?.email ?? null;
-  } catch {
-    return null;
-  }
 }
 
 /** Short, human label for the day's dominant strategy, used in list/campaign names. */

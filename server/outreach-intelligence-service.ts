@@ -162,18 +162,20 @@ You MUST respond with valid JSON only (no markdown, no explanation outside the J
   "estimatedLeads": 45
 }
 
-Include 3-5 lead categories, 5-8 search queries, and 0-3 blocker requests. Be specific and actionable.`;
+Include 4-6 lead categories, 8-12 search queries, and 0-3 blocker requests. Be specific and actionable. Vary the queries within a category (different cities, English + local-language phrasings, "firm directory" vs "attorney name" angles) so they don't all return the same results.`;
 
 // ─── SerpAPI Web Search ───────────────────────────────────────────────────────
 
 async function serpSearch(query: string): Promise<{ title: string; link: string; snippet: string }[]> {
   if (!SERPAPI_KEY) return [];
   try {
-    const url = `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(query)}&num=10&api_key=${SERPAPI_KEY}`;
+    // Pull a full 20-result page — the old 8-result cap left most of each
+    // query's candidates on the table (a SerpAPI call costs the same either way).
+    const url = `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(query)}&num=20&api_key=${SERPAPI_KEY}`;
     const res = await fetch(url);
     if (!res.ok) return [];
     const data = await res.json() as { organic_results?: { title?: string; link?: string; snippet?: string }[] };
-    return (data.organic_results ?? []).slice(0, 8).map(r => ({
+    return (data.organic_results ?? []).slice(0, 20).map(r => ({
       title: r.title ?? "",
       link: r.link ?? "",
       snippet: r.snippet ?? "",
@@ -240,9 +242,11 @@ ${results.map((r, i) => `${i + 1}. ${r.title}\n   ${r.snippet}\n   ${r.link}`).j
 Return JSON array of leads found (referral partners only):
 [{"fullName": "Name or Org Name", "company": "Firm/Company", "website": "URL if found", "notes": "Why they are a strong referral partner for E-2 franchise clients"}]
 
+IMPORTANT — website field: ALWAYS include a website when the search result links to the person's or firm's OWN site (use that result's URL). The website is how we find their work email, so a lead without one usually can't be contacted. Only leave it out when the result is a directory/social page (LinkedIn, Avvo, Yelp, news article) and no firm site is evident.
+
 Return empty array [] if no clear referral partners found. Only return verified names/orgs from the results, do NOT invent.`;
 
-    const raw = await callClaude("", prompt, 1500);
+    const raw = await callClaude("", prompt, 2500);
     const cleaned = raw.replace(/```json\n?|\n?```/g, "").trim();
     const arr = JSON.parse(cleaned);
     return Array.isArray(arr) ? arr.map(l => ({ ...l, category })) : [];
@@ -412,9 +416,12 @@ export function buildPlanExecutedSms(opts: {
   if (campaign) {
     const parts: string[] = [];
     parts.push(`\n\n🎯 Campaign "${campaign.campaignName}" is LIVE.`);
+    const enrichNote = campaign.emailsEnriched
+      ? ` (${campaign.emailsEnriched} work emails found` +
+        `${campaign.firmPeopleAdded ? `, incl. ${campaign.firmPeopleAdded} people discovered at firms` : ""})`
+      : "";
     parts.push(
-      `List "${campaign.listName}" — ${campaign.contactsAdded} contacts, ${campaign.enrolled} enrolled` +
-        `${campaign.emailsEnriched ? ` (${campaign.emailsEnriched} work emails found via Hunter)` : ""}.`,
+      `List "${campaign.listName}" — ${campaign.contactsAdded} contacts, ${campaign.enrolled} enrolled${enrichNote}.`,
     );
     // Always explain the gap between contacts and enrollments so "0 enrolled"
     // never looks like a silent failure.
@@ -489,8 +496,11 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
         ) ?? plan.leadCategories[0];
         queryCountry = cat?.country;
         const titles = cat ? [cat.category.replace(/_/g, " ")] : ["immigration attorney"];
-        const locations = cat ? [cat.geoFocus] : [];
-        seamlessLeads = await seamlessSearch({ titles, locations, keywords: "E-2 visa", limit: 20 });
+        // The location filter needs a real country name — geoFocus is a prose
+        // sentence ("Seoul — in-country immigration attorneys…") that matches
+        // nothing, which silently zeroed out every Seamless query.
+        const locations = cat?.country ? [cat.country] : [];
+        seamlessLeads = await seamlessSearch({ titles, locations, keywords: "E-2 visa", limit: 25 });
         discovered = seamlessLeads.map(p => ({
           fullName: p.name,
           company: p.company,

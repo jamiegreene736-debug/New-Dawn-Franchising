@@ -27,7 +27,11 @@ import {
   decisionFromStoredStatus,
 } from "./email-verification-service";
 import { processDripEmails } from "./drip-processor";
-import { enrichLeadEmail } from "./lead-email-enrichment";
+import {
+  enrichLeadEmail,
+  findPeopleAtFirm,
+  looksLikePersonName,
+} from "./lead-email-enrichment";
 import { BROKER_2_CAMPAIGN_NAME } from "@shared/campaign-tracks";
 import type { DripCampaign, Prospect } from "@shared/schema";
 
@@ -50,6 +54,8 @@ export interface DailyCampaignResult {
   campaignId: string;
   contactsAdded: number;
   emailsEnriched: number;
+  /** Extra people discovered at org-only leads' firms (Hunter domain-search). */
+  firmPeopleAdded: number;
   enrolled: number;
   skippedDuplicate: number;
   skippedUndeliverable: number;
@@ -206,42 +212,102 @@ export async function buildDailyCampaignFromLeads(opts: {
   if (leads.length === 0) return null;
 
   // 1. Discovered leads → deduped CRM contacts. SerpAPI gives us a name + firm
-  //    website but no email; enrich a work email via Hunter first so the
-  //    email-led campaign actually has someone to send to.
+  //    website but no email; enrich a work email (Hunter → Apollo → PDL →
+  //    verified pattern guess) first so the email-led campaign actually has
+  //    someone to send to. Org-only leads ("Smith Immigration Law") are
+  //    expanded into the real people Hunter knows at that firm's domain.
   const contactIds: string[] = [];
   let emailsEnriched = 0;
-  for (const l of leads) {
-    let email = l.email?.trim() || null;
-    let enrichedEmail: string | null = null;
-    if (!email) {
-      enrichedEmail = await enrichLeadEmail(l);
-      if (enrichedEmail) email = enrichedEmail;
-    }
+  let firmPeopleAdded = 0;
+  // Addresses whose deliverability was already confirmed during enrichment —
+  // carried to the enrol step so the same address isn't verified (and billed)
+  // twice in one run.
+  const verifiedDuringEnrichment = new Set<string>();
+  // Bound the per-run Hunter domain-search spend for org expansion.
+  let orgExpansionsLeft = 15;
+
+  const addContact = async (input: {
+    fullName: string;
+    companyName?: string | null;
+    email: string | null;
+    websiteUrl?: string | null;
+    linkedinUrl?: string | null;
+    jobTitle?: string | null;
+    country?: string | null;
+    city?: string | null;
+  }, category?: string | null): Promise<{ id: string; email: string | null } | null> => {
     try {
       const { contact } = await addProspectContact(
-        {
-          fullName: l.fullName,
-          companyName: l.company,
-          email,
-          websiteUrl: l.website,
-          linkedinUrl: l.linkedinUrl,
-          jobTitle: l.jobTitle,
-          country: l.country,
-          city: l.city,
-        },
-        l.category ?? undefined,
+        input,
+        category ?? undefined,
         { source: "Outreach Agent — Daily Plan" },
       );
       contactIds.push(contact.id);
-      // Only count an enrichment once the address has actually landed on the
-      // persisted contact — so the SMS never claims a Hunter email that didn't
-      // stick (a pre-existing row can keep its own address, and a throw above
-      // skips this line entirely).
-      if (enrichedEmail && (contact.email ?? "").toLowerCase() === enrichedEmail.toLowerCase()) {
-        emailsEnriched++;
-      }
+      return { id: contact.id, email: contact.email ?? null };
     } catch (e) {
-      console.warn(`[DailyCampaign] Could not add contact "${l.fullName}":`, (e as Error).message);
+      console.warn(`[DailyCampaign] Could not add contact "${input.fullName}":`, (e as Error).message);
+      return null;
+    }
+  };
+
+  for (const l of leads) {
+    let email = l.email?.trim() || null;
+    let enrichedEmail: string | null = null;
+
+    if (!email && looksLikePersonName(l.fullName)) {
+      const enriched = await enrichLeadEmail(l);
+      if (enriched) {
+        email = enrichedEmail = enriched.email;
+        if (enriched.verifiedStatus === "valid") {
+          verifiedDuringEnrichment.add(enriched.email.toLowerCase());
+        }
+      }
+    }
+
+    // Org-only lead with no address: expand it into the real people Hunter has
+    // on file at the firm's domain. Each person arrives WITH a work email, so
+    // this converts what used to be a guaranteed "no email" skip into
+    // enrollable contacts. The org itself is only added when expansion found
+    // nobody (it still lands in the outreach_leads pipeline either way).
+    if (!email && !looksLikePersonName(l.fullName) && orgExpansionsLeft > 0) {
+      orgExpansionsLeft--;
+      const people = await findPeopleAtFirm(l.website);
+      if (people.length > 0) {
+        for (const person of people) {
+          const added = await addContact({
+            fullName: person.fullName,
+            companyName: l.company?.trim() || l.fullName,
+            email: person.email,
+            websiteUrl: l.website,
+            jobTitle: person.jobTitle ?? l.jobTitle,
+            country: l.country,
+            city: l.city,
+          }, l.category);
+          if (added && (added.email ?? "").toLowerCase() === person.email.toLowerCase()) {
+            firmPeopleAdded++;
+            emailsEnriched++;
+          }
+        }
+        continue;
+      }
+    }
+
+    const added = await addContact({
+      fullName: l.fullName,
+      companyName: l.company,
+      email,
+      websiteUrl: l.website,
+      linkedinUrl: l.linkedinUrl,
+      jobTitle: l.jobTitle,
+      country: l.country,
+      city: l.city,
+    }, l.category);
+    // Only count an enrichment once the address has actually landed on the
+    // persisted contact — so the SMS never claims an email that didn't stick
+    // (a pre-existing row can keep its own address, and an add failure skips
+    // this entirely).
+    if (added && enrichedEmail && (added.email ?? "").toLowerCase() === enrichedEmail.toLowerCase()) {
+      emailsEnriched++;
     }
   }
   if (contactIds.length === 0) return null;
@@ -276,6 +342,22 @@ export async function buildDailyCampaignFromLeads(opts: {
     skippedNoEmail = 0;
   for (const p of prospectsInList) {
     try {
+      // An address whose deliverability was already confirmed during
+      // enrichment doesn't need a second verifier call — persist the verdict
+      // so enrolProspect's 30-day cache path picks it up.
+      const pEmail = (p.email ?? "").trim().toLowerCase();
+      if (
+        pEmail &&
+        verifiedDuringEnrichment.has(pEmail) &&
+        !((p as any).emailStatus && isFreshVerification((p as any).emailVerifiedAt))
+      ) {
+        const now = new Date();
+        await storage
+          .updateProspect(p.id, { emailStatus: "valid", emailVerifiedAt: now } as any)
+          .catch(() => {});
+        (p as any).emailStatus = "valid";
+        (p as any).emailVerifiedAt = now;
+      }
       const outcome = await enrolProspect(campaign.id, p, seenThisRun);
       if (outcome === "enrolled") enrolled++;
       else if (outcome === "duplicate") skippedDuplicate++;
@@ -295,7 +377,8 @@ export async function buildDailyCampaignFromLeads(opts: {
   }
 
   console.log(
-    `[DailyCampaign] ${runDate}: list "${listName}" (${contactIds.length}, ${emailsEnriched} emails enriched), ` +
+    `[DailyCampaign] ${runDate}: list "${listName}" (${contactIds.length}, ${emailsEnriched} emails enriched, ` +
+      `${firmPeopleAdded} people found at org leads), ` +
       `campaign "${campaignName}" — enrolled ${enrolled}, dup ${skippedDuplicate}, ` +
       `undeliverable ${skippedUndeliverable}, no-email ${skippedNoEmail}.`,
   );
@@ -307,6 +390,7 @@ export async function buildDailyCampaignFromLeads(opts: {
     campaignId: campaign.id,
     contactsAdded: contactIds.length,
     emailsEnriched,
+    firmPeopleAdded,
     enrolled,
     skippedDuplicate,
     skippedUndeliverable,

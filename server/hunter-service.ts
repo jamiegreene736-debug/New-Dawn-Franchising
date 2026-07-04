@@ -75,16 +75,70 @@ export async function hunterVerifyEmail(email: string): Promise<HunterVerifyResu
   } catch { return null; }
 }
 
-export async function hunterDomainPattern(domain: string): Promise<string | null> {
+export interface HunterDomainEmail {
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  position: string | null;
+  /** "personal" (a named person's mailbox) or "generic" (info@, office@…). */
+  type: string;
+  confidence: number;
+}
+
+export interface HunterDomainSearchResult {
+  pattern: string | null;
+  organization: string | null;
+  emails: HunterDomainEmail[];
+}
+
+/**
+ * Full Hunter domain-search: the firm's email pattern PLUS the actual addresses
+ * Hunter has on file for the domain — including named people with positions.
+ * This is what turns an org-only lead ("Smith Immigration Law") into real,
+ * emailable contacts.
+ */
+export async function hunterDomainSearch(domain: string): Promise<HunterDomainSearchResult | null> {
   if (!HUNTER_API_KEY) return null;
 
   try {
     const params = new URLSearchParams({ domain, api_key: HUNTER_API_KEY });
     const res = await fetch(`https://api.hunter.io/v2/domain-search?${params}`);
     if (!res.ok) return null;
-    const json = await res.json() as { data?: { pattern?: string } };
-    return json.data?.pattern || null;
+    const json = await res.json() as {
+      data?: {
+        pattern?: string;
+        organization?: string;
+        emails?: Array<{
+          value?: string;
+          first_name?: string | null;
+          last_name?: string | null;
+          position?: string | null;
+          type?: string;
+          confidence?: number;
+        }>;
+      };
+    };
+    if (!json.data) return null;
+    return {
+      pattern: json.data.pattern || null,
+      organization: json.data.organization || null,
+      emails: (json.data.emails ?? [])
+        .filter((e) => e.value && e.value.includes("@"))
+        .map((e) => ({
+          email: String(e.value),
+          firstName: e.first_name || null,
+          lastName: e.last_name || null,
+          position: e.position || null,
+          type: String(e.type || "generic"),
+          confidence: Number(e.confidence || 0),
+        })),
+    };
   } catch { return null; }
+}
+
+export async function hunterDomainPattern(domain: string): Promise<string | null> {
+  const r = await hunterDomainSearch(domain);
+  return r?.pattern ?? null;
 }
 
 export function buildEmailFromPattern(

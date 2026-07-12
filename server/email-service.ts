@@ -32,6 +32,16 @@ export function getSenderPassword(profile: SenderProfile): string | undefined {
   return clean || undefined;
 }
 
+/**
+ * How many sender mailboxes are actually credentialed (app password present).
+ * Drives the default daily send cap: ~100/day per real mailbox is the safe
+ * per-address Gmail volume, so total capacity scales as mailboxes are added.
+ */
+export function countConfiguredSenders(): number {
+  const n = ALL_SENDER_PROFILES.filter((p) => !!getSenderPassword(p)).length;
+  return Math.max(1, n);
+}
+
 export function getAvailableSenders(): SenderProfile[] {
   // franchising@ is the primary sender — always included (even before its app password
   // is confirmed) so the UI has at least one option; the actual send surfaces any error.

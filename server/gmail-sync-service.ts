@@ -124,7 +124,19 @@ export async function syncFranchisingInbox(): Promise<SyncResult> {
     lastResult = { scanned: 0, matched: 0, stored: 0, bounced: 0, error: "GMAIL_APP_PASSWORD_FRANCHISING not set", lastRunAt: new Date() };
     return lastResult;
   }
+  lastResult = await syncSenderInbox(FRANCHISING_EMAIL, password);
+  return lastResult;
+}
 
+/**
+ * Full inbox sync for ONE sender mailbox: bounce/NDR handling plus personal
+ * replies (pause the sender's active campaigns for that person, alert the team,
+ * and land the message on the matching CRM record). With sender rotation on,
+ * drip mail goes out from every credentialed mailbox — so every one of those
+ * inboxes needs this treatment, not just franchising@ (a reply to dylan@ that
+ * nobody sees is exactly the "no one ever replies" failure mode).
+ */
+export async function syncSenderInbox(senderEmail: string, password: string): Promise<SyncResult> {
   let client: ImapFlow | null = null;
   let scanned = 0;
   let matched = 0;
@@ -136,7 +148,7 @@ export async function syncFranchisingInbox(): Promise<SyncResult> {
       host: "imap.gmail.com",
       port: 993,
       secure: true,
-      auth: { user: FRANCHISING_EMAIL, pass: password },
+      auth: { user: senderEmail, pass: password },
       logger: false,
     });
 
@@ -197,7 +209,7 @@ export async function syncFranchisingInbox(): Promise<SyncResult> {
         if (processedMessageIds.has(msgId)) continue;
 
         // Skip our own messages / anything without a sender.
-        if (!fromAddr || fromAddr === FRANCHISING_EMAIL) {
+        if (!fromAddr || fromAddr === senderEmail) {
           processedMessageIds.add(msgId);
           continue;
         }
@@ -248,7 +260,7 @@ export async function syncFranchisingInbox(): Promise<SyncResult> {
               clientId: clientRow.id,
               fromEmail: fromAddr,
               fromName,
-              toEmail: FRANCHISING_EMAIL,
+              toEmail: senderEmail,
               subject,
               bodyHtml,
               bodyText,
@@ -314,19 +326,17 @@ export async function syncFranchisingInbox(): Promise<SyncResult> {
     await client.logout();
   } catch (e: any) {
     const error = e?.message || "IMAP sync error";
-    console.error("[GmailSync] franchising@ poll error:", error);
+    console.error(`[GmailSync] ${senderEmail} poll error:`, error);
     if (client) {
       try { await client.logout(); } catch {}
     }
-    lastResult = { scanned, matched, stored, bounced, error, lastRunAt: new Date() };
-    return lastResult;
+    return { scanned, matched, stored, bounced, error, lastRunAt: new Date() };
   }
 
   if (stored > 0 || bounced > 0) {
-    console.log(`[GmailSync] franchising@ — scanned ${scanned}, matched ${matched}, stored ${stored} (${bounced} bounce[s])`);
+    console.log(`[GmailSync] ${senderEmail} — scanned ${scanned}, matched ${matched}, stored ${stored} (${bounced} bounce[s])`);
   }
-  lastResult = { scanned, matched, stored, bounced, error: null, lastRunAt: new Date() };
-  return lastResult;
+  return { scanned, matched, stored, bounced, error: null, lastRunAt: new Date() };
 }
 
 let scheduled = false;
@@ -346,57 +356,15 @@ export function scheduleGmailSync(): void {
   console.log("[GmailSync] franchising@ inbox sync scheduled (every 2 min)");
 }
 
-// ─── Bounce scanning for the OTHER sender inboxes ──────────────────────────────
-// franchising@ gets the full reply+bounce sync above. dylan@/info@/support@ also
-// send mail, so their bounce NDRs must be caught too — but we only want the
-// bounce-suppression half here (not the full CRM reply import), so this is a
-// lightweight, bounce-only scan.
-export async function syncInboxBounces(email: string, password: string): Promise<{ scanned: number; bounced: number }> {
-  let client: ImapFlow | null = null;
-  let scanned = 0;
-  let bounced = 0;
-  try {
-    const softSkipDnc = (await getDeliverabilitySettings()).softBounceSkipDnc;
-    client = new ImapFlow({ host: "imap.gmail.com", port: 993, secure: true, auth: { user: email, pass: password }, logger: false });
-    await client.connect();
-    const lock = await client.getMailboxLock("INBOX");
-    try {
-      const since = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
-      for await (const msg of client.fetch({ since }, { envelope: true, source: true })) {
-        scanned++;
-        const fromAddr = msg.envelope?.from?.[0]?.address?.toLowerCase() || "";
-        const subject = msg.envelope?.subject || "(no subject)";
-        const rawSource = msg.source ? msg.source.toString("utf8") : "";
-        if (!isBounceNotification(fromAddr, subject, rawSource.slice(0, 4000))) continue;
-        const kind = classifyBounce(rawSource || subject);
-        if (kind === "soft" && softSkipDnc) continue;
-        for (const addr of extractBouncedRecipients(rawSource || subject)) {
-          const marked = await storage.markDripSendBounced(addr, `Bounced (${kind}) @${email}: ${subject}`.slice(0, 200));
-          if (marked) {
-            bounced++;
-            try { await addToDnc(addr, undefined, undefined, `Email hard-bounced (${kind})`); } catch {}
-            try {
-              if (marked.enrollmentId) await storage.updateDripEnrollment(marked.enrollmentId, { status: "bounced" } as any);
-            } catch {}
-            console.log(`[GmailSync] bounce @${email} — marked ${addr} bounced + suppressed (${subject})`);
-          }
-        }
-      }
-    } finally {
-      lock.release();
-    }
-  } catch (e: any) {
-    console.error(`[GmailSync] bounce scan ${email} failed:`, e?.message || e);
-  } finally {
-    if (client) { try { await client.logout(); } catch {} }
-  }
-  if (bounced > 0) console.log(`[GmailSync] ${email} — bounce scan found ${bounced} bounce(s) in ${scanned} msgs`);
-  return { scanned, bounced };
-}
+// ─── Full sync for the OTHER sender inboxes ────────────────────────────────────
+// franchising@ gets the frequent (2-min) sync above. With sender rotation on,
+// dylan@/info@/support@ send cold drip mail too — so their inboxes need the SAME
+// full treatment (personal replies pause campaigns + alert the team + land on
+// the CRM record, bounces suppress), just on a gentler cadence.
 
 let allInboxScheduled = false;
 
-/** Register a recurring bounce-only scan of the non-franchising sender inboxes. */
+/** Register a recurring full reply+bounce sync of the non-franchising sender inboxes. */
 export function scheduleAllInboxBounceScan(): void {
   if (allInboxScheduled) return;
   allInboxScheduled = true;
@@ -404,8 +372,8 @@ export function scheduleAllInboxBounceScan(): void {
   cron.schedule("*/15 * * * *", async () => {
     for (const p of others()) {
       const pass = getSenderPassword(p);
-      if (pass) await syncInboxBounces(p.email, pass).catch((e) => console.error("[GmailSync] all-inbox scan error:", e?.message || e));
+      if (pass) await syncSenderInbox(p.email, pass).catch((e) => console.error("[GmailSync] all-inbox sync error:", e?.message || e));
     }
   });
-  console.log(`[GmailSync] all-inbox bounce scan scheduled (every 15 min) for ${others().length} other sender(s)`);
+  console.log(`[GmailSync] all-inbox reply+bounce sync scheduled (every 15 min) for ${others().length} other sender(s)`);
 }

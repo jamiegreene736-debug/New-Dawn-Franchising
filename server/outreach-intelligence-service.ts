@@ -9,7 +9,7 @@
 
 import { db } from "./db";
 import { outreachDailyPlans, outreachLeads } from "@shared/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, or, desc, gte, isNull, isNotNull, inArray } from "drizzle-orm";
 import { notifyBlocker, sendAgentSms, isRedundantDataVendorBlocker } from "./agent-sms-service";
 import { buildDailyCampaignFromLeads, type DiscoveredLeadInput, type DailyCampaignResult } from "./daily-campaign-service";
 import { seamlessFindPeople } from "./seamless-service";
@@ -18,6 +18,16 @@ import { randomUUID } from "crypto";
 const APP_BASE = () => process.env.APP_BASE_URL ?? "https://www.newdawnfranchising.com";
 const SERPAPI_KEY = process.env.SERPAPI_KEY ?? "";
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY ?? "";
+
+// How many contacts each daily campaign build aims to start with. At the
+// observed ~25-35% email-find rate this lands 40-50+ enrollable contacts per
+// day (200-250+/week); shortfalls vs today's discoveries are topped up from
+// never-campaigned pipeline leads (see the backfill in executeApprovedPlan).
+// Override with DAILY_CAMPAIGN_TARGET_CONTACTS.
+const DAILY_CAMPAIGN_TARGET = (() => {
+  const n = parseInt(process.env.DAILY_CAMPAIGN_TARGET_CONTACTS ?? "", 10);
+  return Number.isFinite(n) && n > 0 ? n : 150;
+})();
 
 // ─── Claude helper ────────────────────────────────────────────────────────────
 
@@ -162,20 +172,23 @@ You MUST respond with valid JSON only (no markdown, no explanation outside the J
   "estimatedLeads": 45
 }
 
-Include 4-6 lead categories, 8-12 search queries, and 0-3 blocker requests. Be specific and actionable. Vary the queries within a category (different cities, English + local-language phrasings, "firm directory" vs "attorney name" angles) so they don't all return the same results.`;
+VOLUME TARGET — this matters: the pipeline needs 120–180 NEW leads discovered per day. Only ~25-35% of discovered leads yield a deliverable work email after enrichment, and the goal is 100+ emailable contacts entering a campaign every day (500+ per week). Plan wide enough to hit that.
+
+Include 6-10 lead categories, 16-24 search queries, and 0-3 blocker requests. At least 4 of the queries MUST use source "seamless" (Seamless returns contacts WITH verified emails, so those convert to campaign enrollments at a far higher rate than SerpAPI finds). Be specific and actionable. Vary the queries within a category (different cities, English + local-language phrasings, "firm directory" vs "attorney name" angles) so they don't all return the same results.`;
 
 // ─── SerpAPI Web Search ───────────────────────────────────────────────────────
 
 async function serpSearch(query: string): Promise<{ title: string; link: string; snippet: string }[]> {
   if (!SERPAPI_KEY) return [];
   try {
-    // Pull a full 20-result page — the old 8-result cap left most of each
-    // query's candidates on the table (a SerpAPI call costs the same either way).
-    const url = `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(query)}&num=20&api_key=${SERPAPI_KEY}`;
+    // Pull a deep 40-result page — one SerpAPI request costs the same credit
+    // regardless of num, and only ~25% of extracted leads end up emailable, so
+    // every extra organic result widens the funnel for free.
+    const url = `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(query)}&num=40&api_key=${SERPAPI_KEY}`;
     const res = await fetch(url);
     if (!res.ok) return [];
     const data = await res.json() as { organic_results?: { title?: string; link?: string; snippet?: string }[] };
-    return (data.organic_results ?? []).slice(0, 20).map(r => ({
+    return (data.organic_results ?? []).slice(0, 40).map(r => ({
       title: r.title ?? "",
       link: r.link ?? "",
       snippet: r.snippet ?? "",
@@ -200,7 +213,7 @@ async function seamlessSearch(opts: {
       titles: opts.titles ?? [],
       countries: opts.locations ?? [],
       keywords: opts.keywords,
-      limit: Math.min(opts.limit ?? 20, 25),
+      limit: Math.min(opts.limit ?? 40, 50),
     },
     { enrich: true },
   );
@@ -406,6 +419,8 @@ export function buildPlanExecutedSms(opts: {
   sourcesSearched: number;
   profilesFound: number;
   leadsAdded: number;
+  /** Never-campaigned pipeline leads recycled into today's build. */
+  backfilled?: number;
   campaign: DailyCampaignResult | null;
 }): string {
   const { base, campaign } = opts;
@@ -446,10 +461,13 @@ export function buildPlanExecutedSms(opts: {
     campaignLine = parts.join("\n");
   }
 
+  const backfillLine = opts.backfilled
+    ? ` (+${opts.backfilled} recycled from earlier days' pipeline)`
+    : "";
   return (
     `✅ Today's lead plan executed!${whyLine}\n\n` +
     `Searched ${opts.sourcesSearched} sources → found ${opts.profilesFound} profiles → ` +
-    `added ${opts.leadsAdded} new leads to your pipeline.${campaignLine}\n\n` +
+    `added ${opts.leadsAdded} new leads to your pipeline${backfillLine}.${campaignLine}\n\n` +
     `View pipeline: ${base}/agent`
   );
 }
@@ -500,7 +518,7 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
         // sentence ("Seoul — in-country immigration attorneys…") that matches
         // nothing, which silently zeroed out every Seamless query.
         const locations = cat?.country ? [cat.country] : [];
-        seamlessLeads = await seamlessSearch({ titles, locations, keywords: "E-2 visa", limit: 25 });
+        seamlessLeads = await seamlessSearch({ titles, locations, keywords: "E-2 visa", limit: 50 });
         discovered = seamlessLeads.map(p => ({
           fullName: p.name,
           company: p.company,
@@ -537,6 +555,9 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
             notes: `[${query.source.toUpperCase()}] ${lead.notes}`,
             score: 60,
             status: "new",
+            // Today's discoveries go straight into today's campaign build below,
+            // so stamp them now — the backfill top-up only recycles NULL rows.
+            campaignedAt: new Date(),
           });
           addedFromQuery++;
           totalAdded++;
@@ -576,6 +597,53 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
     updatedAt: new Date(),
   }).where(eq(outreachDailyPlans.id, planId));
 
+  // Top up today's campaign from the standing pipeline: leads discovered on
+  // earlier days that never made it into any campaign build (typically because
+  // no email could be found back then, or the day's run died before the build).
+  // The enrichment waterfall + firm expansion keep improving, so recycling these
+  // is the cheapest source of extra emailable contacts — no new searches needed.
+  // Each lead is recycled at most once: it gets its campaigned_at stamp here
+  // whether or not enrichment succeeds this time.
+  let backfilled = 0;
+  if (discoveredForCampaign.length < DAILY_CAMPAIGN_TARGET) {
+    try {
+      const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const room = DAILY_CAMPAIGN_TARGET - discoveredForCampaign.length;
+      const pool = await db.select().from(outreachLeads)
+        .where(and(
+          eq(outreachLeads.status, "new"),
+          isNull(outreachLeads.campaignedAt),
+          gte(outreachLeads.createdAt, cutoff),
+          eq(outreachLeads.optedOut, false),
+          or(isNotNull(outreachLeads.email), isNotNull(outreachLeads.website)),
+        ))
+        .orderBy(desc(outreachLeads.score), desc(outreachLeads.createdAt))
+        .limit(room);
+      if (pool.length > 0) {
+        await db.update(outreachLeads)
+          .set({ campaignedAt: new Date() })
+          .where(inArray(outreachLeads.id, pool.map(l => l.id)));
+        for (const l of pool) {
+          discoveredForCampaign.push({
+            fullName: l.fullName,
+            company: l.company ?? "",
+            email: l.email ?? null,
+            website: l.website ?? null,
+            linkedinUrl: l.linkedinUrl ?? null,
+            jobTitle: l.title ?? null,
+            category: l.category ?? null,
+            country: null,
+            city: null,
+          });
+        }
+        backfilled = pool.length;
+        console.log(`[OutreachIntel] Backfilled ${backfilled} never-campaigned pipeline lead(s) into today's build.`);
+      }
+    } catch (e) {
+      console.warn("[OutreachIntel] Backfill top-up failed (continuing with today's finds):", (e as Error).message);
+    }
+  }
+
   // Build the day's custom list + a fresh clone of the Grok 2.0 broker campaign,
   // enrol the list, and set it live. Failure here must NOT lose the saved leads,
   // so it's isolated — the pipeline is already persisted above.
@@ -610,6 +678,7 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
     sourcesSearched: updatedQueries.length,
     profilesFound: totalDiscovered,
     leadsAdded: totalAdded,
+    backfilled,
     campaign,
   });
   await sendAgentSms("outreach", smsBody, { triggerType: "plan_executed" }).catch(() => {});

@@ -1158,6 +1158,9 @@ export const outreachLeads = pgTable("outreach_leads", {
   sequenceFlow: text("sequence_flow"), // "heygen_flow" (legacy: "lob_enabled" before postcards were removed)
   sequenceTrack: text("sequence_track").notNull().default("broker"), // "broker" | "client"
   lastEnrichedAt: timestamp("last_enriched_at"),
+  // Stamped when the lead is included in a daily auto-campaign build (on its
+  // discovery day, or later by the backfill top-up). NULL = never attempted.
+  campaignedAt: timestamp("campaigned_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

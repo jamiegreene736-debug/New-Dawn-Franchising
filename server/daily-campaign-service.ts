@@ -223,8 +223,13 @@ export async function buildDailyCampaignFromLeads(opts: {
   // carried to the enrol step so the same address isn't verified (and billed)
   // twice in one run.
   const verifiedDuringEnrichment = new Set<string>();
-  // Bound the per-run Hunter domain-search spend for org expansion.
-  let orgExpansionsLeft = 15;
+  // Bound the per-run Hunter domain-search spend for firm expansion (org-only
+  // leads AND person leads whose email enrichment came up dry). Only ~25-35% of
+  // discovered leads yield an email otherwise, so this budget is the main lever
+  // for converting a big discovery day into enrollable contacts.
+  let orgExpansionsLeft = 40;
+  // How many named mailboxes to pull per expanded firm.
+  const PEOPLE_PER_FIRM = 5;
 
   const addContact = async (input: {
     fullName: string;
@@ -253,8 +258,9 @@ export async function buildDailyCampaignFromLeads(opts: {
   for (const l of leads) {
     let email = l.email?.trim() || null;
     let enrichedEmail: string | null = null;
+    const isPerson = looksLikePersonName(l.fullName);
 
-    if (!email && looksLikePersonName(l.fullName)) {
+    if (!email && isPerson) {
       const enriched = await enrichLeadEmail(l);
       if (enriched) {
         email = enrichedEmail = enriched.email;
@@ -264,32 +270,42 @@ export async function buildDailyCampaignFromLeads(opts: {
       }
     }
 
-    // Org-only lead with no address: expand it into the real people Hunter has
-    // on file at the firm's domain. Each person arrives WITH a work email, so
-    // this converts what used to be a guaranteed "no email" skip into
-    // enrollable contacts. The org itself is only added when expansion found
-    // nobody (it still lands in the outreach_leads pipeline either way).
-    if (!email && !looksLikePersonName(l.fullName) && orgExpansionsLeft > 0) {
+    // Still no address: expand the firm's domain into the real people Hunter
+    // has on file there. Each person arrives WITH a work email, so this
+    // converts what used to be a guaranteed "no email" skip into enrollable
+    // contacts. Applies to org-only leads ("Smith Immigration Law") AND to
+    // person leads whose enrichment came up dry — a colleague at the same
+    // referral firm is an equally good campaign target. If the expansion
+    // happens to surface the person lead themself, that's their email.
+    if (!email && l.website && orgExpansionsLeft > 0) {
       orgExpansionsLeft--;
-      const people = await findPeopleAtFirm(l.website);
-      if (people.length > 0) {
-        for (const person of people) {
-          const added = await addContact({
-            fullName: person.fullName,
-            companyName: l.company?.trim() || l.fullName,
-            email: person.email,
-            websiteUrl: l.website,
-            jobTitle: person.jobTitle ?? l.jobTitle,
-            country: l.country,
-            city: l.city,
-          }, l.category);
-          if (added && (added.email ?? "").toLowerCase() === person.email.toLowerCase()) {
-            firmPeopleAdded++;
-            emailsEnriched++;
-          }
+      const people = await findPeopleAtFirm(l.website, PEOPLE_PER_FIRM);
+      const leadNameLc = l.fullName.trim().toLowerCase();
+      for (const person of people) {
+        if (isPerson && person.fullName.trim().toLowerCase() === leadNameLc) {
+          // The "colleague" is the lead — recovered their address after all.
+          email = enrichedEmail = person.email;
+          continue;
         }
-        continue;
+        const added = await addContact({
+          fullName: person.fullName,
+          // Org leads carry the firm in fullName; person leads only in company.
+          companyName: l.company?.trim() || (isPerson ? null : l.fullName),
+          email: person.email,
+          websiteUrl: l.website,
+          jobTitle: person.jobTitle ?? l.jobTitle,
+          country: l.country,
+          city: l.city,
+        }, l.category);
+        if (added && (added.email ?? "").toLowerCase() === person.email.toLowerCase()) {
+          firmPeopleAdded++;
+          emailsEnriched++;
+        }
       }
+      // An org lead whose expansion produced people is fully replaced by them;
+      // it's only added as an (email-less) contact when expansion found nobody.
+      // A person lead always falls through and is added under their own name.
+      if (!isPerson && people.length > 0) continue;
     }
 
     const added = await addContact({

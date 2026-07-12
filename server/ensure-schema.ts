@@ -149,6 +149,10 @@ const STATEMENTS: string[] = [
   // automated engine can run the broker OR the client variant for the same lead
   // pool. Defaults to 'broker' to preserve existing behavior.
   `ALTER TABLE outreach_leads ADD COLUMN IF NOT EXISTS sequence_track text NOT NULL DEFAULT 'broker'`,
+
+  // When a lead was swept into a daily auto-campaign build (discovery day or a
+  // later backfill). NULL = never attempted, so the daily top-up can recycle it.
+  `ALTER TABLE outreach_leads ADD COLUMN IF NOT EXISTS campaigned_at timestamptz`,
   // ─── AI search telemetry ─────────────────────────────────────────────────
   // search_events records every AI/lead search so we can measure quality and
   // tune scoring/prompts. Written fire-and-forget from the search routes.
@@ -434,7 +438,7 @@ const STATEMENTS: string[] = [
   `CREATE TABLE IF NOT EXISTS deliverability_settings (
     id                          varchar      PRIMARY KEY DEFAULT 'singleton',
     verify_before_send          boolean      NOT NULL DEFAULT false,
-    sender_rotation             boolean      NOT NULL DEFAULT false,
+    sender_rotation             boolean      NOT NULL DEFAULT true,
     domain_guard                boolean      NOT NULL DEFAULT true,
     domain_bounce_threshold_pct integer      NOT NULL DEFAULT 40,
     domain_bounce_min           integer      NOT NULL DEFAULT 8,
@@ -461,6 +465,15 @@ const STATEMENTS: string[] = [
   `ALTER TABLE deliverability_settings ADD COLUMN IF NOT EXISTS ramp_start_cap integer NOT NULL DEFAULT 20`,
   `ALTER TABLE deliverability_settings ADD COLUMN IF NOT EXISTS ramp_days integer NOT NULL DEFAULT 14`,
   `ALTER TABLE deliverability_settings ADD COLUMN IF NOT EXISTS ramp_started_at timestamptz`,
+
+  // ─── Volume scale-up (2026-07): flip sender rotation ON exactly once ─────────
+  // Rotation spreads drip volume across every credentialed mailbox so the raised
+  // daily cap (~100/day/sender) never concentrates on one address. The marker
+  // column makes this a one-time migration: an operator who later turns rotation
+  // back off in Sending & Safety keeps their choice across restarts.
+  `ALTER TABLE deliverability_settings ADD COLUMN IF NOT EXISTS rotation_default_applied boolean NOT NULL DEFAULT false`,
+  `UPDATE deliverability_settings SET sender_rotation = true, rotation_default_applied = true
+     WHERE id = 'singleton' AND rotation_default_applied = false`,
 
   // ─── Phase 3: seed inbox-placement test ──────────────────────────────────────
   `CREATE TABLE IF NOT EXISTS seed_inboxes (

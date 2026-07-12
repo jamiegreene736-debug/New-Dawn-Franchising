@@ -1,6 +1,7 @@
 import { promises as dns } from "dns";
 import { pool } from "./db";
 import { ALL_SENDER_PROFILES, getSenderPassword } from "./email-service";
+import { EMAIL_DAILY_CAP, EMAIL_HOURLY_CAP } from "./smart-scheduler";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Email Deliverability service
@@ -411,8 +412,8 @@ export async function getDeliverabilityMetrics(): Promise<DeliverabilityMetrics>
       replyRate: enrTotal ? +((Number(enr.replied || 0) / enrTotal) * 100).toFixed(1) : 0,
     },
     config: {
-      dailyCap: Number(process.env.EMAIL_DAILY_CAP || 100),
-      hourlyCap: Number(process.env.EMAIL_HOURLY_CAP || 20),
+      dailyCap: EMAIL_DAILY_CAP,
+      hourlyCap: EMAIL_HOURLY_CAP,
       domainGapSeconds: Number(process.env.EMAIL_DOMAIN_GAP_SECONDS || 45),
       sendersConfigured,
       sendersTotal: ALL_SENDER_PROFILES.length,

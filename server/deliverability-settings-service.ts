@@ -7,9 +7,11 @@ import { EMAIL_DAILY_CAP, EMAIL_HOURLY_CAP, EMAIL_DOMAIN_GAP_MS } from "./smart-
 // Deliverability settings + safety guards (Phase 2)
 //
 // A single settings row (id='singleton') that gates the behaviour-changing parts
-// of the send path. EVERYTHING here defaults to the current behaviour:
+// of the send path. Defaults:
 //   • verifyBeforeSend  = false  (no change)
-//   • senderRotation    = false  (always DEFAULT_SENDER, as before)
+//   • senderRotation    = true   (spread volume across every credentialed
+//                                 mailbox; a no-op when only one sender has an
+//                                 app password — see chooseSenderForKey)
 //   • domainGuard       = true   (protective: auto-suppress a domain that is
 //                                 clearly hard-blocking — same idea as a manual
 //                                 DNC, just automatic and high-threshold)
@@ -47,7 +49,7 @@ export interface DeliverabilitySettings {
 
 const DEFAULTS = {
   verify_before_send: false,
-  sender_rotation: false,
+  sender_rotation: true,
   domain_guard: true,
   domain_bounce_threshold_pct: 40,
   domain_bounce_min: 8,

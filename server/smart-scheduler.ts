@@ -7,11 +7,14 @@
  *          Rate:  3–8 s random delay (organic, carrier-safe)
  *          Max:   ~50/hr to stay under carrier thresholds
  *
- * - Email: Tue–Thu 8–10 AM and 1–3 PM local
- *          Avoid: before 8 AM, after 6 PM, weekends
+ * - Email: Mon–Fri 8 AM–5 PM local (full business day)
+ *          Avoid: before 8 AM, after 5 PM, weekends
  *          Rate:  5–20 s random delay (avoids ISP bulk-sender flags)
- *          Max:   100/day per sending address (Gmail App Password limit)
+ *          Max:   ~100/day per sending address (Gmail App Password limit);
+ *                 the total daily cap scales with configured sender mailboxes
  */
+
+import { countConfiguredSenders } from "./email-service";
 
 export type SendMode = "now" | "smart";
 
@@ -31,13 +34,18 @@ const SMS_WINDOWS: Record<number, TimeWindow[]> = {
   6: [], // Saturday — avoid
 };
 
+// Full business day, Mon–Fri. The old "peak windows" (Tue–Thu 8–10 & 1–3 only)
+// capped real throughput at ~4 sendable hours/day, which made every campaign a
+// trickle — the volume target (hundreds of new contacts/week) needs the whole
+// 8 AM–5 PM span. Peak-hour engagement bias is small next to not sending at all;
+// the hourly cap + jitter still pace the day so it never bursts.
 const EMAIL_WINDOWS: Record<number, TimeWindow[]> = {
   0: [], // Sunday
-  1: [{ start: 9, end: 11 }, { start: 13, end: 15 }],  // Monday
-  2: [{ start: 8, end: 10 }, { start: 13, end: 15 }],  // Tuesday  ★ best
-  3: [{ start: 8, end: 10 }, { start: 13, end: 15 }],  // Wednesday ★ best
-  4: [{ start: 8, end: 10 }, { start: 13, end: 15 }],  // Thursday  ★ best
-  5: [{ start: 9, end: 11 }],   // Friday
+  1: [{ start: 8, end: 17 }],   // Monday
+  2: [{ start: 8, end: 17 }],   // Tuesday
+  3: [{ start: 8, end: 17 }],   // Wednesday
+  4: [{ start: 8, end: 17 }],   // Thursday
+  5: [{ start: 8, end: 17 }],   // Friday
   6: [], // Saturday
 };
 
@@ -228,7 +236,7 @@ export function projectStepSendTime(enrolledAt: Date, delayDays: number): string
 
 /** Human-readable summary of the email send windows, for UI captions. */
 export const EMAIL_WINDOW_SUMMARY =
-  "Emails send Mon–Fri during optimal windows (Tue–Thu 8–10 AM & 1–3 PM CT; Mon 9–11 AM & 1–3 PM; Fri 9–11 AM), spaced out to protect deliverability.";
+  "Emails send Mon–Fri 8 AM–5 PM CT, paced with hourly caps, per-domain gaps, and organic jitter to protect deliverability.";
 
 
 // ─── Delay / jitter calculations ─────────────────────────────────────────────
@@ -281,15 +289,23 @@ function envInt(name: string, fallback: number): number {
   return Number.isFinite(n) && n > 0 ? n : fallback;
 }
 
-// Per-day volume ceiling per sending address (conservative Gmail App Password
-// limit). Override with EMAIL_DAILY_CAP in Railway → Variables.
-export const EMAIL_DAILY_CAP = envInt("EMAIL_DAILY_CAP", 100);
+// Per-day TOTAL volume ceiling. Defaults to ~100/day for every sender mailbox
+// that actually has an app password configured (the safe per-address Gmail
+// volume), so capacity scales as mailboxes are added: 1 sender → 100/day,
+// all 4 → 400/day. Sender rotation spreads the volume so no single address
+// exceeds its own ~100/day share. Override the total explicitly with
+// EMAIL_DAILY_CAP in Railway → Variables.
+export const EMAIL_DAILY_CAP = envInt(
+  "EMAIL_DAILY_CAP",
+  100 * countConfiguredSenders(),
+);
 
 // Per-hour ceiling so the daily volume is spread across the business-hours
 // window instead of bursting in a single cron run (a strong spam signal).
-// 100/day ÷ ~11 business hours ≈ 9/hr; default 20 leaves headroom. Override
-// with EMAIL_HOURLY_CAP in Railway → Variables.
-export const EMAIL_HOURLY_CAP = envInt("EMAIL_HOURLY_CAP", 20);
+// 400/day ÷ 9 sendable hours ≈ 45/hr; default 50 covers that with a little
+// headroom while staying well under Gmail burst limits. Override with
+// EMAIL_HOURLY_CAP in Railway → Variables.
+export const EMAIL_HOURLY_CAP = envInt("EMAIL_HOURLY_CAP", 50);
 
 // Minimum spacing between two emails sent to the SAME recipient domain within a
 // run. ISPs flag rapid bursts to one domain (e.g. many gmail.com in seconds),

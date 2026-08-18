@@ -76,7 +76,7 @@ import {
 } from "./bulk-enrich";
 import { pollAllRenderingVideos, runHeygenPreparation } from "./heygen-service";
 import { heygenVideos, prospectLists } from "../shared/schema";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { db } from "./db";
 import { runAllHealthChecks, runHealthCheckWithAlerts } from "./api-health";
 import cron from "node-cron";
@@ -137,7 +137,7 @@ import {
   getMeetings, getUpcomingMeetings, updateMeetingOutcome, handleMeetingBooked, classifyReplyIntent,
 } from "./meetings";
 import { generateWeeklyBrief } from "./strategy-brief";
-import { briefs, systemNotifications, contacts, agentDnc } from "@shared/schema";
+import { briefs, systemNotifications, contacts, agentDnc, dripEnrollments, dripCampaigns } from "@shared/schema";
 import { callClaude } from "./chat-service";
 
 // Run `fn` over `items` with at most `concurrency` in flight, preserving order.
@@ -5796,8 +5796,91 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
     } catch (e: any) {
       console.error(`[Unsubscribe] contact flag failed for ${email}:`, e?.message);
     }
+    // Tell Dylan right away — same SMS channel as the daily-plan texts. Campaign
+    // names give context on what they were dropped from. Best-effort: a failed
+    // text must never break the public unsubscribe flow.
+    try {
+      const stoppedCampaigns = await db.selectDistinct({ name: dripCampaigns.name })
+        .from(dripEnrollments)
+        .innerJoin(dripCampaigns, eq(dripEnrollments.campaignId, dripCampaigns.id))
+        .where(and(
+          sql`lower(${dripEnrollments.prospectEmail}) = ${email}`,
+          eq(dripEnrollments.status, "unsubscribed"),
+        ));
+      const campaignNote = stoppedCampaigns.length
+        ? `\nDropped from: ${stoppedCampaigns.map((c) => c.name).slice(0, 3).join(", ")}${stoppedCampaigns.length > 3 ? ` +${stoppedCampaigns.length - 3} more` : ""}`
+        : "";
+      await sendAgentSms(
+        "outreach",
+        `📭 Unsubscribe: ${email} opted out via the email link.${campaignNote}\nThey're now on the do-not-contact list — no further emails will go out.`,
+        { triggerType: "unsubscribe", contextJson: { email, campaigns: stoppedCampaigns.map((c) => c.name) } },
+      );
+    } catch (e: any) {
+      console.error(`[Unsubscribe] owner notification failed for ${email}:`, e?.message);
+    }
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.status(200).send(unsubscribedPage(email));
+  });
+
+  // ─── Admin: every unsubscribe in one place ─────────────────────────────────
+  // agent_dnc stays the single source of truth (link opt-outs land as
+  // "Unsubscribed (List-Unsubscribe)", reply opt-outs as "Replied to
+  // unsubscribe"); this endpoint overlays contact identity + which campaigns
+  // each address was dropped from so the CRM can show the full story.
+  app.get("/api/admin/unsubscribes", requireAdminAuth, async (_req, res) => {
+    try {
+      const rows = await db.select({ id: agentDnc.id, email: agentDnc.email, reason: agentDnc.reason, addedAt: agentDnc.addedAt })
+        .from(agentDnc)
+        .where(sql`${agentDnc.email} IS NOT NULL AND ${agentDnc.reason} ILIKE '%unsubscrib%'`)
+        .orderBy(desc(agentDnc.addedAt));
+      const emails = Array.from(new Set(rows.map((r) => r.email!.toLowerCase())));
+
+      const contactByEmail = new Map<string, { name: string; firmName: string | null }>();
+      const campaignsByEmail = new Map<string, string[]>();
+      if (emails.length > 0) {
+        const contactRows = await db.select({ email: contacts.email, firstName: contacts.firstName, lastName: contacts.lastName, firmName: contacts.firmName })
+          .from(contacts)
+          .where(sql`lower(${contacts.email}) = ANY(${emails})`);
+        for (const c of contactRows) {
+          if (c.email) contactByEmail.set(c.email.toLowerCase(), { name: `${c.firstName} ${c.lastName}`.trim(), firmName: c.firmName });
+        }
+        const enrollmentRows = await db.selectDistinct({ email: dripEnrollments.prospectEmail, name: dripCampaigns.name })
+          .from(dripEnrollments)
+          .innerJoin(dripCampaigns, eq(dripEnrollments.campaignId, dripCampaigns.id))
+          .where(and(
+            sql`lower(${dripEnrollments.prospectEmail}) = ANY(${emails})`,
+            eq(dripEnrollments.status, "unsubscribed"),
+          ));
+        for (const e of enrollmentRows) {
+          const key = e.email.toLowerCase();
+          campaignsByEmail.set(key, [...(campaignsByEmail.get(key) ?? []), e.name]);
+        }
+      }
+
+      const now = Date.now();
+      const unsubscribes = rows.map((r) => {
+        const key = r.email!.toLowerCase();
+        return {
+          id: r.id,
+          email: r.email,
+          name: contactByEmail.get(key)?.name || null,
+          firmName: contactByEmail.get(key)?.firmName || null,
+          // Human-readable source, derived from the DNC reason string.
+          source: /replied/i.test(r.reason ?? "") ? "reply" : "link",
+          reason: r.reason,
+          campaignsStopped: campaignsByEmail.get(key) ?? [],
+          unsubscribedAt: r.addedAt,
+        };
+      });
+      res.json({
+        total: unsubscribes.length,
+        last7: unsubscribes.filter((u) => now - new Date(u.unsubscribedAt).getTime() < 7 * 86400_000).length,
+        last30: unsubscribes.filter((u) => now - new Date(u.unsubscribedAt).getTime() < 30 * 86400_000).length,
+        unsubscribes,
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Failed to load unsubscribes" });
+    }
   });
 
   // ─── Email Deliverability tab ───────────────────────────────────────────────

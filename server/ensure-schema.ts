@@ -156,6 +156,23 @@ const STATEMENTS: string[] = [
   // When a lead was swept into a daily auto-campaign build (discovery day or a
   // later backfill). NULL = never attempted, so the daily top-up can recycle it.
   `ALTER TABLE outreach_leads ADD COLUMN IF NOT EXISTS campaigned_at timestamptz`,
+  // ─── Outreach autopilot (hands-free daily lead plans) ────────────────────
+  // Bookkeeping so an unattended run is resumable and diagnosable: when the
+  // plan was auto-approved, how many execution attempts ran, and the last
+  // execution error.
+  `ALTER TABLE outreach_daily_plans ADD COLUMN IF NOT EXISTS auto_approved_at timestamp`,
+  `ALTER TABLE outreach_daily_plans ADD COLUMN IF NOT EXISTS execution_attempts integer NOT NULL DEFAULT 0`,
+  `ALTER TABLE outreach_daily_plans ADD COLUMN IF NOT EXISTS last_error text`,
+  // plan_date uniqueness was app-level only (a race could double-plan a day and
+  // double-send a campaign). Dedupe survivors-keep-newest, then enforce it.
+  `DELETE FROM outreach_daily_plans a USING outreach_daily_plans b
+     WHERE a.plan_date = b.plan_date
+       AND (a.created_at < b.created_at OR (a.created_at = b.created_at AND a.id < b.id))`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS outreach_daily_plans_plan_date_uq
+     ON outreach_daily_plans (plan_date)`,
+  // DB-level autopilot pause switch (the emergency brake behind the SMS pause
+  // link + admin UI); the env flag OUTREACH_AUTOPILOT is the master enable.
+  `ALTER TABLE deliverability_settings ADD COLUMN IF NOT EXISTS outreach_autopilot_paused boolean NOT NULL DEFAULT false`,
   // ─── AI search telemetry ─────────────────────────────────────────────────
   // search_events records every AI/lead search so we can measure quality and
   // tune scoring/prompts. Written fire-and-forget from the search routes.

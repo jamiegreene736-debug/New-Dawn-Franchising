@@ -299,6 +299,55 @@ function OutreachApproval({ token }: { token: string }) {
   );
 }
 
+// ── Autopilot control (pause / resume, token-authenticated) ───────────────────
+function AutopilotPanel({ token, autopilot }: { token: string; autopilot: { enabled: boolean; paused: boolean } }) {
+  const [paused, setPaused] = useState(autopilot.paused);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  const toggle = async () => {
+    setBusy(true);
+    setErr("");
+    try {
+      const next = !paused;
+      await api(`/api/approve/plan/${token}`, {
+        method: "POST",
+        body: JSON.stringify({ action: next ? "pause_autopilot" : "resume_autopilot" }),
+      });
+      setPaused(next);
+    } catch (e: any) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!autopilot.enabled) return null;
+  return (
+    <div className={`rounded-xl border p-4 ${paused ? "bg-amber-50 border-amber-200" : "bg-emerald-50 border-emerald-200"}`}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className={`text-sm font-semibold ${paused ? "text-amber-900" : "text-emerald-900"}`}>
+            🤖 Autopilot is {paused ? "paused" : "on"}
+          </p>
+          <p className={`text-xs mt-0.5 ${paused ? "text-amber-700" : "text-emerald-700"}`}>
+            {paused
+              ? "Daily lead plans wait for your manual approval."
+              : "Daily lead plans run hands-free every morning at 6AM ET."}
+          </p>
+        </div>
+        <button onClick={toggle} disabled={busy}
+          className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm font-semibold disabled:opacity-50 flex items-center gap-2 ${
+            paused ? "bg-emerald-600 text-white hover:bg-emerald-700" : "border-2 border-amber-300 text-amber-800 hover:bg-amber-100"}`}>
+          {busy && <Loader2 className="w-4 h-4 animate-spin" />}
+          {paused ? "Resume Autopilot" : "Pause Autopilot"}
+        </button>
+      </div>
+      {err && <p className="text-xs text-red-600 mt-2">{err}</p>}
+    </div>
+  );
+}
+
 // ── Outreach Daily Plan Approval ──────────────────────────────────────────────
 function OutreachPlanApproval({ token }: { token: string }) {
   const [plan, setPlan] = useState<any>(null);
@@ -355,6 +404,25 @@ function OutreachPlanApproval({ token }: { token: string }) {
     </div>
   );
   if (plan?.status && plan.status !== "awaiting_approval") {
+    // Processed plans stay useful: the report SMS links here as the autopilot
+    // pause/resume control.
+    if (plan?.autopilot?.enabled) {
+      return (
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center px-5">
+          <div className="max-w-md w-full space-y-4">
+            <div className="text-center">
+              <CheckCircle className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
+              <h1 className="text-lg font-bold text-gray-900">Plan {plan.status.replace(/_/g, " ")}</h1>
+              <p className="text-sm text-gray-500 mt-1">
+                Daily Lead Plan · {plan.planDate}{plan.discoveredCount ? ` · ${plan.discoveredCount} leads added` : ""}
+              </p>
+            </div>
+            <AutopilotPanel token={token} autopilot={plan.autopilot} />
+            <p className="text-xs text-center text-gray-400 pt-2">New Dawn Franchising · Outreach Intelligence Agent</p>
+          </div>
+        </div>
+      );
+    }
     return <AlreadyProcessed status={plan.status} />;
   }
 
@@ -382,6 +450,9 @@ function OutreachPlanApproval({ token }: { token: string }) {
       </div>
 
       <div className="max-w-2xl mx-auto px-5 py-6 space-y-5">
+        {/* Autopilot state (also explains why a held plan is asking for a tap) */}
+        {plan?.autopilot?.enabled && <AutopilotPanel token={token} autopilot={plan.autopilot} />}
+
         {/* Plan summary */}
         <div className="bg-white rounded-xl border border-gray-200 p-4">
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Agent's Plan</p>

@@ -523,6 +523,17 @@ function scheduleAgentCrons() {
       );
       console.log(`[Agent Startup] Running startup catchup at ${nyHour}h ET...`);
 
+      // ── Outreach Intelligence (normally 6AM ET) — run any time before 3PM ──
+      // planDailyIntelligence is idempotent: an existing plan for today is
+      // skipped (manual mode) or resumed/retried (autopilot), so a restart
+      // across 6AM can no longer cost the day's lead discovery.
+      if (nyHour >= 6 && nyHour < 15) {
+        console.log("[Agent Startup] Running outreach intelligence catchup...");
+        planDailyIntelligence().catch((e: any) =>
+          console.error("[Agent Startup] Outreach intelligence catchup error:", e.message)
+        );
+      }
+
       // ── SEO Campaign Agent (normally 7AM ET) — run any time before 6PM ──────
       if (nyHour >= 7 && nyHour < 18) {
         console.log("[Agent Startup] Running SEO Campaign Agent catchup...");

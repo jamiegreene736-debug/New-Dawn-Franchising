@@ -3,21 +3,71 @@
  * Daily autonomous lead intelligence for E-2 visa franchise outreach.
  *
  * Daily schedule (via cron in routes.ts):
- *   6:00 AM ET — planDailyIntelligence() → Claude plans the day, saves to DB, sends SMS approval link
- *   On approval  — executeApprovedPlan(planId) → SerpAPI + Seamless searches → populates outreach_leads
+ *   6:00 AM ET — planDailyIntelligence() → Claude plans the day, saves to DB.
+ *     • Autopilot ON (OUTREACH_AUTOPILOT=true, not paused, breaker clear):
+ *       auto-approves and executes immediately — no human tap needed; the SMS
+ *       becomes an end-of-run report with a pause link.
+ *     • Autopilot OFF (or breaker tripped / plan anomalous): sends the SMS
+ *       approval link and waits, exactly as before.
+ *   On approval  — executeApprovedPlan(planId) → SerpAPI + Seamless + Apollo
+ *                  (+ Hunter domain) searches → populates outreach_leads →
+ *                  builds + enrolls the day's campaign.
  */
 
-import { db } from "./db";
+import { db, pool } from "./db";
 import { outreachDailyPlans, outreachLeads } from "@shared/schema";
-import { eq, and, or, desc, gte, isNull, isNotNull, inArray } from "drizzle-orm";
+import { eq, and, or, desc, gte, lt, isNull, isNotNull, inArray } from "drizzle-orm";
 import { notifyBlocker, sendAgentSms, isRedundantDataVendorBlocker } from "./agent-sms-service";
-import { buildDailyCampaignFromLeads, type DiscoveredLeadInput, type DailyCampaignResult } from "./daily-campaign-service";
-import { seamlessFindPeople } from "./seamless-service";
+import { buildDailyCampaignFromLeads, type DiscoveredLeadInput } from "./daily-campaign-service";
+import { seamlessFindPeople, type SeamlessPerson } from "./seamless-service";
+import { apolloSearchContacts, apolloRevealById } from "./apollo-service";
+import { findPeopleAtFirm } from "./lead-email-enrichment";
+import { getDeliverabilitySettings } from "./deliverability-settings-service";
+import {
+  isAutopilotEnabled,
+  shouldAutoResume,
+  planLooksAnomalous,
+  buildPlanExecutedSms,
+  MAX_EXECUTION_ATTEMPTS,
+} from "./outreach-autopilot-helpers";
 import { randomUUID } from "crypto";
+
+// Re-exported for existing importers/tests of the SMS builder.
+export { buildPlanExecutedSms, isAutopilotEnabled } from "./outreach-autopilot-helpers";
 
 const APP_BASE = () => process.env.APP_BASE_URL ?? "https://www.newdawnfranchising.com";
 const SERPAPI_KEY = process.env.SERPAPI_KEY ?? "";
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY ?? "";
+
+/** Today's date (YYYY-MM-DD) in ET — the outreach system's day boundary.
+ *  Plans used to key on the UTC date while campaign names used ET, so an
+ *  evening run keyed to "tomorrow"; everything is ET now. */
+function etToday(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+}
+
+// Autopilot circuit breaker: pause hands-free enrollment when the trailing
+// bounce rate says the domain is in trouble. Overridable via env.
+const BREAKER_BOUNCE_PCT = (() => {
+  const n = parseFloat(process.env.OUTREACH_BREAKER_BOUNCE_PCT ?? "");
+  return Number.isFinite(n) && n > 0 ? n : 4;
+})();
+const BREAKER_MIN_SAMPLE = (() => {
+  const n = parseInt(process.env.OUTREACH_BREAKER_MIN_SAMPLE ?? "", 10);
+  return Number.isFinite(n) && n > 0 ? n : 50;
+})();
+const BREAKER_WINDOW = 200; // trailing attempted email sends examined
+
+// Apollo people-search results arrive with emails masked; revealing costs ~1
+// credit each. Cap the hands-free daily spend (0 disables reveals entirely).
+const APOLLO_REVEAL_BUDGET = (() => {
+  const n = parseInt(process.env.APOLLO_DAILY_REVEAL_CREDITS ?? "", 10);
+  return Number.isFinite(n) && n >= 0 ? n : 25;
+})();
+
+// Delay before a failed execution is retried in-process (restart-safe too: the
+// startup catch-up re-enters planDailyIntelligence, which resumes failed plans).
+const RETRY_DELAY_MS = 30 * 60 * 1000;
 
 // How many contacts each daily campaign build aims to start with. At the
 // observed ~25-35% email-find rate this lands 40-50+ enrollable contacts per
@@ -114,10 +164,11 @@ IMPORTANT: The system will automatically detect the lead's country and send all 
 Think about timing and strategy: What country or category has the most active deal flow right now? Which professional category is most likely to have a wealthy international client looking for US residency today?
 
 AVAILABLE TOOLS (you already have full B2B contact-data coverage — do NOT request more):
-- SerpAPI: Google Search (use for finding specific people, firms, associations, contact info)
-- Seamless: B2B lead database with email enrichment (use for finding specific job titles at companies)
-- Hunter.io: Email finder for domains
-- People Data Labs, Apollo, Proxycurl, Origami: additional contact discovery + email/phone enrichment, applied automatically
+- SerpAPI ("serpapi"): Google Search (use for finding specific people, firms, associations, contact info)
+- Seamless ("seamless"): B2B lead database with email enrichment (use for finding specific job titles at companies)
+- Apollo ("apollo"): structured B2B people search by job title + country — strong coverage of attorneys, brokers, and advisors; the system reveals verified emails for the best matches automatically
+- Hunter.io ("hunter"): people-at-a-firm lookup for a KNOWN firm website domain. Only emit a hunter query when you know a specific target firm's real domain; the query MUST be just the bare domain (e.g. "smithimmigrationlaw.com"). If you don't know a real domain, don't emit hunter queries.
+- People Data Labs, Proxycurl, Origami: additional email/phone enrichment, applied automatically
 - Note: LinkedIn scraping NOT available.
 
 DO NOT emit blockerRequests for B2B contact databases (e.g. ZoomInfo, Apollo, Lusha, Cognism, RocketReach, Sales Navigator, "verified contact data", "B2B database"). The platform already aggregates the equivalent capability via the tools above, so requesting them only creates noise. Only flag a blocker for a genuinely missing, non-overlapping capability (e.g. an approved WhatsApp template, a new-geo compliance clearance, or exhausted Seamless credits that need a top-up). When in doubt, leave blockerRequests empty.
@@ -159,6 +210,11 @@ You MUST respond with valid JSON only (no markdown, no explanation outside the J
       "query": "abogado inmigracion visa E-2 inversionista Ciudad de Mexico",
       "source": "serpapi",
       "purpose": "Find Mexican immigration attorneys in Spanish — E-2 investor visa specialists (Angle 1)"
+    },
+    {
+      "query": "immigration attorney — South Korea",
+      "source": "apollo",
+      "purpose": "Structured Apollo search: immigration attorneys in South Korea (Angle 1)"
     }
   ],
   "blockerRequests": [
@@ -174,60 +230,134 @@ You MUST respond with valid JSON only (no markdown, no explanation outside the J
 
 VOLUME TARGET — this matters: the pipeline needs 120–180 NEW leads discovered per day. Only ~25-35% of discovered leads yield a deliverable work email after enrichment, and the goal is 100+ emailable contacts entering a campaign every day (500+ per week). Plan wide enough to hit that.
 
-Include 6-10 lead categories, 16-24 search queries, and 0-3 blocker requests. At least 4 of the queries MUST use source "seamless" (Seamless returns contacts WITH verified emails, so those convert to campaign enrollments at a far higher rate than SerpAPI finds). Be specific and actionable. Vary the queries within a category (different cities, English + local-language phrasings, "firm directory" vs "attorney name" angles) so they don't all return the same results.`;
+Include 6-10 lead categories, 16-24 search queries, and 0-3 blocker requests. At least 4 of the queries MUST use source "seamless" and at least 3 MUST use source "apollo" (both return real contact records — Seamless with verified emails, Apollo with reveal-able verified emails — so they convert to campaign enrollments at a far higher rate than SerpAPI finds). Spreading queries across independent providers also keeps the day productive when any one provider has an outage or runs out of credits. Be specific and actionable. Vary the queries within a category (different cities, English + local-language phrasings, "firm directory" vs "attorney name" angles) so they don't all return the same results.`;
 
-// ─── SerpAPI Web Search ───────────────────────────────────────────────────────
+// ─── Search providers ─────────────────────────────────────────────────────────
+// Every provider wrapper returns an `error` string alongside its results so an
+// unattended run can distinguish "searched, found nothing" from "provider is
+// down / out of credits" — and say so in the report SMS instead of silently
+// shipping an empty day.
 
-async function serpSearch(query: string): Promise<{ title: string; link: string; snippet: string }[]> {
-  if (!SERPAPI_KEY) return [];
+type PlanPerson = {
+  name: string;
+  title: string;
+  company: string;
+  email?: string;
+  phone?: string;
+  linkedinUrl?: string;
+  website?: string;
+  location?: string;
+  city?: string;
+};
+
+async function serpSearch(query: string): Promise<{
+  results: { title: string; link: string; snippet: string }[];
+  error?: string;
+}> {
+  if (!SERPAPI_KEY) return { results: [], error: "SERPAPI_KEY not configured" };
   try {
     // Pull a deep 40-result page — one SerpAPI request costs the same credit
     // regardless of num, and only ~25% of extracted leads end up emailable, so
     // every extra organic result widens the funnel for free.
     const url = `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(query)}&num=40&api_key=${SERPAPI_KEY}`;
     const res = await fetch(url);
-    if (!res.ok) return [];
-    const data = await res.json() as { organic_results?: { title?: string; link?: string; snippet?: string }[] };
-    return (data.organic_results ?? []).slice(0, 40).map(r => ({
-      title: r.title ?? "",
-      link: r.link ?? "",
-      snippet: r.snippet ?? "",
-    }));
-  } catch {
-    return [];
+    if (!res.ok) return { results: [], error: `SerpAPI HTTP ${res.status}` };
+    const data = await res.json() as { organic_results?: { title?: string; link?: string; snippet?: string }[]; error?: string };
+    if (data.error) return { results: [], error: `SerpAPI: ${String(data.error).slice(0, 120)}` };
+    return {
+      results: (data.organic_results ?? []).slice(0, 40).map(r => ({
+        title: r.title ?? "",
+        link: r.link ?? "",
+        snippet: r.snippet ?? "",
+      })),
+    };
+  } catch (e) {
+    return { results: [], error: `SerpAPI: ${(e as Error).message.slice(0, 120)}` };
   }
 }
 
-// ─── Seamless.AI People Search ──────────────────────────────────────────────
+/** Map a provider person (Seamless/Apollo shape) to the plan's lead shape. */
+function toPlanPerson(p: SeamlessPerson): PlanPerson {
+  return {
+    name: p.fullName || `${p.firstName} ${p.lastName}`.trim(),
+    title: p.jobTitle ?? "",
+    company: p.company ?? "",
+    email: p.email ?? undefined,
+    phone: p.phone ?? undefined,
+    linkedinUrl: p.linkedinUrl ?? undefined,
+    website: p.domain ? `https://${p.domain}` : undefined,
+    location: [p.city, p.country].filter(Boolean).join(" "),
+    city: p.city ?? undefined,
+  };
+}
 
 async function seamlessSearch(opts: {
   titles?: string[];
   locations?: string[];
   keywords?: string;
   limit?: number;
-}): Promise<{ name: string; title: string; company: string; email?: string; linkedinUrl?: string; location?: string; city?: string }[]> {
-  if (!process.env.SEAMLESS_API_KEY) return [];
-  // enrich=true runs the research+poll step so emails come back.
-  const people = await seamlessFindPeople(
-    {
-      titles: opts.titles ?? [],
-      countries: opts.locations ?? [],
+}): Promise<{ people: PlanPerson[]; error?: string }> {
+  if (!process.env.SEAMLESS_API_KEY) return { people: [], error: "SEAMLESS_API_KEY not configured" };
+  try {
+    // enrich=true runs the research+poll step so emails come back.
+    const people = await seamlessFindPeople(
+      {
+        titles: opts.titles ?? [],
+        countries: opts.locations ?? [],
+        keywords: opts.keywords,
+        limit: Math.min(opts.limit ?? 40, 50),
+      },
+      { enrich: true },
+    );
+    return { people: people.map(toPlanPerson).filter((p) => p.name) };
+  } catch (e) {
+    return { people: [], error: `Seamless: ${(e as Error).message.slice(0, 120)}` };
+  }
+}
+
+/**
+ * Apollo structured people search (free api_search endpoint) + a credit-capped
+ * email reveal for the best matches. Search results arrive with emails masked;
+ * revealing the top matches turns them into immediately-enrollable contacts,
+ * and anyone left unrevealed still flows through the enrichment waterfall via
+ * their firm domain.
+ */
+async function apolloPlanSearch(
+  opts: { titles: string[]; countries: string[]; keywords?: string; limit?: number },
+  revealBudget: { left: number },
+): Promise<{ people: PlanPerson[]; error?: string }> {
+  if (!process.env.APOLLO_API_KEY) return { people: [], error: "APOLLO_API_KEY not configured" };
+  try {
+    const { people, error } = await apolloSearchContacts({
+      titles: opts.titles,
+      countries: opts.countries,
       keywords: opts.keywords,
-      limit: Math.min(opts.limit ?? 40, 50),
-    },
-    { enrich: true },
-  );
-  return people
-    .map((p) => ({
-      name: p.fullName || `${p.firstName} ${p.lastName}`.trim(),
-      title: p.jobTitle ?? "",
-      company: p.company ?? "",
-      email: p.email ?? undefined,
-      linkedinUrl: p.linkedinUrl ?? undefined,
-      location: [p.city, p.country].filter(Boolean).join(" "),
-      city: p.city ?? undefined,
-    }))
-    .filter((p) => p.name);
+      maxResults: Math.min(opts.limit ?? 50, 100),
+    });
+    if (error) return { people: [], error: `Apollo: ${error.message.slice(0, 120)}` };
+
+    // Reveal emails for masked matches while the daily credit budget lasts.
+    const out: SeamlessPerson[] = [];
+    for (const p of people) {
+      if (!p.email && revealBudget.left > 0 && p.searchResultId?.startsWith("apollo:")) {
+        revealBudget.left--;
+        const revealed = await apolloRevealById(p.searchResultId.slice("apollo:".length));
+        out.push(revealed?.email ? { ...p, ...revealed } : p);
+      } else {
+        out.push(p);
+      }
+    }
+    return { people: out.map(toPlanPerson).filter((p) => p.name) };
+  } catch (e) {
+    return { people: [], error: `Apollo: ${(e as Error).message.slice(0, 120)}` };
+  }
+}
+
+/** Pull a bare firm domain out of a hunter-source query ("smithlaw.com", a URL, …). */
+export function domainFromHunterQuery(query: string): string | null {
+  const m = (query ?? "").toLowerCase().match(/([a-z0-9][a-z0-9-]*\.)+[a-z]{2,}/);
+  if (!m) return null;
+  return m[0].replace(/^www\./, "");
 }
 
 // ─── Extract leads from SerpAPI results ──────────────────────────────────────
@@ -268,22 +398,102 @@ Return empty array [] if no clear referral partners found. Only return verified 
   }
 }
 
+// ─── Autopilot state + safety rails ───────────────────────────────────────────
+
+/** Env master switch + DB pause switch, resolved together. */
+export async function getAutopilotState(): Promise<{ enabled: boolean; paused: boolean }> {
+  const enabled = isAutopilotEnabled();
+  if (!enabled) return { enabled, paused: false };
+  try {
+    const s = await getDeliverabilitySettings();
+    return { enabled, paused: s.outreachAutopilotPaused };
+  } catch {
+    return { enabled, paused: false };
+  }
+}
+
+/**
+ * Deliverability circuit breaker: trailing bounce rate over the last
+ * BREAKER_WINDOW attempted email sends. When tripped, autopilot stops
+ * auto-approving plans and falls back to the manual approval link — blind
+ * daily sending is the one thing that can genuinely burn the domain.
+ * Fails open on a query error (a stats hiccup shouldn't halt lead-gen; the
+ * drip processor's own caps/guards still protect the send path).
+ */
+export async function checkDeliverabilityBreaker(): Promise<{ tripped: boolean; detail: string }> {
+  try {
+    const { rows } = await pool.query(
+      `SELECT count(*)::int AS attempted,
+              (count(*) FILTER (WHERE status = 'bounced'))::int AS bounced
+         FROM (SELECT status FROM drip_sends
+                WHERE channel = 'email'
+                  AND status IN ('sent','delivered','opened','clicked','replied','bounced','failed')
+                ORDER BY created_at DESC
+                LIMIT $1) t`,
+      [BREAKER_WINDOW],
+    );
+    const attempted = Number(rows[0]?.attempted ?? 0);
+    const bounced = Number(rows[0]?.bounced ?? 0);
+    if (attempted < BREAKER_MIN_SAMPLE) {
+      return { tripped: false, detail: `only ${attempted} recent sends (min sample ${BREAKER_MIN_SAMPLE})` };
+    }
+    const pct = (bounced / attempted) * 100;
+    if (pct >= BREAKER_BOUNCE_PCT) {
+      return {
+        tripped: true,
+        detail: `bounce rate ${pct.toFixed(1)}% over the last ${attempted} sends (breaker limit ${BREAKER_BOUNCE_PCT}%)`,
+      };
+    }
+    return { tripped: false, detail: `bounce rate ${pct.toFixed(1)}% over ${attempted} sends` };
+  } catch (e) {
+    console.warn("[OutreachIntel] Breaker check failed (failing open):", (e as Error).message);
+    return { tripped: false, detail: "breaker check unavailable" };
+  }
+}
+
 // ─── Plan Daily Intelligence ──────────────────────────────────────────────────
 
 export async function planDailyIntelligence(): Promise<{ planId: string; approvalUrl: string }> {
-  const today = new Date().toISOString().split("T")[0];
+  const today = etToday();
+  const autopilot = await getAutopilotState();
+  const autopilotActive = autopilot.enabled && !autopilot.paused;
+
+  // Autopilot keeps its own queue clean: pending plans from previous days can
+  // never be actioned anymore (each day builds fresh), so expire them instead
+  // of letting them nag the morning digest forever.
+  if (autopilot.enabled) {
+    try {
+      await db.update(outreachDailyPlans)
+        .set({ status: "expired", updatedAt: new Date() })
+        .where(and(
+          eq(outreachDailyPlans.status, "awaiting_approval"),
+          lt(outreachDailyPlans.planDate, today),
+        ));
+    } catch (e) {
+      console.warn("[OutreachIntel] Stale-plan expiry failed:", (e as Error).message);
+    }
+  }
 
   // Check if we already planned today
   const [existing] = await db.select({
     id: outreachDailyPlans.id,
     status: outreachDailyPlans.status,
     approvalToken: outreachDailyPlans.approvalToken,
+    executionAttempts: outreachDailyPlans.executionAttempts,
   }).from(outreachDailyPlans)
     .where(eq(outreachDailyPlans.planDate, today));
 
   if (existing) {
-    console.log(`[OutreachIntel] Plan for ${today} already exists (${existing.status}), skipping.`);
     const approvalUrl = `${APP_BASE()}/approve/outreach-plan/${existing.approvalToken}`;
+    // Resume interrupted autopilot work: a plan stuck in awaiting_approval
+    // (flag flipped on after planning / crash before auto-approve), approved
+    // (crash mid-execution), or failed with attempts left.
+    if (autopilotActive && shouldAutoResume(existing.status, existing.executionAttempts)) {
+      console.log(`[OutreachIntel] Autopilot resuming today's plan (status ${existing.status}, attempts ${existing.executionAttempts ?? 0}).`);
+      await autoApproveAndExecute(existing.id, approvalUrl);
+    } else {
+      console.log(`[OutreachIntel] Plan for ${today} already exists (${existing.status}), skipping.`);
+    }
     return { planId: existing.id, approvalUrl };
   }
 
@@ -314,7 +524,7 @@ export async function planDailyIntelligence(): Promise<{ planId: string; approva
     ? recentTargetLines.slice(0, 40).join("\n")
     : "- None yet — this is the first plan.";
 
-  const contextMessage = `Today is ${today} (${new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}).
+  const contextMessage = `Today is ${today} (${new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: "America/New_York" })}).
 
 Current pipeline composition (last 100 leads):
 ${Object.entries(categoryCounts).map(([cat, count]) => `- ${cat}: ${count}`).join("\n") || "- Pipeline is empty — any category is welcome"}
@@ -372,26 +582,7 @@ Based on this context, generate today's outreach intelligence plan. Deliberately
   const planId = record.id;
   const approvalUrl = `${APP_BASE()}/approve/outreach-plan/${token}`;
 
-  console.log(`[OutreachIntel] Plan saved (${planId}). Sending SMS...`);
-
-  // SMS to Dylan
-  const categoryLines = plan.leadCategories
-    .sort((a, b) => (a.priority === "high" ? -1 : 1))
-    .slice(0, 3)
-    .map(c => `• ${c.country} ${c.category.replace(/_/g, " ")} (~${c.estimatedLeads} leads)`)
-    .join("\n");
-
-  const blockerNote = (plan.blockerRequests?.length ?? 0) > 0
-    ? `\n\n⚠️ Agent needs ${plan.blockerRequests!.length} tool(s) — see plan for details.`
-    : "";
-
-  const smsBody = `Good morning! Outreach Agent has today's lead plan ready 🎯\n\n${plan.planSummary}\n\nTop targets:\n${categoryLines}\n\n~${plan.estimatedLeads} leads estimated${blockerNote}\n\nApprove & execute: ${approvalUrl}`;
-
-  await sendAgentSms("outreach", smsBody, { triggerType: "daily_plan" }).catch(e =>
-    console.warn("[OutreachIntel] SMS send failed:", e.message),
-  );
-
-  // If there are blockers, send a separate notification
+  // Genuine blockers are worth a text in either mode.
   if ((plan.blockerRequests?.length ?? 0) > 0) {
     for (const b of plan.blockerRequests!.slice(0, 2)) {
       await notifyBlocker(
@@ -402,74 +593,108 @@ Based on this context, generate today's outreach intelligence plan. Deliberately
     }
   }
 
+  // ── Autopilot: approve + execute immediately, no morning tap needed ────────
+  // The safety rails that replace the human glance: a plan that looks anomalous
+  // or a tripped deliverability breaker falls back to the manual approval link.
+  if (autopilotActive) {
+    const anomaly = planLooksAnomalous(plan, DAILY_CAMPAIGN_TARGET);
+    const breaker = anomaly ? null : await checkDeliverabilityBreaker();
+    const holdReason = anomaly
+      ? `today's plan looks unusual — ${anomaly}`
+      : breaker?.tripped
+        ? `the deliverability breaker tripped — ${breaker.detail}`
+        : null;
+
+    if (!holdReason) {
+      console.log(`[OutreachIntel] Autopilot: plan ${planId} auto-approved, executing now.`);
+      await autoApproveAndExecute(planId, approvalUrl);
+      return { planId, approvalUrl };
+    }
+
+    console.warn(`[OutreachIntel] Autopilot held plan ${planId}: ${holdReason}`);
+    await sendAgentSms(
+      "outreach",
+      `🤖⚠️ Autopilot needs you today: ${holdReason}.\n\nToday's plan was NOT run automatically. Review & approve it here: ${approvalUrl}`,
+      { triggerType: "daily_plan" },
+    ).catch(e => console.warn("[OutreachIntel] SMS send failed:", e.message));
+    return { planId, approvalUrl };
+  }
+
+  // ── Manual mode: SMS the approval link, exactly as before ──────────────────
+  console.log(`[OutreachIntel] Plan saved (${planId}). Sending approval SMS...`);
+  const categoryLines = plan.leadCategories
+    .sort((a, b) => (a.priority === "high" ? -1 : 1))
+    .slice(0, 3)
+    .map(c => `• ${c.country} ${c.category.replace(/_/g, " ")} (~${c.estimatedLeads} leads)`)
+    .join("\n");
+
+  const blockerNote = (plan.blockerRequests?.length ?? 0) > 0
+    ? `\n\n⚠️ Agent needs ${plan.blockerRequests!.length} tool(s) — see plan for details.`
+    : "";
+
+  const pausedNote = autopilot.enabled && autopilot.paused
+    ? `\n\n(Autopilot is paused — resume it from this link to go hands-free again.)`
+    : "";
+
+  const smsBody = `Good morning! Outreach Agent has today's lead plan ready 🎯\n\n${plan.planSummary}\n\nTop targets:\n${categoryLines}\n\n~${plan.estimatedLeads} leads estimated${blockerNote}${pausedNote}\n\nApprove & execute: ${approvalUrl}`;
+
+  await sendAgentSms("outreach", smsBody, { triggerType: "daily_plan" }).catch(e =>
+    console.warn("[OutreachIntel] SMS send failed:", e.message),
+  );
+
   return { planId, approvalUrl };
 }
 
-// ─── Completion SMS builder ───────────────────────────────────────────────────
+// ─── Autopilot execution (approve → execute → retry once on failure) ─────────
+
+async function autoApproveAndExecute(planId: string, approvalUrl: string): Promise<void> {
+  await db.update(outreachDailyPlans)
+    .set({ status: "approved", autoApprovedAt: new Date(), updatedAt: new Date() })
+    .where(eq(outreachDailyPlans.id, planId));
+  await executePlanWithRetry(planId, approvalUrl);
+}
 
 /**
- * Build the "Today's lead plan executed!" summary SMS. Pure + exported so the
- * exact operator-facing text can be asserted in tests. It surfaces WHY the leads
- * were chosen, the contacts-vs-enrolled breakdown (so "0 enrolled" is never a
- * silent failure), and the no-duplicate guarantee.
+ * Run the plan; on failure record the error, retry once after RETRY_DELAY_MS,
+ * and only text for help when the retry also fails. A restart between failure
+ * and retry is covered too: the startup catch-up re-enters
+ * planDailyIntelligence, which resumes failed plans with attempts left.
  */
-export function buildPlanExecutedSms(opts: {
-  base: string;
-  why?: string | null;
-  sourcesSearched: number;
-  profilesFound: number;
-  leadsAdded: number;
-  /** Never-campaigned pipeline leads recycled into today's build. */
-  backfilled?: number;
-  campaign: DailyCampaignResult | null;
-}): string {
-  const { base, campaign } = opts;
-  const why = (opts.why ?? "").trim();
-  const whyLine = why ? `\n\n🧭 Why these leads: ${why.slice(0, 320)}` : "";
+async function executePlanWithRetry(planId: string, approvalUrl: string): Promise<void> {
+  const [row] = await db.select({ attempts: outreachDailyPlans.executionAttempts })
+    .from(outreachDailyPlans).where(eq(outreachDailyPlans.id, planId));
+  const attempt = (row?.attempts ?? 0) + 1;
+  await db.update(outreachDailyPlans)
+    .set({ executionAttempts: attempt, updatedAt: new Date() })
+    .where(eq(outreachDailyPlans.id, planId));
 
-  let campaignLine = "";
-  if (campaign) {
-    const parts: string[] = [];
-    parts.push(`\n\n🎯 Campaign "${campaign.campaignName}" is LIVE.`);
-    const enrichNote = campaign.emailsEnriched
-      ? ` (${campaign.emailsEnriched} work emails found` +
-        `${campaign.firmPeopleAdded ? `, incl. ${campaign.firmPeopleAdded} people discovered at firms` : ""})`
-      : "";
-    parts.push(
-      `List "${campaign.listName}" — ${campaign.contactsAdded} contacts, ${campaign.enrolled} enrolled${enrichNote}.`,
-    );
-    // Always explain the gap between contacts and enrollments so "0 enrolled"
-    // never looks like a silent failure.
-    const skips: string[] = [];
-    if (campaign.skippedNoEmail) skips.push(`${campaign.skippedNoEmail} no email`);
-    if (campaign.skippedDuplicate) skips.push(`${campaign.skippedDuplicate} already contacted`);
-    if (campaign.skippedUndeliverable) skips.push(`${campaign.skippedUndeliverable} undeliverable`);
-    if (campaign.enrolled === 0) {
-      parts.push(
-        `⚠️ 0 enrolled${skips.length ? ` — ${skips.join(", ")}` : ""}. ` +
-          `Add or verify emails on those contacts in the CRM to start sending.`,
-      );
-    } else if (skips.length) {
-      parts.push(`(skipped ${skips.join(", ")})`);
+  try {
+    await executeApprovedPlan(planId);
+  } catch (e) {
+    const msg = (e as Error).message ?? String(e);
+    console.error(`[OutreachIntel] Execution attempt ${attempt} failed:`, msg);
+    await db.update(outreachDailyPlans)
+      .set({ status: "failed", lastError: msg.slice(0, 500), updatedAt: new Date() })
+      .where(eq(outreachDailyPlans.id, planId));
+
+    if (attempt < MAX_EXECUTION_ATTEMPTS) {
+      console.log(`[OutreachIntel] Retrying plan ${planId} in ${Math.round(RETRY_DELAY_MS / 60000)} min...`);
+      const timer = setTimeout(() => {
+        db.update(outreachDailyPlans)
+          .set({ status: "approved", updatedAt: new Date() })
+          .where(and(eq(outreachDailyPlans.id, planId), eq(outreachDailyPlans.status, "failed")))
+          .then(() => executePlanWithRetry(planId, approvalUrl))
+          .catch(err => console.error("[OutreachIntel] Retry failed to start:", (err as Error).message));
+      }, RETRY_DELAY_MS);
+      timer.unref?.();
+    } else {
+      await sendAgentSms(
+        "outreach",
+        `❌ Autopilot: today's lead plan failed ${MAX_EXECUTION_ATTEMPTS} times and needs you.\n\nLast error: ${msg.slice(0, 180)}\n\nPlan: ${approvalUrl}`,
+        { triggerType: "daily_plan" },
+      ).catch(() => {});
     }
-    // Dedup reassurance — the user asked to know duplicate research is prevented.
-    parts.push(
-      `🔁 No-duplicate system is active: anyone already in a campaign is skipped, and today's plan was ` +
-        `steered away from the last 7 days of targets so the same people/segments aren't researched twice.`,
-    );
-    parts.push(`Track it: ${base}/crm`);
-    campaignLine = parts.join("\n");
   }
-
-  const backfillLine = opts.backfilled
-    ? ` (+${opts.backfilled} recycled from earlier days' pipeline)`
-    : "";
-  return (
-    `✅ Today's lead plan executed!${whyLine}\n\n` +
-    `Searched ${opts.sourcesSearched} sources → found ${opts.profilesFound} profiles → ` +
-    `added ${opts.leadsAdded} new leads to your pipeline${backfillLine}.${campaignLine}\n\n` +
-    `View pipeline: ${base}/agent`
-  );
 }
 
 // ─── Execute Approved Plan ────────────────────────────────────────────────────
@@ -489,16 +714,23 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
   const updatedQueries: NonNullable<typeof plan.searchQueries> = [];
   // Newly-added leads this run, carried forward to build the day's list + campaign.
   const discoveredForCampaign: DiscoveredLeadInput[] = [];
+  // Distinct provider failures across the run — surfaced in the report SMS so a
+  // dead key / drained credit pool is visible the same morning, not weeks later.
+  const providerIssues = new Map<string, string>();
+  // Shared Apollo email-reveal credit budget for the whole run.
+  const apolloReveals = { left: APOLLO_REVEAL_BUDGET };
 
   // Execute each search query
   for (const query of (plan.searchQueries ?? [])) {
     try {
       let discovered: { fullName: string; company: string; website?: string; category: string; notes: string }[] = [];
-      let seamlessLeads: { name: string; title: string; company: string; email?: string; linkedinUrl?: string; location?: string; city?: string }[] = [];
+      let providerPeople: PlanPerson[] = [];
       let queryCountry: string | undefined;
+      let queryError: string | undefined;
 
       if (query.source === "serpapi") {
-        const results = await serpSearch(query.query);
+        const serp = await serpSearch(query.query);
+        queryError = serp.error;
         // Find the matching category for this query
         const matchedCategory = plan.leadCategories[0]; // fallback to first
         const cat = plan.leadCategories.find(c =>
@@ -506,9 +738,9 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
           query.query.toLowerCase().includes(c.country.toLowerCase())
         ) ?? matchedCategory;
         queryCountry = cat?.country;
-        discovered = await extractLeadsFromSerp(results, cat?.category ?? "other", cat?.country ?? "");
-      } else if (query.source === "seamless") {
-        // Parse Seamless query into titles + locations
+        discovered = await extractLeadsFromSerp(serp.results, cat?.category ?? "other", cat?.country ?? "");
+      } else if (query.source === "seamless" || query.source === "apollo") {
+        // Parse the query into titles + locations
         const cat = plan.leadCategories.find(c =>
           query.purpose.toLowerCase().includes(c.country.toLowerCase())
         ) ?? plan.leadCategories[0];
@@ -518,15 +750,54 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
         // sentence ("Seoul — in-country immigration attorneys…") that matches
         // nothing, which silently zeroed out every Seamless query.
         const locations = cat?.country ? [cat.country] : [];
-        seamlessLeads = await seamlessSearch({ titles, locations, keywords: "E-2 visa", limit: 50 });
-        discovered = seamlessLeads.map(p => ({
+        const r = query.source === "seamless"
+          ? await seamlessSearch({ titles, locations, keywords: "E-2 visa", limit: 50 })
+          // Apollo: title + country alone — its keyword filter is AND-ed and
+          // would narrow most international queries to zero.
+          : await apolloPlanSearch({ titles, countries: locations, limit: 50 }, apolloReveals);
+        queryError = r.error;
+        providerPeople = r.people;
+        const label = query.source === "seamless" ? "Seamless" : "Apollo";
+        discovered = providerPeople.map(p => ({
           fullName: p.name,
           company: p.company,
-          website: undefined,
+          website: p.website,
           category: cat?.category ?? "other",
-          notes: `${p.title} — found via Seamless | ${p.location}`,
+          notes: `${p.title} — found via ${label} | ${p.location}`,
         }));
+      } else if (query.source === "hunter") {
+        // People-at-a-firm lookup: the query must carry a real firm domain.
+        const domain = domainFromHunterQuery(query.query);
+        const cat = plan.leadCategories.find(c =>
+          query.purpose.toLowerCase().includes(c.country.toLowerCase())
+        ) ?? plan.leadCategories[0];
+        queryCountry = cat?.country;
+        if (!domain) {
+          queryError = "hunter query skipped — no firm domain in query text";
+        } else {
+          const firmSite = `https://${domain}`;
+          const people = await findPeopleAtFirm(firmSite, 10);
+          providerPeople = people.map(fp => ({
+            name: fp.fullName,
+            title: fp.jobTitle ?? "",
+            company: domain,
+            email: fp.email,
+            website: firmSite,
+            location: cat?.country ?? "",
+          }));
+          discovered = providerPeople.map(p => ({
+            fullName: p.name,
+            company: p.company,
+            website: p.website,
+            category: cat?.category ?? "other",
+            notes: `${p.title} — found via Hunter at ${domain}`,
+          }));
+        }
+      } else {
+        queryError = `unknown source "${(query as { source: string }).source}"`;
       }
+
+      if (queryError) providerIssues.set(query.source, queryError);
 
       // Deduplicate and insert into outreach_leads
       let addedFromQuery = 0;
@@ -544,14 +815,14 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
 
           if (existing.length > 0) continue;
 
-          const seamlessMatch = seamlessLeads.find(a => a.name === lead.fullName);
+          const providerMatch = providerPeople.find(a => a.name === lead.fullName);
           await db.insert(outreachLeads).values({
             fullName: lead.fullName,
             company: lead.company ?? "",
             website: lead.website,
             category: lead.category,
-            email: seamlessMatch?.email,
-            linkedinUrl: seamlessMatch?.linkedinUrl,
+            email: providerMatch?.email,
+            linkedinUrl: providerMatch?.linkedinUrl,
             notes: `[${query.source.toUpperCase()}] ${lead.notes}`,
             score: 60,
             status: "new",
@@ -564,13 +835,13 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
           discoveredForCampaign.push({
             fullName: lead.fullName,
             company: lead.company ?? "",
-            email: seamlessMatch?.email ?? null,
+            email: providerMatch?.email ?? null,
             website: lead.website ?? null,
-            linkedinUrl: seamlessMatch?.linkedinUrl ?? null,
-            jobTitle: seamlessMatch?.title ?? null,
+            linkedinUrl: providerMatch?.linkedinUrl ?? null,
+            jobTitle: providerMatch?.title ?? null,
             category: lead.category,
             country: queryCountry ?? null,
-            city: seamlessMatch?.city ?? null,
+            city: providerMatch?.city ?? null,
           });
         } catch {
           // ignore duplicate key errors
@@ -578,14 +849,21 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
       }
 
       totalDiscovered += discovered.length;
-      updatedQueries.push({ ...query, executed: true, resultsCount: discovered.length });
-      console.log(`[OutreachIntel] Query "${query.query.slice(0, 50)}..." → ${discovered.length} found, ${addedFromQuery} added`);
+      updatedQueries.push({
+        ...query,
+        executed: true,
+        resultsCount: discovered.length,
+        ...(queryError ? { error: queryError } : {}),
+      });
+      console.log(`[OutreachIntel] Query "${query.query.slice(0, 50)}..." → ${discovered.length} found, ${addedFromQuery} added${queryError ? ` (${queryError})` : ""}`);
 
       // Small delay between searches
       await new Promise(r => setTimeout(r, 800));
     } catch (err) {
-      console.warn(`[OutreachIntel] Query failed: ${(err as Error).message}`);
-      updatedQueries.push({ ...query, executed: true, resultsCount: 0 });
+      const msg = (err as Error).message.slice(0, 160);
+      console.warn(`[OutreachIntel] Query failed: ${msg}`);
+      providerIssues.set(query.source, `${query.source}: ${msg}`);
+      updatedQueries.push({ ...query, executed: true, resultsCount: 0, error: msg });
     }
   }
 
@@ -594,6 +872,7 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
     discoveredCount: totalAdded,
     searchQueries: updatedQueries,
     executedAt: new Date(),
+    lastError: null,
     updatedAt: new Date(),
   }).where(eq(outreachDailyPlans.id, planId));
 
@@ -651,8 +930,8 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
   // drafted — a stale plan approved days later should read as today's campaign.
   // Use ET (not UTC) to match the rest of the outreach system (6AM-ET cron,
   // morning-digest day boundary): an evening-ET approval is still "today" locally
-  // even though UTC has already rolled to tomorrow. en-CA gives YYYY-MM-DD.
-  const runDate = new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+  // even though UTC has already rolled to tomorrow.
+  const runDate = etToday();
   let campaign: Awaited<ReturnType<typeof buildDailyCampaignFromLeads>> = null;
   try {
     campaign = await buildDailyCampaignFromLeads({
@@ -671,7 +950,10 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
     ).catch(() => {});
   }
 
-  // Notify Dylan of results.
+  // Notify Dylan of results. An autopilot run gets the "no action needed"
+  // framing plus the pause link (the approval page carries the pause control);
+  // provider outages hit during discovery are called out either way.
+  const autopilotRun = !!plan.autoApprovedAt;
   const smsBody = buildPlanExecutedSms({
     base: APP_BASE(),
     why: plan.planSummary || plan.strategicReasoning,
@@ -680,6 +962,11 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
     leadsAdded: totalAdded,
     backfilled,
     campaign,
+    autopilot: autopilotRun,
+    pauseUrl: autopilotRun && plan.approvalToken
+      ? `${APP_BASE()}/approve/outreach-plan/${plan.approvalToken}`
+      : null,
+    providerIssues: [...providerIssues.values()],
   });
   await sendAgentSms("outreach", smsBody, { triggerType: "plan_executed" }).catch(() => {});
 
@@ -690,7 +977,7 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
 // ─── Get today's plan ─────────────────────────────────────────────────────────
 
 export async function getTodaysPlan() {
-  const today = new Date().toISOString().split("T")[0];
+  const today = etToday();
   const [plan] = await db.select().from(outreachDailyPlans)
     .where(eq(outreachDailyPlans.planDate, today))
     .orderBy(desc(outreachDailyPlans.createdAt))

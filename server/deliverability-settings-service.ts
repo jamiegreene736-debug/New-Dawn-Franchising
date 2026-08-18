@@ -32,6 +32,9 @@ export interface DeliverabilitySettings {
   campaignBounceThresholdPct: number;
   campaignBounceMin: number;
   softBounceSkipDnc: boolean;
+  // Outreach autopilot pause switch (env OUTREACH_AUTOPILOT is the master
+  // enable; this is the runtime emergency brake behind the SMS pause link).
+  outreachAutopilotPaused: boolean;
   dailyCapOverride: number | null;
   hourlyCapOverride: number | null;
   domainGapOverrideSeconds: number | null;
@@ -57,6 +60,7 @@ const DEFAULTS = {
   campaign_bounce_threshold_pct: 12,
   campaign_bounce_min: 50,
   soft_bounce_skip_dnc: true,
+  outreach_autopilot_paused: false,
   ramp_mode: "off",
   ramp_start_cap: 20,
   ramp_days: 14,
@@ -92,6 +96,7 @@ function rowToSettings(r: any): DeliverabilitySettings {
     campaignBounceThresholdPct: Number(r.campaign_bounce_threshold_pct),
     campaignBounceMin: Number(r.campaign_bounce_min),
     softBounceSkipDnc: !!r.soft_bounce_skip_dnc,
+    outreachAutopilotPaused: !!r.outreach_autopilot_paused,
     dailyCapOverride,
     hourlyCapOverride,
     domainGapOverrideSeconds,
@@ -142,6 +147,7 @@ const PATCH_COLS: Record<string, string> = {
   campaignBounceThresholdPct: "campaign_bounce_threshold_pct",
   campaignBounceMin: "campaign_bounce_min",
   softBounceSkipDnc: "soft_bounce_skip_dnc",
+  outreachAutopilotPaused: "outreach_autopilot_paused",
   dailyCapOverride: "daily_cap_override",
   hourlyCapOverride: "hourly_cap_override",
   domainGapOverrideSeconds: "domain_gap_override_seconds",

@@ -21,7 +21,9 @@ import {
 import { eq, and, gte, isNotNull, ne } from "drizzle-orm";
 import { sendAgentSms } from "./agent-sms-service";
 import { approveAndSendTouch } from "./outreach-agent-service";
-import { executeApprovedPlan } from "./outreach-intelligence-service";
+import { executeApprovedPlan, getAutopilotState } from "./outreach-intelligence-service";
+import { updateDeliverabilitySettings } from "./deliverability-settings-service";
+import { pool } from "./db";
 
 const router = Router();
 
@@ -160,17 +162,39 @@ router.get("/plan/:token", async (req, res) => {
   const [plan] = await db.select().from(outreachDailyPlans)
     .where(eq(outreachDailyPlans.approvalToken, req.params.token));
   if (!plan) return res.status(404).json({ error: "Plan not found or link expired" });
-  res.json({ ...plan, type: "outreach_plan" });
+  const autopilot = await getAutopilotState().catch(() => ({ enabled: false, paused: false }));
+  res.json({ ...plan, type: "outreach_plan", autopilot });
 });
 
-// ── Outreach Daily Plan: approve/reject ────────────────────────────────────────
+// ── Outreach Daily Plan: approve/reject/pause-autopilot ───────────────────────
 router.post("/plan/:token", async (req, res) => {
-  const { action, notes } = req.body as { action: "approve" | "reject"; notes?: string };
-  if (!["approve", "reject"].includes(action)) return res.status(400).json({ error: "action must be approve or reject" });
+  const { action, notes } = req.body as {
+    action: "approve" | "reject" | "pause_autopilot" | "resume_autopilot";
+    notes?: string;
+  };
+  if (!["approve", "reject", "pause_autopilot", "resume_autopilot"].includes(action)) {
+    return res.status(400).json({ error: "action must be approve, reject, pause_autopilot, or resume_autopilot" });
+  }
 
   const [plan] = await db.select().from(outreachDailyPlans)
     .where(eq(outreachDailyPlans.approvalToken, req.params.token));
   if (!plan) return res.status(404).json({ error: "Plan not found or link expired" });
+
+  // Autopilot pause/resume: token-authenticated emergency brake. Deliberately
+  // NOT gated on plan status — the pause control lives on completed plans' pages
+  // (that's where the report SMS links to). POST-only, so an SMS link-scanner's
+  // GET can never flip it.
+  if (action === "pause_autopilot" || action === "resume_autopilot") {
+    const paused = action === "pause_autopilot";
+    await updateDeliverabilitySettings({ outreachAutopilotPaused: paused });
+    try {
+      await sendAgentSms("outreach", paused
+        ? `⏸️ Outreach autopilot PAUSED. Daily plans will wait for your manual approval until you resume.`
+        : `▶️ Outreach autopilot RESUMED. Daily lead plans will run hands-free again starting tomorrow 6AM ET.`);
+    } catch { /* silent */ }
+    return res.json({ ok: true, autopilotPaused: paused });
+  }
+
   if (plan.status !== "awaiting_approval") {
     return res.json({ ok: true, alreadyProcessed: true, status: plan.status });
   }
@@ -419,6 +443,29 @@ router.post("/morning-digest", async (_req, res) => {
   }
 });
 
+/**
+ * One-line email pipeline health snapshot for the morning digest: attempted /
+ * bounced / replied over the trailing 24h. Null when the stats are unavailable
+ * (never blocks the digest).
+ */
+async function getPipelineHealthLine(): Promise<string | null> {
+  try {
+    const { rows } = await pool.query(
+      `SELECT count(*) FILTER (WHERE status IN ('sent','delivered','opened','clicked','replied','bounced','failed'))::int AS attempted,
+              count(*) FILTER (WHERE status = 'bounced')::int AS bounced,
+              count(*) FILTER (WHERE status = 'replied')::int AS replied
+         FROM drip_sends
+        WHERE channel = 'email' AND created_at > now() - interval '24 hours'`,
+    );
+    const attempted = Number(rows[0]?.attempted ?? 0);
+    const bounced = Number(rows[0]?.bounced ?? 0);
+    const replied = Number(rows[0]?.replied ?? 0);
+    return `📊 Last 24h: ${attempted} email${attempted === 1 ? "" : "s"} sent · ${bounced} bounce${bounced === 1 ? "" : "s"} · ${replied} repl${replied === 1 ? "y" : "ies"}`;
+  } catch {
+    return null;
+  }
+}
+
 export async function sendMorningDigest(): Promise<void> {
   // Idempotency: only send once per calendar day regardless of server restarts
   const startOfDayET = new Date(
@@ -495,7 +542,17 @@ export async function sendMorningDigest(): Promise<void> {
     sends.push(sendAgentSms("seo", lines.join("\n"), { triggerType: "morning_digest" }).catch(() => {}));
   }
 
+  const autopilot = await getAutopilotState().catch(() => ({ enabled: false, paused: false }));
+  const healthLine = await getPipelineHealthLine();
+
   if (outreachDrafts.length === 0 && dailyPlans.length === 0 && forumDrafts.length === 0 && linkedinItems.length === 0) {
+    // Nothing pending — with autopilot that's the normal, healthy state, so the
+    // digest becomes a pipeline-health pulse instead of going silent.
+    if (autopilot.enabled) {
+      const msg = `🤖 Outreach autopilot is ${autopilot.paused ? "PAUSED" : "ON"} — no approvals needed this morning.` +
+        (healthLine ? `\n\n${healthLine}` : "");
+      sends.push(sendAgentSms("outreach", msg, { triggerType: "morning_digest" }).catch(() => {}));
+    }
     await Promise.all(sends);
     return;
   }
@@ -545,6 +602,8 @@ export async function sendMorningDigest(): Promise<void> {
       }
       if (linkedinItems.length > 3) lines.push(`+ ${linkedinItems.length - 3} more LinkedIn actions`);
     }
+
+    if (healthLine) lines.push(`\n${healthLine}`);
 
     sends.push(sendAgentSms("outreach", lines.join("\n"), { triggerType: "morning_digest" }).catch(() => {}));
   }

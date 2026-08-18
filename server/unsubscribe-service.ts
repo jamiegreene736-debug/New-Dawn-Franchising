@@ -69,7 +69,9 @@ export function htmlToPlainText(html: string): string {
     // Keep anchor text and append real destinations (skip tracking/mailto noise).
     .replace(/<a\b[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi, (_m, href: string, text: string) => {
       const t = text.replace(/<[^>]+>/g, "").trim();
-      const skip = !href || href.startsWith("mailto:") || href.startsWith("tel:") || /\/api\/track\//.test(href);
+      // /api/unsubscribe is skipped because the text part gets its own explicit
+      // unsubscribe line — otherwise the URL would appear twice.
+      const skip = !href || href.startsWith("mailto:") || href.startsWith("tel:") || /\/api\/(track|unsubscribe)\b/.test(href);
       return skip ? t : `${t} (${href})`;
     })
     .replace(/<li[^>]*>/gi, "\n• ")

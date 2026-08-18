@@ -13,7 +13,10 @@ export interface SenderProfile {
 }
 
 export const ALL_SENDER_PROFILES: SenderProfile[] = [
-  { email: "franchising@newdawnfranchising.com", name: "New Dawn Franchising", envVar: "GMAIL_APP_PASSWORD_FRANCHISING" },
+  // From-name matches the signature signer (Dylan) — a "New Dawn Franchising"
+  // From over a "Dylan Delaney" sign-off reads as a mismatch to both spam
+  // filters and skeptical recipients.
+  { email: "franchising@newdawnfranchising.com", name: "Dylan Delaney — New Dawn Franchising", envVar: "GMAIL_APP_PASSWORD_FRANCHISING" },
   { email: "dylan@newdawnfranchising.com", name: "Dylan – New Dawn Franchising", envVar: "GMAIL_APP_PASSWORD_DYLAN" },
   { email: "info@newdawnfranchising.com", name: "New Dawn Franchising — Info", envVar: "GMAIL_APP_PASSWORD_INFO" },
   { email: "support@newdawnfranchising.com", name: "New Dawn Franchising Support", envVar: "GMAIL_APP_PASSWORD_SUPPORT" },
@@ -133,6 +136,16 @@ export async function sendEmailFromSender(
     const profile = getSenderProfile(fromEmail);
     const transport = getTransporter(fromEmail);
 
+    // Resolve the recipient up front — the visible unsubscribe footer and the
+    // List-Unsubscribe headers both need it. Only a single, well-formed
+    // recipient gets an unsubscribe link: the token is bound to ONE address, so
+    // a comma-list send would hand every recipient the first one's
+    // (invalid-for-them) link. The regex also rejects malformed addresses that
+    // only contain "@".
+    const recipientAddr = (to.match(/<([^>]+)>/)?.[1] || to).trim();
+    const oneRecipient = /^[^@\s,]+@[^@\s,]+\.[^@\s,]+$/.test(recipientAddr);
+    const wantsUnsubscribe = !options?.skipUnsubscribe && oneRecipient;
+
     // Build a unified HTML email. All content — body + signature — lives inside
     // ONE container so Gmail cannot structurally detect a "signature block" to collapse.
     // Gmail's collapse algorithm looks for visually or structurally separate blocks
@@ -181,12 +194,24 @@ export async function sendEmailFromSender(
         );
       }
 
+      // Visible CAN-SPAM footer: unsubscribe link + physical mailing address.
+      // Appended AFTER the click-tracking rewrite so the opt-out link is a
+      // clean first-party URL (never a tracked redirect — recipients and spam
+      // filters both need to see it plainly, and an unsubscribe must never
+      // count as engagement).
+      const footerHtml = wantsUnsubscribe
+        ? `\n<p style="margin:28px 0 0;padding-top:14px;border-top:1px solid #e8e8e8;font-size:11px;line-height:1.6;color:#8a8a8a;">
+New Dawn Franchising LLC &middot; 2601 N Zaragoza Rd, El Paso, TX 79938<br/>
+Don't want these emails? <a href="${unsubscribeUrl(recipientAddr)}" style="color:#8a8a8a;text-decoration:underline;">Unsubscribe</a> and we won't email you again.
+</p>`
+        : "";
+
       finalHtml = `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#ffffff;">
 <div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.7;color:#222222;max-width:600px;margin:0 auto;padding:24px 20px;">
-${innerHtml}
+${innerHtml}${footerHtml}
 </div>${pixelHtml}
 </body>
 </html>`;
@@ -195,15 +220,9 @@ ${innerHtml}
     // Deliverability headers. A real From-aligned Reply-To, a plain-text part
     // (multipart/alternative), and one-click List-Unsubscribe (RFC 8058) — the
     // latter is effectively required by Gmail/Yahoo bulk-sender rules.
-    const recipientAddr = (to.match(/<([^>]+)>/)?.[1] || to).trim();
-    // Only a single, well-formed recipient gets an unsubscribe link: the token is
-    // bound to ONE address, so a comma-list send would hand every recipient the
-    // first one's (invalid-for-them) link. The regex also rejects malformed
-    // addresses that only contain "@".
-    const oneRecipient = /^[^@\s,]+@[^@\s,]+\.[^@\s,]+$/.test(recipientAddr);
     let textBody = htmlToPlainText(finalHtml);
     const extraHeaders: Record<string, string> = {};
-    if (!options?.skipUnsubscribe && oneRecipient) {
+    if (wantsUnsubscribe) {
       Object.assign(extraHeaders, buildUnsubscribeHeaders(recipientAddr));
       textBody += `\n\n—\nNot interested? Unsubscribe: ${unsubscribeUrl(recipientAddr)}`;
     }
@@ -284,16 +303,18 @@ export async function cacheDylanCalendlyUrl(): Promise<void> {
 }
 
 const SIGNER_MAP: Record<string, SignerInfo> = {
-  // Company-branded signature (logo, no personal headshot) for the shared franchising@ inbox.
+  // Dylan signs the shared franchising@ inbox — his mailbox moved from dylan@
+  // to franchising@, and outreach must sign off from a person, not a brand.
   "franchising@newdawnfranchising.com": {
-    name: "New Dawn Franchising",
-    title: "Franchise Development",
+    name: "Dylan Delaney",
+    title: "Director of Franchise Development",
     email: "franchising@newdawnfranchising.com",
     phone: "(346) 597-9994",
-    linkedin: "https://www.linkedin.com/company/new-dawn-franchising",
+    linkedin: "https://www.linkedin.com/in/dylanmdelaney",
     photoKey: "dylan-headshot-email.jpg",
     whatsappUrl: "https://wa.me/13465979994",
-    usePhoto: false,
+    calendlyUrl: "https://calendly.com/dylan-newdawnfranchising",
+    usePhoto: true,
   },
   "dylan@newdawnfranchising.com": {
     name: "Dylan Delaney",
@@ -311,7 +332,7 @@ const SIGNER_MAP: Record<string, SignerInfo> = {
 const DEFAULT_SIGNER: SignerInfo = {
   name: "Dylan Delaney",
   title: "Director of Franchise Development",
-  email: "dylan@newdawnfranchising.com",
+  email: "franchising@newdawnfranchising.com",
   phone: "(346) 597-9994",
   linkedin: "https://www.linkedin.com/in/dylanmdelaney",
   whatsappUrl: "https://wa.me/13465979994",

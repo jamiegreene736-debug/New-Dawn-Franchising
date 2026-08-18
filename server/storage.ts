@@ -81,6 +81,9 @@ export interface IStorage {
   deleteDripSend(id: string): Promise<void>;
   recordEmailOpen(sendId: string): Promise<DripSend | undefined>;
   recordEmailClick(sendId: string): Promise<DripSend | undefined>;
+  recordBotEmailOpen(sendId: string): Promise<void>;
+  recordBotEmailClick(sendId: string): Promise<void>;
+  markEnrollmentsUnsubscribed(email: string): Promise<number>;
   markDripSendBounced(recipientEmail: string, reason: string): Promise<DripSend | null>;
   getSmsCampaigns(): Promise<SmsCampaign[]>;
   createSmsCampaign(data: InsertSmsCampaign): Promise<SmsCampaign>;
@@ -756,6 +759,37 @@ export class DatabaseStorage implements IStorage {
       .where(eq(dripSends.id, sendId))
       .returning();
     return updated;
+  }
+
+  // Scanner/bot hits (see server/tracking-bot-filter.ts) — counted separately so
+  // openedAt/clickedAt + openCount/clickCount always mean a human engaged.
+  async recordBotEmailOpen(sendId: string): Promise<void> {
+    await db.update(dripSends)
+      .set({ botOpenCount: sql`${dripSends.botOpenCount} + 1` })
+      .where(eq(dripSends.id, sendId));
+  }
+
+  async recordBotEmailClick(sendId: string): Promise<void> {
+    // A bot that clicked also fetched the message — still only bot counters.
+    await db.update(dripSends)
+      .set({
+        botClickCount: sql`${dripSends.botClickCount} + 1`,
+        botOpenCount: sql`${dripSends.botOpenCount} + 1`,
+      })
+      .where(eq(dripSends.id, sendId));
+  }
+
+  // Unsubscribe write-through: stop every live enrollment for this address so the
+  // drip halts immediately and the campaign UI shows WHY (not just "bounced").
+  async markEnrollmentsUnsubscribed(email: string): Promise<number> {
+    const rows = await db.update(dripEnrollments)
+      .set({ status: "unsubscribed" })
+      .where(and(
+        sql`lower(${dripEnrollments.prospectEmail}) = ${email.toLowerCase()}`,
+        eq(dripEnrollments.status, "active"),
+      ))
+      .returning({ id: dripEnrollments.id });
+    return rows.length;
   }
 
   async markDripSendBounced(recipientEmail: string, reason: string): Promise<DripSend | null> {

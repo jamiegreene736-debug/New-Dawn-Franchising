@@ -148,6 +148,9 @@ interface CrmClient {
   emailVerifiedAt?: string | null;
   emailScore?: number | null;
   suggestedEmail?: string | null;
+  // Set when this email opted out via the unsubscribe link (overlaid from the
+  // DNC list by GET /api/crm/clients) — campaigns will never email them again.
+  unsubscribedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -1914,6 +1917,15 @@ export default function CrmPage() {
                           </span>
                         )}
                         <EmailStatusBadge status={client.emailStatus} score={client.emailScore} />
+                        {client.unsubscribedAt && (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs bg-orange-100 text-orange-700"
+                            title={`Unsubscribed ${new Date(client.unsubscribedAt).toLocaleDateString()} — suppressed from all campaigns`}
+                            data-testid="badge-unsubscribed"
+                          >
+                            Unsubscribed
+                          </span>
+                        )}
                       </div>
 
                       {/* Row 2: contact info */}

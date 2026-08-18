@@ -130,6 +130,9 @@ const STATEMENTS: string[] = [
   // Every email is tracked for opens (pixel) and now link clicks (redirect).
   `ALTER TABLE drip_sends ADD COLUMN IF NOT EXISTS clicked_at timestamp`,
   `ALTER TABLE drip_sends ADD COLUMN IF NOT EXISTS click_count integer NOT NULL DEFAULT 0`,
+  // Scanner/bot hits recorded separately so open/click counts mean a human engaged.
+  `ALTER TABLE drip_sends ADD COLUMN IF NOT EXISTS bot_open_count integer NOT NULL DEFAULT 0`,
+  `ALTER TABLE drip_sends ADD COLUMN IF NOT EXISTS bot_click_count integer NOT NULL DEFAULT 0`,
   // ─── Unified Activity feed ───────────────────────────────────────────────
   // Every drip touch records its channel so the Activity tab can show & filter
   // email / SMS / LinkedIn / call / task touches side-by-side.

@@ -94,6 +94,11 @@ interface CampaignStats {
     clicks: number;
     replies: number;
     bounced: number;
+    unsubscribed?: number;
+    // Scanner/security-gateway hits filtered out of opens/clicks (see
+    // server/tracking-bot-filter.ts) — shown so heavy bot traffic is visible.
+    botClicks?: number;
+    botOpens?: number;
   };
   perStep: Record<string, { sent: number; opened: number; clicked: number; bounced: number; tasks: number; notSent: number }>;
 }
@@ -252,6 +257,7 @@ function ActivityStatusBadge({ item }: { item: ActivityItem }) {
     failed:   { label: "Failed",   cls: "bg-red-100 text-red-700" },
     pending:  { label: "Pending",  cls: "bg-gray-100 text-gray-600" },
     task:     { label: "Task",     cls: "bg-purple-100 text-purple-700" },
+    unsubscribed: { label: "Unsubscribed", cls: "bg-orange-100 text-orange-700" },
   };
   const s = map[item.status] ?? { label: item.status || "—", cls: "bg-gray-100 text-gray-600" };
   return (
@@ -1030,7 +1036,7 @@ function EmailCampaignTab() {
               </div>
 
               {/* Overview stat row */}
-              <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2 mb-6">
+              <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-11 gap-2 mb-6">
                 {[
                   { label: "Total", value: stats?.overview.total ?? enrollments.length, color: "text-[hsl(var(--primary))]" },
                   { label: "Active", value: stats?.overview.active ?? 0, color: "text-green-600" },
@@ -1041,8 +1047,11 @@ function EmailCampaignTab() {
                   { label: "Clicks", value: stats?.overview.clicks ?? 0, color: "text-amber-600" },
                   { label: "Replies", value: stats?.overview.replies ?? 0, color: "text-purple-600" },
                   { label: "Bounced", value: stats?.overview.bounced ?? 0, color: "text-red-600" },
+                  { label: "Unsubscribed", value: stats?.overview.unsubscribed ?? 0, color: "text-orange-600" },
+                  { label: "Bot hits filtered", value: (stats?.overview.botClicks ?? 0) + (stats?.overview.botOpens ?? 0), color: "text-gray-400",
+                    title: "Scanner/security-gateway opens+clicks excluded from the Opens and Clicks counts" },
                 ].map((s) => (
-                  <Card key={s.label} data-testid={`overview-stat-${s.label.toLowerCase()}`} className="p-3 text-center">
+                  <Card key={s.label} data-testid={`overview-stat-${s.label.toLowerCase().replace(/\s+/g, "-")}`} className="p-3 text-center" title={(s as any).title}>
                     <div className={`text-xl font-bold ${s.color}`}>{s.value}</div>
                     <div className="text-[11px] text-muted-foreground">{s.label}</div>
                   </Card>
@@ -1252,7 +1261,7 @@ function EmailCampaignTab() {
                               <div className="text-sm font-medium">{e.prospectName}</div>
                               <div className="text-xs text-muted-foreground">
                                 {e.prospectEmail} &middot; Step {e.currentStep}/{campaignDetail.steps?.length || 0} &middot;{" "}
-                                <span className={e.status === "active" ? "text-green-600" : e.status === "completed" ? "text-blue-600" : "text-gray-500"}>{e.status}</span>
+                                <span className={e.status === "active" ? "text-green-600" : e.status === "completed" ? "text-blue-600" : e.status === "unsubscribed" ? "text-orange-600" : "text-gray-500"}>{e.status}</span>
                               </div>
                               {/* Next scheduled send */}
                               {e.status === "active" && (

@@ -62,6 +62,7 @@ import { processPartnerSequence } from "./partner-sequence-service";
 import { runDailyPreparation, runDailyBrief, pollForApprovalReply, runApprovalDeadlineCheck, addToDnc, isOnDnc } from "./agent-service";
 import { verifyEmailForEnrollment, isFreshVerification, decisionFromStoredStatus } from "./email-verification-service";
 import { verifyUnsubToken, unsubscribeConfirmPage, unsubscribedPage, invalidUnsubscribeLinkPage } from "./unsubscribe-service";
+import { classifyTrackingHit, isBotUserAgent } from "./tracking-bot-filter";
 import { hunterFindEmail, hunterDomainPattern, buildEmailFromPattern, hunterVerifyEmail, getHunterStatus } from "./hunter-service";
 import { runLeadResearchAgent } from "./lead-research-agent";
 import {
@@ -75,7 +76,7 @@ import {
 } from "./bulk-enrich";
 import { pollAllRenderingVideos, runHeygenPreparation } from "./heygen-service";
 import { heygenVideos, prospectLists } from "../shared/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import { db } from "./db";
 import { runAllHealthChecks, runHealthCheckWithAlerts } from "./api-health";
 import cron from "node-cron";
@@ -136,7 +137,7 @@ import {
   getMeetings, getUpcomingMeetings, updateMeetingOutcome, handleMeetingBooked, classifyReplyIntent,
 } from "./meetings";
 import { generateWeeklyBrief } from "./strategy-brief";
-import { briefs, systemNotifications, contacts } from "@shared/schema";
+import { briefs, systemNotifications, contacts, agentDnc } from "@shared/schema";
 import { callClaude } from "./chat-service";
 
 // Run `fn` over `items` with at most `concurrency` in flight, preserving order.
@@ -1461,7 +1462,19 @@ export async function registerRoutes(
   app.get("/api/crm/clients", requireAdminAuth, async (_req, res) => {
     try {
       const clients = await storage.getCrmClients();
-      res.json(clients);
+      // Per-lead opt-out visibility: overlay the DNC unsubscribes onto each row
+      // (agent_dnc stays the single source of truth — no per-table flag to drift).
+      let unsubByEmail = new Map<string, Date>();
+      try {
+        const rows = await db.select({ email: agentDnc.email, addedAt: agentDnc.addedAt })
+          .from(agentDnc)
+          .where(sql`${agentDnc.email} IS NOT NULL AND ${agentDnc.reason} ILIKE 'unsubscribed%'`);
+        unsubByEmail = new Map(rows.filter((r) => r.email).map((r) => [r.email!.toLowerCase(), r.addedAt]));
+      } catch { /* overlay is best-effort — never block the client list */ }
+      res.json(clients.map((c) => ({
+        ...c,
+        unsubscribedAt: c.email ? (unsubByEmail.get(c.email.toLowerCase()) ?? null) : null,
+      })));
     } catch (err) {
       res.status(500).json({ message: "Failed to fetch clients" });
     }
@@ -3142,20 +3155,37 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
   // --- Tracking pixel endpoint (no auth required) ---
   app.get("/api/track/open/:sendId", async (req, res) => {
     const sendId = req.params.sendId as string;
+    let human = true;
     try {
       if (sendId.startsWith("de_")) {
-        await storage.recordDirectEmailOpen(sendId);
+        // Direct 1:1 emails: user-agent screen only (no sent-at handy here).
+        if (isBotUserAgent(req.headers["user-agent"]) || req.method === "HEAD") {
+          human = false;
+        } else {
+          await storage.recordDirectEmailOpen(sendId);
+        }
       } else {
-        await storage.recordEmailOpen(sendId);
+        // Security gateways fetch the pixel the instant mail lands — classify
+        // before counting so "opened" always means a person did.
+        const send = await storage.getDripSend(sendId);
+        if (send && classifyTrackingHit(req, "open", send.sentAt) === "bot") {
+          human = false;
+          await storage.recordBotEmailOpen(sendId);
+        } else {
+          await storage.recordEmailOpen(sendId);
+        }
       }
     } catch (err) {
       // silently fail - don't break the pixel
     }
-    // Also check if this token belongs to a broker sequence event
-    try {
-      const { handleEmailOpen } = await import("./broker-sequence-service");
-      await handleEmailOpen(sendId);
-    } catch { /* non-fatal */ }
+    // Also check if this token belongs to a broker sequence event — but never
+    // let a scanner's pixel fetch advance an open-triggered sequence.
+    if (human) {
+      try {
+        const { handleEmailOpen } = await import("./broker-sequence-service");
+        await handleEmailOpen(sendId);
+      } catch { /* non-fatal */ }
+    }
 
     const pixel = Buffer.from("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "base64");
     res.set({ "Content-Type": "image/gif", "Cache-Control": "no-store, no-cache, must-revalidate", "Pragma": "no-cache" });
@@ -3170,12 +3200,23 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
     const target = String(req.query.u || "");
     try {
       if (id.startsWith("de_")) {
-        await storage.recordDirectEmailClick(id);
+        // Direct 1:1 emails: user-agent screen only (no sent-at handy here).
+        if (!isBotUserAgent(req.headers["user-agent"]) && req.method !== "HEAD") {
+          await storage.recordDirectEmailClick(id);
+        }
       } else {
-        const updated = await storage.recordEmailClick(id);
-        // First click = hot lead → create a call task + alert the team (once).
-        if (updated && (updated.clickCount ?? 0) === 1) {
-          fireClickReaction(updated).catch((e) => console.error("[ClickReaction]", e?.message || e));
+        // Gateways (SafeLinks/Proofpoint/Barracuda…) crawl every link within
+        // seconds of delivery and re-crawl for days — before this filter they
+        // produced 200+ "clicks" per recipient and bogus hot-lead call tasks.
+        const send = await storage.getDripSend(id);
+        if (send && classifyTrackingHit(req, "click", send.sentAt, send.clickCount ?? 0) === "bot") {
+          await storage.recordBotEmailClick(id);
+        } else {
+          const updated = await storage.recordEmailClick(id);
+          // First HUMAN click = hot lead → create a call task + alert the team (once).
+          if (updated && (updated.clickCount ?? 0) === 1) {
+            fireClickReaction(updated).catch((e) => console.error("[ClickReaction]", e?.message || e));
+          }
         }
       }
     } catch {
@@ -3257,6 +3298,11 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
         clicks: sends.filter((s) => s.status === "sent" && (s as any).clickedAt).length,
         replies: repliedCount,
         bounced: emailSends.filter((s) => s.status === "failed" || s.status === "bounced").length,
+        unsubscribed: enrollments.filter((e) => e.status === "unsubscribed").length,
+        // Scanner/gateway hits filtered out of opens/clicks — kept visible so a
+        // "quiet" campaign with heavy bot traffic is distinguishable from no reach.
+        botClicks: sends.reduce((n, s) => n + ((s as any).botClickCount ?? 0), 0),
+        botOpens: sends.reduce((n, s) => n + ((s as any).botOpenCount ?? 0), 0),
       };
 
       res.json({ overview, perStep });
@@ -5733,6 +5779,22 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
       console.log(`[Unsubscribe] ${email} suppressed via List-Unsubscribe`);
     } catch (e: any) {
       console.error(`[Unsubscribe] failed for ${email}:`, e?.message);
+    }
+    // Write the opt-out through to every lead surface so it's visible per lead,
+    // not only in the DNC list: stop live enrollments (status "unsubscribed"
+    // shows in the campaign UI) and flag the contact record.
+    try {
+      const stopped = await storage.markEnrollmentsUnsubscribed(email);
+      if (stopped > 0) console.log(`[Unsubscribe] stopped ${stopped} active enrollment(s) for ${email}`);
+    } catch (e: any) {
+      console.error(`[Unsubscribe] enrollment stop failed for ${email}:`, e?.message);
+    }
+    try {
+      await db.update(contacts)
+        .set({ status: "unsubscribed", updatedAt: new Date() })
+        .where(sql`lower(${contacts.email}) = ${email}`);
+    } catch (e: any) {
+      console.error(`[Unsubscribe] contact flag failed for ${email}:`, e?.message);
     }
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.status(200).send(unsubscribedPage(email));

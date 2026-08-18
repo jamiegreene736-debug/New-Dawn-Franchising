@@ -1225,6 +1225,87 @@ function MonitoringPanel() {
   );
 }
 
+// ─── Unsubscribes ─────────────────────────────────────────────────────────────
+// Every opt-out in one place (link + reply), overlaid with contact identity and
+// the campaigns each address was dropped from. Backed by /api/admin/unsubscribes;
+// agent_dnc remains the source of truth.
+interface UnsubscribeRow {
+  id: string;
+  email: string;
+  name: string | null;
+  firmName: string | null;
+  source: "link" | "reply";
+  reason: string | null;
+  campaignsStopped: string[];
+  unsubscribedAt: string;
+}
+interface UnsubscribesReport {
+  total: number;
+  last7: number;
+  last30: number;
+  unsubscribes: UnsubscribeRow[];
+}
+
+function UnsubscribesPanel() {
+  const q = useQuery<UnsubscribesReport>({ queryKey: ["/api/admin/unsubscribes"] });
+  const d = q.data;
+  return (
+    <Card className="mt-3 p-4">
+      <h4 className="mb-2 flex items-center gap-2 text-sm font-semibold">
+        <Ban className="size-4" /> Unsubscribes
+        {d && (
+          <span className="font-normal text-muted-foreground">
+            — {d.total} total · {d.last7} in 7d · {d.last30} in 30d
+          </span>
+        )}
+      </h4>
+      {q.isLoading ? (
+        <div className="text-sm text-muted-foreground">Loading unsubscribes…</div>
+      ) : !d ? (
+        <div className="text-sm text-red-600">Could not load unsubscribes.</div>
+      ) : d.unsubscribes.length === 0 ? (
+        <div className="text-sm text-muted-foreground">No one has unsubscribed yet.</div>
+      ) : (
+        <div className="max-h-80 overflow-x-auto overflow-y-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs uppercase text-muted-foreground">
+                <th className="py-1 pr-3">Email</th>
+                <th className="py-1 pr-3">Contact</th>
+                <th className="py-1 pr-3">Via</th>
+                <th className="py-1 pr-3">Campaigns stopped</th>
+                <th className="py-1">When</th>
+              </tr>
+            </thead>
+            <tbody>
+              {d.unsubscribes.map((u) => (
+                <tr key={u.id} className="border-t align-top">
+                  <td className="py-1.5 pr-3 font-medium">{u.email}</td>
+                  <td className="py-1.5 pr-3 text-foreground/80">
+                    {u.name || "—"}
+                    {u.firmName && <span className="text-muted-foreground"> · {u.firmName}</span>}
+                  </td>
+                  <td className="py-1.5 pr-3">
+                    <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${u.source === "reply" ? "bg-sky-100 text-sky-700" : "bg-orange-100 text-orange-700"}`}>
+                      {u.source === "reply" ? "Replied" : "Email link"}
+                    </span>
+                  </td>
+                  <td className="py-1.5 pr-3 text-foreground/80">
+                    {u.campaignsStopped.length > 0 ? u.campaignsStopped.join(", ") : "—"}
+                  </td>
+                  <td className="py-1.5 whitespace-nowrap text-muted-foreground">
+                    {new Date(u.unsubscribedAt).toLocaleDateString()}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 // ─── Main tab ─────────────────────────────────────────────────────────────────
 type DeliverabilitySection = "health" | "dns" | "warmup" | "content" | "blacklist" | "safety" | "monitoring";
 const SECTION_TABS: { id: DeliverabilitySection; label: string; Icon: any }[] = [
@@ -1463,6 +1544,7 @@ export default function EmailDeliverabilityTab() {
         ) : (
           <div className="text-sm text-red-600">Could not load metrics.</div>
         )}
+        <UnsubscribesPanel />
       </div>
 
       {/* Roadmap */}

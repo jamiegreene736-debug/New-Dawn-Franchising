@@ -31,7 +31,9 @@ import {
   enrichLeadEmail,
   findPeopleAtFirm,
   looksLikePersonName,
+  domainFromWebsite,
 } from "./lead-email-enrichment";
+import { clearHunterIssue, getHunterIssue } from "./hunter-service";
 import { BROKER_2_CAMPAIGN_NAME } from "@shared/campaign-tracks";
 import type { DripCampaign, Prospect } from "@shared/schema";
 
@@ -60,6 +62,12 @@ export interface DailyCampaignResult {
   skippedDuplicate: number;
   skippedUndeliverable: number;
   skippedNoEmail: number;
+  /**
+   * Enrichment-time provider problems worth telling the operator about (Hunter
+   * quota exhaustion, leads arriving with nothing to enrich) — merged into the
+   * daily report SMS's provider-issues line by the caller.
+   */
+  providerIssues?: string[];
 }
 
 /** Short, human label for the day's dominant strategy, used in list/campaign names. */
@@ -211,6 +219,14 @@ export async function buildDailyCampaignFromLeads(opts: {
   const leads = opts.leads.filter((l) => l.fullName && l.fullName.trim().length >= 3);
   if (leads.length === 0) return null;
 
+  // Track Hunter failures fresh for this run so a quota-dead key shows up in
+  // the report instead of masquerading as "no emails found".
+  clearHunterIssue();
+  // Leads that arrive with neither an email nor a usable firm domain give the
+  // enrichment waterfall nothing to work with — count them so a low-yield day
+  // is explainable at a glance.
+  let unenrichableLeads = 0;
+
   // 1. Discovered leads → deduped CRM contacts. SerpAPI gives us a name + firm
   //    website but no email; enrich a work email (Hunter → Apollo → PDL →
   //    verified pattern guess) first so the email-led campaign actually has
@@ -259,6 +275,7 @@ export async function buildDailyCampaignFromLeads(opts: {
     let email = l.email?.trim() || null;
     let enrichedEmail: string | null = null;
     const isPerson = looksLikePersonName(l.fullName);
+    if (!email && !domainFromWebsite(l.website)) unenrichableLeads++;
 
     if (!email && isPerson) {
       const enriched = await enrichLeadEmail(l);
@@ -392,11 +409,21 @@ export async function buildDailyCampaignFromLeads(opts: {
     );
   }
 
+  const providerIssues: string[] = [];
+  const hunterIssue = getHunterIssue();
+  if (hunterIssue) providerIssues.push(hunterIssue);
+  if (unenrichableLeads > 0) {
+    providerIssues.push(
+      `${unenrichableLeads}/${leads.length} discovered leads had no email and no website — enrichment had nothing to work with`,
+    );
+  }
+
   console.log(
     `[DailyCampaign] ${runDate}: list "${listName}" (${contactIds.length}, ${emailsEnriched} emails enriched, ` +
       `${firmPeopleAdded} people found at org leads), ` +
       `campaign "${campaignName}" — enrolled ${enrolled}, dup ${skippedDuplicate}, ` +
-      `undeliverable ${skippedUndeliverable}, no-email ${skippedNoEmail}.`,
+      `undeliverable ${skippedUndeliverable}, no-email ${skippedNoEmail}.` +
+      (providerIssues.length ? ` Issues: ${providerIssues.join("; ")}` : ""),
   );
 
   return {
@@ -411,5 +438,6 @@ export async function buildDailyCampaignFromLeads(opts: {
     skippedDuplicate,
     skippedUndeliverable,
     skippedNoEmail,
+    providerIssues,
   };
 }

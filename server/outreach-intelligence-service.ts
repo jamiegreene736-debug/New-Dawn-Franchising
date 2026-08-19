@@ -29,6 +29,7 @@ import {
   planLooksAnomalous,
   buildPlanExecutedSms,
   extractJson,
+  looksLikeSerpQuotaExhaustion,
   MAX_EXECUTION_ATTEMPTS,
 } from "./outreach-autopilot-helpers";
 import { randomUUID } from "crypto";
@@ -258,29 +259,98 @@ type PlanPerson = {
   city?: string;
 };
 
+// A 429 from SerpAPI is ambiguous: per-second throttling (retry shortly) or the
+// monthly quota running dry mid-run (retrying is pointless — every remaining
+// serpapi query would burn 15+s failing the same way). The account endpoint
+// settles it; cache the probe so a run of 429s costs one extra request.
+let serpAccountProbe: { at: number; quotaExhausted: boolean; renewal?: string } | null = null;
+
+async function probeSerpQuota(): Promise<{ quotaExhausted: boolean; renewal?: string } | null> {
+  const now = Date.now();
+  if (serpAccountProbe && now - serpAccountProbe.at < 10 * 60 * 1000) return serpAccountProbe;
+  try {
+    const res = await fetch(`https://serpapi.com/account.json?api_key=${SERPAPI_KEY}`, {
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) return null;
+    const data = await res.json() as {
+      total_searches_left?: number;
+      plan_searches_left?: number;
+      plan_renewal_date?: string;
+      account_status?: string;
+    };
+    const left = data.total_searches_left ?? data.plan_searches_left;
+    serpAccountProbe = {
+      at: now,
+      quotaExhausted: left != null ? left <= 0 : looksLikeSerpQuotaExhaustion(data.account_status),
+      renewal: data.plan_renewal_date,
+    };
+    return serpAccountProbe;
+  } catch {
+    return null;
+  }
+}
+
+// Backoff schedule for throttle-429s: one query is worth two short waits, but
+// not more — the run has 10+ serpapi queries to get through.
+const SERP_RETRY_DELAYS_MS = [5_000, 15_000];
+// Extra spacing between consecutive serpapi queries (the general inter-query
+// delay is 800ms, which is what got half a run 429'd).
+const SERP_INTER_QUERY_DELAY_MS = 3_000;
+
 async function serpSearch(query: string): Promise<{
   results: { title: string; link: string; snippet: string }[];
   error?: string;
+  /** True when the MONTHLY quota is gone — callers should stop issuing serpapi queries. */
+  quotaExhausted?: boolean;
 }> {
   if (!SERPAPI_KEY) return { results: [], error: "SERPAPI_KEY not configured" };
-  try {
-    // Pull a deep 40-result page — one SerpAPI request costs the same credit
-    // regardless of num, and only ~25% of extracted leads end up emailable, so
-    // every extra organic result widens the funnel for free.
-    const url = `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(query)}&num=40&api_key=${SERPAPI_KEY}`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(30_000) });
-    if (!res.ok) return { results: [], error: `SerpAPI HTTP ${res.status}` };
-    const data = await res.json() as { organic_results?: { title?: string; link?: string; snippet?: string }[]; error?: string };
-    if (data.error) return { results: [], error: `SerpAPI: ${String(data.error).slice(0, 120)}` };
-    return {
-      results: (data.organic_results ?? []).slice(0, 40).map(r => ({
-        title: r.title ?? "",
-        link: r.link ?? "",
-        snippet: r.snippet ?? "",
-      })),
-    };
-  } catch (e) {
-    return { results: [], error: `SerpAPI: ${(e as Error).message.slice(0, 120)}` };
+  for (let attempt = 0; ; attempt++) {
+    try {
+      // Pull a deep 40-result page — one SerpAPI request costs the same credit
+      // regardless of num, and only ~25% of extracted leads end up emailable, so
+      // every extra organic result widens the funnel for free.
+      const url = `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(query)}&num=40&api_key=${SERPAPI_KEY}`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+      const bodyText = await res.text();
+      let data: { organic_results?: { title?: string; link?: string; snippet?: string }[]; error?: string } | null = null;
+      try { data = JSON.parse(bodyText); } catch { /* non-JSON error page */ }
+
+      if (res.ok && data && !data.error) {
+        return {
+          results: (data.organic_results ?? []).slice(0, 40).map(r => ({
+            title: r.title ?? "",
+            link: r.link ?? "",
+            snippet: r.snippet ?? "",
+          })),
+        };
+      }
+
+      const apiError = String(data?.error ?? "");
+      if (looksLikeSerpQuotaExhaustion(apiError || bodyText)) {
+        return { results: [], error: "SerpAPI monthly search quota exhausted", quotaExhausted: true };
+      }
+      if (res.status === 429) {
+        const probe = await probeSerpQuota();
+        if (probe?.quotaExhausted) {
+          return {
+            results: [],
+            error: `SerpAPI monthly search quota exhausted${probe.renewal ? ` (renews ${probe.renewal})` : ""}`,
+            quotaExhausted: true,
+          };
+        }
+        if (attempt < SERP_RETRY_DELAYS_MS.length) {
+          console.warn(`[OutreachIntel] SerpAPI 429 (throttled) — retrying in ${SERP_RETRY_DELAYS_MS[attempt] / 1000}s...`);
+          await new Promise(r => setTimeout(r, SERP_RETRY_DELAYS_MS[attempt]));
+          continue;
+        }
+        return { results: [], error: `SerpAPI HTTP 429 (still throttled after ${SERP_RETRY_DELAYS_MS.length} retries)` };
+      }
+      if (!res.ok) return { results: [], error: `SerpAPI HTTP ${res.status}` };
+      return { results: [], error: `SerpAPI: ${apiError.slice(0, 120)}` };
+    } catch (e) {
+      return { results: [], error: `SerpAPI: ${(e as Error).message.slice(0, 120)}` };
+    }
   }
 }
 
@@ -299,6 +369,11 @@ function toPlanPerson(p: SeamlessPerson): PlanPerson {
   };
 }
 
+/** Shared per-run Apollo email-reveal budget + attempt/success accounting, so
+ *  the report can distinguish "reveals worked" from "reveals silently failing
+ *  (out of export credits)". */
+type ApolloRevealBudget = { left: number; attempted: number; revealed: number };
+
 /**
  * Apollo structured people search (free api_search endpoint) + a credit-capped
  * email reveal for the best matches. Search results arrive with emails masked;
@@ -308,8 +383,8 @@ function toPlanPerson(p: SeamlessPerson): PlanPerson {
  */
 async function apolloPlanSearch(
   opts: { titles: string[]; countries: string[]; keywords?: string; limit?: number },
-  revealBudget: { left: number },
-): Promise<{ people: PlanPerson[]; error?: string }> {
+  revealBudget: ApolloRevealBudget,
+): Promise<{ people: PlanPerson[]; error?: string; droppedUnrevealed?: number }> {
   if (!process.env.APOLLO_API_KEY) return { people: [], error: "APOLLO_API_KEY not configured" };
   try {
     const { people, error } = await apolloSearchContacts({
@@ -325,13 +400,30 @@ async function apolloPlanSearch(
     for (const p of people) {
       if (!p.email && revealBudget.left > 0 && p.searchResultId?.startsWith("apollo:")) {
         revealBudget.left--;
+        revealBudget.attempted++;
         const revealed = await apolloRevealById(p.searchResultId.slice("apollo:".length));
+        if (revealed?.email) revealBudget.revealed++;
         out.push(revealed?.email ? { ...p, ...revealed } : p);
       } else {
         out.push(p);
       }
     }
-    return { people: out.map(toPlanPerson).filter((p) => p.name) };
+
+    // api_search masks surnames ("Ignacy Ch***k") and omits the org domain
+    // until a reveal. An unrevealed person with no email and no domain can
+    // never be contacted OR enriched (the waterfall + firm expansion both key
+    // off the domain), and the masked name dodges the name+company dedup
+    // against their own revealed copy — so a whole day can fill up with junk
+    // placeholder rows (2026-08-19: 27 of 32 leads). Keep only actionable
+    // people: a real email, or an unmasked name with a firm domain to enrich.
+    const usable = out.filter(
+      (p) => p.email || (p.domain && !/\*/.test(`${p.fullName} ${p.lastName}`)),
+    );
+    const droppedUnrevealed = out.length - usable.length;
+    return {
+      people: usable.map(toPlanPerson).filter((p) => p.name),
+      ...(droppedUnrevealed > 0 ? { droppedUnrevealed } : {}),
+    };
   } catch (e) {
     return { people: [], error: `Apollo: ${(e as Error).message.slice(0, 120)}` };
   }
@@ -758,7 +850,10 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
   // dead key / drained credit pool is visible the same morning, not weeks later.
   const providerIssues = new Map<string, string>();
   // Shared Apollo email-reveal credit budget for the whole run.
-  const apolloReveals = { left: APOLLO_REVEAL_BUDGET };
+  const apolloReveals: ApolloRevealBudget = { left: APOLLO_REVEAL_BUDGET, attempted: 0, revealed: 0 };
+  // Once the SerpAPI monthly quota is confirmed gone, skip the remaining
+  // serpapi queries outright — each would burn 15+s failing identically.
+  let serpQuotaExhausted = false;
 
   // Execute each search query
   for (const query of (plan.searchQueries ?? [])) {
@@ -769,8 +864,6 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
       let queryError: string | undefined;
 
       if (query.source === "serpapi") {
-        const serp = await serpSearch(query.query);
-        queryError = serp.error;
         // Find the matching category for this query
         const matchedCategory = plan.leadCategories[0]; // fallback to first
         const cat = plan.leadCategories.find(c =>
@@ -778,7 +871,19 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
           query.query.toLowerCase().includes(c.country.toLowerCase())
         ) ?? matchedCategory;
         queryCountry = cat?.country;
-        discovered = await extractLeadsFromSerp(serp.results, cat?.category ?? "other", cat?.country ?? "");
+        if (serpQuotaExhausted) {
+          queryError = "skipped — SerpAPI monthly quota exhausted earlier in this run";
+        } else {
+          const serp = await serpSearch(query.query);
+          queryError = serp.error;
+          if (serp.quotaExhausted) {
+            serpQuotaExhausted = true;
+            // Quota exhaustion is THE story for the day — make sure it's what
+            // the report shows for serpapi, not an earlier throttle message.
+            if (serp.error) providerIssues.set("serpapi", serp.error);
+          }
+          discovered = await extractLeadsFromSerp(serp.results, cat?.category ?? "other", cat?.country ?? "");
+        }
       } else if (query.source === "apollo" || query.source === "seamless") {
         // "seamless" only appears on legacy plan rows — Seamless was dropped as
         // a provider (2026-08-19), so those queries run through Apollo instead.
@@ -797,6 +902,9 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
         const r = await apolloPlanSearch({ titles, countries: locations, limit: 50 }, apolloReveals);
         queryError = r.error;
         providerPeople = r.people;
+        if (r.droppedUnrevealed) {
+          console.log(`[OutreachIntel] Apollo query dropped ${r.droppedUnrevealed} unrevealed/unactionable result(s) (masked name, no email, no domain).`);
+        }
         discovered = providerPeople.map(p => ({
           fullName: p.name,
           company: p.company,
@@ -836,7 +944,9 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
         queryError = `unknown source "${(query as { source: string }).source}"`;
       }
 
-      if (queryError) providerIssues.set(query.source, queryError);
+      // First failure per provider wins (per-query detail lives on the query
+      // records) — except the quota override above.
+      if (queryError && !providerIssues.has(query.source)) providerIssues.set(query.source, queryError);
 
       // Deduplicate and insert into outreach_leads
       let addedFromQuery = 0;
@@ -896,13 +1006,28 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
       });
       console.log(`[OutreachIntel] Query "${query.query.slice(0, 50)}..." → ${discovered.length} found, ${addedFromQuery} added${queryError ? ` (${queryError})` : ""}`);
 
-      // Small delay between searches
-      await new Promise(r => setTimeout(r, 800));
+      // Small delay between searches — longer after a serpapi query, whose
+      // per-second throttle is what 429'd half a run at the old flat 800ms.
+      const delay = query.source === "serpapi" && !serpQuotaExhausted ? SERP_INTER_QUERY_DELAY_MS : 800;
+      await new Promise(r => setTimeout(r, delay));
     } catch (err) {
       const msg = (err as Error).message.slice(0, 160);
       console.warn(`[OutreachIntel] Query failed: ${msg}`);
       providerIssues.set(query.source, `${query.source}: ${msg}`);
       updatedQueries.push({ ...query, executed: true, resultsCount: 0, error: msg });
+    }
+  }
+
+  // Reveal accounting: attempts with zero successes means the credit-spending
+  // path is silently broken (typically Apollo export credits ran dry) — every
+  // Apollo lead then arrives masked and unusable, so say so in the report.
+  if (apolloReveals.attempted > 0) {
+    console.log(`[OutreachIntel] Apollo email reveals: ${apolloReveals.revealed}/${apolloReveals.attempted} succeeded (budget ${APOLLO_REVEAL_BUDGET}).`);
+    if (apolloReveals.revealed === 0) {
+      providerIssues.set(
+        "apollo-reveal",
+        `Apollo email reveals: 0/${apolloReveals.attempted} returned an email — check Apollo export credits`,
+      );
     }
   }
 
@@ -1005,7 +1130,9 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
     pauseUrl: autopilotRun && plan.approvalToken
       ? `${APP_BASE()}/approve/outreach-plan/${plan.approvalToken}`
       : null,
-    providerIssues: [...providerIssues.values()],
+    // Discovery-time issues + enrichment-time issues (Hunter quota, leads
+    // arriving with nothing to enrich) — one line, same morning.
+    providerIssues: [...providerIssues.values(), ...(campaign?.providerIssues ?? [])],
   });
   await sendAgentSms("outreach", smsBody, { triggerType: "plan_executed" }).catch(() => {});
 

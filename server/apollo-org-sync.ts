@@ -25,6 +25,19 @@ const INITIAL_RUN_DELAY_MS = 25_000;
 const LEAD_SOURCE = "apollo_sync";
 const LIST_PREFIX = "Apollo · ";
 
+// When Apollo answers 403 on the Contacts API (plan/key-permission gating, NOT
+// a key-tier problem), retrying every 15 minutes only spams the logs — the
+// answer won't change until the Apollo plan or key permissions do. Pause the
+// scheduled sync and re-probe once per day; a manual sync retries immediately.
+const PAUSE_ON_403_MS = 24 * 60 * 60 * 1000;
+let pausedUntil = 0;
+
+/** APOLLO_ORG_SYNC_ENABLED=false|0|off disables the cron (manual sync still works). */
+function orgSyncEnabled(): boolean {
+  const v = (process.env.APOLLO_ORG_SYNC_ENABLED || "").trim().toLowerCase();
+  return !(v === "false" || v === "0" || v === "off");
+}
+
 function labelIdsFromPerson(p: SeamlessPerson): string[] {
   const raw = p.raw as { apolloLabelIds?: unknown } | null | undefined;
   const ids = raw?.apolloLabelIds;
@@ -132,11 +145,17 @@ async function findOrCreateCrmListByName(name: string): Promise<string> {
 
 let running = false;
 
-export async function syncApolloOrgContacts(_opts: { full?: boolean } = {}): Promise<ApolloSyncResult> {
+export async function syncApolloOrgContacts(opts: { full?: boolean; manual?: boolean } = {}): Promise<ApolloSyncResult> {
   if (!apolloConfigured()) {
     return {
       ...resultFromState(emptyState()),
       note: "Apollo.io is not configured (APOLLO_API_KEY missing).",
+    };
+  }
+  if (!opts.manual && Date.now() < pausedUntil) {
+    return {
+      ...resultFromState(await readState()),
+      note: `Apollo sync paused until ${new Date(pausedUntil).toISOString()} after a 403 from the Contacts API (not included in the current Apollo plan or key permissions). A manual sync retries immediately.`,
     };
   }
   if (running) {
@@ -160,6 +179,17 @@ export async function syncApolloOrgContacts(_opts: { full?: boolean } = {}): Pro
       : labelError && people.length === 0
         ? `${labelError.code}: ${labelError.message}`
         : null;
+
+    // 403 = the Contacts API isn't available to this plan/key. Pause the cron
+    // (one clear line instead of a failure every 15 min) and re-probe daily.
+    if (fetchError?.status === 403 || (labelError?.status === 403 && people.length === 0)) {
+      pausedUntil = Date.now() + PAUSE_ON_403_MS;
+      console.warn(
+        `[ApolloSync] Apollo's Contacts API (GET /labels, POST /contacts/search) returned 403 — the current Apollo plan or API-key permissions don't include it. Pausing scheduled sync until ${new Date(pausedUntil).toISOString()}; POST /api/apollo/sync retries immediately.`,
+      );
+    } else if (!errMsg) {
+      pausedUntil = 0;
+    }
 
     let imported = 0;
     let skipped = 0;
@@ -227,8 +257,20 @@ export async function syncApolloOrgContacts(_opts: { full?: boolean } = {}): Pro
   }
 }
 
-export function getApolloSyncConfig(): { configured: boolean; cron: string; running: boolean } {
-  return { configured: apolloConfigured(), cron: CRON_EXPR, running };
+export function getApolloSyncConfig(): {
+  configured: boolean;
+  cron: string;
+  running: boolean;
+  enabled: boolean;
+  pausedUntil: string | null;
+} {
+  return {
+    configured: apolloConfigured(),
+    cron: CRON_EXPR,
+    running,
+    enabled: orgSyncEnabled(),
+    pausedUntil: Date.now() < pausedUntil ? new Date(pausedUntil).toISOString() : null,
+  };
 }
 
 export async function getApolloSyncState(): Promise<ApolloSyncResult> {
@@ -243,6 +285,10 @@ export function scheduleApolloOrgSync(): void {
 
   if (!apolloConfigured()) {
     console.log("[ApolloSync] APOLLO_API_KEY not set — org-contact sync idle until configured");
+    return;
+  }
+  if (!orgSyncEnabled()) {
+    console.log("[ApolloSync] disabled via APOLLO_ORG_SYNC_ENABLED — org-contact sync not scheduled (manual POST /api/apollo/sync still works)");
     return;
   }
 

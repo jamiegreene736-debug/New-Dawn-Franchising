@@ -8,6 +8,7 @@ import {
   shouldAutoResume,
   planLooksAnomalous,
   buildPlanExecutedSms,
+  extractJson,
   MAX_EXECUTION_ATTEMPTS,
 } from "./outreach-autopilot-helpers";
 
@@ -120,6 +121,26 @@ const noCampaign = buildPlanExecutedSms({
   providerIssues: ["Apollo: unauthorized"],
 });
 assert("provider issues shown even without a campaign", noCampaign.includes("Apollo: unauthorized"));
+
+// ─── extractJson ──────────────────────────────────────────────────────────────
+console.log("extractJson:");
+assert("plain JSON object", extractJson<{ a: number }>('{"a":1}').a === 1);
+assert("fenced ```json block", extractJson<{ a: number }>('```json\n{"a":1}\n```').a === 1);
+assert("prose before and after", extractJson<{ a: number }>('Here is the plan:\n{"a":1}\nLet me know!').a === 1);
+assert("fenced array", (extractJson<number[]>('```json\n[1,2]\n```')).length === 2);
+assert("prose + fence + trailing text", extractJson<{ q: string }>('Sure!\n```json\n{"q":"x"}\n```\nDone.').q === "x");
+{
+  let threw = false;
+  try { extractJson('```json\n{"a": 1, "b": [truncated mid-stre'); } catch (e) {
+    threw = (e as Error).message.includes("invalid JSON");
+  }
+  assert("truncated JSON throws with snippet", threw);
+}
+{
+  let threw = false;
+  try { extractJson("no json here at all"); } catch { threw = true; }
+  assert("no JSON throws", threw);
+}
 
 // ─── Result ───────────────────────────────────────────────────────────────────
 if (failures > 0) {

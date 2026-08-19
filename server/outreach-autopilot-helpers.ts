@@ -68,6 +68,26 @@ export function planLooksAnomalous(
   return null;
 }
 
+/**
+ * Pull the outermost JSON value out of a model response: strips ```json fences
+ * and any prose before/after the JSON. Throws with a snippet on failure.
+ */
+export function extractJson<T>(raw: string): T {
+  const cleaned = raw.replace(/```json\n?|\n?```/g, "").trim();
+  try {
+    return JSON.parse(cleaned) as T;
+  } catch { /* fall through to bracket slice */ }
+  const starts = ["{", "["].map(c => cleaned.indexOf(c)).filter(i => i >= 0);
+  const first = starts.length ? Math.min(...starts) : -1;
+  const last = Math.max(cleaned.lastIndexOf("}"), cleaned.lastIndexOf("]"));
+  if (first >= 0 && last > first) {
+    try {
+      return JSON.parse(cleaned.slice(first, last + 1)) as T;
+    } catch { /* fall through to throw */ }
+  }
+  throw new Error(`Claude returned invalid JSON: ${raw.slice(0, 300)}`);
+}
+
 // ─── Completion SMS builder ───────────────────────────────────────────────────
 
 /**

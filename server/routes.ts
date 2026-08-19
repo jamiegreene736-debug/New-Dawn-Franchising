@@ -80,7 +80,7 @@ import { eq, and, desc, sql } from "drizzle-orm";
 import { db } from "./db";
 import { runAllHealthChecks, runHealthCheckWithAlerts } from "./api-health";
 import cron from "node-cron";
-import { planDailyIntelligence, getRecentPlans, getTodaysPlan } from "./outreach-intelligence-service";
+import { planDailyIntelligence, runDailyPlanning, getRecentPlans, getTodaysPlan } from "./outreach-intelligence-service";
 import { sendSmsViaQuo, getQuoStatus, listQuoPhoneNumbers, SMS_TEMPLATES, fetchSmsConversation, phoneLast10, type SmsConversationMessage } from "./quo-service";
 import { sendAgentSms, handleInboundAgentSms, notifyDraftPending, notifyBlocker, notifyError, getAgentSmsHistory, AGENT_NUMBERS, DYLAN_PHONE } from "./agent-sms-service";
 import { fetchOpenPhoneCalls, fetchCallTranscript, formatTranscript, getCallerNumber, getCallerName } from "./openphone-calls";
@@ -526,10 +526,11 @@ function scheduleAgentCrons() {
       // ── Outreach Intelligence (normally 6AM ET) — run any time before 3PM ──
       // planDailyIntelligence is idempotent: an existing plan for today is
       // skipped (manual mode) or resumed/retried (autopilot), so a restart
-      // across 6AM can no longer cost the day's lead discovery.
+      // across 6AM can no longer cost the day's lead discovery. runDailyPlanning
+      // wraps it so a planning failure texts the operator + retries once.
       if (nyHour >= 6 && nyHour < 15) {
         console.log("[Agent Startup] Running outreach intelligence catchup...");
-        planDailyIntelligence().catch((e: any) =>
+        runDailyPlanning().catch((e: any) =>
           console.error("[Agent Startup] Outreach intelligence catchup error:", e.message)
         );
       }
@@ -582,7 +583,7 @@ function scheduleAgentCrons() {
 
   // Outreach Intelligence — 6 AM ET daily: plan daily leads + SMS Dylan for approval
   cron.schedule("0 6 * * *", () => {
-    planDailyIntelligence().catch(e => console.error("[OutreachIntel] Daily plan error:", e));
+    runDailyPlanning().catch(e => console.error("[OutreachIntel] Daily plan error:", e));
   }, { timezone: "America/New_York" });
   console.log("Outreach Intelligence Agent scheduled: 6AM ET daily");
 

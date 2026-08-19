@@ -41,6 +41,10 @@ export interface DiscoveredLeadInput {
   fullName: string;
   company?: string | null;
   email?: string | null;
+  /** True when the discovery provider already verified the address (e.g.
+   *  Apollo email_status "verified") — skips the Hunter verify at enrol time,
+   *  which matters at 100+/day against Hunter's monthly verification quota. */
+  emailPreVerified?: boolean | null;
   website?: string | null;
   linkedinUrl?: string | null;
   jobTitle?: string | null;
@@ -242,8 +246,14 @@ export async function buildDailyCampaignFromLeads(opts: {
   // Bound the per-run Hunter domain-search spend for firm expansion (org-only
   // leads AND person leads whose email enrichment came up dry). Only ~25-35% of
   // discovered leads yield an email otherwise, so this budget is the main lever
-  // for converting a big discovery day into enrollable contacts.
-  let orgExpansionsLeft = 40;
+  // for converting a big discovery day into enrollable contacts. Default 25:
+  // the Hunter plan allows 1,000 searches/month, so 25/day (~750/mo) leaves
+  // headroom for the email-finder calls that share the same quota. Override
+  // with HUNTER_DAILY_FIRM_EXPANSIONS after a Hunter plan upgrade.
+  let orgExpansionsLeft = (() => {
+    const n = parseInt(process.env.HUNTER_DAILY_FIRM_EXPANSIONS ?? "", 10);
+    return Number.isFinite(n) && n >= 0 ? n : 25;
+  })();
   // How many named mailboxes to pull per expanded firm.
   const PEOPLE_PER_FIRM = 5;
 
@@ -276,6 +286,12 @@ export async function buildDailyCampaignFromLeads(opts: {
     let enrichedEmail: string | null = null;
     const isPerson = looksLikePersonName(l.fullName);
     if (!email && !domainFromWebsite(l.website)) unenrichableLeads++;
+
+    // Provider-verified addresses (Apollo "verified") skip the Hunter verify at
+    // enrol time — same trusted-verdict mechanism as waterfall-verified emails.
+    if (email && l.emailPreVerified) {
+      verifiedDuringEnrichment.add(email.toLowerCase());
+    }
 
     if (!email && isPerson) {
       const enriched = await enrichLeadEmail(l);

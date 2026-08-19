@@ -28,6 +28,7 @@ import {
   shouldAutoResume,
   planLooksAnomalous,
   buildPlanExecutedSms,
+  extractJson,
   MAX_EXECUTION_ATTEMPTS,
 } from "./outreach-autopilot-helpers";
 import { randomUUID } from "crypto";
@@ -103,7 +104,12 @@ async function callClaude(system: string, userMessage: string, maxTokens = 3000)
     const err = await res.text();
     throw new Error(`Claude API error ${res.status}: ${err.slice(0, 200)}`);
   }
-  const data = await res.json() as { content: { type: string; text: string }[] };
+  const data = await res.json() as { content: { type: string; text: string }[]; stop_reason?: string };
+  // A response cut off at the output cap is silently-broken JSON downstream —
+  // fail loudly instead so the caller's error names the real problem.
+  if (data.stop_reason === "max_tokens") {
+    throw new Error(`Claude response truncated at max_tokens=${maxTokens} — raise the budget for this call`);
+  }
   return data.content.filter(b => b.type === "text").map(b => b.text).join("").trim();
 }
 
@@ -392,9 +398,9 @@ IMPORTANT — website field: ALWAYS include a website when the search result lin
 
 Return empty array [] if no clear referral partners found. Only return verified names/orgs from the results, do NOT invent.`;
 
-    const raw = await callClaude("", prompt, 2500);
-    const cleaned = raw.replace(/```json\n?|\n?```/g, "").trim();
-    const arr = JSON.parse(cleaned);
+    // 40 SERP results can extract into a long lead array — give it headroom.
+    const raw = await callClaude("", prompt, 8000);
+    const arr = extractJson<unknown>(raw);
     return Array.isArray(arr) ? arr.map(l => ({ ...l, category })) : [];
   } catch {
     return [];
@@ -597,23 +603,19 @@ ${recentTargetsBlock}
 
 Based on this context, generate today's outreach intelligence plan. Deliberately DIVERSIFY away from the combinations listed above — rotate to different treaty countries, cities, and partner categories that the recent plans have NOT covered, while still fitting the E-2 referral-partner strategy. Be strategic about what's missing from the pipeline and what's timely today.`;
 
-  const raw = await callClaude(INTELLIGENCE_SYSTEM_PROMPT, contextMessage, 3000);
-  const cleaned = raw.replace(/```json\n?|\n?```/g, "").trim();
+  // The prompt asks for 6-10 categories + 16-24 queries with reasoning — that
+  // easily exceeds 3k output tokens, and a truncated response is unparseable
+  // JSON (this silently killed every plan once the wider-net prompt landed).
+  const raw = await callClaude(INTELLIGENCE_SYSTEM_PROMPT, contextMessage, 12000);
 
-  let plan: {
+  const plan = extractJson<{
     planSummary: string;
     strategicReasoning: string;
     leadCategories: { category: string; country: string; geoFocus: string; reasoning: string; estimatedLeads: number; priority: "high"|"medium"|"low" }[];
-    searchQueries: { query: string; source: "serpapi"|"seamless"|"hunter"; purpose: string }[];
+    searchQueries: { query: string; source: "serpapi"|"seamless"|"apollo"|"hunter"; purpose: string }[];
     blockerRequests?: { tool: string; reason: string; priority: "high"|"medium"|"low"; url?: string }[];
     estimatedLeads: number;
-  };
-
-  try {
-    plan = JSON.parse(cleaned);
-  } catch {
-    throw new Error(`Claude returned invalid JSON: ${raw.slice(0, 300)}`);
-  }
+  }>(raw);
 
   // Drop blocker requests for paid B2B contact databases — the platform already
   // sources & enriches leads (Seamless + Hunter + SerpAPI + PDL + Apollo +

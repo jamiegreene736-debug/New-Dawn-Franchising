@@ -239,7 +239,7 @@ You MUST respond with valid JSON only (no markdown, no explanation outside the J
 
 VOLUME TARGET — this matters: the pipeline needs 120–180 NEW leads discovered per day. Only ~25-35% of discovered leads yield a deliverable work email after enrichment, and the goal is 100+ emailable contacts entering a campaign every day (500+ per week). Plan wide enough to hit that.
 
-Include 6-10 lead categories, 16-24 search queries, and 0-3 blocker requests. At least 7 of the queries MUST use source "apollo" (Apollo returns real contact records with reveal-able verified emails, so those convert to campaign enrollments at a far higher rate than SerpAPI finds). Spreading queries across independent providers also keeps the day productive when any one provider has an outage or runs out of credits. Be specific and actionable. Vary the queries within a category (different cities, English + local-language phrasings, "firm directory" vs "attorney name" angles) so they don't all return the same results.`;
+Include 6-10 lead categories, 18-26 search queries, and 0-3 blocker requests. At least 10 of the queries MUST use source "apollo" (Apollo returns real contact records with reveal-able verified emails, so those convert to campaign enrollments at a far higher rate than SerpAPI finds — it is the primary volume engine for the 100+/day goal). For apollo queries, vary the professional TITLE per country (e.g. "immigration attorney", "business broker", "wealth manager" as separate queries for the same country) — each title+country pair is an independent pool of contacts. Spreading queries across independent providers also keeps the day productive when any one provider has an outage or runs out of credits. Be specific and actionable. Vary the queries within a category (different cities, English + local-language phrasings, "firm directory" vs "attorney name" angles) so they don't all return the same results.`;
 
 // ─── Search providers ─────────────────────────────────────────────────────────
 // Every provider wrapper returns an `error` string alongside its results so an
@@ -252,6 +252,9 @@ type PlanPerson = {
   title: string;
   company: string;
   email?: string;
+  /** True when the provider itself verified the address (Apollo email_status
+   *  "verified") — those skip the Hunter verification at enrol time. */
+  emailVerified?: boolean;
   phone?: string;
   linkedinUrl?: string;
   website?: string;
@@ -361,6 +364,7 @@ function toPlanPerson(p: SeamlessPerson): PlanPerson {
     title: p.jobTitle ?? "",
     company: p.company ?? "",
     email: p.email ?? undefined,
+    emailVerified: !!p.email && (p.emailVerified || p.emailStatus === "valid"),
     phone: p.phone ?? undefined,
     linkedinUrl: p.linkedinUrl ?? undefined,
     website: p.domain ? `https://${p.domain}` : undefined,
@@ -899,7 +903,10 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
         const locations = cat?.country ? [cat.country] : [];
         // Apollo: title + country alone — its keyword filter is AND-ed and
         // would narrow most international queries to zero.
-        const r = await apolloPlanSearch({ titles, countries: locations, limit: 50 }, apolloReveals);
+        // Fetch deep (100 = two api_search pages): the search itself is free,
+        // and shallow page-1 pulls kept re-finding the same people on repeat
+        // countries — dedup then discarded the whole query's yield.
+        const r = await apolloPlanSearch({ titles, countries: locations, limit: 100 }, apolloReveals);
         queryError = r.error;
         providerPeople = r.people;
         if (r.droppedUnrevealed) {
@@ -985,6 +992,7 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
             fullName: lead.fullName,
             company: lead.company ?? "",
             email: providerMatch?.email ?? null,
+            emailPreVerified: providerMatch?.emailVerified ?? false,
             website: lead.website ?? null,
             linkedinUrl: providerMatch?.linkedinUrl ?? null,
             jobTitle: providerMatch?.title ?? null,

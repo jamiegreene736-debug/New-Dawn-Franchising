@@ -9,8 +9,8 @@
  *       becomes an end-of-run report with a pause link.
  *     • Autopilot OFF (or breaker tripped / plan anomalous): sends the SMS
  *       approval link and waits, exactly as before.
- *   On approval  — executeApprovedPlan(planId) → SerpAPI + Seamless + Apollo
- *                  (+ Hunter domain) searches → populates outreach_leads →
+ *   On approval  — executeApprovedPlan(planId) → SerpAPI + Apollo (+ Hunter
+ *                  domain) searches → populates outreach_leads →
  *                  builds + enrolls the day's campaign.
  */
 
@@ -19,7 +19,7 @@ import { outreachDailyPlans, outreachLeads, agentSmsMessages } from "@shared/sch
 import { eq, and, or, desc, gte, lt, isNull, isNotNull, inArray } from "drizzle-orm";
 import { notifyBlocker, sendAgentSms, isRedundantDataVendorBlocker } from "./agent-sms-service";
 import { buildDailyCampaignFromLeads, type DiscoveredLeadInput } from "./daily-campaign-service";
-import { seamlessFindPeople, type SeamlessPerson } from "./seamless-service";
+import { type SeamlessPerson } from "./seamless-service";
 import { apolloSearchContacts, apolloRevealById } from "./apollo-service";
 import { findPeopleAtFirm } from "./lead-email-enrichment";
 import { getDeliverabilitySettings } from "./deliverability-settings-service";
@@ -174,13 +174,12 @@ Think about timing and strategy: What country or category has the most active de
 
 AVAILABLE TOOLS (you already have full B2B contact-data coverage — do NOT request more):
 - SerpAPI ("serpapi"): Google Search (use for finding specific people, firms, associations, contact info)
-- Seamless ("seamless"): B2B lead database with email enrichment (use for finding specific job titles at companies)
 - Apollo ("apollo"): structured B2B people search by job title + country — strong coverage of attorneys, brokers, and advisors; the system reveals verified emails for the best matches automatically
 - Hunter.io ("hunter"): people-at-a-firm lookup for a KNOWN firm website domain. Only emit a hunter query when you know a specific target firm's real domain; the query MUST be just the bare domain (e.g. "smithimmigrationlaw.com"). If you don't know a real domain, don't emit hunter queries.
 - People Data Labs, Proxycurl, Origami: additional email/phone enrichment, applied automatically
 - Note: LinkedIn scraping NOT available.
 
-DO NOT emit blockerRequests for B2B contact databases (e.g. ZoomInfo, Apollo, Lusha, Cognism, RocketReach, Sales Navigator, "verified contact data", "B2B database"). The platform already aggregates the equivalent capability via the tools above, so requesting them only creates noise. Only flag a blocker for a genuinely missing, non-overlapping capability (e.g. an approved WhatsApp template, a new-geo compliance clearance, or exhausted Seamless credits that need a top-up). When in doubt, leave blockerRequests empty.
+DO NOT emit blockerRequests for B2B contact databases (e.g. ZoomInfo, Apollo, Lusha, Cognism, RocketReach, Sales Navigator, "verified contact data", "B2B database"). The platform already aggregates the equivalent capability via the tools above, so requesting them only creates noise. Only flag a blocker for a genuinely missing, non-overlapping capability (e.g. an approved WhatsApp template, a new-geo compliance clearance, or exhausted Apollo/SerpAPI credits that need a top-up). When in doubt, leave blockerRequests empty.
 
 You MUST respond with valid JSON only (no markdown, no explanation outside the JSON):
 {
@@ -239,7 +238,7 @@ You MUST respond with valid JSON only (no markdown, no explanation outside the J
 
 VOLUME TARGET — this matters: the pipeline needs 120–180 NEW leads discovered per day. Only ~25-35% of discovered leads yield a deliverable work email after enrichment, and the goal is 100+ emailable contacts entering a campaign every day (500+ per week). Plan wide enough to hit that.
 
-Include 6-10 lead categories, 16-24 search queries, and 0-3 blocker requests. At least 4 of the queries MUST use source "seamless" and at least 3 MUST use source "apollo" (both return real contact records — Seamless with verified emails, Apollo with reveal-able verified emails — so they convert to campaign enrollments at a far higher rate than SerpAPI finds). Spreading queries across independent providers also keeps the day productive when any one provider has an outage or runs out of credits. Be specific and actionable. Vary the queries within a category (different cities, English + local-language phrasings, "firm directory" vs "attorney name" angles) so they don't all return the same results.`;
+Include 6-10 lead categories, 16-24 search queries, and 0-3 blocker requests. At least 7 of the queries MUST use source "apollo" (Apollo returns real contact records with reveal-able verified emails, so those convert to campaign enrollments at a far higher rate than SerpAPI finds). Spreading queries across independent providers also keeps the day productive when any one provider has an outage or runs out of credits. Be specific and actionable. Vary the queries within a category (different cities, English + local-language phrasings, "firm directory" vs "attorney name" angles) so they don't all return the same results.`;
 
 // ─── Search providers ─────────────────────────────────────────────────────────
 // Every provider wrapper returns an `error` string alongside its results so an
@@ -285,7 +284,7 @@ async function serpSearch(query: string): Promise<{
   }
 }
 
-/** Map a provider person (Seamless/Apollo shape) to the plan's lead shape. */
+/** Map a provider person (Apollo, in the shared SeamlessPerson shape) to the plan's lead shape. */
 function toPlanPerson(p: SeamlessPerson): PlanPerson {
   return {
     name: p.fullName || `${p.firstName} ${p.lastName}`.trim(),
@@ -298,30 +297,6 @@ function toPlanPerson(p: SeamlessPerson): PlanPerson {
     location: [p.city, p.country].filter(Boolean).join(" "),
     city: p.city ?? undefined,
   };
-}
-
-async function seamlessSearch(opts: {
-  titles?: string[];
-  locations?: string[];
-  keywords?: string;
-  limit?: number;
-}): Promise<{ people: PlanPerson[]; error?: string }> {
-  if (!process.env.SEAMLESS_API_KEY) return { people: [], error: "SEAMLESS_API_KEY not configured" };
-  try {
-    // enrich=true runs the research+poll step so emails come back.
-    const people = await seamlessFindPeople(
-      {
-        titles: opts.titles ?? [],
-        countries: opts.locations ?? [],
-        keywords: opts.keywords,
-        limit: Math.min(opts.limit ?? 40, 50),
-      },
-      { enrich: true },
-    );
-    return { people: people.map(toPlanPerson).filter((p) => p.name) };
-  } catch (e) {
-    return { people: [], error: `Seamless: ${(e as Error).message.slice(0, 120)}` };
-  }
 }
 
 /**
@@ -612,14 +587,14 @@ Based on this context, generate today's outreach intelligence plan. Deliberately
     planSummary: string;
     strategicReasoning: string;
     leadCategories: { category: string; country: string; geoFocus: string; reasoning: string; estimatedLeads: number; priority: "high"|"medium"|"low" }[];
-    searchQueries: { query: string; source: "serpapi"|"seamless"|"apollo"|"hunter"; purpose: string }[];
+    searchQueries: { query: string; source: "serpapi"|"apollo"|"hunter"; purpose: string }[];
     blockerRequests?: { tool: string; reason: string; priority: "high"|"medium"|"low"; url?: string }[];
     estimatedLeads: number;
   }>(raw);
 
   // Drop blocker requests for paid B2B contact databases — the platform already
-  // sources & enriches leads (Seamless + Hunter + SerpAPI + PDL + Apollo +
-  // Proxycurl), so the agent must not ask Dylan to sign up for ZoomInfo et al.
+  // sources & enriches leads (Apollo + Hunter + SerpAPI + PDL + Proxycurl), so
+  // the agent must not ask Dylan to sign up for ZoomInfo et al.
   if (plan.blockerRequests?.length) {
     const before = plan.blockerRequests.length;
     plan.blockerRequests = plan.blockerRequests.filter(
@@ -804,7 +779,9 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
         ) ?? matchedCategory;
         queryCountry = cat?.country;
         discovered = await extractLeadsFromSerp(serp.results, cat?.category ?? "other", cat?.country ?? "");
-      } else if (query.source === "seamless" || query.source === "apollo") {
+      } else if (query.source === "apollo" || query.source === "seamless") {
+        // "seamless" only appears on legacy plan rows — Seamless was dropped as
+        // a provider (2026-08-19), so those queries run through Apollo instead.
         // Parse the query into titles + locations
         const cat = plan.leadCategories.find(c =>
           query.purpose.toLowerCase().includes(c.country.toLowerCase())
@@ -813,22 +790,19 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
         const titles = cat ? [cat.category.replace(/_/g, " ")] : ["immigration attorney"];
         // The location filter needs a real country name — geoFocus is a prose
         // sentence ("Seoul — in-country immigration attorneys…") that matches
-        // nothing, which silently zeroed out every Seamless query.
+        // nothing, which silently zeroes out the search.
         const locations = cat?.country ? [cat.country] : [];
-        const r = query.source === "seamless"
-          ? await seamlessSearch({ titles, locations, keywords: "E-2 visa", limit: 50 })
-          // Apollo: title + country alone — its keyword filter is AND-ed and
-          // would narrow most international queries to zero.
-          : await apolloPlanSearch({ titles, countries: locations, limit: 50 }, apolloReveals);
+        // Apollo: title + country alone — its keyword filter is AND-ed and
+        // would narrow most international queries to zero.
+        const r = await apolloPlanSearch({ titles, countries: locations, limit: 50 }, apolloReveals);
         queryError = r.error;
         providerPeople = r.people;
-        const label = query.source === "seamless" ? "Seamless" : "Apollo";
         discovered = providerPeople.map(p => ({
           fullName: p.name,
           company: p.company,
           website: p.website,
           category: cat?.category ?? "other",
-          notes: `${p.title} — found via ${label} | ${p.location}`,
+          notes: `${p.title} — found via Apollo | ${p.location}`,
         }));
       } else if (query.source === "hunter") {
         // People-at-a-firm lookup: the query must carry a real firm domain.

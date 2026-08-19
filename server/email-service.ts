@@ -20,6 +20,11 @@ export const ALL_SENDER_PROFILES: SenderProfile[] = [
   { email: "dylan@newdawnfranchising.com", name: "Dylan – New Dawn Franchising", envVar: "GMAIL_APP_PASSWORD_DYLAN" },
   { email: "info@newdawnfranchising.com", name: "New Dawn Franchising — Info", envVar: "GMAIL_APP_PASSWORD_INFO" },
   { email: "support@newdawnfranchising.com", name: "New Dawn Franchising Support", envVar: "GMAIL_APP_PASSWORD_SUPPORT" },
+  // Volume-scaling senders (2026-08-19): a profile only enters the rotation
+  // once its app-password env var is set, so listing them ahead of the
+  // mailbox/password existing is harmless.
+  { email: "partnerships@newdawnfranchising.com", name: "Dylan Delaney — New Dawn Partnerships", envVar: "GMAIL_APP_PASSWORD_PARTNERSHIPS" },
+  { email: "dylan.delaney@newdawnfranchising.com", name: "Dylan Delaney", envVar: "GMAIL_APP_PASSWORD_DYLAN_DELANEY" },
 ];
 
 // Resolve the actual password for a sender.

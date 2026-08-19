@@ -15,7 +15,7 @@
  */
 
 import { db, pool } from "./db";
-import { outreachDailyPlans, outreachLeads } from "@shared/schema";
+import { outreachDailyPlans, outreachLeads, agentSmsMessages } from "@shared/schema";
 import { eq, and, or, desc, gte, lt, isNull, isNotNull, inArray } from "drizzle-orm";
 import { notifyBlocker, sendAgentSms, isRedundantDataVendorBlocker } from "./agent-sms-service";
 import { buildDailyCampaignFromLeads, type DiscoveredLeadInput } from "./daily-campaign-service";
@@ -95,6 +95,9 @@ async function callClaude(system: string, userMessage: string, maxTokens = 3000)
       system,
       messages: [{ role: "user", content: userMessage }],
     }),
+    // A hung request here would stall the whole unattended morning run — fail
+    // after 2 min so the planning-failure SMS + retry can take over.
+    signal: AbortSignal.timeout(120_000),
   });
   if (!res.ok) {
     const err = await res.text();
@@ -260,7 +263,7 @@ async function serpSearch(query: string): Promise<{
     // regardless of num, and only ~25% of extracted leads end up emailable, so
     // every extra organic result widens the funnel for free.
     const url = `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(query)}&num=40&api_key=${SERPAPI_KEY}`;
-    const res = await fetch(url);
+    const res = await fetch(url, { signal: AbortSignal.timeout(30_000) });
     if (!res.ok) return { results: [], error: `SerpAPI HTTP ${res.status}` };
     const data = await res.json() as { organic_results?: { title?: string; link?: string; snippet?: string }[]; error?: string };
     if (data.error) return { results: [], error: `SerpAPI: ${String(data.error).slice(0, 120)}` };
@@ -451,6 +454,66 @@ export async function checkDeliverabilityBreaker(): Promise<{ tripped: boolean; 
   }
 }
 
+// ─── Daily planning entry point (cron + startup catch-up) ────────────────────
+
+/**
+ * At most this many planning-failure SMS per ET day (first failure + final
+ * failure). Extra failures (e.g. repeated restarts while a provider is down)
+ * stay in the logs instead of spamming the phone.
+ */
+const MAX_PLAN_FAILURE_SMS_PER_DAY = 2;
+
+async function sendPlanFailureSmsThrottled(body: string): Promise<void> {
+  try {
+    const startOfDayET = new Date(
+      new Date().toLocaleDateString("en-US", { timeZone: "America/New_York" }) + " 00:00:00",
+    );
+    const sent = await db.select({ id: agentSmsMessages.id })
+      .from(agentSmsMessages)
+      .where(and(
+        eq(agentSmsMessages.triggerType, "plan_failed"),
+        gte(agentSmsMessages.createdAt, startOfDayET),
+      ))
+      .limit(MAX_PLAN_FAILURE_SMS_PER_DAY);
+    if (sent.length >= MAX_PLAN_FAILURE_SMS_PER_DAY) {
+      console.log("[OutreachIntel] Plan-failure SMS already sent today — skipping duplicate.");
+      return;
+    }
+  } catch { /* throttle check is best-effort — still send */ }
+  await sendAgentSms("outreach", body, { triggerType: "plan_failed" }).catch(() => {});
+}
+
+/**
+ * The safe entry point the cron and startup catch-up call: planning failures
+ * (Claude outage, blocked API key, DB hiccup) text the operator instead of
+ * dying silently in the logs, and get one automatic retry after
+ * RETRY_DELAY_MS. Before this, a 6AM planning failure meant no plan, no SMS,
+ * and an 8AM digest that confusingly nagged about old plans instead.
+ */
+export async function runDailyPlanning(): Promise<void> {
+  try {
+    await planDailyIntelligence();
+  } catch (e) {
+    const msg = (e as Error).message ?? String(e);
+    console.error("[OutreachIntel] Daily planning failed:", msg);
+    await sendPlanFailureSmsThrottled(
+      `⚠️ Today's lead plan couldn't be created.\n\nError: ${msg.slice(0, 180)}\n\nRetrying once in ${Math.round(RETRY_DELAY_MS / 60000)} min.`,
+    );
+    const timer = setTimeout(() => {
+      planDailyIntelligence()
+        .then(() => console.log("[OutreachIntel] Planning retry succeeded."))
+        .catch(async (err) => {
+          const m = (err as Error).message ?? String(err);
+          console.error("[OutreachIntel] Planning retry failed:", m);
+          await sendPlanFailureSmsThrottled(
+            `❌ Today's lead plan failed twice and needs attention.\n\nLast error: ${m.slice(0, 180)}\n\nThe next automatic attempt is tomorrow 6AM ET (or restart the server to retry sooner).`,
+          );
+        });
+    }, RETRY_DELAY_MS);
+    timer.unref?.();
+  }
+}
+
 // ─── Plan Daily Intelligence ──────────────────────────────────────────────────
 
 export async function planDailyIntelligence(): Promise<{ planId: string; approvalUrl: string }> {
@@ -458,20 +521,20 @@ export async function planDailyIntelligence(): Promise<{ planId: string; approva
   const autopilot = await getAutopilotState();
   const autopilotActive = autopilot.enabled && !autopilot.paused;
 
-  // Autopilot keeps its own queue clean: pending plans from previous days can
-  // never be actioned anymore (each day builds fresh), so expire them instead
-  // of letting them nag the morning digest forever.
-  if (autopilot.enabled) {
-    try {
-      await db.update(outreachDailyPlans)
-        .set({ status: "expired", updatedAt: new Date() })
-        .where(and(
-          eq(outreachDailyPlans.status, "awaiting_approval"),
-          lt(outreachDailyPlans.planDate, today),
-        ));
-    } catch (e) {
-      console.warn("[OutreachIntel] Stale-plan expiry failed:", (e as Error).message);
-    }
+  // Keep the queue clean in every mode: pending plans from previous days can
+  // never be usefully actioned anymore (each day builds fresh, and approving a
+  // stale plan just re-runs its old queries), so expire them instead of letting
+  // them nag the morning digest forever. Before this ran unconditionally, 18
+  // stale plans dating back to July were still texting approve links.
+  try {
+    await db.update(outreachDailyPlans)
+      .set({ status: "expired", updatedAt: new Date() })
+      .where(and(
+        eq(outreachDailyPlans.status, "awaiting_approval"),
+        lt(outreachDailyPlans.planDate, today),
+      ));
+  } catch (e) {
+    console.warn("[OutreachIntel] Stale-plan expiry failed:", (e as Error).message);
   }
 
   // Check if we already planned today

@@ -29,6 +29,9 @@ const router = Router();
 
 const APP_BASE_URL = () => process.env.APP_BASE_URL ?? "https://www.newdawnfranchising.com";
 
+/** Today (YYYY-MM-DD) in ET — the outreach system's day boundary. */
+const etTodayStr = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+
 // ── SEO Draft: preview ────────────────────────────────────────────────────────
 router.get("/seo/:token", async (req, res) => {
   const [draft] = await db.select().from(seoContentDrafts)
@@ -383,7 +386,12 @@ router.get("/pending", async (_req, res) => {
       estimatedLeads: outreachDailyPlans.estimatedLeads,
       approvalToken: outreachDailyPlans.approvalToken,
       createdAt: outreachDailyPlans.createdAt,
-    }).from(outreachDailyPlans).where(eq(outreachDailyPlans.status, "awaiting_approval")),
+    }).from(outreachDailyPlans).where(and(
+      eq(outreachDailyPlans.status, "awaiting_approval"),
+      // Only today's plan is actionable — a stale plan's approve link just
+      // re-runs old queries, and expiry will sweep it anyway.
+      eq(outreachDailyPlans.planDate, etTodayStr()),
+    )),
     db.select({
       id: agentForumPosts.id,
       platform: agentForumPosts.platform,
@@ -501,7 +509,12 @@ export async function sendMorningDigest(): Promise<void> {
       planSummary: outreachDailyPlans.planSummary,
       estimatedLeads: outreachDailyPlans.estimatedLeads,
       approvalToken: outreachDailyPlans.approvalToken,
-    }).from(outreachDailyPlans).where(eq(outreachDailyPlans.status, "awaiting_approval")),
+    }).from(outreachDailyPlans).where(and(
+      eq(outreachDailyPlans.status, "awaiting_approval"),
+      // Never text an approve link for a stale plan — before this filter the
+      // digest was nagging with July plans ("+17 more plans pending").
+      eq(outreachDailyPlans.planDate, etTodayStr()),
+    )),
     db.select({
       id: agentForumPosts.id,
       platform: agentForumPosts.platform,

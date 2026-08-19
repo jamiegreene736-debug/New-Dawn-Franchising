@@ -4,6 +4,45 @@ export function getHunterStatus() {
   return { configured: !!HUNTER_API_KEY, provider: "Hunter.io" };
 }
 
+// ─── Failure visibility ───────────────────────────────────────────────────────
+// Every function below returns null on any failure so callers degrade
+// gracefully — but that made a quota-exhausted key indistinguishable from
+// "no email found": a whole day's enrichment could silently produce zero.
+// Record the most severe recent HTTP failure so batch jobs (the daily campaign
+// build) can surface it in their report; quota/rate failures outrank the rest.
+let lastHunterIssue: { message: string; quota: boolean } | null = null;
+
+/** Most recent Hunter HTTP failure since the last clear (null = all healthy). */
+export function getHunterIssue(): string | null {
+  return lastHunterIssue?.message ?? null;
+}
+
+/** Reset failure tracking — call at the start of a batch run. */
+export function clearHunterIssue(): void {
+  lastHunterIssue = null;
+}
+
+function noteHunterHttpFailure(endpoint: string, status: number, bodyText: string): void {
+  const detail = (() => {
+    try {
+      const errs = (JSON.parse(bodyText) as { errors?: { details?: string; id?: string }[] }).errors;
+      return errs?.[0]?.details || errs?.[0]?.id || "";
+    } catch {
+      return "";
+    }
+  })();
+  const quota = status === 429 || /limit|quota|run out|insufficient/i.test(detail);
+  if (quota) {
+    lastHunterIssue = {
+      quota: true,
+      message: `Hunter ${endpoint} rate/quota limit hit (HTTP ${status}${detail ? `: ${detail.slice(0, 100)}` : ""}) — email enrichment degraded`,
+    };
+  } else if (!lastHunterIssue?.quota) {
+    lastHunterIssue = { quota: false, message: `Hunter ${endpoint} error HTTP ${status}${detail ? `: ${detail.slice(0, 100)}` : ""}` };
+  }
+  console.warn(`[Hunter] ${endpoint} HTTP ${status}${detail ? ` — ${detail.slice(0, 160)}` : ""}`);
+}
+
 export interface HunterEmailResult {
   email: string;
   confidence: number;
@@ -26,7 +65,10 @@ export async function hunterFindEmail(
       api_key: HUNTER_API_KEY,
     });
     const res = await fetch(`https://api.hunter.io/v2/email-finder?${params}`);
-    if (!res.ok) return null;
+    if (!res.ok) {
+      noteHunterHttpFailure("email-finder", res.status, await res.text().catch(() => ""));
+      return null;
+    }
     const json = await res.json() as { data?: Record<string, unknown>; errors?: unknown[] };
     if (json.errors?.length || !json.data?.email) return null;
     const d = json.data;
@@ -58,7 +100,10 @@ export async function hunterVerifyEmail(email: string): Promise<HunterVerifyResu
   try {
     const params = new URLSearchParams({ email, api_key: HUNTER_API_KEY });
     const res = await fetch(`https://api.hunter.io/v2/email-verifier?${params}`);
-    if (!res.ok) return null;
+    if (!res.ok) {
+      noteHunterHttpFailure("email-verifier", res.status, await res.text().catch(() => ""));
+      return null;
+    }
     const json = await res.json() as { data?: Record<string, any>; errors?: unknown[] };
     if (json.errors?.length || !json.data) return null;
     const d = json.data;
@@ -103,7 +148,10 @@ export async function hunterDomainSearch(domain: string): Promise<HunterDomainSe
   try {
     const params = new URLSearchParams({ domain, api_key: HUNTER_API_KEY });
     const res = await fetch(`https://api.hunter.io/v2/domain-search?${params}`);
-    if (!res.ok) return null;
+    if (!res.ok) {
+      noteHunterHttpFailure("domain-search", res.status, await res.text().catch(() => ""));
+      return null;
+    }
     const json = await res.json() as {
       data?: {
         pattern?: string;

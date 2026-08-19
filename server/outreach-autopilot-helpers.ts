@@ -69,6 +69,18 @@ export function planLooksAnomalous(
 }
 
 /**
+ * True when a SerpAPI failure body/message means the MONTHLY search quota is
+ * gone (top-up or wait for renewal) rather than a transient per-second rate
+ * limit (retry shortly). Both arrive as HTTP 429, so the body text is the only
+ * in-band signal; callers fall back to probing account.json when this misses.
+ */
+export function looksLikeSerpQuotaExhaustion(text: string | null | undefined): boolean {
+  return /run out of searches|out of searches|monthly (search(es)? )?quota|searches? quota|no (more )?searches (left|remaining)/i.test(
+    text ?? "",
+  );
+}
+
+/**
  * Pull the outermost JSON value out of a model response: strips ```json fences
  * and any prose before/after the JSON. Throws with a snippet on failure.
  */

@@ -9,6 +9,7 @@ import {
   planLooksAnomalous,
   buildPlanExecutedSms,
   extractJson,
+  looksLikeSerpQuotaExhaustion,
   MAX_EXECUTION_ATTEMPTS,
 } from "./outreach-autopilot-helpers";
 
@@ -141,6 +142,16 @@ assert("prose + fence + trailing text", extractJson<{ q: string }>('Sure!\n```js
   try { extractJson("no json here at all"); } catch { threw = true; }
   assert("no JSON throws", threw);
 }
+
+// ─── looksLikeSerpQuotaExhaustion ─────────────────────────────────────────────
+console.log("looksLikeSerpQuotaExhaustion:");
+// Real SerpAPI account_status / error bodies for a drained plan.
+assert("account_status wording", looksLikeSerpQuotaExhaustion("Your account has run out of searches."));
+assert("error-body wording", looksLikeSerpQuotaExhaustion("You are exceeding your monthly searches quota."));
+assert("generic quota wording", looksLikeSerpQuotaExhaustion("no more searches left this month"));
+assert("plain rate-limit is NOT quota", !looksLikeSerpQuotaExhaustion("Too many requests, slow down"));
+assert("unrelated error is NOT quota", !looksLikeSerpQuotaExhaustion("Invalid API key"));
+assert("null/empty is NOT quota", !looksLikeSerpQuotaExhaustion(null) && !looksLikeSerpQuotaExhaustion(""));
 
 // ─── Result ───────────────────────────────────────────────────────────────────
 if (failures > 0) {

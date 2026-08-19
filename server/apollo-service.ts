@@ -31,8 +31,16 @@ import type {
 const APOLLO_BASE = "https://api.apollo.io/api/v1";
 const FETCH_TIMEOUT_MS = 12000;
 
-/** Classify a non-OK Apollo Response into a ProviderError (never swallowed). */
-async function apolloHttpError(res: Response): Promise<ProviderError> {
+// Endpoints whose 403 means "not a master API key". Everything else that 403s
+// (the Contacts API: /contacts/search, /labels, …) is gated on the Apollo PLAN
+// or the key's per-endpoint permissions — a master key doesn't help there, and
+// Apollo's own docs describe their 403 as "only available to users on paid plans".
+const MASTER_KEY_ENDPOINTS = ["/mixed_people/", "/mixed_companies/"];
+
+/** Classify a non-OK Apollo Response into a ProviderError (never swallowed).
+ *  `endpoint` is the API path (e.g. "/contacts/search") so 403s get the right
+ *  remediation hint instead of blaming the key tier for every denial. */
+async function apolloHttpError(res: Response, endpoint: string): Promise<ProviderError> {
   let body: any = null;
   try {
     body = JSON.parse(await res.text());
@@ -47,9 +55,14 @@ async function apolloHttpError(res: Response): Promise<ProviderError> {
     return { status: 401, code: "unauthorized", message: "Apollo.io rejected the API key (unauthorized). Check APOLLO_API_KEY." };
   }
   if (res.status === 403) {
-    // The People Search endpoint (mixed_people/api_search) only accepts a MASTER
-    // API key — a regular key returns 403. Tell the user exactly how to fix it.
-    return { status: 403, code: "unauthorized", message: "Apollo.io's People Search API requires a master API key. In Apollo → Settings → Integrations → API, create a key with 'Set as master key' enabled and set it as APOLLO_API_KEY." };
+    if (MASTER_KEY_ENDPOINTS.some((e) => endpoint.includes(e))) {
+      return { status: 403, code: "unauthorized", message: "Apollo.io's People Search API requires a master API key. In Apollo → Settings → Integrations → API, create a key with 'Set as master key' enabled and set it as APOLLO_API_KEY." };
+    }
+    return {
+      status: 403,
+      code: "forbidden",
+      message: `Apollo.io denied access to ${endpoint} (403). This endpoint isn't included in the current Apollo plan (Contacts API endpoints need a paid plan) or the API key's endpoint permissions.${msg ? ` Apollo said: ${msg}` : ""}`,
+    };
   }
   if (res.status === 429) {
     return { status: 429, code: "rateLimited", message: "Apollo.io rate limit reached. Try again shortly." };
@@ -444,7 +457,7 @@ export async function apolloSearchContacts(
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
       if (!res.ok) {
-        const error = await apolloHttpError(res);
+        const error = await apolloHttpError(res, "/mixed_people/api_search");
         console.warn(`[Apollo] /mixed_people/api_search ${error.status} ${error.code}: ${error.message}`);
         return { people: [], nextToken: null, error };
       }
@@ -533,7 +546,7 @@ export async function apolloSearchCompanies(
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
     if (!res.ok) {
-      const error = await apolloHttpError(res);
+      const error = await apolloHttpError(res, "/mixed_companies/search");
       console.warn(`[Apollo] /mixed_companies/search ${error.status} ${error.code}: ${error.message}`);
       return { companies: [], nextToken: null, error };
     }
@@ -673,7 +686,7 @@ export async function apolloResolveSeedCompany(
       headers: authHeaders(key),
       signal: AbortSignal.timeout(COMPANY_RESOLVE_TIMEOUT_MS),
     });
-    if (!res.ok) return { company: null, error: await apolloHttpError(res) };
+    if (!res.ok) return { company: null, error: await apolloHttpError(res, "/mixed_companies/search") };
     const json = (await res.json()) as { organizations?: ApolloOrg[]; accounts?: ApolloOrg[] };
     const org = (json.organizations || json.accounts || [])[0];
     return { company: org ? mapCompany(org) : null };
@@ -716,7 +729,7 @@ async function apolloSearchCompaniesAll(
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
       if (!res.ok) {
-        const error = await apolloHttpError(res);
+        const error = await apolloHttpError(res, "/mixed_companies/search");
         if (all.length === 0) return { companies: [], totalMatchesEstimate, error };
         break;
       }
@@ -1095,7 +1108,7 @@ export async function apolloGetLabels(): Promise<{ labels: ApolloLabel[]; error?
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
     if (!res.ok) {
-      const error = await apolloHttpError(res);
+      const error = await apolloHttpError(res, "/labels");
       console.warn(`[Apollo] GET /labels ${error.status} ${error.code}: ${error.message}`);
       return { labels: [], error };
     }
@@ -1143,7 +1156,7 @@ export async function apolloGetOrgContacts(opts: { maxPages?: number } = {}): Pr
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
       if (!res.ok) {
-        const error = await apolloHttpError(res);
+        const error = await apolloHttpError(res, "/contacts/search");
         console.warn(`[Apollo] POST /contacts/search p${page} ${error.status} ${error.code}: ${error.message}`);
         if (!firstError) firstError = error;
         if (all.length === 0) return { people: [], pages: page - 1, error };

@@ -511,7 +511,7 @@ export function registerContactRoutes(app: Express) {
         return res.status(503).json({ message: "Apollo.io is not configured (APOLLO_API_KEY missing)." });
       }
       const full = req.body?.full === true || req.query?.full === "1";
-      const result = await syncApolloOrgContacts({ full });
+      const result = await syncApolloOrgContacts({ full, manual: true });
       res.json(result);
     } catch (err: any) {
       console.error("POST /api/apollo/sync error:", err);

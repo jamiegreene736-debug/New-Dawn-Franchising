@@ -93,7 +93,24 @@ export function classifyHunterResult(r: HunterVerifyResult | null): EnrollVerify
 
 // Verify one address for enrollment. (One Hunter credit per fresh call — the
 // routes cache the verdict on the record so re-enroll doesn't re-spend.)
+// Cheap structural sanity check run BEFORE spending a Hunter verification: a
+// malformed string ("john at firm dot com", a bare domain, whitespace) makes
+// Hunter return HTTP 400 — which the fail-open policy then treats as
+// "couldn't verify" and ENROLLS, guaranteeing a bounce.
+const EMAIL_FORMAT_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
 export async function verifyEmailForEnrollment(email: string): Promise<EnrollVerifyResult> {
+  if (!EMAIL_FORMAT_RE.test(email.trim())) {
+    return {
+      email,
+      status: "invalid",
+      deliverable: false,
+      shouldEnroll: false,
+      shouldDnc: false, // record-level junk, not a suppressible address
+      reason: "malformed address (failed format check; not sent to verifier)",
+      score: 0,
+    };
+  }
   const r = await hunterVerifyEmail(email);
   const out = classifyHunterResult(r);
   out.email = email;

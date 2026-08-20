@@ -52,7 +52,7 @@ import {
 import seoAgentRouter from "./seo-agent-routes";
 import seoCampaignRouter from "./seo-campaign-routes";
 import { runAllActiveCampaigns } from "./seo-campaign-agent";
-import approvalRouter, { sendMorningDigest } from "./approval-routes";
+import approvalRouter, { sendMorningDigest, sendWeeklyRollup } from "./approval-routes";
 import { registerVisitorRoutes } from "./visitor-routes";
 import agentRouter, { runScheduledJobs } from "./agent-routes";
 import franchiseeRouter from "./franchisee-routes";
@@ -549,6 +549,13 @@ function scheduleAgentCrons() {
         sendMorningDigest().catch((e: any) =>
           console.error("[Agent Startup] Morning digest catchup error:", e.message)
         );
+        // Weekly rollup (normally Mon 7:30AM ET) — idempotent, Mondays only
+        const nyDay = new Date().toLocaleDateString("en-US", { timeZone: "America/New_York", weekday: "short" });
+        if (nyDay === "Mon") {
+          sendWeeklyRollup().catch((e: any) =>
+            console.error("[Agent Startup] Weekly rollup catchup error:", e.message)
+          );
+        }
       }
 
       // ── Outreach agent (prep 8AM, brief 9AM) — run any time before 2PM ─────
@@ -580,6 +587,12 @@ function scheduleAgentCrons() {
     sendMorningDigest().catch(e => console.error("[Morning Digest] Error:", e));
   }, { timezone: "America/New_York" });
   console.log("Morning approval digest scheduled: 8AM ET daily");
+
+  // Weekly outreach rollup — Monday 7:30 AM ET (idempotent per week)
+  cron.schedule("30 7 * * 1", () => {
+    sendWeeklyRollup().catch(e => console.error("[WeeklyRollup] Error:", e));
+  }, { timezone: "America/New_York" });
+  console.log("Weekly outreach rollup scheduled: Monday 7:30AM ET");
 
   // Outreach Intelligence — 6 AM ET daily: plan daily leads + SMS Dylan for approval
   cron.schedule("0 6 * * *", () => {

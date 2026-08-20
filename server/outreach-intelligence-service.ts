@@ -30,6 +30,8 @@ import {
   buildPlanExecutedSms,
   extractJson,
   looksLikeSerpQuotaExhaustion,
+  formatOutcomeHistory,
+  type PlanOutcomeRow,
   MAX_EXECUTION_ATTEMPTS,
 } from "./outreach-autopilot-helpers";
 import { randomUUID } from "crypto";
@@ -591,6 +593,48 @@ export async function runDailyPlanning(): Promise<void> {
   }
 }
 
+// ─── Outcome history (the planner's learning loop) ───────────────────────────
+
+/**
+ * Per-day outcomes of the last two weeks of daily campaigns — enrolled, sent,
+ * replied, bounced — joined back to the segments (category·country) that day
+ * targeted. Fed into the 6AM planning context so the planner weights toward
+ * segments that get replies instead of only diversifying blindly. Best-effort:
+ * an empty string on any failure (planning must never die on analytics).
+ */
+async function getOutcomeHistoryBlock(): Promise<string> {
+  try {
+    const { rows } = await pool.query(
+      `SELECT p.plan_date,
+              p.lead_categories,
+              count(DISTINCT e.id)::int AS enrolled,
+              (count(s.id) FILTER (WHERE s.status IN ('sent','delivered','opened','clicked','replied','bounced','failed')))::int AS sent,
+              (count(s.id) FILTER (WHERE s.status = 'replied'))::int AS replied,
+              (count(s.id) FILTER (WHERE s.status = 'bounced'))::int AS bounced
+         FROM outreach_daily_plans p
+         JOIN drip_campaigns c ON c.name LIKE 'Grok 2.0 Brokers — ' || p.plan_date || '%'
+         LEFT JOIN drip_enrollments e ON e.campaign_id = c.id
+         LEFT JOIN drip_sends s ON s.enrollment_id = e.id AND s.channel = 'email'
+        WHERE p.status = 'completed'
+          AND p.plan_date >= to_char(now() - interval '14 days', 'YYYY-MM-DD')
+        GROUP BY p.id, p.plan_date, p.lead_categories
+        ORDER BY p.plan_date DESC`,
+    );
+    const mapped: PlanOutcomeRow[] = rows.map((r) => ({
+      planDate: String(r.plan_date),
+      categories: Array.isArray(r.lead_categories) ? r.lead_categories : [],
+      enrolled: Number(r.enrolled ?? 0),
+      sent: Number(r.sent ?? 0),
+      replied: Number(r.replied ?? 0),
+      bounced: Number(r.bounced ?? 0),
+    }));
+    return formatOutcomeHistory(mapped);
+  } catch (e) {
+    console.warn("[OutreachIntel] Outcome-history query failed (planning continues):", (e as Error).message);
+    return "";
+  }
+}
+
 // ─── Plan Daily Intelligence ──────────────────────────────────────────────────
 
 export async function planDailyIntelligence(): Promise<{ planId: string; approvalUrl: string }> {
@@ -653,6 +697,7 @@ export async function planDailyIntelligence(): Promise<{ planId: string; approva
   // Recent plan history so Claude diversifies instead of re-targeting the same
   // country + category + geo it already covered on prior days.
   const recentPlans = await getRecentPlans(7);
+  const outcomeBlock = await getOutcomeHistoryBlock();
   const recentTargetLines: string[] = [];
   for (const p of recentPlans) {
     if (p.planDate === today) continue; // skip an in-progress same-day record
@@ -672,7 +717,12 @@ ${Object.entries(categoryCounts).map(([cat, count]) => `- ${cat}: ${count}`).joi
 ALREADY TARGETED in the last 7 days (category · country · geo) — DO NOT repeat these exact combinations; pick fresh countries, cities, or professional categories so each day explores genuinely new ground:
 ${recentTargetsBlock}
 
-Based on this context, generate today's outreach intelligence plan. Deliberately DIVERSIFY away from the combinations listed above — rotate to different treaty countries, cities, and partner categories that the recent plans have NOT covered, while still fitting the E-2 referral-partner strategy. Be strategic about what's missing from the pipeline and what's timely today.`;
+CAMPAIGN OUTCOMES — last 14 days (what actually happened after each day's plan went out):
+${outcomeBlock || "- No campaign outcomes yet — nothing to learn from, plan on strategy alone."}
+
+LEARN FROM THE OUTCOMES: weight roughly 3/4 of today's plan TOWARD the segment types (professional category + country) that produced REPLIES, and adjacent variants of them (same category in a neighboring country/city, same country with a related category). Avoid segment types that got a meaningful number of sends but zero replies, and treat any day with a high bounce rate as a data-quality warning for that segment. Keep the remaining ~1/4 of the plan for genuinely new, untested segments so learning continues. Replies are the metric that matters — not leads found, not emails sent.
+
+Based on this context, generate today's outreach intelligence plan. Deliberately DIVERSIFY away from the already-targeted combinations listed above — rotate to different treaty countries, cities, and partner categories that the recent plans have NOT covered, while still fitting the E-2 referral-partner strategy. Be strategic about what's missing from the pipeline and what's timely today.`;
 
   // The prompt asks for 6-10 categories + 16-24 queries with reasoning — that
   // easily exceeds 3k output tokens, and a truncated response is unparseable

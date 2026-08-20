@@ -100,6 +100,39 @@ export function extractJson<T>(raw: string): T {
   throw new Error(`Claude returned invalid JSON: ${raw.slice(0, 300)}`);
 }
 
+// ─── Outcome-history formatter (the planner's learning loop) ─────────────────
+
+export interface PlanOutcomeRow {
+  planDate: string;
+  categories: { category: string; country: string }[];
+  enrolled: number;
+  sent: number;
+  replied: number;
+  bounced: number;
+}
+
+/**
+ * Render past campaigns' outcomes as compact lines for the 6AM planning
+ * context, so each day's plan can weight toward segments that actually got
+ * replies and away from ones that only bounced or went silent. Pure +
+ * exported for tests.
+ */
+export function formatOutcomeHistory(rows: PlanOutcomeRow[]): string {
+  return rows
+    .map((r) => {
+      const segments = r.categories
+        .slice(0, 4)
+        .map((c) => `${(c.category ?? "?").replace(/_/g, " ")}·${c.country ?? "?"}`)
+        .join(", ");
+      const extra = r.categories.length > 4 ? ` +${r.categories.length - 4} more` : "";
+      const bounceNote = r.sent > 0 && r.bounced > 0
+        ? ` (${Math.round((r.bounced / r.sent) * 100)}% bounce)`
+        : "";
+      return `- ${r.planDate} [${segments}${extra}]: ${r.enrolled} enrolled, ${r.sent} sent, ${r.replied} repl${r.replied === 1 ? "y" : "ies"}, ${r.bounced} bounce${r.bounced === 1 ? "" : "s"}${bounceNote}`;
+    })
+    .join("\n");
+}
+
 // ─── Completion SMS builder ───────────────────────────────────────────────────
 
 /**

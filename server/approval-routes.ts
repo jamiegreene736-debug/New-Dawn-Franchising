@@ -624,4 +624,58 @@ export async function sendMorningDigest(): Promise<void> {
   await Promise.all(sends);
 }
 
+// ── Weekly rollup: Monday-morning trajectory SMS ─────────────────────────────
+
+const ATTEMPTED_STATUSES = `('sent','delivered','opened','clicked','replied','bounced','failed')`;
+
+/**
+ * One SMS every Monday morning with the week's totals vs the prior week —
+ * leads discovered, enrolled, sent, replies, bounce rate — so trajectory is
+ * judgeable without reading every daily report. Idempotent per week.
+ */
+export async function sendWeeklyRollup(): Promise<void> {
+  const dup = await db.select({ id: agentSmsMessages.id })
+    .from(agentSmsMessages)
+    .where(and(
+      eq(agentSmsMessages.triggerType, "weekly_rollup"),
+      gte(agentSmsMessages.createdAt, new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)),
+    ))
+    .limit(1);
+  if (dup.length > 0) {
+    console.log("[WeeklyRollup] Already sent this week — skipping duplicate");
+    return;
+  }
+
+  const { rows } = await pool.query(
+    `SELECT
+       (SELECT count(*) FROM outreach_leads WHERE created_at > now() - interval '7 days')::int AS leads7,
+       (SELECT count(*) FROM outreach_leads WHERE created_at BETWEEN now() - interval '14 days' AND now() - interval '7 days')::int AS leads14,
+       (SELECT count(*) FROM drip_enrollments WHERE enrolled_at > now() - interval '7 days')::int AS enrolled7,
+       (SELECT count(*) FROM drip_enrollments WHERE enrolled_at BETWEEN now() - interval '14 days' AND now() - interval '7 days')::int AS enrolled14,
+       (SELECT count(*) FROM drip_sends WHERE channel='email' AND status IN ${ATTEMPTED_STATUSES} AND created_at > now() - interval '7 days')::int AS sent7,
+       (SELECT count(*) FROM drip_sends WHERE channel='email' AND status IN ${ATTEMPTED_STATUSES} AND created_at BETWEEN now() - interval '14 days' AND now() - interval '7 days')::int AS sent14,
+       (SELECT count(*) FROM drip_sends WHERE channel='email' AND status='replied' AND created_at > now() - interval '7 days')::int AS replied7,
+       (SELECT count(*) FROM drip_sends WHERE channel='email' AND status='replied' AND created_at BETWEEN now() - interval '14 days' AND now() - interval '7 days')::int AS replied14,
+       (SELECT count(*) FROM drip_sends WHERE channel='email' AND status='bounced' AND created_at > now() - interval '7 days')::int AS bounced7`,
+  );
+  const r = rows[0] ?? {};
+  const n = (v: unknown) => Number(v ?? 0);
+  const trend = (cur: number, prev: number) =>
+    cur > prev ? `↑ from ${prev}` : cur < prev ? `↓ from ${prev}` : `= ${prev}`;
+  const sent7 = n(r.sent7);
+  const bounced7 = n(r.bounced7);
+  const bouncePct = sent7 > 0 ? ((bounced7 / sent7) * 100).toFixed(1) : "0.0";
+
+  const body =
+    `📈 Weekly outreach rollup\n\n` +
+    `Leads discovered: ${n(r.leads7)} (${trend(n(r.leads7), n(r.leads14))})\n` +
+    `Enrolled in campaigns: ${n(r.enrolled7)} (${trend(n(r.enrolled7), n(r.enrolled14))})\n` +
+    `Emails sent: ${sent7} (${trend(sent7, n(r.sent14))})\n` +
+    `Replies: ${n(r.replied7)} (${trend(n(r.replied7), n(r.replied14))})\n` +
+    `Bounces: ${bounced7} (${bouncePct}% — breaker trips at 4%)\n\n` +
+    `Dashboard: ${APP_BASE_URL()}/crm`;
+
+  await sendAgentSms("outreach", body, { triggerType: "weekly_rollup" });
+}
+
 export default router;

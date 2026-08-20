@@ -10,6 +10,7 @@ import {
   buildPlanExecutedSms,
   extractJson,
   looksLikeSerpQuotaExhaustion,
+  formatOutcomeHistory,
   MAX_EXECUTION_ATTEMPTS,
 } from "./outreach-autopilot-helpers";
 
@@ -152,6 +153,31 @@ assert("generic quota wording", looksLikeSerpQuotaExhaustion("no more searches l
 assert("plain rate-limit is NOT quota", !looksLikeSerpQuotaExhaustion("Too many requests, slow down"));
 assert("unrelated error is NOT quota", !looksLikeSerpQuotaExhaustion("Invalid API key"));
 assert("null/empty is NOT quota", !looksLikeSerpQuotaExhaustion(null) && !looksLikeSerpQuotaExhaustion(""));
+
+// ─── formatOutcomeHistory ─────────────────────────────────────────────────────
+console.log("formatOutcomeHistory:");
+const history = formatOutcomeHistory([
+  {
+    planDate: "2026-08-20",
+    categories: [
+      { category: "immigration_attorney", country: "South Korea" },
+      { category: "wealth_manager", country: "Taiwan" },
+      { category: "business_broker", country: "Thailand" },
+      { category: "franchise_broker", country: "United States" },
+      { category: "chamber", country: "Belgium" },
+    ],
+    enrolled: 62, sent: 45, replied: 3, bounced: 9,
+  },
+  { planDate: "2026-08-19", categories: [{ category: "business_broker", country: "Chile" }], enrolled: 3, sent: 3, replied: 1, bounced: 0 },
+]);
+assert("dates present", history.includes("2026-08-20") && history.includes("2026-08-19"));
+assert("category underscores humanized", history.includes("immigration attorney·South Korea"));
+assert("caps at 4 segments with +N more", history.includes("+1 more"));
+assert("counts rendered", history.includes("62 enrolled, 45 sent, 3 replies, 9 bounces"));
+assert("bounce pct annotated", history.includes("(20% bounce)"));
+assert("singular reply", history.includes("1 reply,"));
+assert("no bounce pct when zero bounces", !history.split("\n")[1].includes("% bounce"));
+assert("empty history → empty string", formatOutcomeHistory([]) === "");
 
 // ─── Result ───────────────────────────────────────────────────────────────────
 if (failures > 0) {

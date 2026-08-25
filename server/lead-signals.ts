@@ -203,5 +203,11 @@ export async function runSignalIngestion(maxContacts = 25): Promise<{ scanned: n
     console.error("[lead-signals] runSignalIngestion error:", err?.message || err);
   }
   console.log(`[lead-signals] ingestion complete — scanned ${scanned}, recorded ${recorded} new signals.`);
+  try {
+    const { discoverFirmsFromSignals } = await import("./introducer-lookalike");
+    await discoverFirmsFromSignals();
+  } catch (err: any) {
+    console.warn("[lead-signals] firm discovery skipped:", err?.message || err);
+  }
   return { scanned, recorded };
 }

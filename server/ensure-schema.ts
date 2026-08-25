@@ -156,6 +156,9 @@ const STATEMENTS: string[] = [
   // When a lead was swept into a daily auto-campaign build (discovery day or a
   // later backfill). NULL = never attempted, so the daily top-up can recycle it.
   `ALTER TABLE outreach_leads ADD COLUMN IF NOT EXISTS campaigned_at timestamptz`,
+  `ALTER TABLE outreach_leads ADD COLUMN IF NOT EXISTS country text`,
+  `ALTER TABLE outreach_leads ADD COLUMN IF NOT EXISTS city text`,
+  `ALTER TABLE outreach_leads ADD COLUMN IF NOT EXISTS firm_hook text`,
   // ─── Outreach autopilot (hands-free daily lead plans) ────────────────────
   // Bookkeeping so an unattended run is resumable and diagnosable: when the
   // plan was auto-approved, how many execution attempts ran, and the last

@@ -24,6 +24,7 @@ import { approveAndSendTouch } from "./outreach-agent-service";
 import { executeApprovedPlan, getAutopilotState } from "./outreach-intelligence-service";
 import { updateDeliverabilitySettings } from "./deliverability-settings-service";
 import { pool } from "./db";
+import { formatYesterdayBrief, getYesterdayBrief } from "./morning-brief";
 
 const router = Router();
 
@@ -451,27 +452,10 @@ router.post("/morning-digest", async (_req, res) => {
   }
 });
 
-/**
- * One-line email pipeline health snapshot for the morning digest: attempted /
- * bounced / replied over the trailing 24h. Null when the stats are unavailable
- * (never blocks the digest).
- */
-async function getPipelineHealthLine(): Promise<string | null> {
-  try {
-    const { rows } = await pool.query(
-      `SELECT count(*) FILTER (WHERE status IN ('sent','delivered','opened','clicked','replied','bounced','failed'))::int AS attempted,
-              count(*) FILTER (WHERE status = 'bounced')::int AS bounced,
-              count(*) FILTER (WHERE status = 'replied')::int AS replied
-         FROM drip_sends
-        WHERE channel = 'email' AND created_at > now() - interval '24 hours'`,
-    );
-    const attempted = Number(rows[0]?.attempted ?? 0);
-    const bounced = Number(rows[0]?.bounced ?? 0);
-    const replied = Number(rows[0]?.replied ?? 0);
-    return `📊 Last 24h: ${attempted} email${attempted === 1 ? "" : "s"} sent · ${bounced} bounce${bounced === 1 ? "" : "s"} · ${replied} repl${replied === 1 ? "y" : "ies"}`;
-  } catch {
-    return null;
-  }
+/** Yesterday's opens / people / campaigns / texts. Null if the query fails. */
+async function getYesterdayBriefLine(): Promise<string | null> {
+  const snap = await getYesterdayBrief();
+  return snap ? formatYesterdayBrief(snap) : null;
 }
 
 export async function sendMorningDigest(): Promise<void> {
@@ -556,16 +540,14 @@ export async function sendMorningDigest(): Promise<void> {
   }
 
   const autopilot = await getAutopilotState().catch(() => ({ enabled: false, paused: false }));
-  const healthLine = await getPipelineHealthLine();
+  const yesterdayLine = await getYesterdayBriefLine();
 
   if (outreachDrafts.length === 0 && dailyPlans.length === 0 && forumDrafts.length === 0 && linkedinItems.length === 0) {
-    // Nothing pending — with autopilot that's the normal, healthy state, so the
-    // digest becomes a pipeline-health pulse instead of going silent.
-    if (autopilot.enabled) {
-      const msg = `🤖 Outreach autopilot is ${autopilot.paused ? "PAUSED" : "ON"} — no approvals needed this morning.` +
-        (healthLine ? `\n\n${healthLine}` : "");
-      sends.push(sendAgentSms("outreach", msg, { triggerType: "morning_digest" }).catch(() => {}));
-    }
+    const status = autopilot.enabled
+      ? `Outreach autopilot is ${autopilot.paused ? "PAUSED" : "ON"} — no approvals needed this morning.`
+      : "No outreach approvals needed this morning.";
+    const msg = [status, yesterdayLine].filter(Boolean).join("\n\n");
+    sends.push(sendAgentSms("outreach", msg, { triggerType: "morning_digest" }).catch(() => {}));
     await Promise.all(sends);
     return;
   }
@@ -616,7 +598,7 @@ export async function sendMorningDigest(): Promise<void> {
       if (linkedinItems.length > 3) lines.push(`+ ${linkedinItems.length - 3} more LinkedIn actions`);
     }
 
-    if (healthLine) lines.push(`\n${healthLine}`);
+    if (yesterdayLine) lines.push(`\n${yesterdayLine}`);
 
     sends.push(sendAgentSms("outreach", lines.join("\n"), { triggerType: "morning_digest" }).catch(() => {}));
   }

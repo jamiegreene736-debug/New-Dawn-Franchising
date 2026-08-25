@@ -51,6 +51,7 @@ export interface DiscoveredLeadInput {
   category?: string | null;
   country?: string | null;
   city?: string | null;
+  firmHook?: string | null;
 }
 
 export interface DailyCampaignResult {
@@ -350,6 +351,7 @@ export async function buildDailyCampaignFromLeads(opts: {
       jobTitle: l.jobTitle,
       country: l.country,
       city: l.city,
+      bio: l.firmHook || null,
     }, l.category);
     // Only count an enrichment once the address has actually landed on the
     // persisted contact — so the SMS never claims an email that didn't stick

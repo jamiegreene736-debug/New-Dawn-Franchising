@@ -60,6 +60,7 @@ import heygenRouter from "./heygen-routes";
 import partnerRouter from "./partner-routes";
 import { processPartnerSequence } from "./partner-sequence-service";
 import { runDailyPreparation, runDailyBrief, pollForApprovalReply, runApprovalDeadlineCheck, addToDnc, isOnDnc } from "./agent-service";
+import { isParallelOutreachEnabled, logParallelSkip } from "./outreach-owner";
 import { verifyEmailForEnrollment, isFreshVerification, decisionFromStoredStatus } from "./email-verification-service";
 import { verifyUnsubToken, unsubscribeConfirmPage, unsubscribedPage, invalidUnsubscribeLinkPage } from "./unsubscribe-service";
 import { classifyTrackingHit, isBotUserAgent } from "./tracking-bot-filter";
@@ -433,12 +434,14 @@ function scheduleDeliverabilityMonitoringCrons() {
 function scheduleAgentCrons() {
   // 8:00 AM ET — daily preparation run (1 hour before brief)
   cron.schedule("0 8 * * *", () => {
+    if (!isParallelOutreachEnabled()) return logParallelSkip("8AM AI Agent prep");
     console.log("[Agent Cron] Running daily preparation...");
     runDailyPreparation().catch(e => console.error("[Agent Cron] Preparation error:", e));
   }, { timezone: "America/New_York" });
 
   // 9:00 AM ET — send daily brief to approval email
   cron.schedule("0 9 * * *", () => {
+    if (!isParallelOutreachEnabled()) return logParallelSkip("9AM AI Agent brief");
     console.log("[Agent Cron] Sending daily brief...");
     runDailyBrief().catch(e => console.error("[Agent Cron] Brief error:", e));
   }, { timezone: "America/New_York" });
@@ -558,12 +561,16 @@ function scheduleAgentCrons() {
         }
       }
 
-      // ── Outreach agent (prep 8AM, brief 9AM) — run any time before 2PM ─────
+      // ── Outreach agent (prep 8AM, brief 9AM) — frozen unless PARALLEL_OUTREACH ─
       if (nyHour >= 8 && nyHour < 14) {
-        console.log("[Agent Startup] Running outreach agent catchup...");
-        await runDailyPreparation();
-        if (nyHour >= 9) {
-          await runDailyBrief();
+        if (!isParallelOutreachEnabled()) {
+          logParallelSkip("startup AI Agent catchup");
+        } else {
+          console.log("[Agent Startup] Running outreach agent catchup...");
+          await runDailyPreparation();
+          if (nyHour >= 9) {
+            await runDailyBrief();
+          }
         }
       }
 
@@ -602,15 +609,17 @@ function scheduleAgentCrons() {
 
   // Broker sequence event processor — every 30 min
   cron.schedule("*/30 * * * *", () => {
+    if (!isParallelOutreachEnabled()) return;
     import("./broker-sequence-service").then(m => m.processSequenceEvents()).catch(e => console.error("[BrokerSequence] Cron error:", e));
   });
-  console.log("Broker outreach sequence processor scheduled: every 30 minutes");
+  console.log("Broker outreach sequence processor scheduled: every 30 minutes (PARALLEL_OUTREACH)");
 
   // Partner sequence event processor — every 30 min
   cron.schedule("*/30 * * * *", () => {
+    if (!isParallelOutreachEnabled()) return;
     processPartnerSequence().catch(e => console.error("[PartnerSequence] Cron error:", e));
   });
-  console.log("Partner outreach sequence processor scheduled: every 30 minutes");
+  console.log("Partner outreach sequence processor scheduled: every 30 minutes (PARALLEL_OUTREACH)");
 
   // OpenPhone call sync — every hour on the hour
   cron.schedule("0 * * * *", () => {

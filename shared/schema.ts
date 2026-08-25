@@ -1152,6 +1152,9 @@ export const outreachLeads = pgTable("outreach_leads", {
   linkedinConnected: boolean("linkedin_connected").default(false),
   website: text("website"),
   category: text("category"), // immigration_attorney | relocation_consultant | real_estate | business_consultant | wealth_manager | chamber | visa_consultant | franchise_broker
+  country: text("country"),
+  city: text("city"),
+  firmHook: text("firm_hook"),
   score: integer("score").default(0),
   status: text("status").default("new"), // new | active | replied | nurture | converted | dead
   optedOut: boolean("opted_out").default(false),

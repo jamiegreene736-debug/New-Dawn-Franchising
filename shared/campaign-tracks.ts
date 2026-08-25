@@ -1012,36 +1012,33 @@ export const BROKER_2_TRACK: CampaignTrackStep[] = [
     bodyHtml: `Send a LinkedIn connection request to {{name}}.
 
 Suggested note (300 chars max):
-"Hi {{name}} — I partner with immigration attorneys and business brokers on E-2 cases. When a client needs a qualifying U.S. business, that's the gap we fill. Would love to connect."`,
+"Hi {{name}} — I work with attorneys whose E-2 clients are ready to file but still need a qualifying U.S. business. That's the gap we fill. Would be glad to connect."`,
     bodyText: `Send a LinkedIn connection request to {{name}}.
 
 Suggested note (300 chars max):
-"Hi {{name}} — I partner with immigration attorneys and business brokers on E-2 cases. When a client needs a qualifying U.S. business, that's the gap we fill. Would love to connect."`,
+"Hi {{name}} — I work with attorneys whose E-2 clients are ready to file but still need a qualifying U.S. business. That's the gap we fill. Would be glad to connect."`,
   },
   {
     stepOrder: 2,
     delayDays: 0,
     stepType: "email",
-    stepName: "Touch 1 — Where Do You Send E-2 Clients?",
+    stepName: "Touch 1 — When the client is ready and has no business",
     priority: "High",
-    subject: "Where do you send E-2 clients who need a business?",
+    subject: "When your E-2 client is ready — and still has no business",
     bodyHtml: `<div style="${EMAIL_STYLE}">
   <p>Hi {{name}},</p>
-  <p>When one of your E-2 clients needs a qualifying U.S. business, where do you usually send them?</p>
-  <p>I ask because that's the gap we fill. New Dawn Franchising runs a franchise platform built specifically for the E-2: your client's $225,000 investment is held in escrow until the visa is approved, and our local teams run the day-to-day so your client can direct the business from anywhere in the U.S.</p>
-  <p>We pay referring partners a 12.5% fee per placement, and we work alongside your existing process — your client's attorney stays their attorney.</p>
-  <p>If you tell me what kind of E-2 clients you see, I'll tell you straight whether we're a fit. Just reply here.</p>
+  <p>{{firmHook}}When an E-2 client is ready to file but still does not have a qualifying U.S. business, that is usually what stalls the petition.</p>
+  <p>That is the gap we fill. New Dawn is a franchise built for the E-2: the client's $225,000 sits in escrow — with an attorney they choose — until the visa is approved. Local teams run day-to-day so your client can direct the business from anywhere in the U.S.</p>
+  <p>I am not asking you to recommend anything from an email. I just want to know whether this is a problem you actually see. What kind of E-2 clients are in front of you right now?</p>
   <p>Best,<br/>Dylan</p>
 </div>`,
     bodyText: `Hi {{name}},
 
-When one of your E-2 clients needs a qualifying U.S. business, where do you usually send them?
+{{firmHook}}When an E-2 client is ready to file but still does not have a qualifying U.S. business, that is usually what stalls the petition.
 
-I ask because that's the gap we fill. New Dawn Franchising runs a franchise platform built specifically for the E-2: your client's $225,000 investment is held in escrow until the visa is approved, and our local teams run the day-to-day so your client can direct the business from anywhere in the U.S.
+That is the gap we fill. New Dawn is a franchise built for the E-2: the client's $225,000 sits in escrow — with an attorney they choose — until the visa is approved. Local teams run day-to-day so your client can direct the business from anywhere in the U.S.
 
-We pay referring partners a 12.5% fee per placement, and we work alongside your existing process — your client's attorney stays their attorney.
-
-If you tell me what kind of E-2 clients you see, I'll tell you straight whether we're a fit. Just reply here.
+I am not asking you to recommend anything from an email. I just want to know whether this is a problem you actually see. What kind of E-2 clients are in front of you right now?
 
 Best,
 Dylan Delaney

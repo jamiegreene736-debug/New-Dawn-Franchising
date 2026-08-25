@@ -34,6 +34,10 @@ import {
   type PlanOutcomeRow,
   MAX_EXECUTION_ATTEMPTS,
 } from "./outreach-autopilot-helpers";
+import { qualifyIntroducer } from "./introducer-qualify";
+import { hunterQueriesForAccounts, isNamedAccountDomain, namedAccountsForCountries } from "./named-accounts";
+import { fetchFirmHook, hookParagraph } from "./firm-hook";
+import { discoverFirmsFromSignals, rememberLookalikeFirms } from "./introducer-lookalike";
 import { randomUUID } from "crypto";
 
 // Re-exported for existing importers/tests of the SMS builder.
@@ -73,14 +77,11 @@ const APOLLO_REVEAL_BUDGET = (() => {
 // startup catch-up re-enters planDailyIntelligence, which resumes failed plans).
 const RETRY_DELAY_MS = 30 * 60 * 1000;
 
-// How many contacts each daily campaign build aims to start with. At the
-// observed ~25-35% email-find rate this lands 40-50+ enrollable contacts per
-// day (200-250+/week); shortfalls vs today's discoveries are topped up from
-// never-campaigned pipeline leads (see the backfill in executeApprovedPlan).
-// Override with DAILY_CAMPAIGN_TARGET_CONTACTS.
+// Quality over volume: 15–25 high-fit introducers/day, not 100+ generic
+// attorneys. Override with DAILY_CAMPAIGN_TARGET_CONTACTS.
 const DAILY_CAMPAIGN_TARGET = (() => {
   const n = parseInt(process.env.DAILY_CAMPAIGN_TARGET_CONTACTS ?? "", 10);
-  return Number.isFinite(n) && n > 0 ? n : 150;
+  return Number.isFinite(n) && n > 0 ? n : 25;
 })();
 
 // ─── Claude helper ────────────────────────────────────────────────────────────
@@ -143,10 +144,10 @@ Key E-2 treaty countries with the strongest referral partner networks:
 - Mexico (massive Mexican-American attorney/broker market in Texas, California, Florida)
 - South Korea (largest E-2 community; many specialized immigration attorneys)
 - Colombia, Brazil, Argentina (growing Latin American investor demand)
-- India (strong demand; many immigration attorneys serve Indian HNW clients)
 - UAE, Saudi Arabia (Gulf wealth; international relocation consultants)
 - UK, Germany, France, Italy (European investor mobility consultants)
 - Israel (strong outbound investor community)
+Do NOT treat India or China as E-2 treaty countries — they are not. Only target advisors there if they serve other treaty-country diasporas.
 
 TWO SEARCH ANGLES — use both every day:
 
@@ -239,9 +240,9 @@ You MUST respond with valid JSON only (no markdown, no explanation outside the J
   "estimatedLeads": 45
 }
 
-VOLUME TARGET — this matters: the pipeline needs 120–180 NEW leads discovered per day. Only ~25-35% of discovered leads yield a deliverable work email after enrichment, and the goal is 100+ emailable contacts entering a campaign every day (500+ per week). Plan wide enough to hit that.
+QUALITY TARGET — this matters more than volume: we enroll 15–25 HIGH-FIT introducers per day, not 100 generic attorneys. Prefer firms that already publish E-2 / treaty-investor / investor-visa work. Name specific firms and cities. Skip junior associates and family/removal-only practices.
 
-Include 6-10 lead categories, 18-26 search queries, and 0-3 blocker requests. At least 10 of the queries MUST use source "apollo" (Apollo returns real contact records with reveal-able verified emails, so those convert to campaign enrollments at a far higher rate than SerpAPI finds — it is the primary volume engine for the 100+/day goal). For apollo queries, vary the professional TITLE per country (e.g. "immigration attorney", "business broker", "wealth manager" as separate queries for the same country) — each title+country pair is an independent pool of contacts. Spreading queries across independent providers also keeps the day productive when any one provider has an outage or runs out of credits. Be specific and actionable. Vary the queries within a category (different cities, English + local-language phrasings, "firm directory" vs "attorney name" angles) so they don't all return the same results.`;
+Include 4-7 lead categories, 8-14 search queries, and 0-3 blocker requests. At least 4 of the queries MUST use source "apollo". Prefer apollo queries that name a TITLE plus E-2/investor-visa keywords, or a known firm — not bare "immigration attorney + country". The system will also inject Hunter lookups against a named-account list of known E-2 firms. Be specific. Vary countries and categories so days do not repeat.`;
 
 // ─── Search providers ─────────────────────────────────────────────────────────
 // Every provider wrapper returns an `error` string alongside its results so an
@@ -750,6 +751,16 @@ Based on this context, generate today's outreach intelligence plan. Deliberately
     if (dropped > 0) console.log(`[OutreachIntel] Filtered ${dropped} redundant data-vendor blocker request(s).`);
   }
 
+  const countries = [...new Set((plan.leadCategories ?? []).map((c) => c.country).filter(Boolean))];
+  const namedQueries = hunterQueriesForAccounts(namedAccountsForCountries(countries, 10));
+  const existingQ = new Set((plan.searchQueries ?? []).map((q) => q.query.toLowerCase()));
+  for (const q of namedQueries) {
+    if (!existingQ.has(q.query.toLowerCase())) {
+      plan.searchQueries = [...(plan.searchQueries ?? []), q];
+      existingQ.add(q.query.toLowerCase());
+    }
+  }
+
   const token = randomUUID();
 
   const [record] = await db.insert(outreachDailyPlans).values({
@@ -1022,15 +1033,39 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
           if (existing.length > 0) continue;
 
           const providerMatch = providerPeople.find(a => a.name === lead.fullName);
+          const website = lead.website || providerMatch?.website;
+          const named = isNamedAccountDomain(website);
+          const verdict = qualifyIntroducer({
+            fullName: lead.fullName,
+            title: providerMatch?.title,
+            company: lead.company,
+            email: providerMatch?.email,
+            website,
+            linkedinUrl: providerMatch?.linkedinUrl,
+            category: lead.category,
+            country: queryCountry,
+            notes: lead.notes,
+            namedAccount: named,
+          });
+          if (!verdict.pass) {
+            console.log(`[OutreachIntel] Dropped "${lead.fullName}": ${verdict.reasons.filter((r) => r.startsWith("rejected")).join("; ") || verdict.reasons.join("; ")}`);
+            continue;
+          }
+          const hookRaw = website ? await fetchFirmHook(website) : null;
+          const firmHook = hookParagraph(hookRaw, lead.company);
           await db.insert(outreachLeads).values({
             fullName: lead.fullName,
+            title: providerMatch?.title ?? null,
             company: lead.company ?? "",
-            website: lead.website,
+            website,
             category: lead.category,
+            country: queryCountry ?? null,
+            city: providerMatch?.city ?? null,
+            firmHook: firmHook || null,
             email: providerMatch?.email,
             linkedinUrl: providerMatch?.linkedinUrl,
             notes: `[${query.source.toUpperCase()}] ${lead.notes}`,
-            score: 60,
+            score: verdict.score,
             status: "new",
             // Today's discoveries go straight into today's campaign build below,
             // so stamp them now — the backfill top-up only recycles NULL rows.
@@ -1043,12 +1078,13 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
             company: lead.company ?? "",
             email: providerMatch?.email ?? null,
             emailPreVerified: providerMatch?.emailVerified ?? false,
-            website: lead.website ?? null,
+            website: website ?? null,
             linkedinUrl: providerMatch?.linkedinUrl ?? null,
             jobTitle: providerMatch?.title ?? null,
             category: lead.category,
             country: queryCountry ?? null,
             city: providerMatch?.city ?? null,
+            firmHook,
           });
         } catch {
           // ignore duplicate key errors
@@ -1133,8 +1169,9 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
             linkedinUrl: l.linkedinUrl ?? null,
             jobTitle: l.title ?? null,
             category: l.category ?? null,
-            country: null,
-            city: null,
+            country: l.country ?? null,
+            city: l.city ?? null,
+            firmHook: l.firmHook ?? null,
           });
         }
         backfilled = pool.length;
@@ -1193,6 +1230,13 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
     providerIssues: [...providerIssues.values(), ...(campaign?.providerIssues ?? [])],
   });
   await sendAgentSms("outreach", smsBody, { triggerType: "plan_executed" }).catch(() => {});
+
+  rememberLookalikeFirms().catch((e) =>
+    console.warn("[OutreachIntel] Lookalike refresh failed:", (e as Error).message),
+  );
+  discoverFirmsFromSignals().catch((e) =>
+    console.warn("[OutreachIntel] Signal-firm discovery failed:", (e as Error).message),
+  );
 
   console.log(`[OutreachIntel] Plan ${planId} complete. ${totalAdded} leads added.`);
   return { discovered: totalDiscovered, added: totalAdded };

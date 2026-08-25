@@ -12,6 +12,42 @@ import {
   emailDomain,
   nextWindowDescription,
 } from "./smart-scheduler";
+import { FIRST_TOUCH, isFirstEmailStep, isLinkedInConnectStep } from "@shared/first-touch";
+import { firstTouchLang } from "./introducer-qualify";
+import { linkedInDailyQueueCap } from "./outreach-owner";
+import { db } from "./db";
+import { dripSends } from "@shared/schema";
+import { and, eq, gte, sql } from "drizzle-orm";
+
+function etStartOfToday(): Date {
+  return new Date(new Date().toLocaleDateString("en-US", { timeZone: "America/New_York" }) + " 00:00:00");
+}
+
+async function linkedInTasksCreatedToday(): Promise<number> {
+  try {
+    const [row] = await db.select({ n: sql<number>`count(*)::int` })
+      .from(dripSends)
+      .where(and(
+        eq(dripSends.channel, "linkedin"),
+        eq(dripSends.status, "task"),
+        gte(dripSends.createdAt, etStartOfToday()),
+      ));
+    return Number(row?.n ?? 0);
+  } catch {
+    return 0;
+  }
+}
+
+function makePersonalize(name: string, email: string, firmHook: string) {
+  const firstName = (name || "").trim().split(/\s+/)[0] || name || "there";
+  return (s: string | null | undefined): string =>
+    (s || "")
+      .replace(/\[Contact First Name\]/gi, firstName)
+      .replace(/\{\{\s*firstName\s*\}\}/gi, firstName)
+      .replace(/\{\{\s*name\s*\}\}/gi, name)
+      .replace(/\{\{\s*email\s*\}\}/gi, email || "")
+      .replace(/\{\{\s*firmHook\s*\}\}/gi, firmHook || "");
+}
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -197,12 +233,10 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
       // gate plus the daily/hourly caps keep the drain bounded.
       const enrolledAt = new Date(enrollment.enrolledAt);
       const firstName = (enrollment.prospectName || "").trim().split(/\s+/)[0] || enrollment.prospectName || "there";
-      const personalize = (s: string | null | undefined): string =>
-        (s || "")
-          .replace(/\[Contact First Name\]/gi, firstName)
-          .replace(/\{\{\s*firstName\s*\}\}/gi, firstName)
-          .replace(/\{\{\s*name\s*\}\}/gi, enrollment.prospectName)
-          .replace(/\{\{\s*email\s*\}\}/gi, enrollment.prospectEmail);
+      const prospect = enrollment.prospectId ? await storage.getProspect(enrollment.prospectId).catch(() => undefined) : undefined;
+      const firmHook = (prospect?.notes || "").trim();
+      const lang = firstTouchLang(prospect?.location, null);
+      const personalize = makePersonalize(enrollment.prospectName, enrollment.prospectEmail, firmHook);
 
       // stepIdx strictly increases every iteration (send/skip/already-sent → +1,
       // wait/cap/bounce → break), so the loop always terminates.
@@ -303,11 +337,12 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
           // Sender rotation (off by default → always DEFAULT_SENDER). Sticky per
           // enrollment so a contact's whole sequence threads from one mailbox.
           const fromEmail = chooseSenderForKey(enrollment.id, delivSettings.senderRotation);
+          const first = isFirstEmailStep(step) ? FIRST_TOUCH[lang] : null;
           const result = await sendEmailFromSender(
             fromEmail,
             enrollment.prospectEmail,
-            personalize(step.subject),
-            personalize(step.bodyHtml),
+            personalize(first?.subject ?? step.subject),
+            personalize(first?.bodyHtml ?? step.bodyHtml),
             trackingUrl
           );
 
@@ -375,27 +410,45 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
           // call / linkedin / linkedin_connect / linkedin_message / task → manual to-do.
           // Record the dedup marker (drip_sends row) FIRST so a task-creation hiccup
           // can't make this step fire again on the next run; then create the task.
-          await storage.createDripSend({
-            enrollmentId: enrollment.id,
-            stepId: step.id,
-            channel: channelOf(stepType),
-            recipientEmail: enrollment.prospectEmail,
-            recipientName: enrollment.prospectName,
-            subject: step.stepName || stepType,
-            status: "task",
-          });
-          const title = personalize(step.stepName) || defaultTaskTitle(stepType, firstName);
-          try {
-            await storage.createContactTask({
-              prospectId: enrollment.prospectId,
-              title,
-              subtitle: enrollment.prospectName,
-              dueDate: new Date(),
-            } as any);
-            console.log(`[Drip] Created ${stepType} task for ${enrollment.prospectName}: "${title}"`);
-          } catch (taskErr) {
-            // Don't let a single task failure abort the whole run or stall the enrollment.
-            console.error(`[Drip] Failed to create ${stepType} task for ${enrollment.prospectName}:`, taskErr);
+          const isLi = stepType.startsWith("linkedin");
+          const liCap = linkedInDailyQueueCap();
+          const liToday = isLi ? await linkedInTasksCreatedToday() : 0;
+          if (isLi && liToday >= liCap) {
+            const skipped = await storage.createDripSend({
+              enrollmentId: enrollment.id,
+              stepId: step.id,
+              channel: channelOf(stepType),
+              recipientEmail: enrollment.prospectEmail,
+              recipientName: enrollment.prospectName,
+              subject: step.stepName || stepType,
+              status: "skipped",
+            });
+            await storage.updateDripSend(skipped.id, { errorMessage: `LinkedIn daily queue cap (${liCap})` } as any).catch(() => {});
+            console.log(`[Drip] LinkedIn cap ${liCap} reached — skipped task for ${enrollment.prospectName}`);
+          } else {
+            const liNote = isLinkedInConnectStep(step) ? FIRST_TOUCH[lang].linkedinNote : "";
+            await storage.createDripSend({
+              enrollmentId: enrollment.id,
+              stepId: step.id,
+              channel: channelOf(stepType),
+              recipientEmail: enrollment.prospectEmail,
+              recipientName: enrollment.prospectName,
+              subject: step.stepName || stepType,
+              status: "task",
+            });
+            const title = personalize(liNote || step.stepName) || defaultTaskTitle(stepType, firstName);
+            try {
+              await storage.createContactTask({
+                prospectId: enrollment.prospectId,
+                title,
+                subtitle: enrollment.prospectName,
+                dueDate: new Date(),
+              } as any);
+              console.log(`[Drip] Created ${stepType} task for ${enrollment.prospectName}: "${title}"`);
+            } catch (taskErr) {
+              // Don't let a single task failure abort the whole run or stall the enrollment.
+              console.error(`[Drip] Failed to create ${stepType} task for ${enrollment.prospectName}:`, taskErr);
+            }
           }
         }
 
@@ -448,13 +501,9 @@ export async function reprocessStep(campaignId: string, stepId: string): Promise
 
   for (const enrollment of enrollments) {
     result.attempted++;
-    const firstName = (enrollment.prospectName || "").trim().split(/\s+/)[0] || enrollment.prospectName || "there";
-    const personalize = (s: string | null | undefined): string =>
-      (s || "")
-        .replace(/\[Contact First Name\]/gi, firstName)
-        .replace(/\{\{\s*firstName\s*\}\}/gi, firstName)
-        .replace(/\{\{\s*name\s*\}\}/gi, enrollment.prospectName)
-        .replace(/\{\{\s*email\s*\}\}/gi, enrollment.prospectEmail);
+    const prospect = enrollment.prospectId ? await storage.getProspect(enrollment.prospectId).catch(() => undefined) : undefined;
+    const lang = firstTouchLang(prospect?.location, null);
+    const personalize = makePersonalize(enrollment.prospectName, enrollment.prospectEmail, (prospect?.notes || "").trim());
 
     try {
       if (stepType === "sms") {
@@ -489,7 +538,8 @@ export async function reprocessStep(campaignId: string, stepId: string): Promise
           subject: step.subject || step.stepName || "Email", status: "pending",
         });
         const trackingUrl = getTrackingPixelUrl(getBaseUrl(), send.id);
-        const r = await sendEmail(enrollment.prospectEmail, personalize(step.subject), personalize(step.bodyHtml), trackingUrl);
+        const first = isFirstEmailStep(step) ? FIRST_TOUCH[lang] : null;
+        const r = await sendEmail(enrollment.prospectEmail, personalize(first?.subject ?? step.subject), personalize(first?.bodyHtml ?? step.bodyHtml), trackingUrl);
         if (r.success) { await storage.updateDripSend(send.id, { status: "sent", sentAt: new Date() } as any); result.sent++; }
         else { await storage.updateDripSend(send.id, { status: "failed", errorMessage: r.error } as any); result.failed++; }
         await sleep(1200); // gentle pacing so a reprocess isn't a hard burst

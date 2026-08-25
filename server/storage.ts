@@ -929,6 +929,7 @@ export class DatabaseStorage implements IStorage {
       category: contact.personaType || "Referral Partner",
       location: contact.city || contact.country || "International",
       source: contact.source || "contact",
+      notes: contact.notes ?? null,
     } as InsertProspect);
   }
 

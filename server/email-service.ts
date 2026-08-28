@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer";
 import type { CrmTemplateGroup } from "@shared/crm-template-groups";
 import { buildUnsubscribeHeaders, htmlToPlainText, unsubscribeUrl } from "./unsubscribe-service";
+import { isSenderDisabled, markSenderAuthFailure, markSenderSuccess } from "./sender-health";
 
 // ─── Sender Profiles ──────────────────────────────────────────────────────────
 // Each profile maps an email address to its Gmail App Password env var name.
@@ -98,9 +99,13 @@ const DEFAULT_SENDER = "franchising@newdawnfranchising.com";
 // whole sequence always threads from the SAME mailbox (preserving threading) while
 // volume is spread evenly across mailboxes to protect any single one's reputation.
 export function chooseSenderForKey(key: string, rotate: boolean): string {
-  if (!rotate) return DEFAULT_SENDER;
-  const senders = getAvailableSenders();
-  if (senders.length <= 1) return DEFAULT_SENDER;
+  const senders = getAvailableSenders().filter((p) => !isSenderDisabled(p.email));
+  if (senders.length === 0) return DEFAULT_SENDER;
+  if (!rotate) {
+    const def = senders.find((p) => p.email === DEFAULT_SENDER);
+    return (def || senders[0]).email;
+  }
+  if (senders.length === 1) return senders[0].email;
   let h = 0;
   for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) | 0;
   return senders[Math.abs(h) % senders.length].email;
@@ -259,10 +264,13 @@ ${innerHtml}${footerHtml}
       return { success: false, error: reason };
     }
     console.log(`[Email] Sent ${fromEmail} → ${to} | messageId=${info?.messageId || "?"} | ${info?.response || "accepted"}`);
+    markSenderSuccess(fromEmail).catch(() => {});
     return { success: true };
   } catch (err: any) {
     console.error(`Email send error from ${fromEmail}:`, err);
-    return { success: false, error: err.message || "Failed to send email" };
+    const error = err.message || "Failed to send email";
+    markSenderAuthFailure(fromEmail, error).catch(() => {});
+    return { success: false, error };
   }
 }
 

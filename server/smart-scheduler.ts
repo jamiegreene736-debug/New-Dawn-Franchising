@@ -10,11 +10,8 @@
  * - Email: Mon–Fri 8 AM–5 PM local (full business day)
  *          Avoid: before 8 AM, after 5 PM, weekends
  *          Rate:  5–20 s random delay (avoids ISP bulk-sender flags)
- *          Max:   ~100/day per sending address (Gmail App Password limit);
- *                 the total daily cap scales with configured sender mailboxes
+ *          Max:   ~80/day total until Gmail login is healthy (override via env)
  */
-
-import { countConfiguredSenders } from "./email-service";
 
 export type SendMode = "now" | "smart";
 
@@ -289,23 +286,18 @@ function envInt(name: string, fallback: number): number {
   return Number.isFinite(n) && n > 0 ? n : fallback;
 }
 
-// Per-day TOTAL volume ceiling. Defaults to ~100/day for every sender mailbox
-// that actually has an app password configured (the safe per-address Gmail
-// volume), so capacity scales as mailboxes are added: 1 sender → 100/day,
-// all 4 → 400/day. Sender rotation spreads the volume so no single address
-// exceeds its own ~100/day share. Override the total explicitly with
-// EMAIL_DAILY_CAP in Railway → Variables.
-export const EMAIL_DAILY_CAP = envInt(
-  "EMAIL_DAILY_CAP",
-  100 * countConfiguredSenders(),
-);
+// Per-day TOTAL volume ceiling. Default 80 until Gmail login is healthy again
+// (Aug 2026 fail spike was 57% SMTP 535/534). Raise EMAIL_DAILY_CAP or the
+// Sending & Safety override after app passwords are re-authed. Previously
+// scaled at 100/day per mailbox (up to 400), which the leftover 13-step
+// sequences blew past via failed attempts that did not count toward the cap.
+export const EMAIL_DAILY_CAP = envInt("EMAIL_DAILY_CAP", 80);
 
 // Per-hour ceiling so the daily volume is spread across the business-hours
 // window instead of bursting in a single cron run (a strong spam signal).
-// 400/day ÷ 9 sendable hours ≈ 45/hr; default 50 covers that with a little
-// headroom while staying well under Gmail burst limits. Override with
-// EMAIL_HOURLY_CAP in Railway → Variables.
-export const EMAIL_HOURLY_CAP = envInt("EMAIL_HOURLY_CAP", 50);
+// 80/day ÷ ~6 sendable hours ≈ 13/hr; default 15 covers that with a little
+// headroom. Override with EMAIL_HOURLY_CAP in Railway → Variables.
+export const EMAIL_HOURLY_CAP = envInt("EMAIL_HOURLY_CAP", 15);
 
 // Minimum spacing between two emails sent to the SAME recipient domain within a
 // run. ISPs flag rapid bursts to one domain (e.g. many gmail.com in seconds),

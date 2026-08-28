@@ -1,6 +1,12 @@
 import cron from "node-cron";
 import { storage } from "./storage";
-import { sendEmail, sendEmailFromSender, getTrackingPixelUrl, chooseSenderForKey } from "./email-service";
+import { sendEmail, sendEmailFromSender, getTrackingPixelUrl, chooseSenderForKey, getAvailableSenders } from "./email-service";
+import {
+  allSendersDisabled,
+  isRecipientFailure,
+  isTerminalDripSend,
+  loadSenderHealth,
+} from "./sender-health";
 import { sendSmsViaQuo, toSmsE164 } from "./quo-service";
 import { isOnDnc, addToDnc, removeFromDnc } from "./agent-service";
 import { getDeliverabilitySettings, recordSenderUse } from "./deliverability-settings-service";
@@ -173,6 +179,13 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
     const hourlyCap = delivSettings.effectiveHourlyCap;
     const domainGapMs = delivSettings.effectiveDomainGapMs;
 
+    await loadSenderHealth();
+    const configuredSenders = getAvailableSenders().map((p) => p.email);
+    if (allSendersDisabled(configuredSenders)) {
+      console.error("[Drip] All sending mailboxes are disabled (Gmail 535/534). Pausing until a mailbox is re-authed.");
+      return;
+    }
+
     // DB-backed rolling-window counters so throttles survive process restarts
     // (Railway redeploys) instead of resetting an in-memory counter mid-day.
     const now = Date.now();
@@ -208,6 +221,10 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
     console.log(`[Drip] ${activeEnrollments.length} active enrollments · ${dailyCap - sentLast24h} left today · ${hourlyCap - sentLastHour} left this hour`);
 
     for (const enrollment of activeEnrollments) {
+      if (allSendersDisabled(configuredSenders)) {
+        console.error("[Drip] All sending mailboxes are disabled mid-run — stopping.");
+        break;
+      }
       // Stop if either throttle is hit mid-run
       if (sentLast24h >= dailyCap) {
         console.log("[Drip] Daily cap hit mid-run. Stopping early.");
@@ -265,7 +282,7 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
           continue;
         }
 
-        const alreadySent = existingSends.some(s => s.stepId === step.id);
+        const alreadySent = existingSends.some(s => s.stepId === step.id && isTerminalDripSend(s));
         if (alreadySent) {
           stepIdx += 1;
           await storage.updateDripEnrollment(enrollment.id, { currentStep: stepIdx } as any);
@@ -357,6 +374,15 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
           } else {
             await storage.updateDripSend(send.id, { status: "failed", errorMessage: result.error } as any);
             console.error(`[Drip] Failed to email ${enrollment.prospectEmail}: ${result.error}`);
+            // Auth / network / 421 — leave the step retryable. Recipient-level
+            // 553s are terminal (alreadySent will treat them as consumed).
+            if (!isRecipientFailure(result.error)) {
+              if (allSendersDisabled(configuredSenders)) {
+                console.error("[Drip] Last healthy mailbox just failed auth — stopping this run.");
+                return;
+              }
+              break;
+            }
           }
 
           // Organic jitter between emails — avoids burst-send spam signals. Applied
@@ -390,8 +416,8 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
           });
 
           if (!phoneCheck.ok) {
-            await storage.updateDripSend(send.id, { status: "failed", errorMessage: phoneCheck.error } as any);
-            console.error(`[Drip] SMS step skipped for ${enrollment.prospectName}: ${phoneCheck.error}`);
+            await storage.updateDripSend(send.id, { status: "skipped", errorMessage: phoneCheck.error } as any);
+            console.log(`[Drip] SMS step skipped for ${enrollment.prospectName}: ${phoneCheck.error}`);
           } else {
             const result = await sendSmsViaQuo(phoneCheck.e164, personalize(step.bodyHtml));
             if (result.success) {
@@ -515,7 +541,7 @@ export async function reprocessStep(campaignId: string, stepId: string): Promise
           subject: step.stepName || "Text message", status: "pending",
         });
         if (!phoneCheck.ok) {
-          await storage.updateDripSend(send.id, { status: "failed", errorMessage: phoneCheck.error } as any);
+          await storage.updateDripSend(send.id, { status: "skipped", errorMessage: phoneCheck.error } as any);
           result.skipped++;
           continue;
         }

@@ -498,6 +498,10 @@ const STATEMENTS: string[] = [
   `UPDATE deliverability_settings SET sender_rotation = true, rotation_default_applied = true
      WHERE id = 'singleton' AND rotation_default_applied = false`,
 
+  // Dead-mailbox circuit breaker + one-time cap pin after the Aug 2026 fail spike.
+  `ALTER TABLE deliverability_settings ADD COLUMN IF NOT EXISTS sender_health jsonb NOT NULL DEFAULT '{}'::jsonb`,
+  `ALTER TABLE deliverability_settings ADD COLUMN IF NOT EXISTS heal_cap_applied boolean NOT NULL DEFAULT false`,
+
   // ─── Phase 3: seed inbox-placement test ──────────────────────────────────────
   `CREATE TABLE IF NOT EXISTS seed_inboxes (
     id            varchar      PRIMARY KEY DEFAULT gen_random_uuid(),

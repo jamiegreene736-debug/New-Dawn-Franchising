@@ -235,6 +235,17 @@ export async function syncSenderInbox(senderEmail: string, password: string): Pr
           const active = enrolls.filter((e) => e.status === "active");
           for (const e of active) {
             await storage.updateDripEnrollment(e.id, { status: "replied" } as any);
+            const sends = await storage.getDripSends(e.id);
+            const latest = sends
+              .filter((s) => (s.channel || "email") === "email" && ["sent", "delivered", "opened", "clicked"].includes(s.status))
+              .sort((a, b) => {
+                const ta = new Date(a.sentAt || a.createdAt).getTime();
+                const tb = new Date(b.sentAt || b.createdAt).getTime();
+                return tb - ta;
+              })[0];
+            if (latest) {
+              await storage.updateDripSend(latest.id, { status: "replied" } as any);
+            }
           }
           if (active.length > 0) {
             console.log(`[GmailSync] reply from ${fromAddr} — paused ${active.length} active enrollment(s)`);

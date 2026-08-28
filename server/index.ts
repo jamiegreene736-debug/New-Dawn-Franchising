@@ -90,6 +90,15 @@ app.use((req, res, next) => {
 (async () => {
   // Ensure required tables exist (runs over Railway's internal network).
   await ensureSchema();
+  try {
+    const { applyOutreachHealOnce } = await import("./legacy-campaign-pause");
+    const heal = await applyOutreachHealOnce();
+    if (heal.paused.length) {
+      console.log(`[Heal] paused ${heal.paused.length} pre-quality-gate campaign(s)`);
+    }
+  } catch (err: any) {
+    console.error(`[Heal] outreach heal skipped: ${err?.message}`);
+  }
   // Give pre-existing CRM lists a linked prospect_list so they're campaign-selectable
   // (idempotent — only does work on the first boot after this feature ships).
   try {

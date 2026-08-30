@@ -58,6 +58,8 @@ import agentRouter, { runScheduledJobs } from "./agent-routes";
 import franchiseeRouter from "./franchisee-routes";
 import heygenRouter from "./heygen-routes";
 import partnerRouter from "./partner-routes";
+import mobileRouter from "./mobile/routes";
+import { readRequiredEnvironmentValue } from "./runtime-config";
 import { processPartnerSequence } from "./partner-sequence-service";
 import { runDailyPreparation, runDailyBrief, pollForApprovalReply, runApprovalDeadlineCheck, addToDnc, isOnDnc } from "./agent-service";
 import { isParallelOutreachEnabled, logParallelSkip } from "./outreach-owner";
@@ -188,8 +190,8 @@ async function verifyAddressForEnroll(
   return { shouldEnroll: true, status: null, bucket: "unverified" };
 }
 
-const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || "dylan@newdawnfranchising.com").toLowerCase().trim();
-const ADMIN_PASSWORD = (process.env.ADMIN_PASSWORD || "NewHorizons@12").trim();
+const ADMIN_EMAIL = readRequiredEnvironmentValue("ADMIN_EMAIL").toLowerCase();
+const ADMIN_PASSWORD = readRequiredEnvironmentValue("ADMIN_PASSWORD");
 
 // Per-scene narration for the homepage overview. Each segment corresponds 1:1
 // with a scene in the front-end player, so the voice stays in sync with the
@@ -5557,6 +5559,8 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
   registerSeoRoutes(app);
   registerOutreachRoutes(app);
   registerVisitorRoutes(app);
+
+  app.use("/api/mobile/v1", mobileRouter);
 
   app.use("/api/seo/agent", seoAgentRouter);
   app.use("/api/seo/campaigns", seoCampaignRouter);

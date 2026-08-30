@@ -265,6 +265,7 @@ export async function buildDailyCampaignFromLeads(opts: {
     websiteUrl?: string | null;
     linkedinUrl?: string | null;
     jobTitle?: string | null;
+    bio?: string | null;
     country?: string | null;
     city?: string | null;
   }, category?: string | null): Promise<{ id: string; email: string | null } | null> => {

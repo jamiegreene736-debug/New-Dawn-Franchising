@@ -34,6 +34,17 @@ const partner = qualifyIntroducer({
   notes: "E-2 treaty investor petitions for Mexican entrepreneurs",
 });
 assert("E-2 partner attorney passes", partner.pass, JSON.stringify(partner));
+
+const usCounsel = qualifyIntroducer({
+  fullName: "James Wright",
+  title: "Partner",
+  company: "Wright Immigration Law",
+  email: "james@wrightimmigration.com",
+  category: "immigration_attorney",
+  country: "United States",
+  notes: "employment and investor visas",
+});
+assert("US immigration partner passes without E-2 in notes", usCounsel.pass, JSON.stringify(usCounsel));
 assert("score is a number", Number.isFinite(partner.score));
 
 const generic = qualifyIntroducer({

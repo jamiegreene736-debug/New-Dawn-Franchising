@@ -4,13 +4,21 @@ import connectPgSimple from "connect-pg-simple";
 import { registerRoutes, warmHomepageVoiceover } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import { randomUUID } from "crypto";
 import { pool } from "./db";
 import { ensureSchema } from "./ensure-schema";
 import { seedBlogPostsIfEmpty } from "./seed-posts";
 import { storage } from "./storage";
+import { readRequiredEnvironmentValue } from "./runtime-config";
 
 const app = express();
 const httpServer = createServer(app);
+const isProduction = process.env.NODE_ENV === "production";
+const sessionSecret = readRequiredEnvironmentValue("SESSION_SECRET");
+
+if (isProduction) {
+  app.set("trust proxy", 1);
+}
 
 declare module "http" {
   interface IncomingMessage {
@@ -43,10 +51,15 @@ app.use(
     // `table.sql` asset at runtime, which esbuild does not emit into dist/, so it
     // throws ENOENT and breaks every session read/write. See server/ensure-schema.ts.
     store: new PgSession({ pool }),
-    secret: process.env.SESSION_SECRET || "nhf-session-secret-2026",
+    secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
-    cookie: { maxAge: 30 * 24 * 60 * 60 * 1000, httpOnly: true, sameSite: "lax" },
+    cookie: {
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+      httpOnly: true,
+      sameSite: "lax",
+      secure: isProduction,
+    },
   }),
 );
 
@@ -64,23 +77,18 @@ export function log(message: string, source = "express") {
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
+  const incomingRequestId = req.header("x-request-id")?.trim();
+  const requestId = incomingRequestId && /^[A-Za-z0-9._:-]{1,128}$/.test(incomingRequestId)
+    ? incomingRequestId
+    : randomUUID();
 
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
+  res.locals.requestId = requestId;
+  res.setHeader("X-Request-Id", requestId);
 
   res.on("finish", () => {
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-
-      log(logLine);
+      log(`${req.method} ${path} ${res.statusCode} in ${duration}ms requestId=${requestId}`);
     }
   });
 
@@ -122,7 +130,7 @@ app.use((req, res, next) => {
       return next(err);
     }
 
-    return res.status(status).json({ message });
+    return res.status(status).json({ message, requestId: res.locals.requestId });
   });
 
   // importantly only setup vite in development and after

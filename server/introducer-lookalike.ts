@@ -95,9 +95,9 @@ export async function rememberLookalikeFirms(maxSeeds = 5): Promise<NamedAccount
 export async function discoverFirmsFromSignals(maxResults = 12): Promise<NamedAccount[]> {
   if (!process.env.SERPAPI_KEY) return [];
   const queries = [
-    `E-2 treaty investor visa attorney practice`,
-    `"E-2 visa" "immigration law" (Mexico OR Korea OR Colombia) -site:reddit.com`,
-    `franchise consultant international buyers E-2`,
+    `E-2 treaty investor visa attorney practice United States`,
+    `"E-2 visa" "immigration attorney" (Houston OR Miami OR Dallas OR "Los Angeles") -site:reddit.com`,
+    `investor visa immigration law firm United States`,
   ];
   const added: NamedAccount[] = [];
   const seen = new Set<string>();

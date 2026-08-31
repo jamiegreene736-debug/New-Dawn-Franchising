@@ -36,6 +36,13 @@ import {
 } from "./outreach-autopilot-helpers";
 import { qualifyIntroducer } from "./introducer-qualify";
 import { hunterQueriesForAccounts, isNamedAccountDomain, namedAccountsForCountries } from "./named-accounts";
+import {
+  applyUsImmigrationFocusToPlan,
+  isUsImmigrationAttorney,
+  isUsImmigrationFocus,
+  namedAccountsForUsImmigration,
+  US_IMMIGRATION_FOCUS_PROMPT,
+} from "./outreach-focus";
 import { fetchFirmHook, hookParagraph } from "./firm-hook";
 import { discoverFirmsFromSignals, rememberLookalikeFirms } from "./introducer-lookalike";
 import { randomUUID } from "crypto";
@@ -728,7 +735,17 @@ Based on this context, generate today's outreach intelligence plan. Deliberately
   // The prompt asks for 6-10 categories + 16-24 queries with reasoning — that
   // easily exceeds 3k output tokens, and a truncated response is unparseable
   // JSON (this silently killed every plan once the wider-net prompt landed).
-  const raw = await callClaude(INTELLIGENCE_SYSTEM_PROMPT, contextMessage, 12000);
+  const focusOn = isUsImmigrationFocus();
+  const raw = await callClaude(
+    INTELLIGENCE_SYSTEM_PROMPT + (focusOn ? US_IMMIGRATION_FOCUS_PROMPT : ""),
+    focusOn
+      ? contextMessage.replace(
+          /Deliberately DIVERSIFY[\s\S]*$/,
+          "Deliberately DIVERSIFY across US cities only — do not add other countries or partner categories. Stay on US immigration attorneys who file E-2 / investor visas.",
+        )
+      : contextMessage,
+    12000,
+  );
 
   const plan = extractJson<{
     planSummary: string;
@@ -751,8 +768,18 @@ Based on this context, generate today's outreach intelligence plan. Deliberately
     if (dropped > 0) console.log(`[OutreachIntel] Filtered ${dropped} redundant data-vendor blocker request(s).`);
   }
 
+  if (focusOn) {
+    const focused = applyUsImmigrationFocusToPlan(plan, recentTargetLines);
+    plan.planSummary = focused.planSummary ?? plan.planSummary;
+    plan.leadCategories = focused.leadCategories ?? plan.leadCategories;
+    plan.searchQueries = focused.searchQueries ?? plan.searchQueries;
+    console.log("[OutreachIntel] Focus locked to US immigration attorneys.");
+  }
+
   const countries = [...new Set((plan.leadCategories ?? []).map((c) => c.country).filter(Boolean))];
-  const namedQueries = hunterQueriesForAccounts(namedAccountsForCountries(countries, 10));
+  const namedQueries = hunterQueriesForAccounts(
+    focusOn ? namedAccountsForUsImmigration(10) : namedAccountsForCountries(countries, 10),
+  );
   const existingQ = new Set((plan.searchQueries ?? []).map((q) => q.query.toLowerCase()));
   for (const q of namedQueries) {
     if (!existingQ.has(q.query.toLowerCase())) {
@@ -1051,6 +1078,18 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
             console.log(`[OutreachIntel] Dropped "${lead.fullName}": ${verdict.reasons.filter((r) => r.startsWith("rejected")).join("; ") || verdict.reasons.join("; ")}`);
             continue;
           }
+          if (isUsImmigrationFocus() && !isUsImmigrationAttorney({
+            category: lead.category,
+            country: queryCountry,
+            city: providerMatch?.city,
+            location: providerMatch?.location,
+            title: providerMatch?.title,
+            company: lead.company,
+            notes: lead.notes,
+          })) {
+            console.log(`[OutreachIntel] Dropped "${lead.fullName}": not a US immigration attorney`);
+            continue;
+          }
           const hookRaw = website ? await fetchFirmHook(website) : null;
           const firmHook = hookParagraph(hookRaw, lead.company);
           await db.insert(outreachLeads).values({
@@ -1146,7 +1185,7 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
     try {
       const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
       const room = DAILY_CAMPAIGN_TARGET - discoveredForCampaign.length;
-      const pool = await db.select().from(outreachLeads)
+      const rawPool = await db.select().from(outreachLeads)
         .where(and(
           eq(outreachLeads.status, "new"),
           isNull(outreachLeads.campaignedAt),
@@ -1155,7 +1194,10 @@ export async function executeApprovedPlan(planId: string): Promise<{ discovered:
           or(isNotNull(outreachLeads.email), isNotNull(outreachLeads.website)),
         ))
         .orderBy(desc(outreachLeads.score), desc(outreachLeads.createdAt))
-        .limit(room);
+        .limit(isUsImmigrationFocus() ? Math.max(room * 4, 20) : room);
+      const pool = isUsImmigrationFocus()
+        ? rawPool.filter((l) => isUsImmigrationAttorney(l)).slice(0, room)
+        : rawPool;
       if (pool.length > 0) {
         await db.update(outreachLeads)
           .set({ campaignedAt: new Date() })

@@ -12,6 +12,7 @@
 import { scoreProspect } from "./lead-intelligence";
 
 export const PRACTICE_CATEGORIES = new Set([
+  "immigration_attorney",
   "business_broker",
   "franchise_broker",
   "wealth_manager",

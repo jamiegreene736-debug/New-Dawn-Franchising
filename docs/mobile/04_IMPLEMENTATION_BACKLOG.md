@@ -39,9 +39,11 @@ Use one cross-functional delivery stream with weekly demonstrations. Build verti
 
 - [x] Confirm production variable presence by name without reading secret values; remove runtime administrator-password and session-secret fallbacks.
 - [x] Set fail-closed environment validation, proxy trust, and secure production cookie settings.
+- [x] Patch the production dependency tree to zero known audit findings and enforce the production audit in CI.
 - [ ] Design access/refresh token rotation, session management, verification, recovery, and deletion.
 - [x] Stop logging serialized API response bodies; retain method, path, status, timing, and safe request ID only.
-- [ ] Define object authorization and negative test matrix.
+- [x] Define object authorization and negative test matrix.
+- [ ] Replace Drizzle Kit's deprecated development-only loader when a stable compatible release removes its four moderate transitive advisories; do not force an unsupported override or downgrade.
 - [ ] Verify provider webhook signatures and reconciliation paths.
 
 **Exit gate:** Security owner accepts the threat model and remediation backlog.

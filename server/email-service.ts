@@ -85,6 +85,11 @@ function getTransporter(senderEmail: string): nodemailer.Transporter {
     connectionTimeout: 15_000,
     greetingTimeout: 15_000,
     socketTimeout: 20_000,
+    // All attachments are in-memory Buffers. Prevent message content from
+    // reading local files or fetching remote URLs even if future call sites
+    // accidentally pass an unsafe attachment shape.
+    disableFileAccess: true,
+    disableUrlAccess: true,
   });
   transporterCache.set(senderEmail, transporter);
   return transporter;

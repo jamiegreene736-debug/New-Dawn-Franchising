@@ -88,7 +88,8 @@ Create the prototype in the same Expo project intended for production, using a t
 
 - [x] Create `mobile/` Expo app, strict TypeScript, Expo Router, typed locale framework, design tokens, and accessibility primitives.
 - [x] Add fail-closed prototype/connected environment separation and foundational unit tests.
-- [ ] Add CI enforcement, component tests, and device preview builds.
+- [x] Enforce the mobile foundation and security test suite in root CI.
+- [ ] Add component tests and device preview builds.
 - [ ] Resolve the monitored `xcode`/`uuid` advisory through an Expo-compatible dependency update; do not force an SDK-breaking downgrade.
 - [ ] Implement secure session storage, generated API client, request IDs, idempotency, and error mapping.
 - [ ] Add privacy-safe analytics allowlist and crash reporting.
@@ -97,9 +98,10 @@ Create the prototype in the same Expo project intended for production, using a t
 
 - [x] Create the versioned `server/mobile/` route boundary, safe prelaunch status endpoint, and validated `shared/mobile/` contracts.
 - [x] Define mobile identity, roles, investor links, partner profiles, rotating refresh sessions, hash-only one-time tokens, referrals, audit events, and deletion-request tables locally.
+- [x] Add a prelaunch bootstrap endpoint, short-lived signed access-token service, hash-only refresh-token reuse evaluation, fail-closed authentication configuration, and privacy-safe error builder.
 - [ ] Generate and review the staging migration from the local schema; do not run a production migration.
 - [ ] Implement registration, verification, login, refresh, logout, recovery, session management, and deletion initiation.
-- [ ] Add server authorization primitives and negative cross-account tests.
+- [x] Add server authorization primitives and negative cross-account tests.
 - [ ] Implement approved-content lifecycle and English/Spanish completeness rules.
 
 ### First production slice

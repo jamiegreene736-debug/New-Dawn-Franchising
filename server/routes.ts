@@ -5,6 +5,8 @@ import path from "path";
 import bcrypt from "bcryptjs";
 import { storage } from "./storage";
 import { insertLeadSchema, insertBrokerSchema, insertBrokerClientSchema, insertCrmClientSchema, insertProspectSchema } from "@shared/schema";
+import { ingestWebsiteLeadToCrm } from "./website-leads";
+import type { WebsiteLeadSource } from "@shared/website-leads";
 import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { generateBlogPost, scheduleWeeklyBlogGeneration } from "./blog-generator";
@@ -1050,22 +1052,21 @@ export async function registerRoutes(
       // so read it straight off the body) tags the CRM client distinctly so the
       // investor-brochure and partner/broker journeys stay separate from generic
       // website leads. Unknown / absent values fall back to "website".
-      const LEAD_SOURCE_BY_TYPE: Record<string, string> = {
+      const LEAD_SOURCE_BY_TYPE: Record<string, WebsiteLeadSource> = {
         "investor-brochure": "brochure-investor",
         "partner-broker": "partner-broker",
       };
       const leadType = typeof req.body?.leadType === "string" ? req.body.leadType.trim() : "";
       const leadSource = LEAD_SOURCE_BY_TYPE[leadType] ?? "website";
 
-      // Auto-create a CRM client from the website lead (fire-and-forget)
-      storage.createCrmClient({
+      // Upsert a CRM client and add them to the Website Leads list (fire-and-forget)
+      ingestWebsiteLeadToCrm({
         fullName: lead.fullName,
         email: lead.email || "",
         phone: lead.phone || null,
         country: lead.country || null,
-        status: "new",
-        leadSource,
         notes: lead.message || null,
+        leadSource,
       }).catch((e) => console.error("Failed to auto-create CRM client from lead:", e));
 
       // TODO(CRM): push this lead to HubSpot and/or GoHighLevel here.
@@ -1103,7 +1104,7 @@ export async function registerRoutes(
               ${lead.message ? `<tr><td style="padding:8px 12px;background:#f9fafb;border-radius:4px;color:#6b7280;font-weight:600;vertical-align:top;">Message</td><td style="padding:8px 12px;">${lead.message.replace(/\n/g, "<br>")}</td></tr>` : ""}
             </table>
             <div style="margin-top:28px;padding-top:20px;border-top:1px solid #e5e7eb;">
-              <a href="${BASE_URL}/crm" style="display:inline-block;background:#1a2a4a;color:#fff;text-decoration:none;padding:12px 24px;border-radius:6px;font-size:14px;font-weight:600;">View in CRM →</a>
+              <a href="${BASE_URL}/crm?source=website" style="display:inline-block;background:#1a2a4a;color:#fff;text-decoration:none;padding:12px 24px;border-radius:6px;font-size:14px;font-weight:600;">View in CRM →</a>
             </div>
           </div>
         </div>`;

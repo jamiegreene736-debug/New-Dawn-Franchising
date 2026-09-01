@@ -40,7 +40,13 @@ import {
   ShieldCheck,
   ListPlus,
   ListChecks,
+  Globe,
 } from "lucide-react";
+import {
+  WEBSITE_LEADS_LIST_NAME,
+  isWebsiteCrmClient,
+  websiteLeadSourceLabel,
+} from "@shared/website-leads";
 import { CrmClientDetail } from "./crm-client-detail";
 import ProspectFinder from "./prospect-finder";
 import AiSearchInsights from "@/components/ai-search-insights";
@@ -919,6 +925,7 @@ export default function CrmPage() {
   const [editingTagsId, setEditingTagsId] = useState<string | null>(null);
   const [inlineTagInput, setInlineTagInput] = useState("");
   const [filterListId, setFilterListId] = useState<string | null>(null);
+  const [filterWebsite, setFilterWebsite] = useState(() => new URLSearchParams(search).get("source") === "website");
   const [addToListId, setAddToListId] = useState<string>("");
   const [newListName, setNewListName] = useState("");
 
@@ -1045,6 +1052,16 @@ export default function CrmPage() {
     queryFn: async () => (await apiRequest("GET", `/api/crm/lists/${filterListId}/members`)).json(),
     enabled: !!filterListId,
   });
+
+  const websiteListId = crmLists.find((l) => l.name === WEBSITE_LEADS_LIST_NAME)?.id ?? null;
+  const { data: websiteListMembers = [] } = useQuery<CrmClient[]>({
+    queryKey: ["/api/crm/lists", websiteListId, "members"],
+    queryFn: async () => (await apiRequest("GET", `/api/crm/lists/${websiteListId}/members`)).json(),
+    enabled: !!websiteListId,
+  });
+  const websiteMemberIds = new Set(websiteListMembers.map((c) => c.id));
+  const isWebsiteLead = (c: CrmClient) => isWebsiteCrmClient(c) || websiteMemberIds.has(c.id);
+  const websiteLeadCount = clients.filter(isWebsiteLead).length;
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -1297,8 +1314,9 @@ export default function CrmPage() {
     const matchesStatus = filterStatus === "all" || c.status === filterStatus;
     const matchesTag = !filterTag || (c.tags && c.tags.includes(filterTag));
     const matchesList = !filterListId || listMemberIds.has(c.id);
+    const matchesWebsite = !filterWebsite || isWebsiteLead(c);
     const matchesEmail = emailFilter === "all" || c.emailStatus === "invalid";
-    return matchesSearch && matchesStatus && matchesTag && matchesList && matchesEmail;
+    return matchesSearch && matchesStatus && matchesTag && matchesList && matchesWebsite && matchesEmail;
   });
 
   const badEmailCount = clients.filter((c) => c.emailStatus === "invalid").length;
@@ -1539,6 +1557,32 @@ export default function CrmPage() {
         </section>
       )}
 
+      {/* Website-inbound sources — always visible so form submissions are one click away */}
+      <section className="py-2.5 border-b bg-gray-50">
+        <div className="nh-container">
+          <div className="flex items-center gap-2 overflow-x-auto scrollbar-tab pb-1">
+            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap shrink-0 flex items-center gap-1.5">
+              <Globe className="size-3.5" /> Sources
+            </span>
+            <button
+              data-testid="filter-source-website"
+              onClick={() => setFilterWebsite((on) => !on)}
+              className={`flex items-center gap-1.5 shrink-0 text-xs px-3 py-1 rounded-full border transition-colors ${
+                filterWebsite
+                  ? "bg-primary text-white border-primary"
+                  : "bg-white border-gray-200 hover:border-primary/40 hover:bg-primary/5 text-gray-700 hover:text-primary"
+              }`}
+            >
+              <span className="font-medium">Website Leads</span>
+              <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${filterWebsite ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500"}`}>
+                {websiteLeadCount}
+              </span>
+              {filterWebsite && <X className="size-3" />}
+            </button>
+          </div>
+        </div>
+      </section>
+
       {/* CRM Lists Quick Access */}
       {crmLists.length > 0 && (
         <section className="py-2.5 border-b bg-gray-50">
@@ -1555,7 +1599,10 @@ export default function CrmPage() {
                   {crmLists.find(l => l.id === filterListId)?.name ?? "List"} <X className="size-3" />
                 </button>
               )}
-              {crmLists.filter(l => l.id !== filterListId).map(list => (
+              {[...crmLists]
+                .sort((a, b) => (a.name === WEBSITE_LEADS_LIST_NAME ? -1 : b.name === WEBSITE_LEADS_LIST_NAME ? 1 : 0))
+                .filter(l => l.id !== filterListId)
+                .map(list => (
                 <button
                   key={list.id}
                   onClick={() => setFilterListId(list.id)}
@@ -1747,7 +1794,9 @@ export default function CrmPage() {
               <p className="mt-3 text-sm text-muted-foreground">
                 {clients.length === 0
                   ? "No clients yet. Click \"Add client\" to add your first client."
-                  : "No clients match your search or filter."}
+                  : filterWebsite
+                    ? "No website form submissions match your other filters."
+                    : "No clients match your search or filter."}
               </p>
             </Card>
           ) : (
@@ -1972,10 +2021,14 @@ export default function CrmPage() {
                       )}
 
                       {/* Row 3: referral party + date */}
-                      <div className="mt-1 text-xs flex items-center gap-1">
+                      <div className="mt-1 text-xs flex items-center gap-1 flex-wrap">
                         {getBrokerName(client.brokerId)
                           ? <span className="text-[hsl(var(--primary))] font-medium">🤝 Referred by {getBrokerName(client.brokerId)}</span>
-                          : <span className="text-muted-foreground">Direct client</span>}
+                          : websiteLeadSourceLabel(client.leadSource)
+                            ? <span className="text-[hsl(var(--primary))] font-medium">{websiteLeadSourceLabel(client.leadSource)}</span>
+                            : isWebsiteCrmClient(client)
+                              ? <span className="text-[hsl(var(--primary))] font-medium">Website</span>
+                              : <span className="text-muted-foreground">Direct client</span>}
                         <span className="text-muted-foreground">· Added {new Date(client.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
                       </div>
 

@@ -716,14 +716,14 @@ export const CRM_EMAIL_TEMPLATES: EmailTemplate[] = [
 
   // ── Nurture & Re-Engagement ───────────────────────────────────────────────
   {
-    id: "pm_john_intro",
-    label: "Introduce John (Texas PM team)",
+    id: "pm_jay_intro",
+    label: "Introduce Jay Carpenter (Texas PM team)",
     group: "5 — Follow-Up",
-    subject: "Nice to meet you — introducing John from our Texas team",
+    subject: "Nice to meet you — introducing Jay from our Texas team",
     bodyHtml: `<p>Hi {{name}},</p>
 <p>Hello — nice to meet you.</p>
-<p>I wanted to introduce <strong>John</strong>, who works with our onsite property management team down in Texas. He knows how we run properties on the ground, and he's the right person to walk you through the day-to-day.</p>
-<p>John will reach out to you shortly so you two can connect directly. In the meantime, just reply here if anything comes up.</p>
+<p>I wanted to introduce <strong>Jay Carpenter</strong>, who works with our onsite property management team down in Texas. He knows how we run properties on the ground, and he's the right person to walk you through the day-to-day.</p>
+<p>I've copied Jay on this note so he can follow up with you directly. Feel free to reply-all.</p>
 <p>Looking forward to connecting.</p>`,
   },
   {
@@ -770,38 +770,26 @@ function escapeHtml(value: string): string {
     .replace(/"/g, "&quot;");
 }
 
-/** Optional CC for John's intro — set JOHN_PM_EMAIL so he is on the thread and can reply. */
-export function johnPmIntroCc(): string | undefined {
-  const raw = process.env.JOHN_PM_EMAIL?.trim();
-  return raw && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(raw) ? raw : undefined;
-}
+export const JAY_PM_NAME = "Jay Carpenter";
+export const JAY_PM_EMAIL = "jay@newdawnfranchising.com";
 
-/** Dylan's one-click CRM follow-up: hello + introduce John (Texas onsite PM) to reach out. */
-export function buildPmJohnIntroEmail(
-  fullName: string,
-  opts?: { ccJohn?: boolean },
-): { subject: string; bodyHtml: string; bodyText: string } {
+/** Dylan's one-click CRM follow-up: hello + introduce Jay Carpenter (Texas onsite PM). */
+export function buildPmJayIntroEmail(fullName: string): { subject: string; bodyHtml: string; bodyText: string } {
   const firstName = firstNameFromFullName(fullName);
   const safe = escapeHtml(firstName);
-  const subject = "Nice to meet you — introducing John from our Texas team";
-  const followUpHtml = opts?.ccJohn
-    ? `<p>I've copied John on this note so he can follow up with you directly. Feel free to reply-all.</p>`
-    : `<p>John will reach out to you shortly so you two can connect directly. In the meantime, just reply here if anything comes up.</p>`;
-  const followUpText = opts?.ccJohn
-    ? "I've copied John on this note so he can follow up with you directly. Feel free to reply-all."
-    : "John will reach out to you shortly so you two can connect directly. In the meantime, just reply here if anything comes up.";
+  const subject = "Nice to meet you — introducing Jay from our Texas team";
   const bodyHtml = `<p>Hi ${safe},</p>
 <p>Hello — nice to meet you.</p>
-<p>I wanted to introduce <strong>John</strong>, who works with our onsite property management team down in Texas. He knows how we run properties on the ground, and he's the right person to walk you through the day-to-day.</p>
-${followUpHtml}
+<p>I wanted to introduce <strong>Jay Carpenter</strong>, who works with our onsite property management team down in Texas. He knows how we run properties on the ground, and he's the right person to walk you through the day-to-day.</p>
+<p>I've copied Jay on this note so he can follow up with you directly. Feel free to reply-all.</p>
 <p>Looking forward to connecting.</p>`;
   const bodyText = `Hi ${firstName},
 
 Hello — nice to meet you.
 
-I wanted to introduce John, who works with our onsite property management team down in Texas. He knows how we run properties on the ground, and he's the right person to walk you through the day-to-day.
+I wanted to introduce Jay Carpenter, who works with our onsite property management team down in Texas. He knows how we run properties on the ground, and he's the right person to walk you through the day-to-day.
 
-${followUpText}
+I've copied Jay on this note so he can follow up with you directly. Feel free to reply-all.
 
 Looking forward to connecting.`;
   return { subject, bodyHtml, bodyText };

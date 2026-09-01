@@ -39,7 +39,7 @@ import { scheduleApolloOrgSync } from "./apollo-org-sync";
 import { seedDefaultCampaign } from "./default-campaign";
 import { seedGrokCampaign } from "./grok-campaign";
 import { seedGlobevisaCampaign } from "./globevisa-campaign";
-import { sendEmail, sendEmailFromSender, getTrackingPixelUrl, getAvailableSenders, getSenderProfile, CRM_EMAIL_TEMPLATES, cacheDylanCalendlyUrl, buildPmJohnIntroEmail, johnPmIntroCc } from "./email-service";
+import { sendEmail, sendEmailFromSender, getTrackingPixelUrl, getAvailableSenders, getSenderProfile, CRM_EMAIL_TEMPLATES, cacheDylanCalendlyUrl, buildPmJayIntroEmail, JAY_PM_EMAIL } from "./email-service";
 import { analyzeEmail } from "./spam-test-service";
 import { isAutomatedOrBulkEmail, shouldShowInCrmEmailHistory } from "./crm-email-filter";
 import { generateFacebookPost } from "./facebook-generator";
@@ -1778,8 +1778,7 @@ export async function registerRoutes(
       }
 
       const fromEmail = getAvailableSenders()[0]?.email || "franchising@newdawnfranchising.com";
-      const johnCc = johnPmIntroCc();
-      const { subject, bodyHtml, bodyText } = buildPmJohnIntroEmail(client.fullName, { ccJohn: !!johnCc });
+      const { subject, bodyHtml, bodyText } = buildPmJayIntroEmail(client.fullName);
 
       const trackingId = `de_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
       const baseUrl = `${req.protocol}://${req.get("host")}`;
@@ -1792,7 +1791,7 @@ export async function registerRoutes(
         bodyHtml,
         pixelUrl,
         undefined,
-        johnCc ? { cc: johnCc } : undefined,
+        { cc: JAY_PM_EMAIL },
       );
       if (!result.success) {
         return res.status(500).json({ message: result.error || "Failed to send follow-up email" });
@@ -1813,7 +1812,7 @@ export async function registerRoutes(
       await storage.createCrmClientActivity({
         clientId,
         activityType: "email_sent",
-        metadata: { subject, from: fromEmail, emailId: emailRecord.id, template: "pm_john_intro", ...(johnCc ? { cc: johnCc } : {}) },
+        metadata: { subject, from: fromEmail, emailId: emailRecord.id, template: "pm_jay_intro", cc: JAY_PM_EMAIL },
       });
 
       res.json(emailRecord);

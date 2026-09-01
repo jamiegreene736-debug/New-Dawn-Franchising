@@ -907,6 +907,7 @@ export default function CrmPage() {
   const [editingClient, setEditingClient] = useState<CrmClient | null>(null);
   const [selectedClient, setSelectedClient] = useState<CrmClient | null>(null);
   const [deleteClientId, setDeleteClientId] = useState<string | null>(null);
+  const [followUpClient, setFollowUpClient] = useState<CrmClient | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [emailFilter, setEmailFilter] = useState<"all" | "bad">("all");
@@ -1085,6 +1086,24 @@ export default function CrmPage() {
     },
     onError: (err: Error) => {
       toast({ title: "Delete failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const followUpMutation = useMutation({
+    mutationFn: async (client: CrmClient) => {
+      const res = await apiRequest("POST", `/api/crm/clients/${client.id}/send-follow-up-email`);
+      return { record: await res.json(), client };
+    },
+    onSuccess: ({ client }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/crm/clients"] });
+      toast({
+        title: "Follow-up sent",
+        description: `Dylan's introduction email was sent to ${client.fullName}.`,
+      });
+      setFollowUpClient(null);
+    },
+    onError: (err: Error) => {
+      toast({ title: "Send failed", description: err.message, variant: "destructive" });
     },
   });
 
@@ -2043,7 +2062,21 @@ export default function CrmPage() {
                       </div>
                     </div>
 
-                    <div className="flex gap-2 shrink-0">
+                    <div className="flex gap-2 shrink-0 flex-wrap justify-end">
+                      <Button
+                        data-testid={`button-follow-up-${client.id}`}
+                        size="sm"
+                        variant="outline"
+                        className="gap-1"
+                        disabled={!client.email || !!client.unsubscribedAt || (followUpMutation.isPending && followUpMutation.variables?.id === client.id)}
+                        title={!client.email ? "No email on file" : client.unsubscribedAt ? "Client unsubscribed" : "Send Dylan's introduction email from the card"}
+                        onClick={() => setFollowUpClient(client)}
+                      >
+                        {followUpMutation.isPending && followUpMutation.variables?.id === client.id
+                          ? <Loader2 className="size-3 animate-spin" />
+                          : <Mail className="size-3" />}
+                        Send follow up email
+                      </Button>
                       <Button
                         data-testid={`button-view-${client.id}`}
                         size="sm"
@@ -2088,6 +2121,30 @@ export default function CrmPage() {
           onRefresh={() => queryClient.invalidateQueries({ queryKey: ["/api/crm/clients"] })}
         />
       )}
+
+      <AlertDialog open={!!followUpClient} onOpenChange={(open) => { if (!open && !followUpMutation.isPending) setFollowUpClient(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Send follow-up email?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Dylan will email {followUpClient?.fullName || "this client"}
+              {followUpClient?.email ? ` (${followUpClient.email})` : ""} introducing John from the onsite property management team in Texas. John will then reach out.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={followUpMutation.isPending} onClick={() => setFollowUpClient(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!followUpClient || followUpMutation.isPending}
+              onClick={(e) => {
+                e.preventDefault();
+                if (followUpClient) followUpMutation.mutate(followUpClient);
+              }}
+            >
+              {followUpMutation.isPending ? "Sending…" : "Send email"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={!!deleteClientId} onOpenChange={(open) => { if (!open) setDeleteClientId(null); }}>
         <AlertDialogContent>

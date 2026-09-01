@@ -140,7 +140,7 @@ export async function sendEmailFromSender(
   // skipUnsubscribe: omit List-Unsubscribe headers + the text-part unsubscribe
   // line. Pass this for genuinely transactional 1:1 mail (FDD receipts, wire
   // instructions, internal alerts) where an "unsubscribe" affordance is wrong.
-  options?: { skipSignature?: boolean; skipUnsubscribe?: boolean }
+  options?: { skipSignature?: boolean; skipUnsubscribe?: boolean; cc?: string }
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const profile = getSenderProfile(fromEmail);
@@ -240,6 +240,7 @@ ${innerHtml}${footerHtml}
     const info = await transport.sendMail({
       from: `"${profile?.name || "New Dawn Franchising"}" <${fromEmail}>`,
       to,
+      ...(options?.cc ? { cc: options.cc } : {}),
       replyTo: fromEmail,
       subject,
       html: finalHtml,
@@ -715,6 +716,17 @@ export const CRM_EMAIL_TEMPLATES: EmailTemplate[] = [
 
   // ── Nurture & Re-Engagement ───────────────────────────────────────────────
   {
+    id: "pm_john_intro",
+    label: "Introduce John (Texas PM team)",
+    group: "5 — Follow-Up",
+    subject: "Nice to meet you — introducing John from our Texas team",
+    bodyHtml: `<p>Hi {{name}},</p>
+<p>Hello — nice to meet you.</p>
+<p>I wanted to introduce <strong>John</strong>, who works with our onsite property management team down in Texas. He knows how we run properties on the ground, and he's the right person to walk you through the day-to-day.</p>
+<p>John will reach out to you shortly so you two can connect directly. In the meantime, just reply here if anything comes up.</p>
+<p>Looking forward to connecting.</p>`,
+  },
+  {
     id: "reengagement",
     label: "Re-Engagement Check-In",
     group: "5 — Follow-Up",
@@ -743,3 +755,54 @@ export const CRM_EMAIL_TEMPLATES: EmailTemplate[] = [
 <p>Wishing you the best with your plans. My door is always open if timing changes.</p>`,
   },
 ];
+
+/** First token of a CRM full name, or "there" when the name is empty. */
+export function firstNameFromFullName(fullName: string | null | undefined): string {
+  const first = (fullName ?? "").trim().split(/\s+/).find(Boolean);
+  return first || "there";
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/** Optional CC for John's intro — set JOHN_PM_EMAIL so he is on the thread and can reply. */
+export function johnPmIntroCc(): string | undefined {
+  const raw = process.env.JOHN_PM_EMAIL?.trim();
+  return raw && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(raw) ? raw : undefined;
+}
+
+/** Dylan's one-click CRM follow-up: hello + introduce John (Texas onsite PM) to reach out. */
+export function buildPmJohnIntroEmail(
+  fullName: string,
+  opts?: { ccJohn?: boolean },
+): { subject: string; bodyHtml: string; bodyText: string } {
+  const firstName = firstNameFromFullName(fullName);
+  const safe = escapeHtml(firstName);
+  const subject = "Nice to meet you — introducing John from our Texas team";
+  const followUpHtml = opts?.ccJohn
+    ? `<p>I've copied John on this note so he can follow up with you directly. Feel free to reply-all.</p>`
+    : `<p>John will reach out to you shortly so you two can connect directly. In the meantime, just reply here if anything comes up.</p>`;
+  const followUpText = opts?.ccJohn
+    ? "I've copied John on this note so he can follow up with you directly. Feel free to reply-all."
+    : "John will reach out to you shortly so you two can connect directly. In the meantime, just reply here if anything comes up.";
+  const bodyHtml = `<p>Hi ${safe},</p>
+<p>Hello — nice to meet you.</p>
+<p>I wanted to introduce <strong>John</strong>, who works with our onsite property management team down in Texas. He knows how we run properties on the ground, and he's the right person to walk you through the day-to-day.</p>
+${followUpHtml}
+<p>Looking forward to connecting.</p>`;
+  const bodyText = `Hi ${firstName},
+
+Hello — nice to meet you.
+
+I wanted to introduce John, who works with our onsite property management team down in Texas. He knows how we run properties on the ground, and he's the right person to walk you through the day-to-day.
+
+${followUpText}
+
+Looking forward to connecting.`;
+  return { subject, bodyHtml, bodyText };
+}

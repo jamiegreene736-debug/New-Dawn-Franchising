@@ -47,6 +47,7 @@ export interface IStorage {
   getProspectsByListId(listId: string): Promise<Prospect[]>;
   getCrmLists(): Promise<(CrmList & { count: number })[]>;
   createCrmList(name: string): Promise<CrmList>;
+  findOrCreateCrmListByName(name: string): Promise<CrmList>;
   renameCrmList(id: string, name: string): Promise<void>;
   deleteCrmList(id: string): Promise<void>;
   addClientsToList(listId: string, clientIds: string[]): Promise<number>;
@@ -364,6 +365,12 @@ export class DatabaseStorage implements IStorage {
     const [pl] = await db.insert(prospectLists).values({ name }).returning();
     await db.update(crmLists).set({ prospectListId: pl.id }).where(eq(crmLists.id, list.id));
     return { ...list, prospectListId: pl.id };
+  }
+
+  async findOrCreateCrmListByName(name: string): Promise<CrmList> {
+    const [existing] = await db.select().from(crmLists).where(eq(crmLists.name, name)).limit(1);
+    if (existing) return existing;
+    return this.createCrmList(name);
   }
 
   async renameCrmList(id: string, name: string): Promise<void> {

@@ -115,6 +115,17 @@ app.use((req, res, next) => {
   } catch (err: any) {
     console.error(`[crm-list-mirror] backfill skipped: ${err?.message}`);
   }
+  try {
+    const { syncWebsiteLeadsFromHistory } = await import("./website-leads");
+    const sync = await syncWebsiteLeadsFromHistory();
+    if (sync.created || sync.updated || sync.listed) {
+      console.log(
+        `[website-leads] synced ${sync.created} created · ${sync.updated} updated · ${sync.listed} listed`,
+      );
+    }
+  } catch (err: any) {
+    console.error(`[website-leads] backfill skipped: ${err?.message}`);
+  }
   // Publish the starter blog posts the first time the blog is empty.
   await seedBlogPostsIfEmpty();
 

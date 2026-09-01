@@ -37,7 +37,7 @@ import { scheduleApolloOrgSync } from "./apollo-org-sync";
 import { seedDefaultCampaign } from "./default-campaign";
 import { seedGrokCampaign } from "./grok-campaign";
 import { seedGlobevisaCampaign } from "./globevisa-campaign";
-import { sendEmail, sendEmailFromSender, getTrackingPixelUrl, getAvailableSenders, getSenderProfile, CRM_EMAIL_TEMPLATES, cacheDylanCalendlyUrl } from "./email-service";
+import { sendEmail, sendEmailFromSender, getTrackingPixelUrl, getAvailableSenders, getSenderProfile, CRM_EMAIL_TEMPLATES, cacheDylanCalendlyUrl, buildPmJohnIntroEmail, johnPmIntroCc } from "./email-service";
 import { analyzeEmail } from "./spam-test-service";
 import { isAutomatedOrBulkEmail, shouldShowInCrmEmailHistory } from "./crm-email-filter";
 import { generateFacebookPost } from "./facebook-generator";
@@ -1761,6 +1761,63 @@ export async function registerRoutes(
       res.json(emailRecord);
     } catch (err: any) {
       res.status(500).json({ message: err.message || "Failed to send email" });
+    }
+  });
+
+  app.post("/api/crm/clients/:id/send-follow-up-email", requireAdminAuth, async (req, res) => {
+    try {
+      const clientId = String(req.params.id);
+      const client = await storage.getCrmClient(clientId);
+      if (!client) return res.status(404).json({ message: "Client not found" });
+      if (!client.email?.trim()) {
+        return res.status(400).json({ message: "Client has no email address" });
+      }
+      if (await isOnDnc(client.email)) {
+        return res.status(400).json({ message: "This address is on the do-not-contact list" });
+      }
+
+      const fromEmail = getAvailableSenders()[0]?.email || "franchising@newdawnfranchising.com";
+      const johnCc = johnPmIntroCc();
+      const { subject, bodyHtml, bodyText } = buildPmJohnIntroEmail(client.fullName, { ccJohn: !!johnCc });
+
+      const trackingId = `de_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+      const baseUrl = `${req.protocol}://${req.get("host")}`;
+      const pixelUrl = getTrackingPixelUrl(baseUrl, trackingId);
+
+      const result = await sendEmailFromSender(
+        fromEmail,
+        client.email,
+        subject,
+        bodyHtml,
+        pixelUrl,
+        undefined,
+        johnCc ? { cc: johnCc } : undefined,
+      );
+      if (!result.success) {
+        return res.status(500).json({ message: result.error || "Failed to send follow-up email" });
+      }
+
+      const senderProfile = getAvailableSenders().find((p) => p.email === fromEmail);
+      const emailRecord = await storage.createCrmDirectEmail({
+        clientId,
+        fromEmail,
+        fromName: senderProfile?.name || fromEmail,
+        toEmail: client.email,
+        subject,
+        bodyHtml,
+        bodyText,
+        trackingId,
+      });
+
+      await storage.createCrmClientActivity({
+        clientId,
+        activityType: "email_sent",
+        metadata: { subject, from: fromEmail, emailId: emailRecord.id, template: "pm_john_intro", ...(johnCc ? { cc: johnCc } : {}) },
+      });
+
+      res.json(emailRecord);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to send follow-up email" });
     }
   });
 

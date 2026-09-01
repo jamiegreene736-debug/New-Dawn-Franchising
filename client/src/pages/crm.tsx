@@ -2181,7 +2181,7 @@ export default function CrmPage() {
             <AlertDialogTitle>Send follow-up email?</AlertDialogTitle>
             <AlertDialogDescription>
               Dylan will email {followUpClient?.fullName || "this client"}
-              {followUpClient?.email ? ` (${followUpClient.email})` : ""} introducing John from the onsite property management team in Texas. John will then reach out.
+              {followUpClient?.email ? ` (${followUpClient.email})` : ""} introducing Jay Carpenter from the onsite property management team in Texas. Jay is copied so he can follow up.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -40,5 +40,8 @@ jobs:
       - name: Type-check
         run: npm run check
 
+      - name: Mobile foundation and security tests
+        run: npm run test:mobile-foundation
+
       - name: Build (client + server)
         run: npm run build

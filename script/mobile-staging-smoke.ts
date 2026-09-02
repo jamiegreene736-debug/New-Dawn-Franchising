@@ -73,7 +73,20 @@ async function main() {
   });
   assert.equal(sessions.sessions.length, 1);
   assert.equal(sessions.sessions[0].current, true);
-  console.log("ok - verification, access control, and session readback");
+  const pathway = await request("/investor/path", {
+    headers: { Authorization: `Bearer ${verified.accessToken}` },
+  });
+  assert.equal(pathway.pathwayVersion, "2026.1");
+  assert.equal(pathway.completedMilestones, 0);
+  assert.equal(pathway.totalMilestones, 8);
+  assert.equal(pathway.milestones[0].key, "initial_readiness");
+  assert.equal(pathway.milestones[0].state, "available");
+  assert.equal(pathway.milestones.some((milestone: Json) => milestone.state === "completed"), false);
+  const firstMilestone = await request("/investor/path/initial_readiness", {
+    headers: { Authorization: `Bearer ${verified.accessToken}` },
+  });
+  assert.equal(firstMilestone.milestone.key, "initial_readiness");
+  console.log("ok - verification, access control, session readback, and persisted pathway");
 
   const rotated = await request("/auth/refresh", {
     method: "POST",

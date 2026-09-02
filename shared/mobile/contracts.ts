@@ -153,6 +153,50 @@ export const mobileDeletionResponseSchema = z.object({
   requestId: z.string().min(1).max(128),
 });
 
+export const mobilePathwayMilestoneStateSchema = z.enum([
+  "not_started",
+  "available",
+  "your_action",
+  "in_progress",
+  "completed",
+  "blocked",
+]);
+export const mobilePathwayOwnerSchema = z.enum([
+  "investor",
+  "new_dawn",
+  "independent_counsel",
+  "shared",
+]);
+export const mobilePathwayMilestoneKeySchema = z.enum([
+  "initial_readiness",
+  "counsel_consultation",
+  "business_model_review",
+  "fdd_review",
+  "territory_operating_plan",
+  "entity_investment_business_plan",
+  "visa_preparation",
+  "launch_training",
+]);
+export const mobilePathwayMilestoneSchema = z.object({
+  key: mobilePathwayMilestoneKeySchema,
+  sequence: z.number().int().min(1).max(100),
+  owner: mobilePathwayOwnerSchema,
+  state: mobilePathwayMilestoneStateSchema,
+  updatedAt: z.string().datetime(),
+});
+export const mobilePathwayResponseSchema = z.object({
+  pathwayVersion: z.string().min(1).max(32),
+  completedMilestones: z.number().int().nonnegative(),
+  totalMilestones: z.number().int().positive(),
+  milestones: z.array(mobilePathwayMilestoneSchema).min(1),
+  requestId: z.string().min(1).max(128),
+});
+export const mobilePathwayMilestoneResponseSchema = z.object({
+  pathwayVersion: z.string().min(1).max(32),
+  milestone: mobilePathwayMilestoneSchema,
+  requestId: z.string().min(1).max(128),
+});
+
 export const mobileApiErrorSchema = z.object({
   error: z.object({
     code: mobileApiErrorCodeSchema,
@@ -173,3 +217,8 @@ export type MobileLoginRequest = z.infer<typeof mobileLoginRequestSchema>;
 export type MobileAuthenticatedResponse = z.infer<typeof mobileAuthenticatedResponseSchema>;
 export type MobileAccount = z.infer<typeof mobileAccountSchema>;
 export type MobileSession = z.infer<typeof mobileSessionSchema>;
+export type MobilePathwayMilestoneState = z.infer<typeof mobilePathwayMilestoneStateSchema>;
+export type MobilePathwayOwner = z.infer<typeof mobilePathwayOwnerSchema>;
+export type MobilePathwayMilestoneKey = z.infer<typeof mobilePathwayMilestoneKeySchema>;
+export type MobilePathwayMilestone = z.infer<typeof mobilePathwayMilestoneSchema>;
+export type MobilePathwayResponse = z.infer<typeof mobilePathwayResponseSchema>;

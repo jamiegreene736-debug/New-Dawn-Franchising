@@ -17,6 +17,9 @@ import {
   mobileRegisterRequestSchema,
   mobileSessionsResponseSchema,
   mobileStatusResponseSchema,
+  mobilePathwayMilestoneKeySchema,
+  mobilePathwayMilestoneResponseSchema,
+  mobilePathwayResponseSchema,
   mobileVerificationResponseSchema,
   mobileVerifyEmailRequestSchema,
 } from "@shared/mobile/contracts";
@@ -27,6 +30,8 @@ import { readMobileAuthRuntimeConfig } from "./auth-config";
 import { PostgresMobileAuthRepository } from "./auth-repository";
 import { MobileAuthService, MobileAuthServiceError } from "./auth-service";
 import { createMobileApiError } from "./api-errors";
+import { MobileAuthorizationError, requireMobileCapability } from "./authorization";
+import { PostgresMobilePathwayRepository } from "./pathway-repository";
 
 type AsyncRoute = (req: Request, res: Response, next: NextFunction) => Promise<unknown>;
 
@@ -76,6 +81,7 @@ const authService = authConfig.enabled && authConfig.accessTokenSecret
 const mobileRouter = Router();
 const sensitiveLimiter = new MobileRateLimiter(10, 15 * 60 * 1000);
 const tokenLimiter = new MobileRateLimiter(30, 15 * 60 * 1000);
+const pathwayRepository = new PostgresMobilePathwayRepository(pool);
 
 mobileRouter.use((_req, res, next) => {
   res.setHeader("Cache-Control", "no-store");
@@ -257,6 +263,38 @@ mobileRouter.get(
   }),
 );
 
+mobileRouter.get(
+  "/investor/path",
+  asyncRoute(async (req, res) => {
+    const { principal } = await authenticated(req);
+    requireMobileCapability(principal, "investor:path:read-own");
+    const pathway = await pathwayRepository.readPath(principal.identityId);
+    if (!pathway) throw new MobileAuthServiceError("INTERNAL_ERROR", 500);
+    return res.json(mobilePathwayResponseSchema.parse({
+      ...pathway,
+      requestId: res.locals.requestId,
+    }));
+  }),
+);
+
+mobileRouter.get(
+  "/investor/path/:milestoneKey",
+  asyncRoute(async (req, res) => {
+    const { principal } = await authenticated(req);
+    requireMobileCapability(principal, "investor:path:read-own");
+    const milestoneKey = mobilePathwayMilestoneKeySchema.parse(req.params.milestoneKey);
+    const pathwayMilestone = await pathwayRepository.readMilestone(
+      principal.identityId,
+      milestoneKey,
+    );
+    if (!pathwayMilestone) throw new MobileAuthServiceError("INVALID_REQUEST", 404);
+    return res.json(mobilePathwayMilestoneResponseSchema.parse({
+      ...pathwayMilestone,
+      requestId: res.locals.requestId,
+    }));
+  }),
+);
+
 mobileRouter.delete(
   "/sessions/:sessionId",
   asyncRoute(async (req, res) => {
@@ -297,6 +335,9 @@ mobileRouter.use((error: unknown, _req: Request, res: Response, next: NextFuncti
       res.locals.requestId,
       error.code === "SERVICE_UNAVAILABLE",
     ));
+  }
+  if (error instanceof MobileAuthorizationError) {
+    return res.status(403).json(createMobileApiError("NOT_AUTHORIZED", res.locals.requestId));
   }
   return next(error);
 });

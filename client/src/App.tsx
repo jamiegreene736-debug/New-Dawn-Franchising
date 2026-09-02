@@ -19,6 +19,7 @@ import TrPage from "@/pages/tr";
 import E2FitPage from "@/pages/e2-fit";
 import E2VisaFranchisePage from "@/pages/e2-visa-franchise";
 import E2VisaProcessPage from "@/pages/e2-visa-process";
+import E2SnapOnPage from "@/pages/e2-snapon";
 import RequestFddPage from "@/pages/request-fdd";
 import LegalPage from "@/pages/legal";
 import EsPropertyManagementPage from "@/pages/es-property-management";
@@ -98,6 +99,7 @@ function Router() {
               <Route path="/legal" component={LegalPage} />
               <Route path="/e2-fit" component={E2FitPage} />
               <Route path="/e2-visa-franchise" component={E2VisaFranchisePage} />
+              <Route path="/e2-snapon" component={E2SnapOnPage} />
               <Route path="/territories" component={TerritoriesPage} />
               <Route path="/quiz" component={QuizPage} />
               <Route path="/team" component={TeamPage} />

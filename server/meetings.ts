@@ -181,6 +181,13 @@ export async function handleMeetingBooked(data: {
     calendlyEventId: data.calendlyEventId,
   });
 
+  try {
+    const { markQueueBookedByEmail } = await import("./call-queue-service");
+    if (data.inviteeEmail) await markQueueBookedByEmail(data.inviteeEmail, meeting.id);
+  } catch (err: any) {
+    console.error("[Meetings] call-queue book mark failed:", err?.message || err);
+  }
+
   return meeting.id;
 }
 

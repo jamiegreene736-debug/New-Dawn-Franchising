@@ -45,6 +45,14 @@ import { isAutomatedOrBulkEmail, shouldShowInCrmEmailHistory } from "./crm-email
 import { generateFacebookPost } from "./facebook-generator";
 import { postToFacebook, getAutoPostStatus, setAutoPostEnabled, scheduleDailyFacebookPosting } from "./facebook-poster";
 import { registerContactRoutes } from "./contacts-routes";
+import { registerCallQueueRoutes } from "./call-queue-routes";
+import {
+  attachQuoCall,
+  enqueueFromDripSend,
+  ensureCallQueueSchema,
+  scanEngagedOpens,
+  scanRepliesWithoutMeetings,
+} from "./call-queue-service";
 import { registerSeoRoutes } from "./seo-routes";
 import { registerOutreachRoutes } from "./outreach-routes";
 import { runSeoBrief } from "./seo-service";
@@ -352,6 +360,14 @@ async function autoSyncPhoneCalls(): Promise<void> {
         crmClientId: matched?.id || null,
         openphoneCreatedAt: call.createdAt ? new Date(call.createdAt) : null,
       });
+      attachQuoCall({
+        callId: call.id,
+        direction: call.direction,
+        fromNumber: call.from,
+        toNumber: call.to,
+        status: call.status,
+        durationSeconds: call.duration || null,
+      }).catch((e) => console.error("[CallQueue] attach sync:", e?.message || e));
 
       // Log to CRM activity timeline (inbound, not already logged)
       if (matched && call.direction === "inbound" && !existing?.crmClientId) {
@@ -493,6 +509,11 @@ function scheduleAgentCrons() {
   // Every 5 minutes — run due scheduled jobs from AI chat
   cron.schedule("*/5 * * * *", () => {
     runScheduledJobs().catch(e => console.error("[ScheduledJobs Cron] Error:", e));
+  });
+
+  cron.schedule("8,23,38,53 * * * *", () => {
+    scanEngagedOpens().catch((e) => console.error("[CallQueue] engaged-open scan:", e?.message || e));
+    scanRepliesWithoutMeetings().catch((e) => console.error("[CallQueue] reply scan:", e?.message || e));
   });
 
   // 5:00 AM CT — buying-intent signal ingestion (Phase 2), then re-score all
@@ -758,6 +779,8 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  ensureCallQueueSchema().catch((e) => console.error("[CallQueue] schema ensure:", e?.message || e));
+
   // Vanity URL: /broker-portal forwards to the real Referring Broker Portal,
   // which lives at /brokers. Done server-side (before the SPA fallback) so it's a
   // proper HTTP redirect that works on first hit without loading the React app.
@@ -3265,7 +3288,12 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
           human = false;
           await storage.recordBotEmailOpen(sendId);
         } else {
-          await storage.recordEmailOpen(sendId);
+          const updated = await storage.recordEmailOpen(sendId);
+          if (updated && (updated.openCount ?? 0) >= 3) {
+            enqueueFromDripSend(updated, "engaged_open").catch((e) =>
+              console.error("[CallQueue] engaged-open enqueue:", e?.message || e),
+            );
+          }
         }
       }
     } catch (err) {
@@ -4849,6 +4877,14 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
           crmClientId: matched?.id || null,
           openphoneCreatedAt: callData.createdAt ? new Date(callData.createdAt) : new Date(),
         });
+        attachQuoCall({
+          callId: callData.id,
+          direction: callData.direction || "inbound",
+          fromNumber: callData.from || "",
+          toNumber: callData.to || "",
+          status: callData.status || "completed",
+          durationSeconds: callData.duration || null,
+        }).catch((e) => console.error("[CallQueue] attach webhook:", e?.message || e));
 
         if (matched && callData.direction === "inbound") {
           await storage.createCrmClientActivity({
@@ -5613,6 +5649,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
   });
 
   registerContactRoutes(app);
+  registerCallQueueRoutes(app);
   registerSeoRoutes(app);
   registerOutreachRoutes(app);
   registerVisitorRoutes(app);

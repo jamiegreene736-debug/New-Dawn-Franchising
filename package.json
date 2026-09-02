@@ -16,6 +16,7 @@
     "mobile:migration:generate": "drizzle-kit generate --config=drizzle.mobile.config.ts",
     "mobile:migration:verify": "tsx script/mobile-migration-safety.ts",
     "mobile:schema:readiness": "tsx script/mobile-schema-readiness.ts",
+    "mobile:staging:smoke": "tsx script/mobile-staging-smoke.ts",
     "db:push": "drizzle-kit push"
   },
   "dependencies": {

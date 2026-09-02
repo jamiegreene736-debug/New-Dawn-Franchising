@@ -1,0 +1,15 @@
+{
+  "cli": {
+    "version": ">= 16.0.0"
+  },
+  "build": {
+    "preview": {
+      "distribution": "internal",
+      "channel": "staging",
+      "env": {
+        "EXPO_PUBLIC_APP_MODE": "connected",
+        "EXPO_PUBLIC_API_BASE_URL": "https://new-dawn-mobile-staging-staging.up.railway.app"
+      }
+    }
+  }
+}

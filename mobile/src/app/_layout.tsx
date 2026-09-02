@@ -2,6 +2,7 @@ import { DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
 import { PrototypeProvider } from '@/prototype/prototype-context';
+import { AuthProvider } from '@/auth/auth-context';
 import { useTranslations } from '@/i18n/use-translations';
 import { brand } from '@/ui/theme';
 
@@ -21,7 +22,9 @@ const navigationTheme = {
 export default function RootLayout() {
   return (
     <PrototypeProvider>
-      <AppNavigation />
+      <AuthProvider>
+        <AppNavigation />
+      </AuthProvider>
     </PrototypeProvider>
   );
 }
@@ -42,6 +45,9 @@ function AppNavigation() {
           contentStyle: { backgroundColor: brand.canvas },
         }}>
         <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="sign-in" options={{ title: 'Sign in' }} />
+        <Stack.Screen name="register" options={{ title: 'Create account' }} />
+        <Stack.Screen name="verify-email" options={{ title: 'Verify email' }} />
         <Stack.Screen name="investor-assessment" options={{ title: t('screen.assessment') }} />
         <Stack.Screen name="investor-result" options={{ title: t('screen.result') }} />
         <Stack.Screen name="partner-application" options={{ title: t('screen.partnerApplication') }} />

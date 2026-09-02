@@ -62,7 +62,7 @@ const PILLARS = [
   {
     icon: MapPin,
     title: "Live Anywhere in the USA",
-    desc: "Trained local teams handle execution, so you direct the business from wherever your family chooses to live.",
+    desc: "New Dawn implements the day-to-day operations under your direction, so you direct the business from wherever your family chooses to live.",
     href: "#live-anywhere",
     id: "anywhere",
   },
@@ -83,7 +83,7 @@ const COMPARISON = [
   },
   {
     traditional: "You work the counter / the shift yourself",
-    newdawn: "You direct; trained local teams handle daily execution",
+    newdawn: "You direct; New Dawn implements the day-to-day under your direction",
   },
   {
     traditional: "Thin margins; can look “marginal” to officers",
@@ -100,7 +100,7 @@ const E2_PRINCIPLES = [
   {
     icon: BadgeCheck,
     title: "You own and direct — genuinely",
-    desc: "You hold ownership control, bank-account authority, and executive decision-making. You set direction, approve key decisions, supervise the team, and review performance through your owner dashboard — real direction, not a passive stake dressed up to look active.",
+    desc: "You hold ownership control, manage the bank account, make the payments, and hold executive decision-making. You set direction, approve key decisions, supervise the team, and review performance through your owner dashboard — real direction, not a passive stake dressed up to look active. New Dawn implements the day-to-day operations under your direction.",
     id: "own-direct",
   },
   {
@@ -436,9 +436,9 @@ export default function WhyNewDawnPage() {
               Direct a business you can run from anywhere
             </h2>
             <p className="mt-3 text-pretty text-base leading-relaxed text-muted-foreground">
-              A traditional E-2 business usually chains you to its address. New Dawn is different: trained local teams
-              handle on-the-ground execution, and you direct the business through executive oversight rather than
-              physical presence. We're headquartered in El Paso, Texas, but qualified E-2 owners can live anywhere in
+              A traditional E-2 business usually chains you to its address. New Dawn is different: New Dawn implements
+              the on-the-ground, day-to-day operations under your direction, and you direct the business through
+              executive oversight rather than physical presence. We're headquartered in El Paso, Texas, but qualified E-2 owners can live anywhere in
               the United States while maintaining ownership control and executive supervision.
             </p>
           </div>

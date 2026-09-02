@@ -21,7 +21,7 @@ const BLOG_TOPICS = [
   "How do you choose the right E-2 visa franchise vertical?",
   "Why are recurring-revenue businesses good for the E-2 visa?",
   "Do you have to live in the US on an E-2 visa?",
-  "How does a hands-off franchise work for E-2 visa investors?",
+  "Who directs the business in a director-led E-2 franchise: the franchisee or the franchisor?",
   "What is the difference between the E-2 and EB-5 visa?",
   "Can an E-2 visa lead to a green card?",
   "How long does it take to get an E-2 visa through a franchise?",

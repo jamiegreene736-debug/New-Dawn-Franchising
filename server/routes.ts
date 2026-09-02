@@ -1003,7 +1003,7 @@ export async function registerRoutes(
   // llms.txt — a curated, AI-friendly map of the site (see llmstxt.org).
   app.get("/llms.txt", async (_req, res) => {
     const pages: Array<[string, string]> = [
-      ["/", "Multi-vertical E-2 visa franchise platform (Property Management, Telecom, Insurance) — overview, how it works, FAQ"],
+      ["/", "Multi-vertical E-2 visa franchise platform (Property Management, Telecom, Insurance) — overview, how it works, who does what (franchisee directs; New Dawn implements day-to-day operations), FAQ"],
       ["/e2-visa-franchise", "The franchisor built for the E-2 visa — how the model is designed around E-2 requirements, plus the three verticals and FAQ"],
       ["/e2-fit", "Why New Dawn satisfies each E-2 Treaty Investor Visa requirement, plus E-2 FAQ"],
       ["/process", "Step-by-step franchise process from inquiry to E-2 approval and operations"],
@@ -1022,9 +1022,10 @@ export async function registerRoutes(
       "# New Dawn Franchising",
       "",
       "> Multi-vertical franchisor specializing in E-2 Treaty Investor Visa-qualifying franchises. " +
-        "Investors choose from three recurring-revenue industries — Property Management, Telecom, or Insurance — " +
-        "and direct a real U.S. business while New Dawn's operating teams handle daily execution. " +
-        "Franchise investment from $225,000. Headquartered in El Paso, Texas. FDD available upon request.",
+        "Investors choose from three recurring-revenue industries — Property Management, Telecom, or Insurance. " +
+        "The franchisee owns, develops, and directs the business: they control the business bank account, make all payments, " +
+        "approve hiring and major decisions, and set strategy. New Dawn implements the day-to-day operations under the " +
+        "franchisee's direction. Franchise investment from $225,000. Headquartered in El Paso, Texas. FDD available upon request.",
       "",
       "## Key Pages",
       ...pages.map(([path, desc]) => `- [${path}](${SITE_URL}${path}): ${desc}`),
@@ -1033,10 +1034,27 @@ export async function registerRoutes(
       "- Identity: multi-vertical franchisor specialized for E-2 visa investors (not a single-industry franchise)",
       "- Verticals: Property Management, Telecom, and Insurance — recurring-revenue industries chosen for E-2 fit",
       "- Franchise investment: from $225,000, structured to meet E-2 visa requirements",
-      "- Owner role: you direct the business and control the bank accounts; approved local teams run daily operations",
+      "- Owner role: the franchisee develops and directs the business (the E-2 \"develop and direct\" role); New Dawn implements day-to-day operations under the franchisee's direction",
       "- Headquarters: El Paso, Texas; owners may live anywhere in the U.S.",
       "- Support: in-house immigration attorneys, financing, real estate brokerage, and proprietary technology",
       "- E-2 holders may live anywhere in the U.S.; spouse is eligible for work authorization",
+      "",
+      "## Who Does What (Franchisee vs. New Dawn)",
+      "The franchisee (the E-2 investor) directs the business. New Dawn implements the day-to-day operations under the franchisee's direction. New Dawn does not own, control, or direct the franchisee's business.",
+      "",
+      "Franchisee (owner and director):",
+      "- Owns the franchise entity (at least 50% ownership, as the E-2 visa requires) and is the legal owner of the business",
+      "- Controls and manages the business bank account and is the signatory on it",
+      "- Makes all payments — payroll, vendors, rent, and franchise fees are paid by the franchisee from the franchisee's account",
+      "- Approves hiring and firing, budgets, major expenditures, and pricing",
+      "- Sets strategy and growth targets; reviews performance through owner dashboards and reports",
+      "- Supervises the operating team and holds it accountable",
+      "",
+      "New Dawn Franchising (franchisor and operations implementer):",
+      "- Provides the franchise system, training, and proprietary technology",
+      "- Implements the day-to-day operations the franchisee directs — client service, tenant/customer coordination, field work, provisioning, billing support, and reporting cadence",
+      "- Staffs and trains the local operating team that reports to the franchisee",
+      "- Provides in-house immigration, financing, real estate, and legal support",
       "",
       "## Contact",
       "- Phone: (346) 597-9994",
@@ -1899,10 +1917,10 @@ WHAT NEW DAWN FRANCHISING ACTUALLY IS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 New Dawn Franchising offers a multi-vertical franchise platform specifically engineered for E-2 Treaty Investor Visa applicants, with recurring-revenue options in Property Management, Telecom, and Insurance.
 
-The franchise model: "You Own It. You Direct It. We Run It."
+The franchise model: "You Own It. You Direct It. We Implement It."
 - The investor selects a franchise vertical and reviews investment details through the Franchise Disclosure Document
-- They are the legal owner and sole signatory on US bank accounts — USCIS requires this
-- Local operations teams execute the day-to-day manual work while the investor maintains executive and supervisory control
+- They are the legal owner and sole signatory on US bank accounts — USCIS requires this — and they make all payments from that account
+- The franchisee directs the business; New Dawn implements the day-to-day manual work under the franchisee's direction while the investor maintains executive and supervisory control
 - The investor can live ANYWHERE in the USA while overseeing the enterprise
 - Revenue comes from recurring-service activity in the selected vertical
 

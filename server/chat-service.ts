@@ -69,7 +69,10 @@ Q: Is my country eligible for E-2?
 A: Most countries qualify — over 80 treaty countries. Mexico, India, UAE, UK, Canada, Brazil, South Korea, Japan, Germany, France, Australia, and many more. Dylan can confirm your specific country.
 
 Q: Do I need to live in El Paso?
-A: No. New Dawn is headquartered in El Paso, but the platform is designed for domestic geographic flexibility. You maintain executive oversight while approved local teams handle day-to-day execution.
+A: No. New Dawn is headquartered in El Paso, but the platform is designed for domestic geographic flexibility. You direct the business from anywhere in the U.S. while New Dawn implements the day-to-day operations under your direction.
+
+Q: Who directs the business — me or New Dawn?
+A: You do. You own the franchise, manage the business bank account, make all the payments, approve hiring and major decisions, and set strategy. New Dawn implements the day-to-day operations under your direction and reports to you. New Dawn does not own, control, or direct your business.
 
 Q: What's the timeline to get an E-2 visa through this?
 A: After signing the franchise agreement and making the investment, the visa application typically takes 2-6 months depending on your country and embassy.
@@ -78,7 +81,7 @@ Q: Can I bring my family?
 A: Yes — your spouse gets an unrestricted work permit with an E-2 visa. Children under 21 get E-2 dependent status and can attend school.
 
 Q: Is this passive income?
-A: The E-2 visa requires you to direct and develop the enterprise — it's not purely passive. But you supervise the business rather than performing daily manual tasks in the chosen vertical. This is an important distinction Dylan can explain in detail.
+A: No. The E-2 visa requires you to direct and develop the enterprise. You manage the bank account, make the payments, approve the key decisions, and supervise the team; New Dawn implements the day-to-day manual tasks in the chosen vertical under your direction. This is an important distinction Dylan can explain in detail.
 
 Q: What happens if the franchise doesn't work out?
 A: The FDD covers exit provisions. Dylan can walk through options during your consultation. Protecting your investment is a priority.

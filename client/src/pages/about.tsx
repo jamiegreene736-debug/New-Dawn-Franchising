@@ -261,9 +261,9 @@ export default function AboutPage() {
                 <div>
                   <div className="text-sm font-semibold">Owner control</div>
                   <div className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                    You direct the business and control its finances — ownership, bank accounts, and the key decisions stay with
-                    you, while our local teams handle daily execution. That substantive directing role is exactly what the E-2
-                    visa is built around.
+                    You direct the business and control its finances — ownership, the bank account, the payments, and the key
+                    decisions stay with you, while New Dawn implements the day-to-day operations under your direction. That
+                    substantive directing role is exactly what the E-2 visa is built around.
                   </div>
                 </div>
               </div>

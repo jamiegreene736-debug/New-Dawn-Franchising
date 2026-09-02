@@ -102,7 +102,7 @@ const E2_FIT = [
   {
     icon: Settings,
     title: "You develop and direct it",
-    desc: "As owner-operator you control hiring, customer strategy, vendor relationships, and growth. New Dawn provides operational support while you direct and develop the enterprise.",
+    desc: "As owner and director you control hiring, customer strategy, vendor relationships, and growth, manage the bank account, and make the payments. New Dawn implements the day-to-day operations under your direction while you direct and develop the enterprise.",
     id: "develop-direct",
   },
   {

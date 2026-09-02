@@ -40,7 +40,7 @@ const SEO = {
 const AUDIENCE = [
   { icon: Handshake, title: "Franchise brokers & consultants", desc: "Add a differentiated, E-2-ready franchise to the opportunities you present to international clients." },
   { icon: ShieldCheck, title: "Immigration attorneys", desc: "Refer clients to a real, operating U.S. business structured around E-2 Treaty Investor requirements." },
-  { icon: Users, title: "Wealth & relocation advisors", desc: "Introduce clients exploring U.S. residency through investment to a hands-off ownership model." },
+  { icon: Users, title: "Wealth & relocation advisors", desc: "Introduce clients exploring U.S. residency through investment to a director-led ownership model: they own and direct the business; New Dawn implements the day-to-day." },
 ];
 
 const STEPS = [

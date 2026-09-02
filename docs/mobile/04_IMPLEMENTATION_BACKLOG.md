@@ -101,7 +101,7 @@ Create the prototype in the same Expo project intended for production, using a t
 - [x] Create the versioned `server/mobile/` route boundary, safe prelaunch status endpoint, and validated `shared/mobile/` contracts.
 - [x] Define mobile identity, roles, investor links, partner profiles, rotating refresh sessions, hash-only one-time tokens, referrals, audit events, and deletion-request tables locally.
 - [x] Add a prelaunch bootstrap endpoint, short-lived signed access-token service, hash-only refresh-token reuse evaluation, fail-closed authentication configuration, and privacy-safe error builder.
-- [ ] Generate and review the staging migration from the local schema; do not run a production migration.
+- [x] Generate and statically verify the staging migration from the local schema; no database migration was run.
 - [ ] Implement registration, verification, login, refresh, logout, recovery, session management, and deletion initiation.
 - [x] Add server authorization primitives and negative cross-account tests.
 - [ ] Implement approved-content lifecycle and English/Spanish completeness rules.
@@ -207,5 +207,6 @@ The product and engineering team may make reversible UX and implementation decis
 2. Review the completed Expo prototype with stakeholders and counsel.
 3. Review and approve the drafted claims/content matrix from the screen specification.
 4. Identify the named review owners and the initial approved opportunity set.
-5. Review the completed production data-ownership and duplicate-safe migration plan.
-6. Run prototype sessions, incorporate findings, and present the prototype plus final build estimate for the production authorization gate.
+5. Provision an isolated staging database, verify its prerequisites, and explicitly approve applying the reviewed mobile-only migration there.
+6. Run the migration, authentication, and rollback checks in staging; keep production authentication disabled.
+7. Run prototype sessions, incorporate findings, and present the prototype plus final build estimate for the production authorization gate.

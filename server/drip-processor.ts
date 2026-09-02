@@ -594,12 +594,14 @@ export async function fireClickReaction(send: any): Promise<void> {
         dueDate: new Date(),
       } as any).catch(() => {});
     }
+    const { enqueueFromDripSend } = await import("./call-queue-service");
+    enqueueFromDripSend(send, "link_click").catch((e) => console.error("[CallQueue] click enqueue:", e?.message || e));
     await sendEmail(
       "dylan@newdawnfranchising.com",
-      `🔥 ${name} clicked a link — call now`,
-      `<p><strong>${name}</strong> (${send.recipientEmail || "—"}) just clicked a link in "${send.subject || "your email"}". High intent — a call task has been created. Reach out now.</p>`,
+      `🔥 ${name} clicked a link — in the Call Queue`,
+      `<p><strong>${name}</strong> (${send.recipientEmail || "—"}) just clicked a link in "${send.subject || "your email"}". They are in <a href="https://www.newdawnfranchising.com/crm?tab=call-queue">the Thailand Call Queue</a> for a setter call to book you.</p>`,
     ).catch(() => {});
-    console.log(`[ClickReaction] hot-lead task + alert for ${name}`);
+    console.log(`[ClickReaction] hot-lead task + call queue + alert for ${name}`);
   } catch (e: any) {
     console.error("[ClickReaction] failed:", e?.message || e);
   }

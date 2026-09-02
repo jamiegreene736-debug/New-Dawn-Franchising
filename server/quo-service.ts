@@ -18,12 +18,14 @@ export function getQuoStatus() {
 
 export async function sendSmsViaQuo(
   to: string,
-  content: string
+  content: string,
+  fromPhoneNumberId?: string,
 ): Promise<{ success: boolean; id?: string; error?: string }> {
   if (!QUO_API_KEY) {
     return { success: false, error: "QUO_API_KEY not configured. Add it in Secrets." };
   }
-  if (!QUO_PHONE_NUMBER_ID) {
+  const fromId = fromPhoneNumberId || QUO_PHONE_NUMBER_ID;
+  if (!fromId) {
     return { success: false, error: "QUO_PHONE_NUMBER_ID not configured. Add it in Secrets." };
   }
 
@@ -48,7 +50,7 @@ export async function sendSmsViaQuo(
       },
       body: JSON.stringify({
         content,
-        from: QUO_PHONE_NUMBER_ID,
+        from: fromId,
         to: [phone],
       }),
     });

@@ -1781,3 +1781,56 @@ export const partnerSequenceEvents = pgTable("partner_sequence_events", {
 
 export type PartnerLead = typeof partnerLeads.$inferSelect;
 export type PartnerSequenceEvent = typeof partnerSequenceEvents.$inferSelect;
+
+// ─── Thailand / human setter call queue ───────────────────────────────────────
+// Work items for the outbound calling agent. phone_calls stays the Quo fact log;
+// this table is "who to call, why, and what she logged."
+export const callQueue = pgTable("call_queue", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  prospectId: varchar("prospect_id"),
+  crmClientId: varchar("crm_client_id"),
+  contactId: varchar("contact_id"),
+  name: text("name").notNull(),
+  email: text("email"),
+  phone: text("phone"),
+  company: text("company"),
+  timezone: text("timezone"),
+  // Which script + framing: broker referral vs E-2 investor.
+  track: text("track").notNull().default("client"),
+  // Why they are in the queue: link_click | engaged_open | reply_no_meeting
+  triggerType: text("trigger_type").notNull(),
+  triggerAt: timestamp("trigger_at").notNull(),
+  triggerLabel: text("trigger_label"),
+  dripSendId: varchar("drip_send_id"),
+  emailSubject: text("email_subject"),
+  // 1 = click, 2 = reply, 3 = engaged open
+  priority: integer("priority").notNull().default(2),
+  assignedTo: text("assigned_to").notNull().default("thailand"),
+  // queued | calling | no_answer | voicemail | callback | not_interested
+  // | booked | dnc | wrong_number | needs_phone | exhausted
+  status: text("status").notNull().default("queued"),
+  attemptCount: integer("attempt_count").notNull().default(0),
+  lastAttemptAt: timestamp("last_attempt_at"),
+  nextAttemptAt: timestamp("next_attempt_at"),
+  phoneCallId: text("phone_call_id"),
+  outcomeNotes: text("outcome_notes"),
+  interestLevel: text("interest_level"),
+  meetingId: varchar("meeting_id"),
+  calendlyUrlSentAt: timestamp("calendly_url_sent_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const callQueueAttempts = pgTable("call_queue_attempts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  queueId: varchar("queue_id").notNull().references(() => callQueue.id, { onDelete: "cascade" }),
+  attemptedAt: timestamp("attempted_at").defaultNow().notNull(),
+  outcome: text("outcome").notNull(),
+  notes: text("notes"),
+  phoneCallId: text("phone_call_id"),
+  durationSeconds: integer("duration_seconds"),
+});
+
+export type CallQueueItem = typeof callQueue.$inferSelect;
+export type InsertCallQueueItem = typeof callQueue.$inferInsert;
+export type CallQueueAttempt = typeof callQueueAttempts.$inferSelect;

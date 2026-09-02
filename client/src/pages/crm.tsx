@@ -36,6 +36,7 @@ import {
   BookOpen,
   Tag,
   Phone,
+  Headphones,
   Sparkles,
   ShieldCheck,
   ListPlus,
@@ -53,6 +54,7 @@ import AiSearchInsights from "@/components/ai-search-insights";
 import EmailCampaigns from "./email-campaigns";
 import FacebookTab from "./facebook-tab";
 import PhoneCallsTab from "./phone-calls-tab";
+import CallQueueTab from "./call-queue-tab";
 import EmailDeliverabilityTab from "./email-deliverability-tab";
 import { CrmPlaybook } from "./crm-playbook";
 import { BulkEnrichDialog } from "@/components/bulk-enrich-dialog";
@@ -930,9 +932,9 @@ export default function CrmPage() {
   const [newListName, setNewListName] = useState("");
 
   const urlParams = new URLSearchParams(search);
-  const urlTab = urlParams.get("tab") as "clients" | "prospects" | "emails" | "facebook" | "reports" | "deliverability" | "api-status" | "franchisees" | "phone-calls" | null;
+  const urlTab = urlParams.get("tab") as "clients" | "prospects" | "emails" | "facebook" | "reports" | "deliverability" | "api-status" | "franchisees" | "phone-calls" | "call-queue" | null;
 
-  const [crmTab, setCrmTab] = useState<"clients" | "prospects" | "ai-insights" | "emails" | "facebook" | "reports" | "deliverability" | "api-status" | "franchisees" | "phone-calls">(
+  const [crmTab, setCrmTab] = useState<"clients" | "prospects" | "ai-insights" | "emails" | "facebook" | "reports" | "deliverability" | "api-status" | "franchisees" | "phone-calls" | "call-queue">(
     urlTab || "clients"
   );
 
@@ -1429,6 +1431,13 @@ export default function CrmPage() {
               <Users className="size-4" /> Franchisees
             </button>
             <button
+              data-testid="tab-crm-call-queue"
+              className={`shrink-0 whitespace-nowrap px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${crmTab === "call-queue" ? "border-[hsl(var(--primary))] text-[hsl(var(--primary))]" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+              onClick={() => setCrmTab("call-queue")}
+            >
+              <Headphones className="size-4" /> Call Queue
+            </button>
+            <button
               data-testid="tab-crm-phone-calls"
               className={`shrink-0 whitespace-nowrap px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${crmTab === "phone-calls" ? "border-[hsl(var(--primary))] text-[hsl(var(--primary))]" : "border-transparent text-muted-foreground hover:text-foreground"}`}
               onClick={() => setCrmTab("phone-calls")}
@@ -1490,6 +1499,14 @@ export default function CrmPage() {
       {crmTab === "api-status" && <ApiStatusTab />}
 
       {crmTab === "franchisees" && <FranchiseesTab />}
+
+      {crmTab === "call-queue" && (
+        <section className="py-6">
+          <div className="nh-container">
+            <CallQueueTab />
+          </div>
+        </section>
+      )}
 
       {crmTab === "phone-calls" && (
         <section className="py-6">

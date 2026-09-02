@@ -9,7 +9,7 @@
     "build": "tsx script/build.ts",
     "start": "NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
-    "test:unit": "tsx server/lead-email-enrichment.test.ts && tsx server/outreach-autopilot.test.ts && tsx server/introducer-qualify.test.ts && tsx server/sender-health.test.ts && tsx server/legacy-campaign-pause.test.ts && tsx server/outreach-focus.test.ts && tsx server/pm-jay-intro.test.ts && tsx server/website-leads.test.ts",
+    "test:unit": "tsx server/lead-email-enrichment.test.ts && tsx server/outreach-autopilot.test.ts && tsx server/introducer-qualify.test.ts && tsx server/sender-health.test.ts && tsx server/legacy-campaign-pause.test.ts && tsx server/outreach-focus.test.ts && tsx server/pm-jay-intro.test.ts && tsx server/website-leads.test.ts && tsx server/call-queue-helpers.test.ts",
     "test:mobile-foundation": "tsx --test tests/mobile-foundation.test.ts",
     "mobile:identity:dry-run": "tsx script/mobile-identity-dry-run.ts",
     "db:push": "drizzle-kit push"

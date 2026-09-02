@@ -1,22 +1,36 @@
-import { useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Redirect, useRouter } from 'expo-router';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { useAuth } from '@/auth/auth-context';
+import { runtimeConfig } from '@/config/runtime';
 import { usePrototype } from '@/prototype/prototype-context';
 import { useTranslations } from '@/i18n/use-translations';
-import { BrandMark, ChoiceCard, Screen, Tag } from '@/ui/components';
+import { BrandMark, Button, ChoiceCard, Screen, Tag } from '@/ui/components';
 import { brand, spacing, type } from '@/ui/theme';
 
 export default function WelcomeScreen() {
   const router = useRouter();
   const { language, setLanguage, setRole } = usePrototype();
+  const { ready, account } = useAuth();
   const { t } = useTranslations();
 
   const chooseRole = (role: 'investor' | 'partner' | 'attorney') => {
     setRole(role);
+    if (runtimeConfig.mode === 'connected') {
+      if (role !== 'attorney') router.push({ pathname: '/register', params: { role } });
+      return;
+    }
     if (role === 'investor') router.push('/investor-assessment');
     else if (role === 'partner') router.push('/partner-application');
     else router.push('/(tabs)/home');
   };
+
+  if (!ready) {
+    return <View style={styles.loading}><ActivityIndicator color={brand.navy} size="large" /></View>;
+  }
+  if (runtimeConfig.mode === 'connected' && account) {
+    return <Redirect href="/(tabs)/home" />;
+  }
 
   return (
     <Screen contentContainerStyle={styles.content}>
@@ -42,15 +56,17 @@ export default function WelcomeScreen() {
       <Text style={styles.sectionTitle}>{t('welcome.choose')}</Text>
       <ChoiceCard eyebrow={t('welcome.investorEyebrow')} title={t('welcome.investorTitle')} body={t('welcome.investorBody')} onPress={() => chooseRole('investor')} testID="choose-investor" />
       <ChoiceCard eyebrow={t('welcome.partnerEyebrow')} title={t('welcome.partnerTitle')} body={t('welcome.partnerBody')} onPress={() => chooseRole('partner')} testID="choose-partner" />
-      <ChoiceCard eyebrow={t('welcome.attorneyEyebrow')} title={t('welcome.attorneyTitle')} body={t('welcome.attorneyBody')} onPress={() => chooseRole('attorney')} testID="choose-attorney" />
+      <ChoiceCard eyebrow={t('welcome.attorneyEyebrow')} title={t('welcome.attorneyTitle')} body={runtimeConfig.mode === 'connected' ? 'Attorney accounts are not included in this pilot.' : t('welcome.attorneyBody')} onPress={() => chooseRole('attorney')} disabled={runtimeConfig.mode === 'connected'} testID="choose-attorney" />
 
-      <Text style={styles.prototypeNote}>{t('prototype.notice')}</Text>
+      {runtimeConfig.mode === 'connected' ? <Button label="Sign in to an existing account" variant="secondary" onPress={() => router.push('/sign-in')} /> : null}
+      <Text style={styles.prototypeNote}>{runtimeConfig.mode === 'connected' ? 'Internal pilot · Staging data only · No production connection' : t('prototype.notice')}</Text>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   content: { paddingTop: spacing.xl, paddingBottom: spacing.xxxl },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: brand.canvas },
   languageRow: { flexDirection: 'row', alignSelf: 'flex-end', borderRadius: 999, backgroundColor: brand.mist, padding: 3, marginBottom: spacing.xl },
   languageButton: { minHeight: 36, justifyContent: 'center', paddingHorizontal: spacing.md, borderRadius: 999 },
   languageButtonSelected: { backgroundColor: brand.white },

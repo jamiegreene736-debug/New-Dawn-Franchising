@@ -33,12 +33,41 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            mobile/package-lock.json
 
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
 
+      - name: Install mobile dependencies
+        run: npm ci --prefix mobile --no-audit --no-fund
+
+      - name: Production dependency audit
+        run: npm run audit:production
+
+      - name: Mobile production dependency audit
+        run: npm audit --prefix mobile --omit=dev --audit-level=high
+
       - name: Type-check
         run: npm run check
+
+      - name: Mobile foundation and security tests
+        run: npm run test:mobile-foundation
+
+      - name: Verify iOS app
+        run: npm run verify --prefix mobile
+
+      - name: Export connected iOS bundle
+        working-directory: mobile
+        env:
+          EXPO_NO_TELEMETRY: "1"
+          EXPO_PUBLIC_APP_MODE: connected
+          EXPO_PUBLIC_API_BASE_URL: https://new-dawn-mobile-staging-staging.up.railway.app
+        run: npx expo export --platform ios
+
+      - name: Verify mobile-only migration boundary
+        run: npm run mobile:migration:verify
 
       - name: Build (client + server)
         run: npm run build

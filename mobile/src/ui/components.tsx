@@ -7,6 +7,8 @@ import {
   StyleProp,
   StyleSheet,
   Text,
+  TextInput,
+  TextInputProps,
   View,
   ViewStyle,
 } from 'react-native';
@@ -148,6 +150,21 @@ export function Callout({ title, body, tone = 'info' }: { title: string; body: s
   );
 }
 
+export function FormField({ label, error, ...props }: TextInputProps & { label: string; error?: string }) {
+  return (
+    <View style={styles.field}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <TextInput
+        accessibilityLabel={label}
+        placeholderTextColor={brand.slate}
+        style={[styles.fieldInput, error && styles.fieldInputError]}
+        {...props}
+      />
+      {error ? <Text style={styles.fieldError}>{error}</Text> : null}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: brand.canvas },
   screenContent: { width: '100%', maxWidth: 760, alignSelf: 'center', paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: spacing.xxxl, gap: spacing.md },
@@ -206,4 +223,9 @@ const styles = StyleSheet.create({
   callout_success: { backgroundColor: brand.successWash, borderLeftColor: brand.success },
   calloutTitle: { ...type.label, color: brand.ink, marginBottom: 4 },
   calloutBody: { ...type.body, color: brand.slate },
+  field: { gap: spacing.xs },
+  fieldLabel: { ...type.label, color: brand.ink },
+  fieldInput: { minHeight: 52, borderWidth: 1, borderColor: brand.line, borderRadius: 14, backgroundColor: brand.white, color: brand.ink, paddingHorizontal: spacing.md, fontSize: 16 },
+  fieldInputError: { borderColor: brand.danger },
+  fieldError: { ...type.caption, color: brand.danger },
 });

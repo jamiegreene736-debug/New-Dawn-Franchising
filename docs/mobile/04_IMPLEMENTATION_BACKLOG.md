@@ -2,7 +2,7 @@
 
 **Planning baseline:** August 30, 2026
 **Target:** Founding TestFlight pilot in 16 weeks after owners, legal reviewers, and required platform access are ready
-**Current phase:** Clickable prototype review, claims review, and production-readiness discovery
+**Current phase:** Isolated identity pilot deployed for internal testing; claims, privacy, and stakeholder review remain open
 
 ## Delivery approach
 
@@ -39,9 +39,11 @@ Use one cross-functional delivery stream with weekly demonstrations. Build verti
 
 - [x] Confirm production variable presence by name without reading secret values; remove runtime administrator-password and session-secret fallbacks.
 - [x] Set fail-closed environment validation, proxy trust, and secure production cookie settings.
-- [ ] Design access/refresh token rotation, session management, verification, recovery, and deletion.
+- [x] Patch the production dependency tree to zero known audit findings and enforce the production audit in CI.
+- [x] Design access/refresh token rotation, session management, verification, recovery, and deletion.
 - [x] Stop logging serialized API response bodies; retain method, path, status, timing, and safe request ID only.
-- [ ] Define object authorization and negative test matrix.
+- [x] Define object authorization and negative test matrix.
+- [ ] Replace Drizzle Kit's deprecated development-only loader when a stable compatible release removes its four moderate transitive advisories; do not force an unsupported override or downgrade.
 - [ ] Verify provider webhook signatures and reconciliation paths.
 
 **Exit gate:** Security owner accepts the threat model and remediation backlog.
@@ -88,18 +90,20 @@ Create the prototype in the same Expo project intended for production, using a t
 
 - [x] Create `mobile/` Expo app, strict TypeScript, Expo Router, typed locale framework, design tokens, and accessibility primitives.
 - [x] Add fail-closed prototype/connected environment separation and foundational unit tests.
-- [ ] Add CI enforcement, component tests, and device preview builds.
+- [x] Enforce the mobile foundation and security test suite in root CI.
+- [ ] Add component tests and device preview builds.
 - [ ] Resolve the monitored `xcode`/`uuid` advisory through an Expo-compatible dependency update; do not force an SDK-breaking downgrade.
-- [ ] Implement secure session storage, generated API client, request IDs, idempotency, and error mapping.
+- [x] Implement secure session storage, typed API client, request IDs, duplicate-neutral registration, and error mapping.
 - [ ] Add privacy-safe analytics allowlist and crash reporting.
 
 ### Backend foundation
 
 - [x] Create the versioned `server/mobile/` route boundary, safe prelaunch status endpoint, and validated `shared/mobile/` contracts.
 - [x] Define mobile identity, roles, investor links, partner profiles, rotating refresh sessions, hash-only one-time tokens, referrals, audit events, and deletion-request tables locally.
-- [ ] Generate and review the staging migration from the local schema; do not run a production migration.
-- [ ] Implement registration, verification, login, refresh, logout, recovery, session management, and deletion initiation.
-- [ ] Add server authorization primitives and negative cross-account tests.
+- [x] Add a prelaunch bootstrap endpoint, short-lived signed access-token service, hash-only refresh-token reuse evaluation, fail-closed authentication configuration, and privacy-safe error builder.
+- [x] Generate and statically verify the migration, rehearse rollback, and apply it to an isolated empty staging database; production remains unchanged.
+- [x] Implement registration, verification, login, refresh, logout, recovery, session management, deletion initiation, and transactional audit records behind staging-only flags.
+- [x] Add server authorization primitives and negative cross-account tests.
 - [ ] Implement approved-content lifecycle and English/Spanish completeness rules.
 
 ### First production slice
@@ -199,9 +203,11 @@ The product and engineering team may make reversible UX and implementation decis
 
 ## Immediate next actions
 
-1. Retain **New Dawn Pathways** as the working name.
-2. Review the completed Expo prototype with stakeholders and counsel.
-3. Review and approve the drafted claims/content matrix from the screen specification.
-4. Identify the named review owners and the initial approved opportunity set.
-5. Review the completed production data-ownership and duplicate-safe migration plan.
-6. Run prototype sessions, incorporate findings, and present the prototype plus final build estimate for the production authorization gate.
+1. Run the staging test runbook on at least two supported iPhones and record defects.
+2. Review the connected pilot with stakeholders, immigration counsel, franchise/compliance counsel, privacy/security, and a Spanish-language reviewer.
+3. Name the ongoing operations, technical, privacy/security, and localization owners.
+4. Approve the claims/content matrix and the data-flow/retention map.
+5. Authorize Expo and Apple signing access, then create the internal TestFlight build from the checked-in `preview` profile.
+6. Connect an approved transactional-email provider and replace staging-only verification-token display before any external pilot.
+7. Implement server-managed approved content and the first persisted investor My Path slice.
+8. Keep production authentication and production schema changes disabled until the production authorization gate is signed.

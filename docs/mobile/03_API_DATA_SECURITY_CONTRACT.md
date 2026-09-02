@@ -59,6 +59,10 @@ shared/mobile/
 
 ## Identity and authorization model
 
+### Implemented foundation
+
+The server now includes standards-based, audience-bound 10-minute access-token signing and verification, hash-only refresh-token evaluation with rotation-reuse detection, explicit role-to-capability mapping, object ownership and invitation checks, and privacy-safe API error construction. These primitives are covered by negative security tests. The public bootstrap endpoint continues to report authentication and every account role as unavailable; no registration or session endpoint is enabled until the reviewed non-production migration, transactional session repository, verification delivery, and operational security review are complete.
+
 ### Proposed tables
 
 | Table | Purpose |

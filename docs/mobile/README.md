@@ -1,6 +1,6 @@
 # New Dawn Pathways Mobile Control Pack
 
-**Status:** Approved product direction; clickable prototype ready for stakeholder review
+**Status:** Approved product direction; connected identity pilot deployed to isolated staging and ready for internal testing
 **Approval source:** Jamie Greene approved the August 30, 2026 Product Requirements Document as proposed.
 **Working product name:** New Dawn Pathways
 **Executive sponsor and interim product owner:** Jamie Greene
@@ -58,6 +58,9 @@ Approval of the PRD authorizes the requirements, audit, and clickable-prototype 
 - [`05_PROTOTYPE_HANDOFF.md`](./05_PROTOTYPE_HANDOFF.md) — prototype journeys, verification results, limitations, and review checklist.
 - [`06_CLAIMS_CONTENT_MATRIX.md`](./06_CLAIMS_CONTENT_MATRIX.md) — counsel-ready inventory of controlling claims, boundaries, sources, and approvals.
 - [`07_DATA_OWNERSHIP_MIGRATION_PLAN.md`](./07_DATA_OWNERSHIP_MIGRATION_PLAN.md) — production schema readback, authoritative-record decisions, aggregate quality findings, and duplicate-safe migration sequence.
+- [`08_STAGING_MIGRATION_RUNBOOK.md`](./08_STAGING_MIGRATION_RUNBOOK.md) — fail-closed commands and gates for staging migration validation.
+- [`09_STAGING_MIGRATION_VALIDATION.md`](./09_STAGING_MIGRATION_VALIDATION.md) — recorded isolated migration rehearsal and rollback evidence.
+- [`STAGING_TEST_RUNBOOK.md`](./STAGING_TEST_RUNBOOK.md) — internal iPhone acceptance flow and strict synthetic-data boundary.
 
 ## Definition of prototype approval
 

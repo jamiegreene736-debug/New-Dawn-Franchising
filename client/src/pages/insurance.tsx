@@ -48,7 +48,7 @@ const SEO = {
   title:
     "New Dawn Franchising | Insurance Franchise for E-2 Visa Investors — Recurring Commission Revenue | El Paso, TX",
   description:
-    "E-2 visa insurance franchise. Own and direct a recurring-revenue insurance agency while New Dawn's licensed teams run daily operations. Investment from $225,000. FDD available upon request.",
+    "E-2 visa insurance franchise. Own and direct a recurring-revenue insurance agency — you manage the bank account and make the payments — while New Dawn's licensed team implements the day-to-day operations under your direction. Investment from $225,000. FDD available upon request.",
   canonical: "https://www.newdawnfranchising.com/insurance",
   image: "https://www.newdawnfranchising.com/opengraph.jpg",
 };
@@ -102,7 +102,7 @@ const COMMISSIONS = [
   },
 ];
 
-// ─── Section 3 — We run it, you direct it ─────────────────────────────────────
+// ─── Section 3 — You direct it, we implement it ─────────────────────────────────────
 const OPERATIONS = [
   {
     icon: UserCheck,
@@ -268,7 +268,7 @@ const FAQS = [
   },
   {
     q: "Do I have to run the day-to-day myself?",
-    a: "No. You are the owner and director. Approved, licensed local teams handle daily execution while you maintain ownership control, bank-account oversight, and executive supervision through your owner dashboard.",
+    a: "No. You are the owner and director. New Dawn's licensed local team implements the day-to-day operations under your direction while you maintain ownership control, manage the bank account, make the payments, and supervise the team through your owner dashboard.",
   },
   {
     q: "How does this support my E-2 visa?",
@@ -379,8 +379,9 @@ export default function InsurancePage() {
               className="mt-4 text-pretty text-base leading-relaxed text-muted-foreground md:text-lg"
             >
               A real, operating U.S. insurance agency built around a renewing book of business — structured so you own
-              and direct the enterprise while New Dawn's licensed teams handle daily execution, exactly as the E-2 visa
-              requires.
+              and direct the enterprise, managing the bank account, making the payments, and making the key decisions,
+              while New Dawn's licensed team implements the day-to-day operations under your direction, exactly as the
+              E-2 visa requires.
             </p>
             <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
               <Button data-testid="button-insurance-hero-fdd" className="gap-2" asChild>
@@ -520,19 +521,20 @@ export default function InsurancePage() {
         </div>
       </section>
 
-      {/* ── SECTION 3 — We run it, you direct it ── */}
+      {/* ── SECTION 3 — You direct it, we implement it ── */}
       <section data-testid="section-insurance-operations" className="border-b bg-white/50 py-8 md:py-20">
         <div className="nh-container">
           <div className="mx-auto max-w-3xl text-center">
-            <SectionEyebrow>We run it, you direct it</SectionEyebrow>
+            <SectionEyebrow>You direct it, we implement it</SectionEyebrow>
             <h2 data-testid="insurance-operations-title" className="mt-3 text-balance text-3xl font-semibold md:text-4xl">
-              You direct the business; our licensed teams run the operations
+              You direct the business; New Dawn's licensed team implements the day-to-day operations
             </h2>
             <p className="mt-3 text-pretty text-base leading-relaxed text-muted-foreground">
-              You are the owner and director. New Dawn provides the operating infrastructure so you maintain executive
-              control without being buried in daily minutiae. You set direction, review performance, approve key
-              decisions, and maintain ownership and bank-account control while the licensed teams handle the regulated,
-              day-to-day execution. This is the &ldquo;own and direct&rdquo; structure the E-2 visa is built around.
+              You are the owner and director. New Dawn implements the day-to-day operations under your direction so you
+              maintain executive control without being buried in daily minutiae. You set direction, review performance,
+              approve key decisions, manage the bank account, and make the payments while the licensed team implements
+              the regulated, day-to-day work. This is the &ldquo;own and direct&rdquo; structure the E-2 visa is built
+              around. New Dawn does not own, control, or direct your business.
             </p>
           </div>
 

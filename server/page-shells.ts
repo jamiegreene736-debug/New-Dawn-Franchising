@@ -16,11 +16,11 @@ const shells: Record<string, PageShell> = {
   "/": {
     title: `${SITE} | E-2 Visa Franchise Platform — Property Management, Telecom & Insurance | El Paso, TX`,
     description:
-      "New Dawn Franchising is a multi-vertical franchisor for E-2 visa investors. Choose from three recurring-revenue franchises — Property Management, Telecom, or Insurance. You direct the business; our teams run daily operations. Investment from $225,000. FDD available upon request.",
+      "New Dawn Franchising is a multi-vertical franchisor for E-2 visa investors. Choose from three recurring-revenue franchises — Property Management, Telecom, or Insurance. You own and direct the business, control the bank account, and make the payments; New Dawn implements the day-to-day operations under your direction. Investment from $225,000. FDD available upon request.",
     html: `
 <main>
   <h1>Three Industries. One E-2 Platform.</h1>
-  <p>New Dawn Franchising is a multi-vertical franchisor built specifically for E-2 Treaty Investor Visa investors. Choose from three recurring-revenue franchise verticals — Property Management, Telecom, or Insurance — and direct a real, operating U.S. business while our teams handle the daily execution, exactly as the E-2 visa requires.</p>
+  <p>New Dawn Franchising is a multi-vertical franchisor built specifically for E-2 Treaty Investor Visa investors. Choose from three recurring-revenue franchise verticals — Property Management, Telecom, or Insurance — and own, develop, and direct a real, operating U.S. business. You control the business bank account, make the payments, approve hiring and major decisions, and set strategy. New Dawn implements the day-to-day operations under your direction — the "develop and direct" structure the E-2 visa requires.</p>
   <p>${TAGLINE}</p>
   <p>Franchise Disclosure Document (FDD) available upon request. New Dawn Franchising is a registered franchisor.</p>
 
@@ -49,9 +49,30 @@ const shells: Record<string, PageShell> = {
     <ol>
       <li><strong>Choose Your Vertical &amp; Invest</strong> — Select Property Management, Telecom, or Insurance and acquire your New Dawn franchise starting at $225,000. This structured investment is designed to meet E-2 visa capital requirements and gives you a real, operating business.</li>
       <li><strong>Apply for Your E-2 Visa</strong> — Our partner immigration attorneys guide you through the E-2 visa application. You own and direct a legitimate U.S. business — the foundation of a strong E-2 petition.</li>
-      <li><strong>Local Teams Run Daily Operations</strong> — Approved operating teams manage day-to-day execution in your chosen vertical. You oversee the business, review reports, and make the key decisions.</li>
+      <li><strong>You Direct; New Dawn Implements the Day-to-Day</strong> — You direct the business: you control the bank account, make the payments, approve hiring and major decisions, and set strategy. New Dawn's trained local team implements the day-to-day operations in your chosen vertical under your direction and reports to you.</li>
       <li><strong>Grow Your U.S. Enterprise</strong> — Scale your business, build equity, and maintain executive control while living anywhere in the United States.</li>
     </ol>
+  </section>
+
+  <section>
+    <h2>Who Does What: The Franchisee Directs, New Dawn Implements</h2>
+    <p>The franchisee (the E-2 investor) owns and directs the business. New Dawn Franchising is the franchisor: it implements the day-to-day operations under the franchisee's direction. New Dawn does not own, control, or direct the franchisee's business.</p>
+    <h3>The franchisee (owner and director)</h3>
+    <ul>
+      <li>Owns the franchise entity — at least 50% ownership, as the E-2 visa requires — and is the legal owner of the business.</li>
+      <li>Controls and manages the business bank account and is the signatory on it.</li>
+      <li>Makes all payments: payroll, vendors, rent, and franchise fees are paid by the franchisee from the franchisee's own account.</li>
+      <li>Approves hiring and firing, budgets, major expenditures, and pricing.</li>
+      <li>Sets strategy and growth targets, and reviews performance through owner dashboards and reports.</li>
+      <li>Supervises the operating team and holds it accountable.</li>
+    </ul>
+    <h3>New Dawn Franchising (franchisor and operations implementer)</h3>
+    <ul>
+      <li>Provides the franchise system, training, and proprietary technology.</li>
+      <li>Implements the day-to-day operations the franchisee directs — client service, customer and tenant coordination, field work, provisioning, billing support, and the reporting cadence.</li>
+      <li>Staffs and trains the local operating team, which reports to the franchisee.</li>
+      <li>Provides in-house immigration, financing, real estate, and legal support.</li>
+    </ul>
   </section>
 
   <section>
@@ -60,7 +81,7 @@ const shells: Record<string, PageShell> = {
       <li>A multi-vertical E-2 platform — choose Property Management, Telecom, or Insurance</li>
       <li>Franchise investment from $225,000 — structured to meet E-2 visa requirements</li>
       <li>Proprietary technology powers every vertical</li>
-      <li>Approved local teams handle day-to-day operations</li>
+      <li>You direct the business; New Dawn implements day-to-day operations under your direction</li>
       <li>In-house E-2 immigration, finance, real estate, and legal professionals</li>
       <li>Headquartered in El Paso, Texas, with domestic geographic flexibility for owners</li>
       <li>Part of the New Dawn Franchising Group of Companies™</li>
@@ -83,8 +104,10 @@ const shells: Record<string, PageShell> = {
     <p>New Dawn franchise investment starts at $225,000. The E-2 visa does not have a fixed minimum, but the investment must be "substantial" relative to the total cost of the business.</p>
     <h3>How do I choose between Property Management, Telecom, and Insurance?</h3>
     <p>The FDD and discovery process help you compare the three options. We look at your goals, market fit, investment preferences, operational comfort, and E-2 strategy, then walk you through which vertical is the strongest fit.</p>
+    <h3>Who directs the business — the franchisee or New Dawn?</h3>
+    <p>The franchisee directs the business. You are the owner and director: you control the business bank account, make all payments, approve hiring and major decisions, and set strategy. New Dawn implements the day-to-day operations under your direction and reports to you. New Dawn does not own, control, or direct your business.</p>
     <h3>Do I have to do the day-to-day work myself?</h3>
-    <p>No. Each New Dawn vertical is structured so you are the business director and decision-maker. You maintain ownership control, bank-account oversight, and executive supervision while approved local teams manage daily execution.</p>
+    <p>No. Each New Dawn vertical is structured so you are the business director and decision-maker while New Dawn's trained local team implements the day-to-day work. You keep ownership control, manage the bank account, make the payments, and supervise the team — the substantive "develop and direct" role the E-2 visa requires.</p>
     <h3>Can I live anywhere in the USA on the E-2 visa?</h3>
     <p>Yes. New Dawn is headquartered in El Paso, Texas, but qualified E-2 owners can live elsewhere in the United States while maintaining executive oversight of the franchise.</p>
   </section>
@@ -103,7 +126,7 @@ const shells: Record<string, PageShell> = {
       {
         question: "What is New Dawn Franchising?",
         answer:
-          "New Dawn Franchising is a multi-vertical franchisor specializing in E-2 Treaty Investor Visa-qualifying franchises. Investors choose from three recurring-revenue industries — Property Management, Telecom, or Insurance — and direct a real U.S. business while New Dawn's operating teams handle daily execution.",
+          "New Dawn Franchising is a multi-vertical franchisor specializing in E-2 Treaty Investor Visa-qualifying franchises. Investors choose from three recurring-revenue industries — Property Management, Telecom, or Insurance — and own and direct a real U.S. business. The franchisee controls the bank account, makes the payments, and sets strategy; New Dawn implements the day-to-day operations under the franchisee's direction.",
       },
       {
         question: "What is the E-2 visa?",
@@ -121,9 +144,14 @@ const shells: Record<string, PageShell> = {
           "The FDD and discovery process help you compare the three options. We look at your goals, market fit, investment preferences, operational comfort, and E-2 strategy, then walk you through which vertical is the strongest fit.",
       },
       {
+        question: "Who directs the business — the franchisee or New Dawn?",
+        answer:
+          "The franchisee directs the business. You are the owner and director: you control the business bank account, make all payments, approve hiring and major decisions, and set strategy. New Dawn implements the day-to-day operations under your direction and reports to you. New Dawn does not own, control, or direct your business.",
+      },
+      {
         question: "Do I have to do the day-to-day work myself?",
         answer:
-          "No. Each New Dawn vertical is structured so you are the business director and decision-maker. You maintain ownership control, bank-account oversight, and executive supervision while approved local teams manage daily execution.",
+          "No. Each New Dawn vertical is structured so you are the business director and decision-maker while New Dawn's trained local team implements the day-to-day work. You keep ownership control, manage the bank account, make the payments, and supervise the team — the substantive \"develop and direct\" role the E-2 visa requires.",
       },
       {
         question: "Can I live anywhere in the USA on the E-2 visa?",
@@ -210,7 +238,7 @@ const shells: Record<string, PageShell> = {
     html: `
 <main>
   <h1>The Franchisor Built for the E-2 Visa</h1>
-  <p>New Dawn Franchising is a multi-vertical franchisor designed specifically for E-2 Treaty Investor Visa investors. You choose one of three recurring-revenue franchises — Property Management, Telecom, or Insurance — own and direct a real U.S. business, and our teams handle the daily execution.</p>
+  <p>New Dawn Franchising is a multi-vertical franchisor designed specifically for E-2 Treaty Investor Visa investors. You choose one of three recurring-revenue franchises — Property Management, Telecom, or Insurance — and own, develop, and direct a real U.S. business. You control the bank account, make the payments, and set strategy; New Dawn implements the day-to-day operations under your direction.</p>
   <p>Unlike general-purpose franchises that merely qualify for the E-2 visa, New Dawn was designed from the ground up around the E-2 requirements.</p>
 
   <section>
@@ -218,7 +246,7 @@ const shells: Record<string, PageShell> = {
     <ul>
       <li><strong>A substantial investment:</strong> Franchise investment starts at $225,000, sized to meet the E-2 substantiality test.</li>
       <li><strong>Capital genuinely at risk:</strong> Your investment funds a real, operating U.S. business, satisfying the E-2 "at-risk" requirement.</li>
-      <li><strong>You direct and develop it:</strong> You own the franchise, control the bank accounts, and make the key decisions while approved teams execute day-to-day.</li>
+      <li><strong>You direct and develop it:</strong> You own the franchise, control and manage the bank account, make the payments, approve hiring, and make the key decisions. New Dawn implements the day-to-day operations under your direction.</li>
       <li><strong>More than a marginal enterprise:</strong> All three verticals are recurring-revenue businesses built to generate real, ongoing activity.</li>
       <li><strong>Open to treaty nationals:</strong> The E-2 visa is available to nationals of 80+ treaty countries.</li>
     </ul>
@@ -241,8 +269,10 @@ const shells: Record<string, PageShell> = {
     <p>Three recurring-revenue industries chosen for E-2 fit: Property Management, Telecom, and Insurance.</p>
     <h3>How much do I need to invest?</h3>
     <p>Franchise investment starts at $225,000, structured to meet the E-2 substantial-investment requirement. Financing options are available.</p>
+    <h3>Who directs the business — the franchisee or New Dawn?</h3>
+    <p>The franchisee directs the business. You control the bank account, make all payments, approve hiring and major decisions, and set strategy. New Dawn implements the day-to-day operations under your direction and reports to you; it does not own, control, or direct your business.</p>
     <h3>Do I have to run the business day-to-day?</h3>
-    <p>No. Each vertical is structured so you are the business director and decision-maker while approved local teams manage daily execution.</p>
+    <p>No. Each vertical is structured so you are the business director and decision-maker while New Dawn's trained local team implements the day-to-day work under your direction.</p>
     <h3>Can I live anywhere in the U.S.?</h3>
     <p>Yes. New Dawn is headquartered in El Paso, Texas, but qualified E-2 owners can live anywhere in the United States.</p>
   </section>
@@ -273,9 +303,14 @@ const shells: Record<string, PageShell> = {
           "Franchise investment starts at $225,000, structured to meet the E-2 substantial-investment requirement. Financing options are available.",
       },
       {
+        question: "Who directs the business — the franchisee or New Dawn?",
+        answer:
+          "The franchisee directs the business. You control the bank account, make all payments, approve hiring and major decisions, and set strategy. New Dawn implements the day-to-day operations under your direction and reports to you; it does not own, control, or direct your business.",
+      },
+      {
         question: "Do I have to run the business day-to-day?",
         answer:
-          "No. Each vertical is structured so you are the business director and decision-maker. You keep ownership control and bank-account oversight while approved local teams manage daily execution.",
+          "No. Each vertical is structured so you are the business director and decision-maker. You keep ownership control, manage the bank account, and make the payments while New Dawn's trained local team implements the day-to-day work under your direction.",
       },
       {
         question: "Can I live anywhere in the U.S.?",
@@ -530,11 +565,11 @@ const shells: Record<string, PageShell> = {
   "/property-management": {
     title: `Property Management Franchise for E-2 Visa Investors — Long-Term Rentals | ${SITE}`,
     description:
-      "E-2 visa property management franchise. Own and direct a recurring-revenue long-term rental management business while New Dawn's local teams run daily operations. Investment from $225,000. FDD available upon request.",
+      "E-2 visa property management franchise. Own and direct a recurring-revenue long-term rental management business — you manage the bank account and make the payments — while New Dawn implements the day-to-day operations under your direction. Investment from $225,000. FDD available upon request.",
     html: `
 <main>
   <h1>Property Management: Recurring Revenue You Direct, Operations We Run</h1>
-  <p>The New Dawn Property Management franchise is a real, operating U.S. business that manages residential long-term rentals on behalf of property owners — handling leasing, rent collection, tenant relations, maintenance coordination, and owner reporting under ongoing management agreements. It is structured so you own and direct the enterprise while approved local teams handle daily execution, exactly as the E-2 visa requires.</p>
+  <p>The New Dawn Property Management franchise is a real, operating U.S. business that manages residential long-term rentals on behalf of property owners — handling leasing, rent collection, tenant relations, maintenance coordination, and owner reporting under ongoing management agreements. It is structured so you own and direct the enterprise — managing the bank account, making the payments, and making the key decisions — while New Dawn implements the day-to-day operations under your direction, exactly as the E-2 visa requires.</p>
 
   <section>
     <h2>Where the recurring revenue comes from</h2>
@@ -542,7 +577,7 @@ const shells: Record<string, PageShell> = {
   </section>
 
   <section>
-    <h2>You direct it; our teams run it</h2>
+    <h2>You direct it; New Dawn implements the day-to-day</h2>
     <p>You are the owner and director. You set direction, review performance, approve key decisions, and keep ownership and bank-account control. Approved local teams handle leasing, tenant relations, rent collection, and maintenance, supported by proprietary technology and owner dashboards that give you the information you use to supervise and decide.</p>
   </section>
 
@@ -567,7 +602,7 @@ const shells: Record<string, PageShell> = {
     <h3>What does the Property Management franchise actually do?</h3>
     <p>It manages residential long-term rentals on behalf of property owners — leasing, rent collection, tenant relations, maintenance coordination, and owner reporting — under ongoing management agreements.</p>
     <h3>Do I have to run the day-to-day myself?</h3>
-    <p>No. You are the owner and director. Approved local teams handle daily execution while you maintain ownership control, bank-account oversight, and executive supervision through your owner dashboard.</p>
+    <p>No. You are the owner and director. New Dawn implements the day-to-day operations under your direction while you maintain ownership control, manage the bank account, make the payments, and supervise the team through your owner dashboard.</p>
     <h3>Is this long-term rentals or short-term/vacation rentals?</h3>
     <p>Long-term rentals — annual leases with established tenants, which provide steadier monthly income and lower turnover.</p>
     <h3>How much do I invest?</h3>
@@ -597,7 +632,7 @@ const shells: Record<string, PageShell> = {
       {
         question: "Do I have to run the day-to-day myself?",
         answer:
-          "No. You are the owner and director. Approved local teams handle daily execution while you maintain ownership control, bank-account oversight, and executive supervision through your owner dashboard.",
+          "No. You are the owner and director. New Dawn implements the day-to-day operations under your direction while you maintain ownership control, manage the bank account, make the payments, and supervise the team through your owner dashboard.",
       },
       {
         question: "How much do I invest?",
@@ -614,7 +649,7 @@ const shells: Record<string, PageShell> = {
     html: `
 <main>
   <h1>Telecom: A Recurring-Subscription Business You Direct</h1>
-  <p>The New Dawn Telecom franchise operates a recurring-service telecom/VoIP business — customers subscribe to ongoing communication services and are billed every month. It is structured so you own and direct the enterprise while centralized systems, sales workflows, and approved teams handle daily execution, exactly as the E-2 visa requires.</p>
+  <p>The New Dawn Telecom franchise operates a recurring-service telecom/VoIP business — customers subscribe to ongoing communication services and are billed every month. It is structured so you own and direct the enterprise — managing the bank account, making the payments, and making the key decisions — while New Dawn's centralized systems, sales workflows, and team implement the day-to-day operations under your direction, exactly as the E-2 visa requires.</p>
 
   <section>
     <h2>Recurring subscription revenue</h2>
@@ -650,11 +685,11 @@ const shells: Record<string, PageShell> = {
   "/insurance": {
     title: `Insurance Franchise for E-2 Visa Investors — Recurring Premiums & Renewals | ${SITE}`,
     description:
-      "E-2 visa insurance franchise. Own and direct a recurring-revenue insurance operation built around compliant supervision, client service, and renewals while New Dawn's teams run daily operations. Investment from $225,000. FDD available upon request.",
+      "E-2 visa insurance franchise. Own and direct a recurring-revenue insurance operation built around compliant supervision, client service, and renewals — you manage the bank account and make the payments — while New Dawn's licensed team implements the day-to-day operations under your direction. Investment from $225,000. FDD available upon request.",
     html: `
 <main>
   <h1>Insurance: Recurring Renewal Revenue You Direct</h1>
-  <p>The New Dawn Insurance franchise operates an insurance-sector business built around recurring premiums, policy renewals, and ongoing client service. It is structured so you own and direct the enterprise — with compliant supervision and licensed staff handling regulated activities — while approved teams run daily operations, exactly as the E-2 visa requires.</p>
+  <p>The New Dawn Insurance franchise operates an insurance-sector business built around recurring premiums, policy renewals, and ongoing client service. It is structured so you own and direct the enterprise — managing the bank account, making the payments, and making the key decisions, with licensed staff handling regulated activities under your supervision — while New Dawn implements the day-to-day operations under your direction, exactly as the E-2 visa requires.</p>
 
   <section>
     <h2>Where the recurring revenue comes from</h2>
@@ -662,7 +697,7 @@ const shells: Record<string, PageShell> = {
   </section>
 
   <section>
-    <h2>You direct it; our teams run it</h2>
+    <h2>You direct it; New Dawn implements the day-to-day</h2>
     <p>You are the owner and director. You set direction, approve key decisions, control the bank accounts, and supervise the operation. Licensed producers and service staff handle regulated, day-to-day activity under proper supervision, supported by proprietary technology and owner reporting.</p>
   </section>
 
@@ -708,7 +743,7 @@ const shells: Record<string, PageShell> = {
 
   <section>
     <h2>The "own and direct" requirement</h2>
-    <p>The investor must own at least 50% of the enterprise and develop and direct it. New Dawn's model is built around this: you hold ownership and bank-account control, approve the key decisions, and supervise performance, while approved local teams handle daily execution. That is a substantive directing role — not passive investment.</p>
+    <p>The investor must own at least 50% of the enterprise and develop and direct it. New Dawn's model is built around this: you hold ownership, control and manage the business bank account, make the payments, approve hiring and the key decisions, and supervise performance. New Dawn implements the day-to-day operations under your direction. That is a substantive directing role — not passive investment.</p>
   </section>
 
   <section>
@@ -838,12 +873,12 @@ const shells: Record<string, PageShell> = {
     html: `
 <main>
   <h1>What Makes New Dawn Different</h1>
-  <p>New Dawn Franchising was designed from the ground up for the E-2 Treaty Investor Visa, across three recurring-revenue verticals — Property Management, Telecom, and Insurance. You own and direct a real U.S. business while our teams handle daily execution.</p>
+  <p>New Dawn Franchising was designed from the ground up for the E-2 Treaty Investor Visa, across three recurring-revenue verticals — Property Management, Telecom, and Insurance. You own and direct a real U.S. business; New Dawn implements the day-to-day operations under your direction.</p>
   <section>
     <h2>Built around the E-2 investor</h2>
     <ul>
       <li>A multi-vertical platform — choose Property Management, Telecom, or Insurance.</li>
-      <li>Owner control and oversight: you keep ownership, bank-account control, and the key decisions.</li>
+      <li>Owner control and oversight: you keep ownership, manage the bank account, make the payments, and make the key decisions.</li>
       <li>Proprietary technology and owner dashboards built for E-2 investor oversight.</li>
       <li>Backed by the New Dawn Franchising Group of Companies — real estate, financing, and legal teams.</li>
       <li>Investment from $225,000, structured to meet E-2 requirements.</li>
@@ -924,6 +959,6 @@ export function getPageShell(pathname: string): PageShell | null {
 export const defaultShell: PageShell = {
   title: `${SITE} | E-2 Visa Franchise Platform — Property Management, Telecom & Insurance | El Paso, TX`,
   description:
-    "New Dawn Franchising is a multi-vertical franchisor for E-2 visa investors — choose from Property Management, Telecom, or Insurance. You direct the business; our teams run daily operations. FDD available upon request.",
+    "New Dawn Franchising is a multi-vertical franchisor for E-2 visa investors — choose from Property Management, Telecom, or Insurance. You own and direct the business; New Dawn implements the day-to-day operations under your direction. FDD available upon request.",
   html: `<main><h1>${SITE}</h1><p>A multi-vertical franchisor for E-2 visa investors — Property Management, Telecom, and Insurance.</p><p>${TAGLINE}</p></main>`,
 };

@@ -22,9 +22,10 @@ const SAME_AS = [
 
 const ORG_DESCRIPTION =
   "New Dawn Franchising is a multi-vertical franchisor specializing in E-2 Treaty Investor Visa-qualifying franchises. " +
-  "Investors choose from three recurring-revenue industries — Property Management, Telecom, or Insurance — and direct a real U.S. " +
-  "business while New Dawn's operating teams handle daily execution. Franchise investment from $225,000. " +
-  "Headquartered in El Paso, Texas. FDD available upon request.";
+  "Investors choose from three recurring-revenue industries — Property Management, Telecom, or Insurance. " +
+  "The franchisee owns, develops, and directs the business: they control the business bank account, make all payments, " +
+  "approve hiring and major decisions, and set strategy. New Dawn implements the day-to-day operations under the franchisee's direction. " +
+  "Franchise investment from $225,000. Headquartered in El Paso, Texas. FDD available upon request.";
 
 /** Primary entity: the franchisor, typed as both Organization and LocalBusiness. */
 export function organizationNode(): Record<string, unknown> {

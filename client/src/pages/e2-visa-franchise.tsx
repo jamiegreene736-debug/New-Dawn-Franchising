@@ -40,7 +40,7 @@ const E2_REQUIREMENTS = [
   {
     icon: UserCheck,
     title: "You direct and develop it",
-    desc: "You own the franchise, control the bank accounts, and make the key decisions while approved teams execute day-to-day.",
+    desc: "You own the franchise, manage the bank account, make the payments, approve hiring, and make the key decisions. New Dawn implements the day-to-day operations under your direction.",
     id: "direct",
   },
   {
@@ -74,9 +74,14 @@ const FAQ = [
     id: "invest",
   },
   {
+    q: "Who directs the business — the franchisee or New Dawn?",
+    a: "The franchisee directs the business. You control the bank account, make all payments, approve hiring and major decisions, and set strategy. New Dawn implements the day-to-day operations under your direction and reports to you; it does not own, control, or direct your business.",
+    id: "who-directs",
+  },
+  {
     q: "Do I have to run the business day-to-day?",
-    a: "No. Each vertical is structured so you are the business director and decision-maker. You keep ownership control and bank-account oversight while approved local teams manage daily execution.",
-    id: "hands-off",
+    a: "No. Each vertical is structured so you are the business director and decision-maker. You keep ownership control, manage the bank account, and make the payments while New Dawn's trained local team implements the day-to-day work under your direction.",
+    id: "director-led",
   },
   {
     q: "Can I live anywhere in the U.S.?",
@@ -101,7 +106,8 @@ export default function E2VisaFranchisePage() {
             <p className="mt-4 text-pretty text-base leading-relaxed text-muted-foreground md:text-lg">
               New Dawn Franchising is a multi-vertical franchisor designed specifically for E-2 Treaty Investor Visa
               investors. You choose one of three recurring-revenue franchises — Property Management, Telecom, or
-              Insurance — own and direct a real U.S. business, and our teams handle the daily execution.
+              Insurance — and own and direct a real U.S. business. You manage the bank account, make the payments, and
+              make the key decisions; New Dawn implements the day-to-day operations under your direction.
             </p>
             <div className="mt-6 flex items-center justify-center gap-3">
               <Button data-testid="button-e2vf-cta" className="gap-2" asChild>

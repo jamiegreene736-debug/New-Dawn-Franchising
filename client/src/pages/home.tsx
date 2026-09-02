@@ -135,17 +135,17 @@ const OVERVIEW_SCENES = [
     kicker: "Why New Dawn",
     title: "",
     copy: [
-      "Built from the ground up for E-2 visa investors who want full ownership without running the show.",
-      "You keep total oversight and direction. Our proprietary AI + ops team handles execution and growth.",
+      "Built from the ground up for E-2 visa investors who want to own and direct a real U.S. business.",
+      "You direct it: you control the bank account, make the payments, and make the key decisions. New Dawn implements the day-to-day operations under your direction.",
       "Live anywhere in the USA while your business runs and scales.",
     ],
     icon: Landmark,
   },
   {
-    id: "hands-off",
+    id: "director-led",
     kicker: "Own it. Direct it.",
-    title: "You direct it. We run it.",
-    copy: "Own a real U.S. business while our teams handle daily operations — and live anywhere in the USA.",
+    title: "You direct it. We implement it.",
+    copy: "Own and direct a real U.S. business while New Dawn implements the day-to-day operations under your direction — and live anywhere in the USA.",
     icon: Plane,
   },
   {
@@ -180,7 +180,7 @@ const OVERVIEW_SCENES = [
     id: "control",
     kicker: "Own it. Direct it.",
     title: "You hold financial control",
-    copy: "You control the bank accounts, approve major decisions, and direct the business — the substantive role the E-2 visa requires.",
+    copy: "You manage the bank account, make the payments, approve major decisions, and direct the business — the substantive role the E-2 visa requires.",
     icon: Wallet,
   },
   {
@@ -660,14 +660,14 @@ export default function Home() {
                   <span className="bg-gradient-to-r from-[hsl(var(--primary))] via-[hsl(var(--primary))] to-[hsl(var(--accent))] bg-clip-text text-transparent">
                     You Direct It.
                   </span>{" "}
-                  We Run It.
+                  We Implement It.
                 </h1>
 
                 <p
                   data-testid="text-hero-subtitle"
                   className="mt-4 max-w-xl text-pretty text-base leading-relaxed text-muted-foreground md:text-lg"
                 >
-                  A multi-vertical franchise platform designed to help qualified E-2 investors and their families live in the USA. Choose from Property Management, Telecom, or Insurance while you maintain executive control and our operating teams handle the daily execution.
+                  A multi-vertical franchise platform designed to help qualified E-2 investors and their families live in the USA. Choose from Property Management, Telecom, or Insurance. You own and direct the business — you control the bank account, make the payments, and make the key decisions — while New Dawn implements the day-to-day operations under your direction.
                 </p>
 
                 <div className="mt-5 grid gap-2 sm:grid-cols-3">
@@ -954,22 +954,22 @@ export default function Home() {
             <SectionHeading
               testId="heading-how"
               eyebrow="How it works"
-              title="You control the business. We manage the operations."
-              subtitle="A structure designed for investors who want full visibility and control, without handling daily manual work in Property Management, Telecom, or Insurance."
+              title="You direct the business. We implement the day-to-day operations."
+              subtitle="A structure designed for investors who want to genuinely own and direct a U.S. business — with full visibility and control — without handling the daily manual work in Property Management, Telecom, or Insurance."
             />
 
             <div className="mt-10 grid gap-4 md:grid-cols-3">
               <FeatureCard
                 testId="card-how-1"
                 icon={<CheckCircle2 className="size-5 text-[hsl(var(--primary))]" />}
-                title="You own the business"
-                desc="You operate under your franchise entity and keep direct control over your bank account and key decisions."
+                title="You own and direct the business"
+                desc="You own the franchise entity, manage the business bank account, make the payments, approve hiring and major decisions, and set strategy."
               />
               <FeatureCard
                 testId="card-how-2"
                 icon={<ClipboardCheck className="size-5 text-[hsl(var(--primary))]" />}
-                title="We set up local operations"
-                desc="Experienced operating teams execute the manual work, service coordination, client communication, and reporting cadence."
+                title="We implement the day-to-day"
+                desc="New Dawn's trained local team implements the manual work, service coordination, client communication, and reporting cadence under your direction — and reports to you."
               />
               <FeatureCard
                 testId="card-how-3"
@@ -977,6 +977,49 @@ export default function Home() {
                 title="Three recurring-revenue lanes"
                 desc="Select the franchise vertical that fits your strategy: Property Management, Telecom, or Insurance."
               />
+            </div>
+
+            <div
+              data-testid="section-who-does-what"
+              className="mx-auto mt-10 grid max-w-5xl gap-4 md:grid-cols-2"
+            >
+              <Card data-testid="card-who-franchisee" className="nh-surface nh-noise border-card-border/80 p-6">
+                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground/60">The franchisee</div>
+                <div className="mt-1 text-lg font-semibold">Owns and directs</div>
+                <ul className="mt-3 space-y-2 text-sm leading-relaxed text-muted-foreground">
+                  {[
+                    "Owns the franchise entity — at least 50%, as the E-2 visa requires",
+                    "Controls and manages the business bank account as its signatory",
+                    "Makes all payments — payroll, vendors, rent, and franchise fees",
+                    "Approves hiring and firing, budgets, major expenditures, and pricing",
+                    "Sets strategy and growth targets; reviews performance through owner dashboards",
+                    "Supervises the operating team and holds it accountable",
+                  ].map((item) => (
+                    <li key={item} className="flex items-start gap-2">
+                      <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-[hsl(var(--primary))]" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+              <Card data-testid="card-who-newdawn" className="nh-surface nh-noise border-card-border/80 p-6">
+                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground/60">New Dawn Franchising</div>
+                <div className="mt-1 text-lg font-semibold">Implements the day-to-day under your direction</div>
+                <ul className="mt-3 space-y-2 text-sm leading-relaxed text-muted-foreground">
+                  {[
+                    "Provides the franchise system, training, and proprietary technology",
+                    "Implements the daily operations you direct — client service, customer and tenant coordination, field work, and reporting",
+                    "Staffs and trains the local operating team, which reports to you",
+                    "Provides in-house immigration, financing, real estate, and legal support",
+                    "Does not own, control, or direct your business",
+                  ].map((item) => (
+                    <li key={item} className="flex items-start gap-2">
+                      <ClipboardCheck className="mt-0.5 size-4 shrink-0 text-[hsl(var(--accent))]" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
             </div>
           </div>
         </section>
@@ -1007,7 +1050,7 @@ export default function Home() {
                 testId="card-why-2"
                 icon={<Wallet className="size-5 text-[hsl(var(--accent))]" />}
                 title="Owner visibility and control"
-                desc="You retain executive control of your franchise, bank accounts, and key decisions while local teams execute the day-to-day workflows."
+                desc="You retain executive control of your franchise: you manage the bank account, make the payments, and make the key decisions, while New Dawn implements the day-to-day workflows under your direction."
               />
               <FeatureCard
                 testId="card-why-live"
@@ -1274,7 +1317,7 @@ export default function Home() {
                 testId="card-inv-control"
                 icon={<RotateCcw className="size-5 text-[hsl(var(--primary))]" />}
                 title="You stay in control"
-                desc="You hold ownership and bank-account control, approve the key decisions, and supervise performance — while our local teams handle daily execution. That's the substantive directing role the E-2 visa is built around."
+                desc="You hold ownership, manage the bank account, make the payments, approve the key decisions, and supervise performance — while New Dawn implements the day-to-day operations under your direction. That's the substantive directing role the E-2 visa is built around."
               />
             </div>
 
@@ -1483,13 +1526,18 @@ export default function Home() {
                 },
                 {
                   q: "What happens to my investment if my E-2 visa isn't approved?",
-                  a: "Your funds are held in escrow throughout the setup process. Your business is established and begins operating while your visa application is in progress. If your E-2 visa application is not approved, your investment is released from escrow and returned to you. We built the process this way intentionally — so that you are never in a position where your money is gone and your visa is not. Full details of the escrow arrangement are outlined in the Franchise Disclosure Document, which is available upon request.",
+                  a: "Your funds are held in escrow throughout the setup process. Your business is established and begins operating while your visa application is in progress. If your E-2 visa application is not approved, your investment is released from escrow and returned to you. We built the process this way intentionally — so that you are never in a position where your money is gone and your visa is not. Escrow whose release is conditioned only on visa issuance is a structure the U.S. Foreign Affairs Manual recognizes for E-2 purposes; your immigration attorney reviews the arrangement for your petition. Full details of the escrow arrangement are outlined in the Franchise Disclosure Document, which is available upon request.",
                   id: "escrow-protection",
                 },
                 {
+                  q: "Who directs the business — the franchisee or New Dawn?",
+                  a: "The franchisee directs the business. You are the owner and director: you control the business bank account, make all payments, approve hiring and major decisions, and set strategy. New Dawn implements the day-to-day operations under your direction and reports to you. New Dawn does not own, control, or direct your business.",
+                  id: "who-directs",
+                },
+                {
                   q: "Do I have to do the day-to-day work myself?",
-                  a: "No. Each New Dawn vertical is structured so you are the business director and decision-maker. You maintain ownership control, bank-account oversight, and executive supervision while approved local teams manage daily execution.",
-                  id: "hands-off",
+                  a: "No. Each New Dawn vertical is structured so you are the business director and decision-maker while New Dawn's trained local team implements the day-to-day work. You keep ownership control, manage the bank account, make the payments, and supervise the team — the substantive \"develop and direct\" role the E-2 visa requires.",
+                  id: "director-led",
                 },
                 {
                   q: "How do I choose between Property Management, Telecom, and Insurance?",

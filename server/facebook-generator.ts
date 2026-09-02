@@ -6,7 +6,7 @@ const openai = createLazyOpenAIClient();
 const POST_THEMES = [
   "E-2 visa investment opportunity through property management",
   "Why El Paso Texas is a great market for rental property investment",
-  "How hands-off franchise ownership works for international investors",
+  "How director-led franchise ownership works for international investors: the franchisee directs, New Dawn implements the day-to-day",
   "Benefits of single-family long-term rental management",
   "Success story style post about franchise investor lifestyle",
   "Property management tips for rental property owners",

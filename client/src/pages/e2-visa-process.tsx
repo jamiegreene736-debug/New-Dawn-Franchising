@@ -88,7 +88,7 @@ const TIMELINE = [
   },
   {
     title: "Launch & renew",
-    desc: "Once admitted, you direct the business while local teams operate it. The E-2 is renewable in two- to five-year increments as long as the enterprise continues to qualify.",
+    desc: "Once admitted, you direct the business — managing the bank account, making the payments, and making the key decisions — while New Dawn implements the day-to-day operations under your direction. The E-2 is renewable in two- to five-year increments as long as the enterprise continues to qualify.",
   },
 ];
 
@@ -369,11 +369,11 @@ export default function E2VisaProcessPage() {
             </Card>
             <Card data-testid="card-e2-direct-teams" className="nh-surface nh-noise border-card-border/80 p-6">
               <Users className="size-6 text-[hsl(var(--primary))]" />
-              <div className="mt-3 text-base font-semibold">What local teams execute</div>
+              <div className="mt-3 text-base font-semibold">What New Dawn implements</div>
               <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-                New Dawn's model lets approved local teams handle day-to-day execution while you keep substantive
-                control. You are not a passive owner — you actively direct the enterprise, oversee the people running it,
-                and review the numbers. That directing role is exactly what the E-2 &ldquo;develop and direct&rdquo;
+                New Dawn implements the day-to-day operations under your direction while you keep substantive
+                control. You are not a passive owner — you actively direct the enterprise, manage the bank account, make
+                the payments, oversee the people doing the daily work, and review the numbers. That directing role is exactly what the E-2 &ldquo;develop and direct&rdquo;
                 standard is built around, and it produces an auditable record that supports renewals.
               </p>
             </Card>

@@ -49,7 +49,7 @@ const SEO = {
   title:
     "New Dawn Franchising | Property Management Franchise for E-2 Visa Investors — Long-Term Rentals | El Paso, TX",
   description:
-    "E-2 visa property management franchise. Own and direct a recurring-revenue long-term rental management business while New Dawn's local teams run daily operations. Investment from $225,000. FDD available upon request.",
+    "E-2 visa property management franchise. Own and direct a recurring-revenue long-term rental management business — you manage the bank account and make the payments — while New Dawn implements the day-to-day operations under your direction. Investment from $225,000. FDD available upon request.",
   canonical: "https://www.newdawnfranchising.com/property-management",
   image: "https://www.newdawnfranchising.com/opengraph.jpg",
 };
@@ -108,7 +108,7 @@ const FEES = [
   },
 ];
 
-// ─── Section 3 — We run it, you direct it ─────────────────────────────────────
+// ─── Section 3 — You direct it, we implement it ─────────────────────────────────────
 const OPERATIONS = [
   {
     icon: Users,
@@ -209,7 +209,7 @@ const WHY = [
   {
     icon: Settings,
     title: "You direct; local teams execute",
-    desc: "Approved local teams handle daily execution while you set strategy, approve key decisions, and supervise performance through your owner dashboard — executive control without the daily minutiae.",
+    desc: "New Dawn implements the day-to-day operations under your direction while you set strategy, approve key decisions, manage the bank account, make the payments, and supervise performance through your owner dashboard — executive control without the daily minutiae.",
     id: "direct",
   },
   {
@@ -273,7 +273,7 @@ const FAQS = [
   },
   {
     q: "Do I have to run the day-to-day myself?",
-    a: "No. You are the owner and director. Approved local teams handle daily execution while you maintain ownership control, bank-account oversight, and executive supervision through your owner dashboard.",
+    a: "No. You are the owner and director. New Dawn implements the day-to-day operations under your direction while you maintain ownership control, manage the bank account, make the payments, and supervise the team through your owner dashboard.",
   },
   {
     q: "Is this long-term rentals or short-term/vacation rentals?",
@@ -388,7 +388,8 @@ export default function PropertyManagementPage() {
               className="mt-4 text-pretty text-base leading-relaxed text-muted-foreground md:text-lg"
             >
               A real, operating U.S. property management business built around long-term rental contracts —
-              structured so you own and direct the enterprise while New Dawn's local teams handle daily execution,
+              structured so you own and direct the enterprise — managing the bank account, making the payments, and
+              making the key decisions — while New Dawn implements the day-to-day operations under your direction,
               exactly as the E-2 visa requires.
             </p>
             <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
@@ -501,19 +502,19 @@ export default function PropertyManagementPage() {
         </div>
       </section>
 
-      {/* ── SECTION 3 — We run it, you direct it ── */}
+      {/* ── SECTION 3 — You direct it, we implement it ── */}
       <section data-testid="section-pm-operations" className="border-b bg-white/50 py-8 md:py-20">
         <div className="nh-container">
           <div className="mx-auto max-w-3xl text-center">
-            <SectionEyebrow>We run it, you direct it</SectionEyebrow>
+            <SectionEyebrow>You direct it, we implement it</SectionEyebrow>
             <h2 data-testid="pm-operations-title" className="mt-3 text-balance text-3xl font-semibold md:text-4xl">
-              You direct the business; our teams run the operations
+              You direct the business; New Dawn implements the day-to-day operations
             </h2>
             <p className="mt-3 text-pretty text-base leading-relaxed text-muted-foreground">
-              You are the owner and director. New Dawn provides the operating infrastructure so you maintain executive
-              control without being buried in daily minutiae. You set direction, review performance, approve key
-              decisions, and maintain ownership and bank-account control — the &ldquo;own and direct&rdquo; structure
-              the E-2 visa is built around.
+              You are the owner and director. New Dawn implements the day-to-day operations under your direction so you
+              maintain executive control without being buried in daily minutiae. You set direction, review performance,
+              approve key decisions, manage the bank account, and make the payments — the &ldquo;own and direct&rdquo;
+              structure the E-2 visa is built around. New Dawn does not own, control, or direct your business.
             </p>
           </div>
 

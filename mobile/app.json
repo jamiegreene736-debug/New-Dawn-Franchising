@@ -10,6 +10,7 @@
     "ios": {
       "icon": "./assets/expo.icon",
       "bundleIdentifier": "com.newdawnfranchising.pathways",
+      "buildNumber": "1",
       "supportsTablet": false
     },
     "android": {

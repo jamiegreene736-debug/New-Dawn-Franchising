@@ -1,6 +1,6 @@
 # New Dawn Pathways Mobile Control Pack
 
-**Status:** Approved product direction; connected identity pilot deployed to isolated staging and ready for internal testing
+**Status:** Approved product direction; connected identity and persisted My Path pilot deployed to isolated staging and ready for internal testing
 **Approval source:** Jamie Greene approved the August 30, 2026 Product Requirements Document as proposed.
 **Working product name:** New Dawn Pathways
 **Executive sponsor and interim product owner:** Jamie Greene

@@ -2,6 +2,7 @@ import type { Pool, PoolClient, QueryResultRow } from "pg";
 import { z } from "zod";
 
 import { mobileRoleSchema, type MobileRole } from "@shared/mobile/contracts";
+import { initializeInvestorPathway } from "./pathway-repository";
 
 const identityAuthRowSchema = z.object({
   id: z.string().uuid(),
@@ -277,6 +278,14 @@ export class PostgresMobileAuthRepository implements MobileAuthRepository {
       const roles = await activeRoles(client, token.identityId);
       if (roles.length === 0) {
         return { outcome: "pending_approval" };
+      }
+      if (roles.includes("investor")) {
+        await initializeInvestorPathway(
+          client,
+          token.identityId,
+          input.requestId,
+          input.now,
+        );
       }
 
       const session = await client.query<{ id: string }>(

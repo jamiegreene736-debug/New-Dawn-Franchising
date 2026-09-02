@@ -51,6 +51,20 @@ export const mobileOneTimeTokenPurpose = pgEnum("mobile_one_time_token_purpose",
   "verify_email",
   "reset_password",
 ]);
+export const mobilePathwayMilestoneState = pgEnum("mobile_pathway_milestone_state", [
+  "not_started",
+  "available",
+  "your_action",
+  "in_progress",
+  "completed",
+  "blocked",
+]);
+export const mobilePathwayOwner = pgEnum("mobile_pathway_owner", [
+  "investor",
+  "new_dawn",
+  "independent_counsel",
+  "shared",
+]);
 
 export const mobileIdentities = pgTable("mobile_identities", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -230,6 +244,49 @@ export const mobileDeletionRequests = pgTable("mobile_deletion_requests", {
   index("mobile_deletion_requests_status_idx").on(table.status),
 ]);
 
+export const mobilePathwayInstances = pgTable("mobile_pathway_instances", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  identityId: varchar("identity_id").notNull().references(() => mobileIdentities.id, { onDelete: "cascade" }),
+  pathwayVersion: varchar("pathway_version", { length: 32 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("mobile_pathway_instances_identity_unique").on(table.identityId),
+]);
+
+export const mobilePathwayMilestones = pgTable("mobile_pathway_milestones", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  pathwayInstanceId: varchar("pathway_instance_id").notNull().references(() => mobilePathwayInstances.id, { onDelete: "cascade" }),
+  milestoneKey: varchar("milestone_key", { length: 64 }).notNull(),
+  sequence: integer("sequence").notNull(),
+  owner: mobilePathwayOwner("owner").notNull(),
+  state: mobilePathwayMilestoneState("state").default("not_started").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("mobile_pathway_milestones_instance_key_unique").on(table.pathwayInstanceId, table.milestoneKey),
+  uniqueIndex("mobile_pathway_milestones_instance_sequence_unique").on(table.pathwayInstanceId, table.sequence),
+  index("mobile_pathway_milestones_state_idx").on(table.state),
+  check("mobile_pathway_milestones_sequence_check", sql`${table.sequence} between 1 and 100`),
+]);
+
+export const mobilePathwayEvents = pgTable("mobile_pathway_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  milestoneId: varchar("milestone_id").notNull().references(() => mobilePathwayMilestones.id, { onDelete: "cascade" }),
+  actorIdentityId: varchar("actor_identity_id").references(() => mobileIdentities.id, { onDelete: "set null" }),
+  eventType: varchar("event_type", { length: 64 }).notNull(),
+  stateBefore: mobilePathwayMilestoneState("state_before"),
+  stateAfter: mobilePathwayMilestoneState("state_after").notNull(),
+  requestId: varchar("request_id", { length: 128 }).notNull(),
+  reason: text("reason"),
+  metadata: jsonb("metadata").$type<Record<string, string | number | boolean | null>>(),
+  occurredAt: timestamp("occurred_at").notNull(),
+  recordedAt: timestamp("recorded_at").defaultNow().notNull(),
+}, (table) => [
+  index("mobile_pathway_events_milestone_idx").on(table.milestoneId),
+  index("mobile_pathway_events_actor_idx").on(table.actorIdentityId),
+  index("mobile_pathway_events_recorded_at_idx").on(table.recordedAt),
+]);
+
 export type MobileIdentity = typeof mobileIdentities.$inferSelect;
 export type MobileIdentityRole = typeof mobileIdentityRoles.$inferSelect;
 export type MobileInvestorLink = typeof mobileInvestorLinks.$inferSelect;
@@ -240,3 +297,6 @@ export type MobileReferral = typeof mobileReferrals.$inferSelect;
 export type MobileReferralMatch = typeof mobileReferralMatches.$inferSelect;
 export type MobileAuditEvent = typeof mobileAuditEvents.$inferSelect;
 export type MobileDeletionRequest = typeof mobileDeletionRequests.$inferSelect;
+export type MobilePathwayInstance = typeof mobilePathwayInstances.$inferSelect;
+export type MobilePathwayMilestone = typeof mobilePathwayMilestones.$inferSelect;
+export type MobilePathwayEvent = typeof mobilePathwayEvents.$inferSelect;

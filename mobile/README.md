@@ -12,6 +12,8 @@ This is the iPhone-first New Dawn Pathways app for investor and referral-partner
 - Explicit `prototype` and `connected` environments; connected mode fails closed without an API URL.
 - Versioned mobile gateway with timeout and response validation.
 - Connected staging registration, email verification, sign-in, token rotation, session restoration, sign-out, and account-deletion requests.
+- Authenticated investors receive a private, persisted eight-step My Path with authoritative event-backed status.
+- A generated native Xcode workspace can be produced with `npx expo prebuild --platform ios --clean`; `npm run ios -- --device "iPhone 17 Pro Max"` builds and launches it.
 - Refresh tokens stored with iOS SecureStore; access tokens stay in memory and expire after ten minutes.
 - Staging-only verification tokens for internal testing until an approved transactional-email provider is connected.
 - No production CRM, payments, legal-document, notification, or provider connection.

@@ -36,13 +36,14 @@ Create new mobile-owned tables rather than adding authentication secrets to CRM 
 - `mobile_partner_profiles` — application, agreement, training, jurisdiction, and approval state;
 - `mobile_referrals` — immutable consent receipt, normalized minimum contact details, attribution, and review status;
 - `mobile_referral_matches` — restricted staff-only link to the authoritative CRM record after transactional review;
+- `mobile_pathway_instances`, `mobile_pathway_milestones`, and `mobile_pathway_events` — investor-owned progress, explicit ownership/state, and append-only authoritative event history;
 - `mobile_refresh_sessions`, `mobile_audit_events`, and `mobile_deletion_requests` — authentication and accountability controls.
 
 These tables are now defined locally in `shared/mobile/schema.ts`. The implementation also includes hash-only, expiring, one-time email verification/password-reset tokens; refresh-token family, rotation, revocation, and reuse-detection fields; idempotency and match-key hashes for referrals; and explicit referral retention expiry.
 
-The generated staging package is `migrations/mobile/0000_mobile_identity_foundation.sql`. Its static verifier permits only mobile-namespaced enum, table, foreign-key, and index creation; the existing `crm_clients` table may be referenced by foreign keys but cannot be altered. It rejects data writes, drops, executable SQL, core-table changes, unexpected objects, and incomplete packages. The reviewed package currently contains 57 statements with SHA-256 `4cada0636c31ea4e876dac682f629b9549b77b5e2e5a0492d26f55a1666c2f71`.
+The generated staging package comprises `migrations/mobile/0000_mobile_identity_foundation.sql` and `migrations/mobile/0001_mobile_pathway_pilot.sql`. Its static verifier permits only mobile-namespaced enum, table, foreign-key, and index creation; the existing `crm_clients` table may be referenced by foreign keys but cannot be altered. It rejects data writes, drops, executable SQL, core-table changes, unexpected objects, and incomplete packages. The reviewed package currently contains 73 statements across 13 mobile tables and ten mobile enums, with aggregate SHA-256 `0aeec917eee062a344a2eae13e2f095f16f52c039ea2ba4e43d4a90ea6676db3`.
 
-Run `npm run mobile:migration:verify` to validate the committed artifact without connecting to a database. Run `npm run mobile:schema:readiness` only with an intentionally selected environment; it opens a read-only transaction, reports table presence only, and always rolls back. The package was transactionally rehearsed, rolled back, and then applied to the isolated Railway `staging` database on September 2, 2026. It has not been applied to production.
+Run `npm run mobile:migration:verify` to validate the committed artifacts without connecting to a database. Run `npm run mobile:schema:readiness` only with an intentionally selected environment; it opens a read-only transaction, reports table presence only, and always rolls back. Both migrations were transactionally rehearsed, rolled back, and then applied to the isolated Railway `staging` database on September 2, 2026. Neither has been applied to production.
 
 No mobile table stores passports, banking/tax records, immigration filings, biometrics, source-of-funds evidence, or legal documents.
 

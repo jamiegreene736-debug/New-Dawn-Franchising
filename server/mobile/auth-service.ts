@@ -33,6 +33,7 @@ export type MobileAuthServiceErrorCode =
   | "INVALID_REQUEST"
   | "NOT_AUTHENTICATED"
   | "NOT_AUTHORIZED"
+  | "INTERNAL_ERROR"
   | "SERVICE_UNAVAILABLE";
 
 export class MobileAuthServiceError extends Error {

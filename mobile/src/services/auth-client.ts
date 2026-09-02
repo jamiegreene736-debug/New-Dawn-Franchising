@@ -28,6 +28,37 @@ export type VerificationResponse =
   | AuthenticatedSession
   | { status: 'pending_approval'; requestId: string };
 
+export type PathwayMilestoneKey =
+  | 'initial_readiness'
+  | 'counsel_consultation'
+  | 'business_model_review'
+  | 'fdd_review'
+  | 'territory_operating_plan'
+  | 'entity_investment_business_plan'
+  | 'visa_preparation'
+  | 'launch_training';
+export type PathwayMilestoneState =
+  | 'not_started'
+  | 'available'
+  | 'your_action'
+  | 'in_progress'
+  | 'completed'
+  | 'blocked';
+export type PathwayOwner = 'investor' | 'new_dawn' | 'independent_counsel' | 'shared';
+export type InvestorPathway = {
+  pathwayVersion: string;
+  completedMilestones: number;
+  totalMilestones: number;
+  milestones: {
+    key: PathwayMilestoneKey;
+    sequence: number;
+    owner: PathwayOwner;
+    state: PathwayMilestoneState;
+    updatedAt: string;
+  }[];
+  requestId: string;
+};
+
 type ApiFault = {
   error?: {
     message?: unknown;
@@ -90,6 +121,12 @@ export class MobileAuthClient {
       method: 'POST',
       headers: { Authorization: `Bearer ${accessToken}` },
     });
+  }
+
+  async getInvestorPath(accessToken: string): Promise<InvestorPathway> {
+    return parseInvestorPath(await this.request('/investor/path', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }));
   }
 
   private async request(path: string, init: RequestInit = {}): Promise<unknown> {
@@ -169,6 +206,64 @@ function parseVerification(value: unknown): VerificationResponse {
     return { status: 'pending_approval', requestId: value.requestId };
   }
   return parseAuthenticated(value);
+}
+
+const PATHWAY_KEYS: readonly PathwayMilestoneKey[] = [
+  'initial_readiness',
+  'counsel_consultation',
+  'business_model_review',
+  'fdd_review',
+  'territory_operating_plan',
+  'entity_investment_business_plan',
+  'visa_preparation',
+  'launch_training',
+];
+const PATHWAY_STATES: readonly PathwayMilestoneState[] = [
+  'not_started', 'available', 'your_action', 'in_progress', 'completed', 'blocked',
+];
+const PATHWAY_OWNERS: readonly PathwayOwner[] = [
+  'investor', 'new_dawn', 'independent_counsel', 'shared',
+];
+
+function parseInvestorPath(value: unknown): InvestorPathway {
+  if (
+    !isRecord(value)
+    || typeof value.pathwayVersion !== 'string'
+    || typeof value.completedMilestones !== 'number'
+    || typeof value.totalMilestones !== 'number'
+    || typeof value.requestId !== 'string'
+    || !Array.isArray(value.milestones)
+  ) throw unexpectedResponse();
+
+  const milestones = value.milestones.map((milestone) => {
+    if (
+      !isRecord(milestone)
+      || typeof milestone.key !== 'string'
+      || !PATHWAY_KEYS.includes(milestone.key as PathwayMilestoneKey)
+      || typeof milestone.sequence !== 'number'
+      || typeof milestone.owner !== 'string'
+      || !PATHWAY_OWNERS.includes(milestone.owner as PathwayOwner)
+      || typeof milestone.state !== 'string'
+      || !PATHWAY_STATES.includes(milestone.state as PathwayMilestoneState)
+      || typeof milestone.updatedAt !== 'string'
+    ) throw unexpectedResponse();
+    return {
+      key: milestone.key as PathwayMilestoneKey,
+      sequence: milestone.sequence,
+      owner: milestone.owner as PathwayOwner,
+      state: milestone.state as PathwayMilestoneState,
+      updatedAt: milestone.updatedAt,
+    };
+  });
+
+  if (value.totalMilestones !== milestones.length) throw unexpectedResponse();
+  return {
+    pathwayVersion: value.pathwayVersion,
+    completedMilestones: value.completedMilestones,
+    totalMilestones: value.totalMilestones,
+    milestones,
+    requestId: value.requestId,
+  };
 }
 
 function unexpectedResponse(): AuthClientError {

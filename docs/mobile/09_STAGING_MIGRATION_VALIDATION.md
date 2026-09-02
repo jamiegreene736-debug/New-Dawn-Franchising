@@ -51,6 +51,14 @@ A separate read-only production transaction after the staging application confir
 - no production migration or CRM backfill was executed;
 - production mobile authentication remains disabled.
 
+## Investor pathway increment
+
+The generated `migrations/mobile/0001_mobile_pathway_pilot.sql` artifact (SHA-256 `6c72edceb57b3a5f5b831bfbd6f1b9d9774e3fa4a30f400b2e300e2070f09c8e`) was separately rehearsed inside a transaction, where all three pathway tables were visible, and then rolled back. The post-rollback readback remained at zero pathway tables. The same artifact was then applied to isolated staging, producing exactly three pathway tables. No customer data or production schema was copied or changed.
+
+The pathway API deployment `f4968022-13cd-4901-bff2-6474c087cf92` completed successfully. A synthetic end-to-end smoke run verified investor registration, verification, authenticated pathway readback, the first milestone detail, refresh-token reuse revocation, recovery, deletion, and partner approval gating. The two synthetic identities and their related records were then removed; staging readback returned zero identities, pathway instances, milestones, and pathway events. A separate read-only production transaction returned zero `mobile_pathway_*` tables.
+
+The native Expo project was generated and opened as `NewDawnPathways.xcworkspace`. Xcode built it for the iOS 26.5 iPhone 17 Pro Max simulator with zero errors, installed it, and launched the connected staging configuration successfully.
+
 ## Remaining gates
 
 1. Build a staging-safe API service profile that disables every email, campaign, sync, posting, scheduled, and paid-provider background job.

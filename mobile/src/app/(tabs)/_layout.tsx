@@ -1,13 +1,21 @@
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
+import { ActivityIndicator, View } from 'react-native';
 
+import { useAuth } from '@/auth/auth-context';
+import { runtimeConfig } from '@/config/runtime';
 import { usePrototype } from '@/prototype/prototype-context';
 import { useTranslations } from '@/i18n/use-translations';
 import { brand } from '@/ui/theme';
 
 export default function TabsLayout() {
+  const { ready, account } = useAuth();
   const { role } = usePrototype();
   const { t } = useTranslations();
+  if (runtimeConfig.mode === 'connected' && !ready) {
+    return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: brand.canvas }}><ActivityIndicator color={brand.navy} /></View>;
+  }
+  if (runtimeConfig.mode === 'connected' && !account) return <Redirect href="/" />;
   const second = role === 'investor' ? t('nav.explore') : role === 'partner' ? t('nav.referrals') : t('nav.resources');
   const third = role === 'investor' ? t('nav.myPath') : role === 'partner' ? t('nav.resources') : t('nav.coordination');
   return (

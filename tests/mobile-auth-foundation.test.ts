@@ -44,6 +44,7 @@ test("mobile authentication remains disabled without explicit secure configurati
   assert.deepEqual(readMobileAuthRuntimeConfig({}), {
     enabled: false,
     accessTokenSecret: null,
+    testTokensEnabled: false,
   });
   assert.throws(
     () => readMobileAuthRuntimeConfig({ MOBILE_AUTH_ENABLED: "sometimes" }),
@@ -60,6 +61,26 @@ test("mobile authentication remains disabled without explicit secure configurati
     }),
     /at least 32 bytes/,
   );
+  assert.throws(
+    () => readMobileAuthRuntimeConfig({
+      APP_RUNTIME_MODE: "full",
+      MOBILE_AUTH_ENABLED: "true",
+      MOBILE_AUTH_TEST_MODE: "true",
+      MOBILE_ACCESS_TOKEN_SECRET: ACCESS_TOKEN_SECRET,
+    }),
+    /allowed only in mobile-staging mode/,
+  );
+  assert.deepEqual(readMobileAuthRuntimeConfig({
+    APP_RUNTIME_MODE: "mobile-staging",
+    RAILWAY_ENVIRONMENT_NAME: "staging",
+    MOBILE_AUTH_ENABLED: "true",
+    MOBILE_AUTH_TEST_MODE: "true",
+    MOBILE_ACCESS_TOKEN_SECRET: ACCESS_TOKEN_SECRET,
+  }), {
+    enabled: true,
+    accessTokenSecret: ACCESS_TOKEN_SECRET,
+    testTokensEnabled: true,
+  });
 });
 
 test("bootstrap advertises only production-ready capabilities", () => {

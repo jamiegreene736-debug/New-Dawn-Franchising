@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { readRequiredEnvironmentValue } from "../server/runtime-config";
+import { readApplicationRuntimeProfile } from "../server/runtime-profile";
 import { runMobileIdentityQualityDryRun } from "../server/mobile/identity-quality";
 import {
   mobileApiErrorSchema,
@@ -21,6 +22,35 @@ test("required server configuration fails closed", () => {
   assert.throws(
     () => readRequiredEnvironmentValue("SESSION_SECRET", {}),
     /SESSION_SECRET is missing/,
+  );
+});
+
+test("mobile staging runtime disables every legacy side-effect surface", () => {
+  assert.deepEqual(
+    readApplicationRuntimeProfile({
+      APP_RUNTIME_MODE: "mobile-staging",
+      RAILWAY_ENVIRONMENT_NAME: "staging",
+    }),
+    {
+      mode: "mobile-staging",
+      legacySessionEnabled: false,
+      legacyStartupWritesEnabled: false,
+      legacyRoutesEnabled: false,
+      backgroundJobsEnabled: false,
+      staticWebsiteEnabled: false,
+      providerWarmupsEnabled: false,
+    },
+  );
+  assert.throws(
+    () => readApplicationRuntimeProfile({
+      APP_RUNTIME_MODE: "mobile-staging",
+      RAILWAY_ENVIRONMENT_NAME: "production",
+    }),
+    /only run in the Railway staging environment/,
+  );
+  assert.throws(
+    () => readApplicationRuntimeProfile({ APP_RUNTIME_MODE: "preview" }),
+    /must be full or mobile-staging/,
   );
 });
 

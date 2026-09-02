@@ -2,7 +2,7 @@
 
 **Planning baseline:** August 30, 2026
 **Target:** Founding TestFlight pilot in 16 weeks after owners, legal reviewers, and required platform access are ready
-**Current phase:** Clickable prototype review, claims review, and production-readiness discovery
+**Current phase:** Staging identity foundation, clickable prototype review, and claims review
 
 ## Delivery approach
 
@@ -101,7 +101,7 @@ Create the prototype in the same Expo project intended for production, using a t
 - [x] Create the versioned `server/mobile/` route boundary, safe prelaunch status endpoint, and validated `shared/mobile/` contracts.
 - [x] Define mobile identity, roles, investor links, partner profiles, rotating refresh sessions, hash-only one-time tokens, referrals, audit events, and deletion-request tables locally.
 - [x] Add a prelaunch bootstrap endpoint, short-lived signed access-token service, hash-only refresh-token reuse evaluation, fail-closed authentication configuration, and privacy-safe error builder.
-- [x] Generate and statically verify the staging migration from the local schema; no database migration was run.
+- [x] Generate and statically verify the migration, rehearse rollback, and apply it to an isolated empty staging database; production remains unchanged.
 - [ ] Implement registration, verification, login, refresh, logout, recovery, session management, and deletion initiation.
 - [x] Add server authorization primitives and negative cross-account tests.
 - [ ] Implement approved-content lifecycle and English/Spanish completeness rules.
@@ -207,6 +207,7 @@ The product and engineering team may make reversible UX and implementation decis
 2. Review the completed Expo prototype with stakeholders and counsel.
 3. Review and approve the drafted claims/content matrix from the screen specification.
 4. Identify the named review owners and the initial approved opportunity set.
-5. Provision an isolated staging database, verify its prerequisites, and explicitly approve applying the reviewed mobile-only migration there.
-6. Run the migration, authentication, and rollback checks in staging; keep production authentication disabled.
-7. Run prototype sessions, incorporate findings, and present the prototype plus final build estimate for the production authorization gate.
+5. Build the transactional authentication repository and endpoints behind the disabled mobile-authentication flag.
+6. Add a staging-safe API service profile with all campaign, email, sync, posting, and voiceover jobs disabled.
+7. Exercise registration, verification, login, rotation, recovery, session revocation, and deletion initiation against staging.
+8. Run prototype sessions, incorporate findings, and present the prototype plus final build estimate for the production authorization gate.

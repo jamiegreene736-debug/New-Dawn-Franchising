@@ -2,7 +2,7 @@
 
 **Scope:** Create the empty mobile-owned schema in an isolated staging database
 
-**Current state:** Migration generated and statically verified; not applied to any database
+**Current state:** Migration generated, statically verified, transactionally rehearsed, rolled back successfully, and applied to the isolated staging database; production remains unchanged
 
 ## Safety boundary
 
@@ -43,4 +43,6 @@ Stop and restore the staging snapshot if any unexpected object changes, data wri
 
 ## Production gate
 
-Production remains unchanged until all of the following are complete: staging migration and rollback evidence, CRM duplicate review, data-flow and retention approval, named legal/privacy/security owners, transactional authentication tests, and a separate production change approval. Production mobile authentication remains disabled until that gate is signed.
+Production remains unchanged until all of the following are complete: CRM duplicate review, data-flow and retention approval, named legal/privacy/security owners, transactional authentication tests, and a separate production change approval. Production mobile authentication remains disabled until that gate is signed.
+
+The September 2, 2026 staging execution and rollback evidence is recorded in `docs/mobile/09_STAGING_MIGRATION_VALIDATION.md`.

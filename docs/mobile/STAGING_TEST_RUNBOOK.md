@@ -17,13 +17,14 @@ Validate the iOS pilot without touching production identities, CRM records, camp
 1. Open the app and confirm the footer reads **Internal pilot · Staging data only · No production connection**.
 2. Create an investor account with a unique `example.test` email and a password of at least 12 characters.
 3. Confirm the staging-only verification token is preloaded, then verify the account.
-4. Confirm the app opens the investor workspace and Profile shows the correct email, an active secure session, and **Staging** environment.
-5. Sign out, sign back in, close and reopen the app, and confirm the secure session restores successfully.
-6. Confirm an invalid password produces a generic sign-in error without revealing whether an account exists.
-7. Create a partner account and verify it; confirm the app shows **Application ready for review** and does not grant workspace access.
-8. From an investor Profile, request account deletion and confirm the app signs out.
-9. Confirm attorney registration is disabled for the pilot.
-10. Confirm the public production website remains healthy and its mobile bootstrap still reports authentication disabled.
+4. Open **My Path** and confirm there are eight persisted milestones, zero unsupported completions, and **Initial readiness** is **Available**.
+5. Confirm the app opens the investor workspace and Profile shows the correct email, an active secure session, and **Staging** environment.
+6. Sign out, sign back in, close and reopen the app, and confirm the secure session restores successfully.
+7. Confirm an invalid password produces a generic sign-in error without revealing whether an account exists.
+8. Create a partner account and verify it; confirm the app shows **Application ready for review** and does not grant workspace access.
+9. From an investor Profile, request account deletion and confirm the app signs out.
+10. Confirm attorney registration is disabled for the pilot.
+11. Confirm the public production website remains healthy and its mobile bootstrap still reports authentication disabled.
 
 ## Acceptance boundary
 

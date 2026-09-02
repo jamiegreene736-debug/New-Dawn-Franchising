@@ -108,7 +108,7 @@ Create the prototype in the same Expo project intended for production, using a t
 
 ### First production slice
 
-- [ ] Investor signs up, verifies email, signs in, reads current boundaries, sees an empty My Path, manages sessions, and requests account deletion.
+- [x] Investor signs up, verifies email, signs in, reads current boundaries, sees a private persisted My Path, manages sessions, and requests account deletion in isolated staging.
 
 **Exit gate:** Security-reviewed identity slice passes automated and manual tests in a non-production environment.
 
@@ -116,8 +116,10 @@ Create the prototype in the same Expo project intended for production, using a t
 
 - [ ] Implement assessment versions, sessions, answers, deterministic scoring, acknowledgements, results, and golden tests.
 - [ ] Build investor assessment and result screens in English and Spanish.
-- [ ] Implement pathway instances, milestone events, source receipts, and staff correction audit.
-- [ ] Build Home and My Path.
+- [x] Implement pathway instances and initialization events.
+- [ ] Add source receipts, controlled transitions, and staff correction audit.
+- [x] Build My Path with persisted staging status.
+- [ ] Connect the Home projection to authoritative pathway status.
 - [ ] Create approved opportunity/content projections and information requests.
 - [ ] Implement scheduling handoff, confirmed appointment projection, and support escalation.
 - [ ] Add investor journey analytics and operational CRM views.

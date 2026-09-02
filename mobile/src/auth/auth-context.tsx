@@ -7,6 +7,7 @@ import {
   type MobileAccount,
   type MobileLocale,
   type MobileRole,
+  type InvestorPathway,
   type VerificationResponse,
 } from '@/services/auth-client';
 import { clearStoredSession, readStoredSession, writeStoredSession } from '@/services/session-store';
@@ -22,6 +23,7 @@ type AuthState = {
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   requestDeletion: () => Promise<void>;
+  loadInvestorPath: () => Promise<InvestorPathway>;
 };
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -100,6 +102,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
       setAccessToken(null);
       setRefreshToken(null);
       await clearStoredSession();
+    },
+    loadInvestorPath: async () => {
+      if (!mobileAuthClient || !accessToken) throw new Error('Please sign in again.');
+      return mobileAuthClient.getInvestorPath(accessToken);
     },
   }), [accessToken, account, pendingVerificationToken, ready, refreshToken, adoptSession]);
 

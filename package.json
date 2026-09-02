@@ -11,8 +11,11 @@
     "check": "tsc",
     "audit:production": "npm audit --omit=dev --audit-level=high",
     "test:unit": "tsx server/lead-email-enrichment.test.ts && tsx server/outreach-autopilot.test.ts && tsx server/introducer-qualify.test.ts && tsx server/sender-health.test.ts && tsx server/legacy-campaign-pause.test.ts && tsx server/outreach-focus.test.ts && tsx server/pm-jay-intro.test.ts && tsx server/website-leads.test.ts",
-    "test:mobile-foundation": "tsx --test tests/mobile-foundation.test.ts tests/mobile-auth-foundation.test.ts",
+    "test:mobile-foundation": "tsx --test tests/mobile-foundation.test.ts tests/mobile-auth-foundation.test.ts tests/mobile-migration-safety.test.ts",
     "mobile:identity:dry-run": "tsx script/mobile-identity-dry-run.ts",
+    "mobile:migration:generate": "drizzle-kit generate --config=drizzle.mobile.config.ts",
+    "mobile:migration:verify": "tsx script/mobile-migration-safety.ts",
+    "mobile:schema:readiness": "tsx script/mobile-schema-readiness.ts",
     "db:push": "drizzle-kit push"
   },
   "dependencies": {

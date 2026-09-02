@@ -46,5 +46,8 @@ jobs:
       - name: Mobile foundation and security tests
         run: npm run test:mobile-foundation
 
+      - name: Verify mobile-only migration boundary
+        run: npm run mobile:migration:verify
+
       - name: Build (client + server)
         run: npm run build

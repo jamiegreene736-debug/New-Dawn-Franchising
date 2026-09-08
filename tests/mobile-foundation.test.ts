@@ -11,11 +11,14 @@ import {
 
 type RuntimeModule = typeof import("../mobile/src/config/runtime");
 type MessagesModule = typeof import("../mobile/src/i18n/messages");
+type WelcomeFunnelModule = typeof import("../mobile/src/analytics/welcome-funnel");
 
 const loadedRuntimeModule = await import("../mobile/src/config/runtime") as RuntimeModule & { default?: RuntimeModule };
 const loadedMessagesModule = await import("../mobile/src/i18n/messages") as MessagesModule & { default?: MessagesModule };
+const loadedWelcomeFunnelModule = await import("../mobile/src/analytics/welcome-funnel") as WelcomeFunnelModule & { default?: WelcomeFunnelModule };
 const { createRuntimeConfig } = loadedRuntimeModule.default ?? loadedRuntimeModule;
 const { hasTranslationParity, translate } = loadedMessagesModule.default ?? loadedMessagesModule;
+const { trackWelcomeFunnelEvent, welcomeFunnelEvents } = loadedWelcomeFunnelModule.default ?? loadedWelcomeFunnelModule;
 
 test("required server configuration fails closed", () => {
   assert.equal(readRequiredEnvironmentValue("SESSION_SECRET", { SESSION_SECRET: " secure-value " }), "secure-value");
@@ -70,6 +73,23 @@ test("English and Spanish controlled navigation content have key parity", () => 
   assert.equal(hasTranslationParity(), true);
   assert.equal(translate("en", "nav.home"), "Home");
   assert.equal(translate("es", "nav.home"), "Inicio");
+  assert.equal(translate("en", "welcome.investorTitle"), "Explore business ownership");
+  assert.equal(translate("es", "welcome.partnerTitle"), "Referir a posibles inversionistas");
+});
+
+test("welcome funnel analytics use a fixed payload-free event allowlist", () => {
+  const events = Object.values(welcomeFunnelEvents);
+  assert.equal(new Set(events).size, events.length);
+  assert.deepEqual(events, [
+    "welcome.investor_selected",
+    "welcome.partner_selected",
+    "welcome.attorney_selected",
+    "welcome.sign_in_selected",
+  ]);
+
+  const recorded: string[] = [];
+  trackWelcomeFunnelEvent(welcomeFunnelEvents.investorSelected, (event) => recorded.push(event));
+  assert.deepEqual(recorded, ["welcome.investor_selected"]);
 });
 
 test("mobile status contract accepts only versioned responses", () => {

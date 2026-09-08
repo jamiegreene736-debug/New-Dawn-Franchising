@@ -47,7 +47,7 @@
 |---|---|---|---|
 | SH-01 | Launch | Brand entry and initialization. | loading, minimum-version block, offline cached-content option, maintenance |
 | SH-02 | Language | Choose English or Spanish before controlling copy appears. | selected, unavailable-locale fallback |
-| SH-03 | Choose a path | Investor, referral partner, or attorney selection. | default, role explanation expanded |
+| SH-03 | Choose a path | Put the goal-based role choice above the legal boundary: emphasize Explore business ownership, keep Refer prospective investors immediately visible, and present independent counsel as a clear supporting action. Returning-account sign-in remains visible. | default, connected-pilot counsel explanation, role selected |
 | SH-04 | Privacy and boundaries | Concise data use, no-legal-advice boundary, and source links. Primary action: Continue. | content unavailable, updated version acknowledgement |
 | SH-05 | Create account | Email and password with terms/privacy links. | validation, email already used, rate limited |
 | SH-06 | Verify email | Enter code or use verified link. | resend timer, expired, incorrect, success |
@@ -202,6 +202,8 @@ Apply/verify → acknowledge independent role → access counsel pack → view o
 
 ## Prototype approval metrics
 
+- On iPhone 17 Pro Max, the investor and referral-partner choices plus the independent-counsel action are visible without scrolling at the default text size.
+- At least 80% of participants identify and select their intended role within five seconds without facilitator intervention.
 - At least 80% of participants complete the primary journey without facilitator intervention.
 - At least 90% correctly state that the result is not a visa eligibility decision.
 - No participant interprets `received`, `sent`, `scheduled`, or `pending` as completed.

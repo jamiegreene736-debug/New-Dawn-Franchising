@@ -30,13 +30,13 @@ export function Screen({ children, contentContainerStyle, style, ...props }: Pro
   );
 }
 
-export function BrandMark() {
+export function BrandMark({ compact = false }: { compact?: boolean }) {
   return (
-    <View style={styles.brandRow} accessibilityLabel="New Dawn Pathways">
-      <View style={styles.brandIcon}><Text style={styles.brandIconText}>ND</Text></View>
+    <View accessible accessibilityRole="image" style={[styles.brandRow, compact && styles.brandRowCompact]} accessibilityLabel="New Dawn Pathways">
+      <View style={[styles.brandIcon, compact && styles.brandIconCompact]}><Text style={[styles.brandIconText, compact && styles.brandIconTextCompact]}>ND</Text></View>
       <View>
-        <Text style={styles.brandName}>NEW DAWN</Text>
-        <Text style={styles.brandProduct}>PATHWAYS</Text>
+        <Text style={[styles.brandName, compact && styles.brandNameCompact]}>NEW DAWN</Text>
+        <Text style={[styles.brandProduct, compact && styles.brandProductCompact]}>PATHWAYS</Text>
       </View>
     </View>
   );
@@ -167,10 +167,15 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: brand.canvas },
   screenContent: { flexGrow: 1, width: '100%', maxWidth: 760, alignSelf: 'center', paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: spacing.xxxl, gap: spacing.md },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: spacing.lg },
+  brandRowCompact: { gap: 10, marginBottom: 0 },
   brandIcon: { width: 50, height: 50, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: brand.navy },
+  brandIconCompact: { width: 42, height: 42, borderRadius: 13 },
   brandIconText: { color: brand.gold, fontSize: 17, fontWeight: '900', letterSpacing: -0.5 },
+  brandIconTextCompact: { fontSize: 14 },
   brandName: { color: brand.navy, fontSize: 18, fontWeight: '900', letterSpacing: 1.8 },
+  brandNameCompact: { fontSize: 16, letterSpacing: 1.6 },
   brandProduct: { color: brand.gold, fontSize: 12, fontWeight: '900', letterSpacing: 3.4, marginTop: 2 },
+  brandProductCompact: { fontSize: 10, letterSpacing: 2.8 },
   tag: { ...type.caption, color: brand.blue, letterSpacing: 1.5, marginBottom: 2 },
   choiceCard: { flexDirection: 'row', alignItems: 'center', minHeight: 112, borderRadius: 20, borderWidth: 1, borderColor: brand.line, backgroundColor: brand.white, padding: spacing.md, gap: spacing.md },
   choiceCardSelected: { borderColor: brand.navy, borderWidth: 2, backgroundColor: '#F3F7FA' },

@@ -94,7 +94,8 @@ Create the prototype in the same Expo project intended for production, using a t
 - [ ] Add component tests and device preview builds.
 - [ ] Resolve the monitored `xcode`/`uuid` advisory through an Expo-compatible dependency update; do not force an SDK-breaking downgrade.
 - [x] Implement secure session storage, typed API client, request IDs, duplicate-neutral registration, and error mapping.
-- [ ] Add privacy-safe analytics allowlist and crash reporting.
+- [x] Add a payload-free allowlist for pre-login role and sign-in funnel events.
+- [ ] Connect the allowlist to an approved first-party analytics sink and add crash reporting after privacy review.
 
 ### Backend foundation
 

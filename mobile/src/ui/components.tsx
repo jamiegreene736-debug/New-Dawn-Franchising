@@ -12,23 +12,21 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-
 import { brand, spacing, type } from './theme';
 
 type ScreenProps = ScrollViewProps & { contentContainerStyle?: StyleProp<ViewStyle> };
 
-export function Screen({ children, contentContainerStyle, ...props }: PropsWithChildren<ScreenProps>) {
+export function Screen({ children, contentContainerStyle, style, ...props }: PropsWithChildren<ScreenProps>) {
   return (
-    <SafeAreaView edges={['bottom']} style={styles.screen}>
-      <ScrollView
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.screenContent, contentContainerStyle]}
-        {...props}>
-        {children}
-      </ScrollView>
-    </SafeAreaView>
+    <ScrollView
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+      contentInsetAdjustmentBehavior="automatic"
+      contentContainerStyle={[styles.screenContent, contentContainerStyle]}
+      {...props}
+      style={[styles.screen, style]}>
+      {children}
+    </ScrollView>
   );
 }
 
@@ -167,7 +165,7 @@ export function FormField({ label, error, ...props }: TextInputProps & { label: 
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: brand.canvas },
-  screenContent: { width: '100%', maxWidth: 760, alignSelf: 'center', paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: spacing.xxxl, gap: spacing.md },
+  screenContent: { flexGrow: 1, width: '100%', maxWidth: 760, alignSelf: 'center', paddingHorizontal: spacing.md, paddingTop: spacing.md, paddingBottom: spacing.xxxl, gap: spacing.md },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: spacing.lg },
   brandIcon: { width: 50, height: 50, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: brand.navy },
   brandIconText: { color: brand.gold, fontSize: 17, fontWeight: '900', letterSpacing: -0.5 },

@@ -2,6 +2,7 @@ import { ComponentProps } from 'react';
 import { Redirect, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { trackWelcomeFunnelEvent, welcomeFunnelEvents } from '@/analytics/welcome-funnel';
 import { useAuth } from '@/auth/auth-context';
@@ -25,6 +26,7 @@ export default function WelcomeScreen() {
   const { language, setLanguage, setRole } = usePrototype();
   const { ready, account } = useAuth();
   const { t } = useTranslations();
+  const insets = useSafeAreaInsets();
 
   const chooseRole = (role: Role) => {
     trackWelcomeFunnelEvent(roleEvent[role]);
@@ -50,6 +52,11 @@ export default function WelcomeScreen() {
     router.push('/sign-in');
   };
 
+  const openE2Overview = () => {
+    trackWelcomeFunnelEvent(welcomeFunnelEvents.e2OverviewSelected);
+    router.push('/e2-overview');
+  };
+
   if (!ready) {
     return <View style={styles.loading}><ActivityIndicator color={brand.navy} size="large" /></View>;
   }
@@ -58,7 +65,7 @@ export default function WelcomeScreen() {
   }
 
   return (
-    <Screen contentContainerStyle={styles.content}>
+    <Screen contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.sm }]}>
       <View style={styles.topRow}>
         <BrandMark compact />
         <View style={styles.languageRow} accessibilityRole="radiogroup">
@@ -109,6 +116,25 @@ export default function WelcomeScreen() {
           <Text style={styles.attorneyArrow} accessibilityElementsHidden>›</Text>
         </Pressable>
       </View>
+
+      <Pressable
+        accessibilityRole="button"
+        testID="open-e2-overview"
+        onPress={openE2Overview}
+        style={({ pressed }) => [styles.e2Card, pressed && styles.pressed]}>
+        <View style={styles.e2TopRow}>
+          <View style={styles.e2Icon} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+            <SymbolView name={{ ios: 'flag.fill', android: 'flag', web: 'flag' }} tintColor={brand.gold} size={19} />
+          </View>
+          <Text style={styles.e2Eyebrow}>{t('welcome.e2Eyebrow')}</Text>
+        </View>
+        <Text style={styles.e2Title}>{t('welcome.e2Title')}</Text>
+        <Text style={styles.e2Body}>{t('welcome.e2Body')}</Text>
+        <View style={styles.e2ActionRow}>
+          <Text style={styles.e2Action}>{t('welcome.e2Action')}</Text>
+          <Text style={styles.e2Arrow} accessibilityElementsHidden>›</Text>
+        </View>
+      </Pressable>
 
       <View style={styles.notice} accessibilityRole="summary">
         <Text style={styles.noticeMark} accessibilityElementsHidden>✓</Text>
@@ -211,6 +237,15 @@ const styles = StyleSheet.create({
   attorneyTitle: { ...type.label, color: brand.blue },
   attorneyBody: { ...type.caption, color: brand.slate, marginTop: 2 },
   attorneyArrow: { color: brand.gold, fontSize: 25, lineHeight: 28, fontWeight: '300' },
+  e2Card: { gap: spacing.xs, borderRadius: 18, borderWidth: 1, borderColor: '#E7D39A', backgroundColor: brand.goldWash, padding: 14 },
+  e2TopRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  e2Icon: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: brand.white },
+  e2Eyebrow: { ...type.caption, flex: 1, color: brand.warning, fontSize: 11, lineHeight: 15, letterSpacing: 0.7 },
+  e2Title: { ...type.subheading, color: brand.ink, marginTop: 2 },
+  e2Body: { ...type.caption, color: brand.slate },
+  e2ActionRow: { minHeight: 30, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, marginTop: 2 },
+  e2Action: { ...type.label, flex: 1, color: brand.blue },
+  e2Arrow: { color: brand.gold, fontSize: 25, lineHeight: 28, fontWeight: '300' },
   notice: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, borderRadius: 14, backgroundColor: brand.goldWash, padding: 12 },
   noticeMark: { ...type.label, color: brand.gold },
   noticeCopy: { flex: 1 },

@@ -55,6 +55,7 @@ Use one cross-functional delivery stream with weekly demonstrations. Build verti
 - [x] Create the Expo SDK 57 project with strict TypeScript and Expo Router.
 - [x] Build the investor and referral-partner primary journeys with typed mock state.
 - [x] Add non-advice boundaries and duplicate-review-safe referral language.
+- [x] Add a bilingual E-2 education preview and overview with official sources, neutral H-1B/EB-5 comparisons, and expiry-safe temporary H-1B context.
 - [x] Verify type checking, linting, Expo compatibility, export, mobile layout, navigation, and browser runtime logs.
 - [ ] Complete stakeholder, counsel, accessibility, and bilingual-content review.
 - [ ] Run the representative research cohort and schedule approved findings.
@@ -94,7 +95,7 @@ Create the prototype in the same Expo project intended for production, using a t
 - [ ] Add component tests and device preview builds.
 - [ ] Resolve the monitored `xcode`/`uuid` advisory through an Expo-compatible dependency update; do not force an SDK-breaking downgrade.
 - [x] Implement secure session storage, typed API client, request IDs, duplicate-neutral registration, and error mapping.
-- [x] Add a payload-free allowlist for pre-login role and sign-in funnel events.
+- [x] Add a payload-free allowlist for pre-login role, E-2 education, and sign-in funnel events.
 - [ ] Connect the allowlist to an approved first-party analytics sink and add crash reporting after privacy review.
 
 ### Backend foundation

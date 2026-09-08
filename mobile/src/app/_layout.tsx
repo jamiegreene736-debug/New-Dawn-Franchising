@@ -52,6 +52,7 @@ function AppNavigation() {
         <Stack.Screen name="investor-result" options={{ title: t('screen.result') }} />
         <Stack.Screen name="partner-application" options={{ title: t('screen.partnerApplication') }} />
         <Stack.Screen name="partner-referral" options={{ title: t('screen.partnerReferral') }} />
+        <Stack.Screen name="e2-overview" options={{ title: t('screen.e2Overview') }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       </Stack>
     </ThemeProvider>

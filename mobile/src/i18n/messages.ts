@@ -1,9 +1,9 @@
 const english = {
   'language.english': 'English',
   'language.spanish': 'Español',
-  'welcome.tag': 'A CLEARER U.S. BUSINESS PATH',
-  'welcome.title': 'Start with the path that fits you',
-  'welcome.subtitle': 'Choose your goal and we’ll show you the right next steps.',
+  'welcome.tag': 'E-2 BUSINESS OWNERSHIP PATH',
+  'welcome.title': 'Explore a U.S. business path you can direct',
+  'welcome.subtitle': 'Choose your goal, understand where E-2 may fit, and get the right next steps.',
   'welcome.boundaryTitle': 'Clear professional roles',
   'welcome.boundaryBody': 'New Dawn explains the business. Independent counsel provides immigration advice.',
   'welcome.choose': 'I want to…',
@@ -19,6 +19,10 @@ const english = {
   'welcome.attorneyBody': 'Learn about the separate counsel resource track.',
   'welcome.attorneyUnavailableTitle': 'Counsel access is separate',
   'welcome.attorneyUnavailableBody': 'Attorney accounts are not included in this pilot. Contact New Dawn to request resource access.',
+  'welcome.e2Eyebrow': 'WHY ENTREPRENEURS EXPLORE E-2',
+  'welcome.e2Title': 'Own and direct a qualifying U.S. business',
+  'welcome.e2Body': 'For eligible treaty-country nationals: a business-led process without the cap-subject H-1B registration selection or EB-5’s fixed statutory investment thresholds.',
+  'welcome.e2Action': 'See the E-2 process and compare pathways',
   'welcome.existingAccount': 'Already have an account?',
   'welcome.signIn': 'Sign in',
   'prototype.notice': 'Interactive prototype · Mock data only · No production connection',
@@ -34,6 +38,7 @@ const english = {
   'screen.result': 'Your result',
   'screen.partnerApplication': 'Partner application',
   'screen.partnerReferral': 'Register a referral',
+  'screen.e2Overview': 'E-2 overview',
 } as const;
 
 export type MessageKey = keyof typeof english;
@@ -42,9 +47,9 @@ export type Locale = 'en' | 'es';
 const spanish: Record<MessageKey, string> = {
   'language.english': 'English',
   'language.spanish': 'Español',
-  'welcome.tag': 'UN CAMINO EMPRESARIAL MÁS CLARO EN EE. UU.',
-  'welcome.title': 'Comience con el camino adecuado para usted',
-  'welcome.subtitle': 'Elija su objetivo y le mostraremos los próximos pasos adecuados.',
+  'welcome.tag': 'CAMINO E-2 PARA PROPIETARIOS DE NEGOCIOS',
+  'welcome.title': 'Explore un camino empresarial en EE. UU. que usted pueda dirigir',
+  'welcome.subtitle': 'Elija su objetivo, entienda cuándo la E-2 podría ser adecuada y conozca los próximos pasos.',
   'welcome.boundaryTitle': 'Funciones profesionales claras',
   'welcome.boundaryBody': 'New Dawn explica el negocio. Un abogado independiente brinda asesoría migratoria.',
   'welcome.choose': 'Quiero…',
@@ -60,6 +65,10 @@ const spanish: Record<MessageKey, string> = {
   'welcome.attorneyBody': 'Conozca el programa separado de recursos para abogados.',
   'welcome.attorneyUnavailableTitle': 'El acceso para abogados es independiente',
   'welcome.attorneyUnavailableBody': 'Las cuentas para abogados no están incluidas en este programa piloto. Comuníquese con New Dawn para solicitar acceso a los recursos.',
+  'welcome.e2Eyebrow': 'POR QUÉ LOS EMPRENDEDORES EXPLORAN LA E-2',
+  'welcome.e2Title': 'Sea propietario y dirija un negocio estadounidense que cumpla los requisitos',
+  'welcome.e2Body': 'Para nacionales elegibles de países con tratado: un proceso empresarial sin la selección del registro H-1B sujeta al límite anual ni los umbrales legales fijos de inversión de la EB-5.',
+  'welcome.e2Action': 'Vea el proceso E-2 y compare caminos',
   'welcome.existingAccount': '¿Ya tiene una cuenta?',
   'welcome.signIn': 'Iniciar sesión',
   'prototype.notice': 'Prototipo interactivo · Solo datos de prueba · Sin conexión a producción',
@@ -75,6 +84,7 @@ const spanish: Record<MessageKey, string> = {
   'screen.result': 'Su resultado',
   'screen.partnerApplication': 'Solicitud de socio',
   'screen.partnerReferral': 'Registrar una referencia',
+  'screen.e2Overview': 'Descripción general de la E-2',
 };
 
 const messages: Record<Locale, Readonly<Record<MessageKey, string>>> = {

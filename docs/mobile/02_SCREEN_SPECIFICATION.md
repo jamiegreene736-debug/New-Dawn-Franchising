@@ -47,7 +47,7 @@
 |---|---|---|---|
 | SH-01 | Launch | Brand entry and initialization. | loading, minimum-version block, offline cached-content option, maintenance |
 | SH-02 | Language | Choose English or Spanish before controlling copy appears. | selected, unavailable-locale fallback |
-| SH-03 | Choose a path | Put the goal-based role choice above the legal boundary: emphasize Explore business ownership, keep Refer prospective investors immediately visible, and present independent counsel as a clear supporting action. Returning-account sign-in remains visible. | default, connected-pilot counsel explanation, role selected |
+| SH-03 | Choose a path | Put the goal-based role choice above the legal boundary: emphasize Explore business ownership, keep Refer prospective investors immediately visible, and present independent counsel as a clear supporting action. Follow the roles with a concise, sourced E-2 value preview that opens the education hub without requiring an account. Returning-account sign-in remains visible. | default, connected-pilot counsel explanation, role selected, E-2 overview selected |
 | SH-04 | Privacy and boundaries | Concise data use, no-legal-advice boundary, and source links. Primary action: Continue. | content unavailable, updated version acknowledgement |
 | SH-05 | Create account | Email and password with terms/privacy links. | validation, email already used, rate limited |
 | SH-06 | Verify email | Enter code or use verified link. | resend timer, expired, incorrect, success |
@@ -90,7 +90,7 @@
 |---|---|---|
 | IN-15 | Opportunity list | Only currently approved offerings; filters limited to practical business dimensions, not legal eligibility. |
 | IN-16 | Opportunity detail | Business overview, responsibilities, support model, territory/availability qualifier, current disclosure status, approved claim version, and Request information. |
-| IN-17 | E-2 education hub | Source-controlled general articles, official government links, date reviewed, and counsel reminder. |
+| IN-17 | E-2 education hub | Give a bilingual, source-controlled overview of E-2 requirements, the general process, and neutral structural comparisons with H-1B and EB-5. Show official government links, date reviewed, counsel reminder, and a fail-safe that removes the temporary H-1B $100,000 statement after the proclamation's stated end unless content is refreshed. |
 | IN-18 | Resource detail | Locale/version/review date, source links, save/share rules, report-a-problem action. |
 
 ### Appointments and support
@@ -204,6 +204,8 @@ Apply/verify → acknowledge independent role → access counsel pack → view o
 
 - On iPhone 17 Pro Max, the investor and referral-partner choices plus the independent-counsel action are visible without scrolling at the default text size.
 - At least 80% of participants identify and select their intended role within five seconds without facilitator intervention.
+- At least 90% of prospective investors can identify treaty nationality, substantial at-risk investment, a real operating enterprise, independent legal review, and government decision as distinct E-2 process elements after viewing the overview.
+- No participant interprets the E-2, H-1B, or EB-5 comparison as a promise of eligibility, approval, speed, permanent residence, or lower total cost.
 - At least 80% of participants complete the primary journey without facilitator intervention.
 - At least 90% correctly state that the result is not a visa eligibility decision.
 - No participant interprets `received`, `sent`, `scheduled`, or `pending` as completed.

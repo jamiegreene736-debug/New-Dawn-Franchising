@@ -12,13 +12,16 @@ import {
 type RuntimeModule = typeof import("../mobile/src/config/runtime");
 type MessagesModule = typeof import("../mobile/src/i18n/messages");
 type WelcomeFunnelModule = typeof import("../mobile/src/analytics/welcome-funnel");
+type E2OverviewModule = typeof import("../mobile/src/content/e2-overview");
 
 const loadedRuntimeModule = await import("../mobile/src/config/runtime") as RuntimeModule & { default?: RuntimeModule };
 const loadedMessagesModule = await import("../mobile/src/i18n/messages") as MessagesModule & { default?: MessagesModule };
 const loadedWelcomeFunnelModule = await import("../mobile/src/analytics/welcome-funnel") as WelcomeFunnelModule & { default?: WelcomeFunnelModule };
+const loadedE2OverviewModule = await import("../mobile/src/content/e2-overview") as E2OverviewModule & { default?: E2OverviewModule };
 const { createRuntimeConfig } = loadedRuntimeModule.default ?? loadedRuntimeModule;
 const { hasTranslationParity, translate } = loadedMessagesModule.default ?? loadedMessagesModule;
 const { trackWelcomeFunnelEvent, welcomeFunnelEvents } = loadedWelcomeFunnelModule.default ?? loadedWelcomeFunnelModule;
+const { getE2OverviewContent, officialE2Sources } = loadedE2OverviewModule.default ?? loadedE2OverviewModule;
 
 test("required server configuration fails closed", () => {
   assert.equal(readRequiredEnvironmentValue("SESSION_SECRET", { SESSION_SECRET: " secure-value " }), "secure-value");
@@ -84,12 +87,26 @@ test("welcome funnel analytics use a fixed payload-free event allowlist", () => 
     "welcome.investor_selected",
     "welcome.partner_selected",
     "welcome.attorney_selected",
+    "welcome.e2_overview_selected",
     "welcome.sign_in_selected",
   ]);
 
   const recorded: string[] = [];
   trackWelcomeFunnelEvent(welcomeFunnelEvents.investorSelected, (event) => recorded.push(event));
   assert.deepEqual(recorded, ["welcome.investor_selected"]);
+});
+
+test("E-2 education remains bilingual, sourced, and time-bounds the temporary H-1B payment", () => {
+  const duringProclamation = new Date("2026-09-08T16:00:00Z");
+  const afterProclamation = new Date("2026-09-21T04:01:01Z");
+  const english = getE2OverviewContent("en", duringProclamation);
+  const spanish = getE2OverviewContent("es", duringProclamation);
+
+  assert.equal(english.steps.length, spanish.steps.length);
+  assert.equal(english.comparisons.length, spanish.comparisons.length);
+  assert.match(english.comparisons[1].detail, /\$100,000/);
+  assert.doesNotMatch(getE2OverviewContent("en", afterProclamation).comparisons[1].detail, /\$100,000/);
+  assert.equal(Object.values(officialE2Sources).every((source) => source.url.startsWith("https://")), true);
 });
 
 test("mobile status contract accepts only versioned responses", () => {

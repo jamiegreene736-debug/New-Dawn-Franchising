@@ -1,6 +1,6 @@
 # New Dawn Pathways — Notification Command Center
 
-**Status:** Product policy and implementation complete; isolated staging validation required before connected pilot use
+**Status:** Product policy, implementation, simulator walkthrough, and isolated staging validation complete; production remains prelaunch
 
 ## Purpose
 
@@ -40,9 +40,8 @@ Notifications make New Dawn Pathways useful between visits. The product watches 
 
 ## Remaining connected-delivery gates
 
-1. Apply `0002_mobile_notifications.sql` only to the isolated staging database and record readback.
-2. Configure an authorized Expo project and Apple push credentials for internal distribution.
-3. Connect authoritative pathway, scheduling, FDD, referral, and owner-operation events through an idempotent outbox/worker.
-4. Reconcile Expo tickets/receipts, deactivate invalid tokens, and add delivery-health monitoring.
-5. Complete legal, privacy, English/Spanish, accessibility, and physical-device review before an external cohort.
-6. Keep production accounts, schema changes, and remote delivery disabled until a separate signed production release gate.
+1. Configure an authorized Expo project and Apple push credentials for internal distribution.
+2. Connect authoritative pathway, scheduling, FDD, referral, and owner-operation events through an idempotent outbox/worker.
+3. Reconcile Expo tickets/receipts, deactivate invalid tokens, and add delivery-health monitoring.
+4. Complete legal, privacy, English/Spanish, accessibility, and physical-device review before an external cohort.
+5. Keep production accounts, schema changes, and remote delivery disabled until a separate signed production release gate.

@@ -59,6 +59,16 @@ The pathway API deployment `f4968022-13cd-4901-bff2-6474c087cf92` completed succ
 
 The native Expo project was generated and opened as `NewDawnPathways.xcworkspace`. Xcode built it for the iOS 26.5 iPhone 17 Pro Max simulator with zero errors, installed it, and launched the connected staging configuration successfully.
 
+## Notification command-center increment
+
+On September 8, 2026, deployment `bfc82d68-b95d-411a-869d-a0c7c793683a` built pull request #200 commit `d0e888e` and reached `SUCCESS` on the isolated `New-Dawn-Mobile-Staging` service. Exact-target preflight recorded the New Dawn project, the `staging` environment, 13 existing mobile tables, and zero notification tables.
+
+`migrations/mobile/0002_mobile_notifications.sql` was then applied in one transaction. Post-commit readback found exactly 17 mobile tables, 14 mobile enums, and the four expected notification tables. All four new tables contained zero rows before testing. The aggregate migration package passed the static allowlist at 94 statements with SHA-256 `1d3855e0c9091d4ebba288304ca99913398e0f7d197a90b7f8206b7403e240d2`.
+
+The connected synthetic smoke test passed bootstrap flags, notification defaults, preference updates, appointment-reminder create/list/cancel, authenticated initial-notification readback, token rotation/reuse protection, recovery, deletion, and partner approval gating. The two generated `@example.test` identities and related test records were removed transactionally; post-cleanup readback returned zero identities, pathways, notification preferences, reminders, devices, and notifications.
+
+A separate production read-only transaction returned zero `mobile_*` tables and zero notification tables. The live production bootstrap continued to report `availability=prelaunch` with authentication and account features disabled. No production migration, account enablement, or remote push delivery was performed.
+
 ## Remaining gates
 
 1. Build a staging-safe API service profile that disables every email, campaign, sync, posting, scheduled, and paid-provider background job.

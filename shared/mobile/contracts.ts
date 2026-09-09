@@ -10,6 +10,8 @@ export const mobileCapabilitySchema = z.enum([
   "account:sessions:manage-own",
   "account:deletion:request-own",
   "investor:path:read-own",
+  "notifications:read-own",
+  "notifications:manage-own",
   "partner:application:write-own",
   "partner:referral:create",
   "partner:referral:read-own",
@@ -34,6 +36,8 @@ export const mobileBootstrapResponseSchema = z.object({
     investorAccounts: z.boolean(),
     partnerAccounts: z.boolean(),
     attorneyAccounts: z.boolean(),
+    notifications: z.boolean(),
+    officialSourceAlerts: z.boolean(),
   }),
   security: z.object({
     accessTokenExpiresInSeconds: z.number().int().min(300).max(900),
@@ -197,6 +201,106 @@ export const mobilePathwayMilestoneResponseSchema = z.object({
   requestId: z.string().min(1).max(128),
 });
 
+export const mobileNotificationCategorySchema = z.enum([
+  "next_action",
+  "appointment",
+  "fdd",
+  "embassy",
+  "expiration",
+  "secure_status",
+  "opportunity",
+  "weekly_digest",
+  "referral",
+  "owner_operations",
+]);
+export const mobileNotificationUrgencySchema = z.enum(["passive", "active", "time_sensitive"]);
+export const mobileNotificationPlatformSchema = z.enum(["ios", "android"]);
+export const mobileReminderKindSchema = z.enum([
+  "appointment",
+  "fdd_review",
+  "passport_check",
+  "visa_check",
+  "i94_check",
+  "business_deadline",
+]);
+
+export const mobileNotificationPreferencesSchema = z.object({
+  nextAction: z.boolean(),
+  appointments: z.boolean(),
+  fdd: z.boolean(),
+  embassy: z.boolean(),
+  expiration: z.boolean(),
+  secureStatus: z.boolean(),
+  opportunities: z.boolean(),
+  weeklyDigest: z.boolean(),
+  referrals: z.boolean(),
+  ownerOperations: z.boolean(),
+  followedEmbassyPost: z.string().trim().min(2).max(120).nullable(),
+  timezone: z.string().trim().min(1).max(64),
+  quietHoursStart: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).nullable(),
+  quietHoursEnd: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).nullable(),
+  updatedAt: z.string().datetime(),
+});
+export const mobileNotificationPreferencesRequestSchema = mobileNotificationPreferencesSchema
+  .omit({ updatedAt: true })
+  .strict();
+export const mobileNotificationPreferencesResponseSchema = mobileNotificationPreferencesSchema.extend({
+  requestId: z.string().min(1).max(128),
+});
+
+export const mobilePushDeviceRequestSchema = z.object({
+  expoPushToken: z.string().trim().regex(/^(ExponentPushToken|ExpoPushToken)\[[A-Za-z0-9_-]+\]$/),
+  platform: mobileNotificationPlatformSchema,
+  deviceLabel: z.string().trim().min(1).max(120).optional(),
+  locale: mobileLocaleSchema,
+}).strict();
+export const mobilePushDeviceResponseSchema = z.object({
+  id: z.string().uuid(),
+  status: z.literal("registered"),
+  requestId: z.string().min(1).max(128),
+});
+
+export const mobileNotificationSourceSchema = z.object({
+  label: z.string().min(1).max(160),
+  url: z.string().url().startsWith("https://"),
+  publishedAt: z.string().datetime().nullable(),
+}).nullable();
+export const mobileNotificationSchema = z.object({
+  id: z.string().uuid(),
+  category: mobileNotificationCategorySchema,
+  urgency: mobileNotificationUrgencySchema,
+  title: z.string().min(1).max(120),
+  body: z.string().min(1).max(500),
+  deepLink: z.string().regex(/^\/[A-Za-z0-9_?=&/().:-]+$/),
+  source: mobileNotificationSourceSchema,
+  availableAt: z.string().datetime(),
+  readAt: z.string().datetime().nullable(),
+  createdAt: z.string().datetime(),
+});
+export const mobileNotificationsResponseSchema = z.object({
+  notifications: z.array(mobileNotificationSchema).max(100),
+  unreadCount: z.number().int().nonnegative(),
+  requestId: z.string().min(1).max(128),
+});
+
+export const mobileReminderRequestSchema = z.object({
+  kind: mobileReminderKindSchema,
+  eventAt: z.string().datetime(),
+}).strict();
+export const mobileReminderSchema = z.object({
+  id: z.string().uuid(),
+  kind: mobileReminderKindSchema,
+  eventAt: z.string().datetime(),
+  createdAt: z.string().datetime(),
+});
+export const mobileReminderResponseSchema = mobileReminderSchema.extend({
+  requestId: z.string().min(1).max(128),
+});
+export const mobileRemindersResponseSchema = z.object({
+  reminders: z.array(mobileReminderSchema).max(100),
+  requestId: z.string().min(1).max(128),
+});
+
 export const mobileApiErrorSchema = z.object({
   error: z.object({
     code: mobileApiErrorCodeSchema,
@@ -222,3 +326,9 @@ export type MobilePathwayOwner = z.infer<typeof mobilePathwayOwnerSchema>;
 export type MobilePathwayMilestoneKey = z.infer<typeof mobilePathwayMilestoneKeySchema>;
 export type MobilePathwayMilestone = z.infer<typeof mobilePathwayMilestoneSchema>;
 export type MobilePathwayResponse = z.infer<typeof mobilePathwayResponseSchema>;
+export type MobileNotificationCategory = z.infer<typeof mobileNotificationCategorySchema>;
+export type MobileNotificationUrgency = z.infer<typeof mobileNotificationUrgencySchema>;
+export type MobileNotificationPreferences = z.infer<typeof mobileNotificationPreferencesSchema>;
+export type MobileNotification = z.infer<typeof mobileNotificationSchema>;
+export type MobileReminderKind = z.infer<typeof mobileReminderKindSchema>;
+export type MobileReminder = z.infer<typeof mobileReminderSchema>;

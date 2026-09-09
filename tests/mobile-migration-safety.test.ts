@@ -24,6 +24,7 @@ test("generated migration creates exactly the reviewed mobile schema", async () 
   assert.deepEqual(result.files, [
     "0000_mobile_identity_foundation.sql",
     "0001_mobile_pathway_pilot.sql",
+    "0002_mobile_notifications.sql",
   ]);
   assert.deepEqual(result.createdTables, [...MOBILE_MIGRATION_TABLES].sort());
   assert.deepEqual(result.createdEnums, [...MOBILE_MIGRATION_ENUMS].sort());

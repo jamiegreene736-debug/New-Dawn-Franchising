@@ -65,6 +65,17 @@ export const mobilePathwayOwner = pgEnum("mobile_pathway_owner", [
   "independent_counsel",
   "shared",
 ]);
+export const mobileNotificationCategory = pgEnum("mobile_notification_category", [
+  "next_action", "appointment", "fdd", "embassy", "expiration", "secure_status",
+  "opportunity", "weekly_digest", "referral", "owner_operations",
+]);
+export const mobileNotificationUrgency = pgEnum("mobile_notification_urgency", [
+  "passive", "active", "time_sensitive",
+]);
+export const mobileNotificationPlatform = pgEnum("mobile_notification_platform", ["ios", "android"]);
+export const mobileReminderKind = pgEnum("mobile_reminder_kind", [
+  "appointment", "fdd_review", "passport_check", "visa_check", "i94_check", "business_deadline",
+]);
 
 export const mobileIdentities = pgTable("mobile_identities", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -287,6 +298,84 @@ export const mobilePathwayEvents = pgTable("mobile_pathway_events", {
   index("mobile_pathway_events_recorded_at_idx").on(table.recordedAt),
 ]);
 
+export const mobileNotificationPreferences = pgTable("mobile_notification_preferences", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  identityId: varchar("identity_id").notNull().references(() => mobileIdentities.id, { onDelete: "cascade" }),
+  nextAction: boolean("next_action").default(true).notNull(),
+  appointments: boolean("appointments").default(true).notNull(),
+  fdd: boolean("fdd").default(true).notNull(),
+  embassy: boolean("embassy").default(true).notNull(),
+  expiration: boolean("expiration").default(true).notNull(),
+  secureStatus: boolean("secure_status").default(true).notNull(),
+  opportunities: boolean("opportunities").default(false).notNull(),
+  weeklyDigest: boolean("weekly_digest").default(true).notNull(),
+  referrals: boolean("referrals").default(true).notNull(),
+  ownerOperations: boolean("owner_operations").default(true).notNull(),
+  followedEmbassyPost: text("followed_embassy_post"),
+  timezone: varchar("timezone", { length: 64 }).default("America/New_York").notNull(),
+  quietHoursStart: varchar("quiet_hours_start", { length: 5 }),
+  quietHoursEnd: varchar("quiet_hours_end", { length: 5 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("mobile_notification_preferences_identity_unique").on(table.identityId),
+]);
+
+export const mobilePushDevices = pgTable("mobile_push_devices", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  identityId: varchar("identity_id").notNull().references(() => mobileIdentities.id, { onDelete: "cascade" }),
+  expoPushToken: text("expo_push_token").notNull(),
+  tokenHash: varchar("token_hash", { length: 64 }).notNull(),
+  platform: mobileNotificationPlatform("platform").notNull(),
+  deviceLabel: text("device_label"),
+  locale: varchar("locale", { length: 2 }).notNull(),
+  enabled: boolean("enabled").default(true).notNull(),
+  lastRegisteredAt: timestamp("last_registered_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("mobile_push_devices_token_hash_unique").on(table.tokenHash),
+  index("mobile_push_devices_identity_idx").on(table.identityId),
+  check("mobile_push_devices_locale_check", sql`${table.locale} in ('en', 'es')`),
+]);
+
+export const mobileNotificationReminders = pgTable("mobile_notification_reminders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  identityId: varchar("identity_id").notNull().references(() => mobileIdentities.id, { onDelete: "cascade" }),
+  kind: mobileReminderKind("kind").notNull(),
+  eventAt: timestamp("event_at").notNull(),
+  cancelledAt: timestamp("cancelled_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("mobile_notification_reminders_identity_idx").on(table.identityId),
+  index("mobile_notification_reminders_event_at_idx").on(table.eventAt),
+]);
+
+export const mobileNotifications = pgTable("mobile_notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  identityId: varchar("identity_id").notNull().references(() => mobileIdentities.id, { onDelete: "cascade" }),
+  reminderId: varchar("reminder_id").references(() => mobileNotificationReminders.id, { onDelete: "cascade" }),
+  category: mobileNotificationCategory("category").notNull(),
+  urgency: mobileNotificationUrgency("urgency").default("active").notNull(),
+  title: varchar("title", { length: 120 }).notNull(),
+  body: text("body").notNull(),
+  deepLink: varchar("deep_link", { length: 240 }).notNull(),
+  sourceLabel: varchar("source_label", { length: 160 }),
+  sourceUrl: text("source_url"),
+  sourcePublishedAt: timestamp("source_published_at"),
+  reviewedBy: text("reviewed_by"),
+  reviewedAt: timestamp("reviewed_at"),
+  availableAt: timestamp("available_at").notNull(),
+  expiresAt: timestamp("expires_at"),
+  readAt: timestamp("read_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("mobile_notifications_identity_available_idx").on(table.identityId, table.availableAt),
+  index("mobile_notifications_identity_read_idx").on(table.identityId, table.readAt),
+  index("mobile_notifications_reminder_idx").on(table.reminderId),
+]);
+
 export type MobileIdentity = typeof mobileIdentities.$inferSelect;
 export type MobileIdentityRole = typeof mobileIdentityRoles.$inferSelect;
 export type MobileInvestorLink = typeof mobileInvestorLinks.$inferSelect;
@@ -300,3 +389,7 @@ export type MobileDeletionRequest = typeof mobileDeletionRequests.$inferSelect;
 export type MobilePathwayInstance = typeof mobilePathwayInstances.$inferSelect;
 export type MobilePathwayMilestone = typeof mobilePathwayMilestones.$inferSelect;
 export type MobilePathwayEvent = typeof mobilePathwayEvents.$inferSelect;
+export type MobileNotificationPreference = typeof mobileNotificationPreferences.$inferSelect;
+export type MobilePushDevice = typeof mobilePushDevices.$inferSelect;
+export type MobileNotificationReminder = typeof mobileNotificationReminders.$inferSelect;
+export type MobileNotificationRecord = typeof mobileNotifications.$inferSelect;

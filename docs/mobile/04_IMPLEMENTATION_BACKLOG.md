@@ -142,7 +142,9 @@ Create the prototype in the same Expo project intended for production, using a t
 
 ## Phase 6 — Notifications, hardening, and operations (Weeks 11–14)
 
-- [ ] APNs/Expo push token lifecycle, transactional events, delivery receipts, retries, preferences, and safe lock-screen text.
+- [x] Implement Path Watchlist UX, contextual iOS permission, category preferences, opportunity opt-in, local important-date reminders, deep links, and generic lock-screen text.
+- [x] Implement authenticated preferences, Expo token registration/removal, notification inbox/read state, reminders, category authorization, reviewed-source policy, and retrying Expo delivery service.
+- [ ] Connect authoritative business events and a worker/outbox to delivery receipts, ticket reconciliation, invalid-token cleanup, and operational alerting.
 - [ ] Staff mobile-journey views, support queue, duplicate-review queue, content approval, and audit lookup in the existing web administration.
 - [ ] Offline cached approved content and local drafts with server-confirmed submission semantics.
 - [ ] Accessibility, localization, performance, poor-network, interruption, device-size, and upgrade testing.

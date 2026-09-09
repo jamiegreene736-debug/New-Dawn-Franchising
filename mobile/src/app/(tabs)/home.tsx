@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { usePrototype } from '@/prototype/prototype-context';
+import { NotificationSummaryCard } from '@/notifications/notification-summary-card';
 import { Button, Callout, Card, PageHeader, ProgressBar, Screen, SectionHeader, StatusPill, StatusRow } from '@/ui/components';
 import { brand, spacing, type } from '@/ui/theme';
 
@@ -17,6 +18,7 @@ function InvestorHome() {
   return (
     <Screen>
       <PageHeader eyebrow="GOOD AFTERNOON" title="Your path is ready" body="Keep business tasks, professional handoffs, and confirmed receipts in one place." />
+      <NotificationSummaryCard />
       <Card style={styles.heroCard}>
         <View style={styles.cardTop}><StatusPill label="Next action" tone="warning" /><Text style={styles.stepCount}>Step 1 of 8</Text></View>
         <Text style={styles.heroTitle}>Review the business model with New Dawn</Text>
@@ -43,6 +45,7 @@ function PartnerHome() {
   return (
     <Screen>
       <PageHeader eyebrow="PARTNER WORKSPACE" title={approved ? 'You are approved to continue' : 'Application received'} body={approved ? 'Complete current requirements before registering a referral.' : 'New Dawn is reviewing professional fit, jurisdiction, and compliance information.'} />
+      <NotificationSummaryCard />
       <Card style={approved ? styles.successCard : styles.heroCard}>
         <View style={styles.cardTop}><StatusPill label={approved ? 'Approved' : 'Under review'} tone={approved ? 'success' : 'warning'} /><Text style={styles.stepCount}>Prototype state</Text></View>
         <Text style={styles.heroTitle}>{approved ? 'Finish partner training' : 'No client information is needed yet'}</Text>
@@ -64,6 +67,7 @@ function AttorneyHome() {
   return (
     <Screen>
       <PageHeader eyebrow="INDEPENDENT COUNSEL" title="Business diligence, clearly separated" body="Access current New Dawn materials without being asked to endorse an opportunity or surrender independent judgment." />
+      <NotificationSummaryCard />
       <Card style={styles.heroCard}>
         <StatusPill label="Resource access preview" tone="success" />
         <Text style={styles.heroTitle}>Counsel diligence pack</Text>

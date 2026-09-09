@@ -13,10 +13,13 @@ This is the iPhone-first New Dawn Pathways app for investor and referral-partner
 - Versioned mobile gateway with timeout and response validation.
 - Connected staging registration, email verification, sign-in, token rotation, session restoration, sign-out, and account-deletion requests.
 - Authenticated investors receive a private, persisted eight-step My Path with authoritative event-backed status.
+- A Path Watchlist notification center provides next-action, appointment, FDD, official-post, important-date, secure-status, weekly-digest, referral, and owner-operation alerts.
+- Users choose categories before the iOS permission prompt; opportunity alerts are opt-in, local reminders work in prototype mode, and connected mode syncs preferences, devices, reminders, and an authenticated inbox.
+- Lock-screen copy is deliberately generic. Sensitive pathway details, document names, referral identities, and immigration or financial facts appear only after the app is opened.
 - A generated native Xcode workspace can be produced with `npx expo prebuild --platform ios --clean`; `npm run ios -- --device "iPhone 17 Pro Max"` builds and launches it.
 - Refresh tokens stored with iOS SecureStore; access tokens stay in memory and expire after ten minutes.
 - Staging-only verification tokens for internal testing until an approved transactional-email provider is connected.
-- No production CRM, payments, legal-document, notification, or provider connection.
+- No production CRM, payments, legal-document, notification-delivery, or provider connection. Production account and remote-notification flags remain prelaunch.
 
 The pilot is for product, usability, accessibility, legal-copy, authentication, and operational review. It must not be presented as a production immigration-advice or investment application.
 
@@ -61,9 +64,11 @@ npx eas-cli build --platform ios --profile preview
 
 1. Choose **Investor** and complete the four-question assessment.
 2. Review the result, then open Home and My Path.
-3. Restart and choose **Referral partner**.
-4. Submit the application, preview approval, finish training, accept the permission boundary, and register a referral.
-5. Confirm that the final receipt communicates duplicate review without exposing another person's information.
+3. Open **Path Watchlist**, choose notification categories, enable notifications, and save an important-date reminder.
+4. Confirm that opportunity alerts start off and lock-screen copy stays generic.
+5. Restart and choose **Referral partner**.
+6. Submit the application, preview approval, finish training, accept the permission boundary, and register a referral.
+7. Confirm that the final receipt communicates duplicate review without exposing another person's information.
 
 ## Staging safety boundary
 

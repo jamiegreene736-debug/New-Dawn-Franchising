@@ -46,3 +46,13 @@ Stop and restore the staging snapshot if any unexpected object changes, data wri
 Production remains unchanged until all of the following are complete: CRM duplicate review, data-flow and retention approval, named legal/privacy/security owners, transactional authentication tests, and a separate production change approval. Production mobile authentication remains disabled until that gate is signed.
 
 The September 2, 2026 staging execution and rollback evidence is recorded in `docs/mobile/09_STAGING_MIGRATION_VALIDATION.md`.
+
+## Notification increment
+
+The additive notification migration uses a fail-closed operator command:
+
+```bash
+npm run mobile:notifications:migrate-staging
+```
+
+The command refuses every project/environment except the recorded isolated New Dawn staging target, statically revalidates `0002_mobile_notifications.sql`, requires exactly 13 existing base mobile tables and zero notification tables, applies all four tables in one transaction, and verifies exact readback before commit. A partial schema or any production target stops without applying the migration.

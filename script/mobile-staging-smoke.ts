@@ -38,6 +38,8 @@ async function main() {
   assert.equal(bootstrap.availability, "pilot");
   assert.equal(bootstrap.features.authentication, true);
   assert.equal(bootstrap.features.attorneyAccounts, false);
+  assert.equal(bootstrap.features.notifications, true);
+  assert.equal(bootstrap.features.officialSourceAlerts, true);
   console.log("ok - isolated pilot bootstrap");
 
   const registration = await request("/auth/register", {
@@ -87,6 +89,57 @@ async function main() {
   });
   assert.equal(firstMilestone.milestone.key, "initial_readiness");
   console.log("ok - verification, access control, session readback, and persisted pathway");
+
+  const preferences = await request("/notification-preferences", {
+    headers: { Authorization: `Bearer ${verified.accessToken}` },
+  });
+  assert.equal(preferences.nextAction, true);
+  assert.equal(preferences.opportunities, false);
+  const updatedPreferences = await request("/notification-preferences", {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${verified.accessToken}` },
+    body: JSON.stringify({
+      nextAction: true,
+      appointments: true,
+      fdd: true,
+      embassy: true,
+      expiration: true,
+      secureStatus: true,
+      opportunities: true,
+      weeklyDigest: true,
+      referrals: true,
+      ownerOperations: true,
+      followedEmbassyPost: "U.S. Embassy London",
+      timezone: "Europe/London",
+      quietHoursStart: "21:00",
+      quietHoursEnd: "08:00",
+    }),
+  });
+  assert.equal(updatedPreferences.followedEmbassyPost, "U.S. Embassy London");
+
+  const reminder = await request("/notification-reminders", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${verified.accessToken}` },
+    body: JSON.stringify({
+      kind: "appointment",
+      eventAt: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
+    }),
+  }, 201);
+  assert.equal(reminder.kind, "appointment");
+  const reminders = await request("/notification-reminders", {
+    headers: { Authorization: `Bearer ${verified.accessToken}` },
+  });
+  assert.equal(reminders.reminders.length, 1);
+  const notifications = await request("/notifications", {
+    headers: { Authorization: `Bearer ${verified.accessToken}` },
+  });
+  assert.equal(notifications.unreadCount, 1);
+  assert.equal(notifications.notifications[0].category, "next_action");
+  await request(`/notification-reminders/${reminder.id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${verified.accessToken}` },
+  });
+  console.log("ok - notification preferences, private reminders, and authenticated inbox");
 
   const rotated = await request("/auth/refresh", {
     method: "POST",

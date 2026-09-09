@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { PrototypeProvider } from '@/prototype/prototype-context';
 import { AuthProvider } from '@/auth/auth-context';
 import { useTranslations } from '@/i18n/use-translations';
+import { NotificationProvider } from '@/notifications/notification-context';
 import { brand } from '@/ui/theme';
 
 const navigationTheme = {
@@ -23,7 +24,9 @@ export default function RootLayout() {
   return (
     <PrototypeProvider>
       <AuthProvider>
-        <AppNavigation />
+        <NotificationProvider>
+          <AppNavigation />
+        </NotificationProvider>
       </AuthProvider>
     </PrototypeProvider>
   );
@@ -53,6 +56,9 @@ function AppNavigation() {
         <Stack.Screen name="partner-application" options={{ title: t('screen.partnerApplication') }} />
         <Stack.Screen name="partner-referral" options={{ title: t('screen.partnerReferral') }} />
         <Stack.Screen name="e2-overview" options={{ title: t('screen.e2Overview') }} />
+        <Stack.Screen name="notifications" options={{ title: t('screen.notifications') }} />
+        <Stack.Screen name="notification-settings" options={{ title: t('screen.notificationSettings') }} />
+        <Stack.Screen name="add-reminder" options={{ title: t('screen.addReminder') }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       </Stack>
     </ThemeProvider>

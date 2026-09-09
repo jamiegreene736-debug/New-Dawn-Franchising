@@ -39,6 +39,9 @@ const english = {
   'screen.partnerApplication': 'Partner application',
   'screen.partnerReferral': 'Register a referral',
   'screen.e2Overview': 'E-2 overview',
+  'screen.notifications': 'Alerts & reminders',
+  'screen.notificationSettings': 'Notification settings',
+  'screen.addReminder': 'Add reminder',
 } as const;
 
 export type MessageKey = keyof typeof english;
@@ -85,6 +88,9 @@ const spanish: Record<MessageKey, string> = {
   'screen.partnerApplication': 'Solicitud de socio',
   'screen.partnerReferral': 'Registrar una referencia',
   'screen.e2Overview': 'Descripción general de la E-2',
+  'screen.notifications': 'Alertas y recordatorios',
+  'screen.notificationSettings': 'Configuración de notificaciones',
+  'screen.addReminder': 'Agregar recordatorio',
 };
 
 const messages: Record<Locale, Readonly<Record<MessageKey, string>>> = {

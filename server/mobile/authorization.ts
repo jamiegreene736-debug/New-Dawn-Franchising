@@ -6,6 +6,8 @@ const COMMON_ACCOUNT_CAPABILITIES: readonly MobileCapability[] = [
   "account:read-own",
   "account:sessions:manage-own",
   "account:deletion:request-own",
+  "notifications:read-own",
+  "notifications:manage-own",
 ];
 
 const ROLE_CAPABILITIES: Readonly<Record<MobileRole, readonly MobileCapability[]>> = {

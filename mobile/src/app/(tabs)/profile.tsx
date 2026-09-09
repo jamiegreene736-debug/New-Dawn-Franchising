@@ -56,6 +56,7 @@ export default function ProfileScreen() {
           <StatusRow title="Current session" detail="Securely stored on this device" state="Active" tone="success" />
           <StatusRow title="Environment" detail="No production customer data or provider actions" state="Staging" tone="warning" />
         </Card>
+        <Button label="Notification preferences" variant="secondary" onPress={() => router.push('/notification-settings')} />
         {error ? <Callout title="Account problem" body={error} tone="warning" /> : null}
         <SectionHeader title="Privacy and control" />
         <Callout title="Pilot data rule" body="Do not upload passports, bank details, tax records, or confidential immigration documents during testing." tone="info" />
@@ -72,7 +73,7 @@ export default function ProfileScreen() {
         <StatusRow title="Language" detail="Controlling content must be complete in the selected locale" state={language === 'es' ? 'Español' : 'English'} />
         <StatusRow title="Email" detail="prototype@example.test" state="Verified" tone="success" />
         <StatusRow title="Current session" detail="This prototype device" state="Active" tone="success" />
-        <StatusRow title="Notifications" detail="No push service connected in prototype" state="Mock only" />
+        <StatusRow title="Notifications" detail="Private iPhone reminders and a personalized watchlist" state="Available" tone="success" />
       </Card>
       <SectionHeader title="Privacy and control" />
       <Card>
@@ -82,6 +83,7 @@ export default function ProfileScreen() {
         <Text style={styles.link}>Request account deletion</Text>
       </Card>
       <Callout title="Mock data only" body="This prototype does not create an account, write to the New Dawn database, send messages, or schedule appointments." tone="info" />
+      <Button label="Notification preferences" variant="secondary" onPress={() => router.push('/notification-settings')} />
       <Button label="Restart and choose another role" variant="secondary" onPress={restart} />
       <Button label="Preview account deletion" variant="danger" onPress={() => undefined} />
     </Screen>

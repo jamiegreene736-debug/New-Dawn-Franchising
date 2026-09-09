@@ -11,6 +11,14 @@ import {
   mobileLogoutRequestSchema,
   mobileMeResponseSchema,
   mobileOkResponseSchema,
+  mobileNotificationPreferencesRequestSchema,
+  mobileNotificationPreferencesResponseSchema,
+  mobileNotificationsResponseSchema,
+  mobilePushDeviceRequestSchema,
+  mobilePushDeviceResponseSchema,
+  mobileReminderRequestSchema,
+  mobileReminderResponseSchema,
+  mobileRemindersResponseSchema,
   mobileRecoveryCompleteRequestSchema,
   mobileRecoveryRequestSchema,
   mobileRefreshRequestSchema,
@@ -32,6 +40,7 @@ import { MobileAuthService, MobileAuthServiceError } from "./auth-service";
 import { createMobileApiError } from "./api-errors";
 import { MobileAuthorizationError, requireMobileCapability } from "./authorization";
 import { PostgresMobilePathwayRepository } from "./pathway-repository";
+import { PostgresMobileNotificationRepository } from "./notification-repository";
 
 type AsyncRoute = (req: Request, res: Response, next: NextFunction) => Promise<unknown>;
 
@@ -82,6 +91,7 @@ const mobileRouter = Router();
 const sensitiveLimiter = new MobileRateLimiter(10, 15 * 60 * 1000);
 const tokenLimiter = new MobileRateLimiter(30, 15 * 60 * 1000);
 const pathwayRepository = new PostgresMobilePathwayRepository(pool);
+const notificationRepository = new PostgresMobileNotificationRepository(pool);
 
 mobileRouter.use((_req, res, next) => {
   res.setHeader("Cache-Control", "no-store");
@@ -109,6 +119,8 @@ mobileRouter.get("/bootstrap", (_req, res) => {
       investorAccounts: authConfig.enabled,
       partnerAccounts: authConfig.enabled,
       attorneyAccounts: false,
+      notifications: authConfig.enabled,
+      officialSourceAlerts: authConfig.enabled,
     },
     security: {
       accessTokenExpiresInSeconds: 600,
@@ -260,6 +272,124 @@ mobileRouter.get(
       sessions,
       requestId: res.locals.requestId,
     }));
+  }),
+);
+
+mobileRouter.get(
+  "/notification-preferences",
+  asyncRoute(async (req, res) => {
+    const { principal } = await authenticated(req);
+    requireMobileCapability(principal, "notifications:read-own");
+    const preferences = await notificationRepository.getPreferences(principal.identityId);
+    return res.json(mobileNotificationPreferencesResponseSchema.parse({
+      ...preferences,
+      requestId: res.locals.requestId,
+    }));
+  }),
+);
+
+mobileRouter.put(
+  "/notification-preferences",
+  asyncRoute(async (req, res) => {
+    const { principal } = await authenticated(req);
+    requireMobileCapability(principal, "notifications:manage-own");
+    const body = mobileNotificationPreferencesRequestSchema.parse(req.body);
+    const preferences = await notificationRepository.updatePreferences(principal.identityId, body);
+    return res.json(mobileNotificationPreferencesResponseSchema.parse({
+      ...preferences,
+      requestId: res.locals.requestId,
+    }));
+  }),
+);
+
+mobileRouter.post(
+  "/notification-devices",
+  asyncRoute(async (req, res) => {
+    const { principal } = await authenticated(req);
+    requireMobileCapability(principal, "notifications:manage-own");
+    const body = mobilePushDeviceRequestSchema.parse(req.body);
+    const id = await notificationRepository.registerDevice(principal.identityId, body);
+    return res.status(201).json(mobilePushDeviceResponseSchema.parse({
+      id,
+      status: "registered",
+      requestId: res.locals.requestId,
+    }));
+  }),
+);
+
+mobileRouter.delete(
+  "/notification-devices/:deviceId",
+  asyncRoute(async (req, res) => {
+    const { principal } = await authenticated(req);
+    requireMobileCapability(principal, "notifications:manage-own");
+    const deviceId = z.string().uuid().parse(req.params.deviceId);
+    await notificationRepository.disableDevice(principal.identityId, deviceId);
+    return res.json(mobileOkResponseSchema.parse({ status: "ok", requestId: res.locals.requestId }));
+  }),
+);
+
+mobileRouter.get(
+  "/notifications",
+  asyncRoute(async (req, res) => {
+    const { principal } = await authenticated(req);
+    requireMobileCapability(principal, "notifications:read-own");
+    const notifications = await notificationRepository.listNotifications(principal.identityId);
+    return res.json(mobileNotificationsResponseSchema.parse({
+      notifications,
+      unreadCount: notifications.filter((notification) => !notification.readAt).length,
+      requestId: res.locals.requestId,
+    }));
+  }),
+);
+
+mobileRouter.patch(
+  "/notifications/:notificationId/read",
+  asyncRoute(async (req, res) => {
+    const { principal } = await authenticated(req);
+    requireMobileCapability(principal, "notifications:manage-own");
+    const notificationId = z.string().uuid().parse(req.params.notificationId);
+    await notificationRepository.markRead(principal.identityId, notificationId);
+    return res.json(mobileOkResponseSchema.parse({ status: "ok", requestId: res.locals.requestId }));
+  }),
+);
+
+mobileRouter.get(
+  "/notification-reminders",
+  asyncRoute(async (req, res) => {
+    const { principal } = await authenticated(req);
+    requireMobileCapability(principal, "notifications:read-own");
+    const reminders = await notificationRepository.listReminders(principal.identityId);
+    return res.json(mobileRemindersResponseSchema.parse({ reminders, requestId: res.locals.requestId }));
+  }),
+);
+
+mobileRouter.post(
+  "/notification-reminders",
+  asyncRoute(async (req, res) => {
+    const { principal } = await authenticated(req);
+    requireMobileCapability(principal, "notifications:manage-own");
+    const body = mobileReminderRequestSchema.parse(req.body);
+    const eventAt = new Date(body.eventAt);
+    const now = new Date();
+    if (eventAt.getTime() <= now.getTime() || eventAt.getTime() > now.getTime() + 10 * 365 * 24 * 60 * 60 * 1000) {
+      throw new MobileAuthServiceError("INVALID_REQUEST", 400);
+    }
+    const reminder = await notificationRepository.createReminder(principal.identityId, body.kind, eventAt, now);
+    return res.status(201).json(mobileReminderResponseSchema.parse({
+      ...reminder,
+      requestId: res.locals.requestId,
+    }));
+  }),
+);
+
+mobileRouter.delete(
+  "/notification-reminders/:reminderId",
+  asyncRoute(async (req, res) => {
+    const { principal } = await authenticated(req);
+    requireMobileCapability(principal, "notifications:manage-own");
+    const reminderId = z.string().uuid().parse(req.params.reminderId);
+    await notificationRepository.cancelReminder(principal.identityId, reminderId);
+    return res.json(mobileOkResponseSchema.parse({ status: "ok", requestId: res.locals.requestId }));
   }),
 );
 

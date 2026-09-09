@@ -74,6 +74,15 @@ export async function initializeInvestorPathway(
       [milestoneId, identityId, milestone.state, requestId, now],
     );
   }
+
+  await client.query(
+    `insert into mobile_notifications
+       (identity_id, category, urgency, title, body, deep_link, available_at, created_at)
+     values ($1, 'next_action', 'active', 'Your first pathway action is ready',
+       'Complete your initial readiness step and save questions for New Dawn or independent counsel.',
+       '/(tabs)/path', $2, $2)`,
+    [identityId, now],
+  );
 }
 
 export class PostgresMobilePathwayRepository {

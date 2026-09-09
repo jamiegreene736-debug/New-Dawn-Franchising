@@ -1,6 +1,6 @@
 # New Dawn Pathways Mobile Control Pack
 
-**Status:** Approved product direction; connected identity and persisted My Path pilot deployed to isolated staging and ready for internal testing
+**Status:** Approved product direction; connected identity, persisted My Path, and privacy-safe Path Watchlist implemented for isolated staging and internal testing
 **Approval source:** Jamie Greene approved the August 30, 2026 Product Requirements Document as proposed.
 **Working product name:** New Dawn Pathways
 **Executive sponsor and interim product owner:** Jamie Greene
@@ -37,6 +37,8 @@ New Dawn staff continue using the existing web administration and CRM surfaces. 
 | Content | All controlling content must be server-managed, versioned, reviewable, localizable, and capable of expiration. |
 | Analytics | First-party product events with no sensitive answer text, immigration facts, message bodies, or legal content in analytics payloads. |
 | Launch | Founding TestFlight cohort before public App Store release. |
+| Notifications | Make the app a Path Command Center: timely next actions and watched dates, not a generic news feed. Government changes require an official source plus recorded human review. |
+| Lock screen | Always generic: “New Dawn Pathways — You have an update in your pathway.” Details require opening the app. |
 
 ## Active phase gate
 
@@ -60,6 +62,7 @@ Approval of the PRD authorizes the requirements, audit, and clickable-prototype 
 - [`07_DATA_OWNERSHIP_MIGRATION_PLAN.md`](./07_DATA_OWNERSHIP_MIGRATION_PLAN.md) — production schema readback, authoritative-record decisions, aggregate quality findings, and duplicate-safe migration sequence.
 - [`08_STAGING_MIGRATION_RUNBOOK.md`](./08_STAGING_MIGRATION_RUNBOOK.md) — fail-closed commands and gates for staging migration validation.
 - [`09_STAGING_MIGRATION_VALIDATION.md`](./09_STAGING_MIGRATION_VALIDATION.md) — recorded isolated migration rehearsal and rollback evidence.
+- [`10_NOTIFICATION_COMMAND_CENTER.md`](./10_NOTIFICATION_COMMAND_CENTER.md) — notification product purpose, categories, safety policy, architecture, and release gates.
 - [`STAGING_TEST_RUNBOOK.md`](./STAGING_TEST_RUNBOOK.md) — internal iPhone acceptance flow and strict synthetic-data boundary.
 
 ## Definition of prototype approval

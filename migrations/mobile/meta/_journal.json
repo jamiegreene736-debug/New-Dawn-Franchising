@@ -15,6 +15,13 @@
       "when": 1788363775104,
       "tag": "0001_mobile_pathway_pilot",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788916481127,
+      "tag": "0002_mobile_notifications",
+      "breakpoints": true
     }
   ]
 }

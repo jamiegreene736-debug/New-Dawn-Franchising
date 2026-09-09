@@ -94,6 +94,8 @@ test("bootstrap advertises only production-ready capabilities", () => {
       investorAccounts: false,
       partnerAccounts: false,
       attorneyAccounts: false,
+      notifications: false,
+      officialSourceAlerts: false,
     },
     security: {
       accessTokenExpiresInSeconds: 600,
@@ -167,6 +169,8 @@ test("role capabilities and object ownership deny cross-account access", () => {
   const capabilities = capabilitiesForMobilePrincipal(investor);
   assert.equal(capabilities.has("account:read-own"), true);
   assert.equal(capabilities.has("investor:path:read-own"), true);
+  assert.equal(capabilities.has("notifications:read-own"), true);
+  assert.equal(capabilities.has("notifications:manage-own"), true);
   assert.equal(capabilities.has("partner:referral:create"), false);
 
   assert.doesNotThrow(() => requireMobileCapability(investor, "investor:path:read-own"));

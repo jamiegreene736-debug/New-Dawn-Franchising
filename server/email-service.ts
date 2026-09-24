@@ -131,7 +131,7 @@ export async function sendEmail(
   trackingPixelUrl?: string,
   attachments?: EmailAttachment[],
   options?: { skipSignature?: boolean; skipUnsubscribe?: boolean }
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; messageId?: string }> {
   return sendEmailFromSender(DEFAULT_SENDER, to, subject, html, trackingPixelUrl, attachments, options);
 }
 
@@ -146,7 +146,7 @@ export async function sendEmailFromSender(
   // line. Pass this for genuinely transactional 1:1 mail (FDD receipts, wire
   // instructions, internal alerts) where an "unsubscribe" affordance is wrong.
   options?: { skipSignature?: boolean; skipUnsubscribe?: boolean; cc?: string }
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; messageId?: string }> {
   try {
     const profile = getSenderProfile(fromEmail);
     const transport = getTransporter(fromEmail);
@@ -271,7 +271,7 @@ ${innerHtml}${footerHtml}
     }
     console.log(`[Email] Sent ${fromEmail} → ${to} | messageId=${info?.messageId || "?"} | ${info?.response || "accepted"}`);
     markSenderSuccess(fromEmail).catch(() => {});
-    return { success: true };
+    return { success: true, messageId: info.messageId };
   } catch (err: any) {
     console.error(`Email send error from ${fromEmail}:`, err);
     const error = err.message || "Failed to send email";

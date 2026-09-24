@@ -127,6 +127,7 @@ function startProcessor(): void {
     activeCount += batch.length;
     await Promise.all(batch.map(item => processOne(item).finally(() => activeCount--)));
   }, 500);
+  processorInterval.unref();
 }
 
 startProcessor();

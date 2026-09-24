@@ -18,7 +18,8 @@
     "mobile:notifications:migrate-staging": "tsx script/mobile-notifications-migrate-staging.ts",
     "mobile:schema:readiness": "tsx script/mobile-schema-readiness.ts",
     "mobile:staging:smoke": "tsx script/mobile-staging-smoke.ts",
-    "db:push": "drizzle-kit push"
+    "db:push": "drizzle-kit push",
+    "test:outreach-desk": "tsx --test tests/outreach-desk.test.ts tests/outreach-desk.integration.test.ts"
   },
   "dependencies": {
     "@fontsource-variable/dm-sans": "^5.2.8",

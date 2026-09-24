@@ -20,6 +20,7 @@ export async function sendSmsViaQuo(
   to: string,
   content: string,
   fromPhoneNumberId?: string,
+  signal?: AbortSignal,
 ): Promise<{ success: boolean; id?: string; error?: string }> {
   if (!QUO_API_KEY) {
     return { success: false, error: "QUO_API_KEY not configured. Add it in Secrets." };
@@ -43,6 +44,7 @@ export async function sendSmsViaQuo(
 
   try {
     const res = await fetch(`${QUO_API_BASE}/messages`, {
+      signal,
       method: "POST",
       headers: {
         Authorization: QUO_API_KEY,

@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
+const OutreachDesk = lazy(() => import("./outreach-desk"));
 import { formatPhone } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
@@ -932,11 +933,18 @@ export default function CrmPage() {
   const [newListName, setNewListName] = useState("");
 
   const urlParams = new URLSearchParams(search);
-  const urlTab = urlParams.get("tab") as "clients" | "prospects" | "emails" | "facebook" | "reports" | "deliverability" | "api-status" | "franchisees" | "phone-calls" | "call-queue" | null;
+  const urlTab = urlParams.get("tab") as "clients" | "prospects" | "emails" | "facebook" | "reports" | "deliverability" | "api-status" | "franchisees" | "phone-calls" | "call-queue" | "outreach-desk" | null;
 
-  const [crmTab, setCrmTab] = useState<"clients" | "prospects" | "ai-insights" | "emails" | "facebook" | "reports" | "deliverability" | "api-status" | "franchisees" | "phone-calls" | "call-queue">(
-    urlTab || "clients"
+  const [crmTab, setCrmTabState] = useState<"clients" | "prospects" | "ai-insights" | "emails" | "facebook" | "reports" | "deliverability" | "api-status" | "franchisees" | "phone-calls" | "call-queue" | "outreach-desk">(
+    urlTab && ["clients","prospects","ai-insights","emails","facebook","reports","deliverability","api-status","franchisees","phone-calls","call-queue","outreach-desk"].includes(urlTab) ? urlTab : "outreach-desk"
   );
+
+  const setCrmTab = (tab: typeof crmTab) => {
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", tab);
+    window.history.replaceState(null, "", url);
+    setCrmTabState(tab);
+  };
 
   const { data: authData, isLoading: authLoading } = useQuery<{ role: string } | null>({
     queryKey: ["/api/auth/me"],
@@ -1347,7 +1355,7 @@ export default function CrmPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 data-testid="crm-title" className="text-2xl font-semibold text-white">
-                Marketing Academy
+                New Dawn Workspace
               </h1>
               <p className="mt-1 text-sm text-white/70">New Dawn Franchising — Investor Sales & Pipeline</p>
             </div>
@@ -1367,6 +1375,11 @@ export default function CrmPage() {
       <section className="border-b">
         <div className="nh-container">
           <div className="flex gap-0 overflow-x-auto scrollbar-tab -mb-px pb-0.5">
+            <button data-testid="tab-crm-outreach-desk"
+              className={`shrink-0 whitespace-nowrap px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${crmTab === "outreach-desk" ? "border-[hsl(var(--primary))] text-[hsl(var(--primary))]" : "border-transparent text-muted-foreground hover:text-foreground"}`}
+              onClick={() => setCrmTab("outreach-desk")}>
+              <Headphones className="size-4" /> Outreach Desk
+            </button>
             <button
               data-testid="tab-crm-clients"
               className={`shrink-0 whitespace-nowrap px-4 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${crmTab === "clients" ? "border-[hsl(var(--primary))] text-[hsl(var(--primary))]" : "border-transparent text-muted-foreground hover:text-foreground"}`}
@@ -1467,6 +1480,8 @@ export default function CrmPage() {
           <ProspectFinder />
         </div>
       </section>
+
+      {crmTab === "outreach-desk" && <Suspense fallback={<div className="p-12 text-center">Loading Outreach Desk…</div>}><OutreachDesk /></Suspense>}
 
       {crmTab === "ai-insights" && (
         <section className="py-6">

@@ -49,7 +49,8 @@ function explainMetaError(err?: { message?: string; code?: number; error_subcode
 
 export async function sendWhatsAppMessage(
   to: string,
-  body: string
+  body: string,
+  signal?: AbortSignal,
 ): Promise<{ success: boolean; id?: string; error?: string }> {
   if (!META_WA_ACCESS_TOKEN)
     return { success: false, error: "META_WHATSAPP_ACCESS_TOKEN not configured." };
@@ -60,6 +61,7 @@ export async function sendWhatsAppMessage(
 
   try {
     const res = await fetch(`${META_API_BASE}/${META_WA_PHONE_NUMBER_ID}/messages`, {
+      signal,
       method: "POST",
       headers: {
         Authorization: `Bearer ${META_WA_ACCESS_TOKEN}`,

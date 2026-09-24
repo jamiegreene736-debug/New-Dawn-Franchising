@@ -99,7 +99,7 @@ export async function hunterVerifyEmail(email: string): Promise<HunterVerifyResu
   if (!HUNTER_API_KEY) return null;
   try {
     const params = new URLSearchParams({ email, api_key: HUNTER_API_KEY });
-    const res = await fetch(`https://api.hunter.io/v2/email-verifier?${params}`);
+    const res = await fetch(`https://api.hunter.io/v2/email-verifier?${params}`, { signal: AbortSignal.timeout(20_000) });
     if (!res.ok) {
       noteHunterHttpFailure("email-verifier", res.status, await res.text().catch(() => ""));
       return null;

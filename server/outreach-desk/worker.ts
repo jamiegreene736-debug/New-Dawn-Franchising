@@ -105,11 +105,11 @@ export async function processOneAction(
         `SELECT EXISTS(
       SELECT 1 FROM crm_direct_emails WHERE direction='inbound' AND lower(trim(from_email))=lower(trim($1)) AND sent_at>$2
       UNION ALL SELECT 1 FROM contact_activities a JOIN contacts c ON a.contact_id=c.id
-        WHERE lower(trim(c.email))=lower(trim($1)) AND a.activity_type IN ('email_received','email_reply','sms_received','whatsapp_received') AND a.created_at>$2
+        WHERE (lower(trim(c.email))=lower(trim($1)) OR regexp_replace(c.phone,'[^0-9]','','g')=regexp_replace($3,'[^0-9]','','g')) AND a.activity_type IN ('email_received','email_reply','sms_received','whatsapp_received') AND a.created_at>$2
       UNION ALL SELECT 1 FROM crm_client_activities a JOIN crm_clients c ON a.client_id=c.id
-        WHERE lower(trim(c.email))=lower(trim($1)) AND a.activity_type IN ('email_received','email_reply','sms_received','whatsapp_received') AND a.created_at>$2
+        WHERE (lower(trim(c.email))=lower(trim($1)) OR regexp_replace(c.phone,'[^0-9]','','g')=regexp_replace($3,'[^0-9]','','g')) AND a.activity_type IN ('email_received','email_reply','sms_received','whatsapp_received') AND a.created_at>$2
       ) AS exists`,
-        [person.email, claim.created_at],
+        [person.email, claim.created_at, person.phone],
       )
     ).rows[0].exists;
     if (lastReply)

@@ -18,6 +18,7 @@ import {
   listPeople,
   campaignPeople,
   personRow,
+  detail,
   iso,
 } from "../server/outreach-desk/queries";
 import { processOneAction } from "../server/outreach-desk/worker";
@@ -593,3 +594,51 @@ test("pause and changed recipients hold scheduled work", { skip }, async () => {
   assert.equal(row.status, "held");
   assert.match(row.error, /contact detail changed/);
 });
+
+test(
+  "phone-only inbound replies hold SMS and appear in the relationship timeline",
+  { skip },
+  async () => {
+    const p = await seedPerson();
+    const person = await personRow(p.id);
+    await pool.query("UPDATE call_queue SET email=NULL WHERE id=$1", [p.id]);
+    const a = await createDraft(
+      p.id,
+      {
+        operationId: randomUUID(),
+        channel: "sms",
+        subject: "",
+        body: "Requested overview",
+      },
+      "agent",
+    );
+    await approveAction(a.id, new Date().toISOString(), "agent");
+    const c = (
+      await pool.query(
+        "INSERT INTO crm_clients(full_name,email,phone) VALUES('Phone only','phone-only-fixture@example.com',$1) RETURNING id",
+        [person.phone],
+      )
+    ).rows[0];
+    await pool.query(
+      "INSERT INTO crm_client_activities(client_id,activity_type,metadata,created_at) VALUES($1,'sms_received',$2,now()+interval '1 second')",
+      [c.id, JSON.stringify({ message: "Please call me instead" })],
+    );
+    await processOneAction(async () => {
+      throw Error("Must not dispatch after reply");
+    });
+    const row = (
+      await pool.query(
+        "SELECT status,error FROM outreach_desk_actions WHERE id=$1",
+        [a.id],
+      )
+    ).rows[0];
+    assert.equal(row.status, "held");
+    assert.match(row.error, /reply arrived/);
+    assert.ok(
+      (await detail(p.id)).timeline.some(
+        (e) =>
+          e.kind === "sms_received" && e.detail === "Please call me instead",
+      ),
+    );
+  },
+);

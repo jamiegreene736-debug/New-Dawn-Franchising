@@ -31,9 +31,18 @@ export type DispatchResult = { success: boolean; id?: string; error?: string };
 export type Dispatch = (action: DispatchAction) => Promise<DispatchResult>;
 async function dispatch(action: DispatchAction): Promise<DispatchResult> {
   if (action.channel === "sms")
-    return sendSmsViaQuo(action.recipient, action.body);
+    return sendSmsViaQuo(
+      action.recipient,
+      action.body,
+      undefined,
+      AbortSignal.timeout(30_000),
+    );
   if (action.channel === "whatsapp")
-    return sendWhatsAppMessage(action.recipient, action.body);
+    return sendWhatsAppMessage(
+      action.recipient,
+      action.body,
+      AbortSignal.timeout(30_000),
+    );
   if (action.channel !== "email")
     return { success: false, error: "Manual channel cannot be dispatched." };
   const sender = ALL_SENDER_PROFILES.find(

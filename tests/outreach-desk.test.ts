@@ -176,3 +176,45 @@ test("outbound plain text is escaped before HTML formatting", () =>
     escapeHtml('<img src=x onerror="bad"> &'),
     "&lt;img src=x onerror=&quot;bad&quot;&gt; &amp;",
   ));
+
+test("SMS and WhatsApp adapters honor cancellation without claiming acceptance", async () => {
+  const keys = [
+    "QUO_API_KEY",
+    "QUO_PHONE_NUMBER_ID",
+    "META_WHATSAPP_ACCESS_TOKEN",
+    "META_WHATSAPP_PHONE_NUMBER_ID",
+  ];
+  const previous = keys.map((key) => process.env[key]);
+  const originalFetch = globalThis.fetch;
+  try {
+    for (const key of keys) process.env[key] = "isolated-test-fixture";
+    globalThis.fetch = async (_input, init) =>
+      new Promise<Response>((_resolve, reject) => {
+        assert.ok(init?.signal);
+        init.signal.addEventListener(
+          "abort",
+          () => reject(new Error("Test request aborted")),
+          { once: true },
+        );
+      });
+    const { sendSmsViaQuo } = await import("../server/quo-service");
+    const { sendWhatsAppMessage } =
+      await import("../server/meta-whatsapp-service");
+    const controller = new AbortController();
+    const requests = Promise.all([
+      sendSmsViaQuo("+15125550147", "Fixture", undefined, controller.signal),
+      sendWhatsAppMessage("+15125550147", "Fixture", controller.signal),
+    ]);
+    controller.abort();
+    for (const result of await requests) {
+      assert.equal(result.success, false);
+      assert.equal(result.id, undefined);
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+    keys.forEach((key, index) => {
+      if (previous[index] === undefined) delete process.env[key];
+      else process.env[key] = previous[index];
+    });
+  }
+});

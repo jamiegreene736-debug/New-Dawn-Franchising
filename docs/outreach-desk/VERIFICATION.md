@@ -3,8 +3,8 @@
 - TypeScript: `npm run check` passed.
 - Production client/server build: `npm run build` passed (existing bundle-size warning).
 - Existing core unit suite: `npm run test:unit` passed.
-- Outreach Desk: `npm run test:outreach-desk` passed 22 policy/database/API tests with no skips using dedicated local PostgreSQL `new_dawn_outreach_desk_test`.
-- Database coverage: auth/origin/input validation, due filtering/keyset pagination, competing session claims, atomic/idempotent outcomes, DNC cancellation, concurrent dispatch exactly once, reply holds, ambiguous-response quarantine, saved views, campaign deduplication/filtering, handled-person requeue protection, cached verification/provider failure, stale draft edits pause/recipient changes and phone-only inbound reply holds/timeline.
+- Outreach Desk: `npm run test:outreach-desk` passed 23 policy/database/API tests with no skips using dedicated local PostgreSQL `new_dawn_outreach_desk_test`.
+- Database coverage: auth/origin/input validation, due filtering/keyset pagination, competing session claims, atomic/idempotent outcomes, DNC cancellation, concurrent dispatch exactly once, reply holds, ambiguous-response quarantine, saved views, campaign deduplication/filtering, handled-person requeue protection, cached verification/provider failure, stale draft edits pause/recipient changes phone-only inbound reply holds/timeline, and empty-phone identity isolation.
 - Pure coverage: channel evidence/expiry, timezones/local hours, WhatsApp service window, safe phone/profile URLs, schema limits, callback daylight-saving gaps/ambiguity and HTML escaping.
 - Real-browser application smoke passed: default landing, search, contact update, call workspace/outcome, persisted draft editing, campaign-open filtering, all desk sections, existing CRM tab navigation/reload, and 390px layout. No browser JavaScript errors or document overflow. Desktop and mobile screenshots were visually inspected.
 - CI now runs the desk tests against an ephemeral PostgreSQL 16 service, in addition to the existing typecheck/build/mobile checks.

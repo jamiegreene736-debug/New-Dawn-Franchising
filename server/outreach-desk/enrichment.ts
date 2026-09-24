@@ -127,7 +127,7 @@ export async function refreshContactEvidence(): Promise<void> {
       AND COALESCE(e.checked_at,c.email_verified_at,t.email_verified_at,p.email_verified_at,'epoch'::timestamptz)<now()-interval '30 days'
       AND NOT EXISTS(SELECT 1 FROM agent_dnc d WHERE lower(trim(d.email))=lower(trim(q.email))
         OR lower(d.domain)=split_part(lower(q.email),'@',2)
-        OR regexp_replace(d.phone,'[^0-9]','','g')=regexp_replace(q.phone,'[^0-9]','','g'))
+        OR NULLIF(regexp_replace(d.phone,'[^0-9]','','g'),'')=NULLIF(regexp_replace(q.phone,'[^0-9]','','g'),''))
       AND NOT EXISTS(SELECT 1 FROM meetings m WHERE lower(trim(m.invitee_email))=lower(trim(q.email)) AND m.status IN ('confirmed','completed'))
     ORDER BY lower(trim(q.email)),q.updated_at DESC)
     SELECT id FROM candidates ORDER BY CASE WHEN status='callback' THEN 0 WHEN trigger_type='reply_no_meeting' THEN 1 ELSE 2 END,

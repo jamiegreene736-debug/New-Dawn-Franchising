@@ -38,17 +38,17 @@ export const PERSON_SQL = `SELECT q.id, q.name, q.email, q.phone, q.company, q.t
  COALESCE(v.checked_at,c.email_verified_at,t.email_verified_at,r.email_verified_at) AS "emailVerifiedAt",
  EXISTS(SELECT 1 FROM agent_dnc d WHERE
    (q.email IS NOT NULL AND lower(trim(d.email))=lower(trim(q.email))) OR
-   (q.phone IS NOT NULL AND regexp_replace(d.phone,'[^0-9]','','g')=regexp_replace(q.phone,'[^0-9]','','g')) OR
+   (q.phone IS NOT NULL AND NULLIF(regexp_replace(d.phone,'[^0-9]','','g'),'')=NULLIF(regexp_replace(q.phone,'[^0-9]','','g'),'')) OR
    (q.email IS NOT NULL AND lower(d.domain)=split_part(lower(q.email),'@',2))) AS suppressed,
  EXISTS(SELECT 1 FROM meetings m WHERE lower(trim(m.invitee_email))=lower(trim(q.email))
    AND m.status IN ('confirmed','completed')) AS booked,
  (SELECT max(inbound.created_at) FROM (
     SELECT a.created_at FROM crm_client_activities a JOIN crm_clients c ON c.id=a.client_id
     WHERE a.activity_type='whatsapp_received' AND (c.id=q.crm_client_id OR lower(trim(c.email))=lower(trim(q.email))
-      OR regexp_replace(c.phone,'[^0-9]','','g')=regexp_replace(q.phone,'[^0-9]','','g'))
+      OR NULLIF(regexp_replace(c.phone,'[^0-9]','','g'),'')=NULLIF(regexp_replace(q.phone,'[^0-9]','','g'),''))
     UNION ALL SELECT a.created_at FROM contact_activities a JOIN contacts c ON c.id=a.contact_id
     WHERE a.activity_type='whatsapp_received' AND (c.id=q.contact_id OR lower(trim(c.email))=lower(trim(q.email))
-      OR regexp_replace(c.phone,'[^0-9]','','g')=regexp_replace(q.phone,'[^0-9]','','g'))
+      OR NULLIF(regexp_replace(c.phone,'[^0-9]','','g'),'')=NULLIF(regexp_replace(q.phone,'[^0-9]','','g'),''))
    ) inbound) AS "whatsappInboundAt"
  FROM call_queue q LEFT JOIN outreach_desk_profiles p ON p.queue_id=q.id
  LEFT JOIN crm_clients c ON c.id=q.crm_client_id LEFT JOIN contacts t ON t.id=q.contact_id
@@ -187,9 +187,9 @@ export async function detail(id: string): Promise<DeskDetail> {
       UNION ALL SELECT e.id,e.direction || '_email', e.subject || E'\n' || left(COALESCE(e.body_text,''),600),e.sent_at
         FROM crm_direct_emails e WHERE lower(trim(CASE WHEN e.direction='inbound' THEN e.from_email ELSE e.to_email END))=lower(trim($2))
       UNION ALL SELECT a.id,a.activity_type,left(COALESCE(a.metadata->>'body',a.metadata->>'message',a.metadata->>'subject',a.metadata->>'notes',a.activity_type),800),a.created_at
-        FROM contact_activities a JOIN contacts c ON c.id=a.contact_id WHERE (lower(trim(c.email))=lower(trim($2)) OR regexp_replace(c.phone,'[^0-9]','','g')=regexp_replace($3,'[^0-9]','','g'))
+        FROM contact_activities a JOIN contacts c ON c.id=a.contact_id WHERE (lower(trim(c.email))=lower(trim($2)) OR NULLIF(regexp_replace(c.phone,'[^0-9]','','g'),'')=NULLIF(regexp_replace($3,'[^0-9]','','g'),''))
       UNION ALL SELECT a.id,a.activity_type,left(COALESCE(a.metadata->>'body',a.metadata->>'message',a.metadata->>'subject',a.metadata->>'notes',a.activity_type),800),a.created_at
-        FROM crm_client_activities a JOIN crm_clients c ON c.id=a.client_id WHERE (lower(trim(c.email))=lower(trim($2)) OR regexp_replace(c.phone,'[^0-9]','','g')=regexp_replace($3,'[^0-9]','','g'))
+        FROM crm_client_activities a JOIN crm_clients c ON c.id=a.client_id WHERE (lower(trim(c.email))=lower(trim($2)) OR NULLIF(regexp_replace(c.phone,'[^0-9]','','g'),'')=NULLIF(regexp_replace($3,'[^0-9]','','g'),''))
       UNION ALL SELECT id,'call_outcome',outcome || COALESCE(': ' || notes,''),attempted_at
         FROM call_queue_attempts WHERE queue_id=$1
     ) events ORDER BY "occurredAt" DESC LIMIT 60`,

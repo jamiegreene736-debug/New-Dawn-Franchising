@@ -105,9 +105,9 @@ export async function processOneAction(
         `SELECT EXISTS(
       SELECT 1 FROM crm_direct_emails WHERE direction='inbound' AND lower(trim(from_email))=lower(trim($1)) AND sent_at>$2
       UNION ALL SELECT 1 FROM contact_activities a JOIN contacts c ON a.contact_id=c.id
-        WHERE (lower(trim(c.email))=lower(trim($1)) OR regexp_replace(c.phone,'[^0-9]','','g')=regexp_replace($3,'[^0-9]','','g')) AND a.activity_type IN ('email_received','email_reply','sms_received','whatsapp_received') AND a.created_at>$2
+        WHERE (lower(trim(c.email))=lower(trim($1)) OR NULLIF(regexp_replace(c.phone,'[^0-9]','','g'),'')=NULLIF(regexp_replace($3,'[^0-9]','','g'),'')) AND a.activity_type IN ('email_received','email_reply','sms_received','whatsapp_received') AND a.created_at>$2
       UNION ALL SELECT 1 FROM crm_client_activities a JOIN crm_clients c ON a.client_id=c.id
-        WHERE (lower(trim(c.email))=lower(trim($1)) OR regexp_replace(c.phone,'[^0-9]','','g')=regexp_replace($3,'[^0-9]','','g')) AND a.activity_type IN ('email_received','email_reply','sms_received','whatsapp_received') AND a.created_at>$2
+        WHERE (lower(trim(c.email))=lower(trim($1)) OR NULLIF(regexp_replace(c.phone,'[^0-9]','','g'),'')=NULLIF(regexp_replace($3,'[^0-9]','','g'),'')) AND a.activity_type IN ('email_received','email_reply','sms_received','whatsapp_received') AND a.created_at>$2
       ) AS exists`,
         [person.email, claim.created_at, person.phone],
       )
@@ -118,7 +118,7 @@ export async function processOneAction(
       await client.query<{ daily: number; person: number }>(
         `SELECT
       count(*) FILTER(WHERE a.dispatch_started_at>=date_trunc('day',now()))::int AS daily,
-      count(*) FILTER(WHERE (a.queue_id=$1 OR lower(trim(a.recipient))=lower(trim($2)) OR lower(trim(q.email))=lower(trim($3)) OR regexp_replace(q.phone,'[^0-9]','','g')=$4) AND a.dispatch_started_at>now()-interval '24 hours')::int AS person
+      count(*) FILTER(WHERE (a.queue_id=$1 OR lower(trim(a.recipient))=lower(trim($2)) OR lower(trim(q.email))=lower(trim($3)) OR NULLIF(regexp_replace(q.phone,'[^0-9]','','g'),'')=$4) AND a.dispatch_started_at>now()-interval '24 hours')::int AS person
       FROM outreach_desk_actions a JOIN call_queue q ON q.id=a.queue_id WHERE a.status IN ('accepted','unknown')`,
         [
           claim.queue_id,

@@ -642,3 +642,31 @@ test(
     );
   },
 );
+
+test(
+  "empty phone fields never merge unrelated conversations or suppression",
+  { skip },
+  async () => {
+    const p = await seedPerson();
+    await pool.query("UPDATE call_queue SET phone='' WHERE id=$1", [p.id]);
+    const c = (
+      await pool.query(
+        "INSERT INTO crm_clients(full_name,email,phone) VALUES('Unrelated','empty-phone@example.com','') RETURNING id",
+      )
+    ).rows[0];
+    await pool.query(
+      "INSERT INTO crm_client_activities(client_id,activity_type,metadata) VALUES($1,'sms_received',$2)",
+      [c.id, JSON.stringify({ message: "Unrelated conversation" })],
+    );
+    await pool.query(
+      "INSERT INTO agent_dnc(email,phone,reason) VALUES('unrelated-dnc@example.com','','Fixture')",
+    );
+    assert.equal((await personRow(p.id)).suppressed, false);
+    assert.equal(
+      (await detail(p.id)).timeline.some(
+        (e) => e.detail === "Unrelated conversation",
+      ),
+      false,
+    );
+  },
+);

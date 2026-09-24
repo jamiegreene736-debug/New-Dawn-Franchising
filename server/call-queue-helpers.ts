@@ -19,6 +19,8 @@ export const TERMINAL_STATUSES = [
   "not_interested",
   "dnc",
   "wrong_number",
+  "needs_followup",
+  "meeting_pending",
 ] as const;
 
 export const ACTIVE_STATUSES = [

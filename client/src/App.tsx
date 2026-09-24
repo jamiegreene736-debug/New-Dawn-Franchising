@@ -65,6 +65,7 @@ function Router() {
     <Suspense fallback={<div className="min-h-screen" />}>
       <Switch>
         {/* Standalone pages — no nav/footer */}
+        <Route path="/crm" component={CrmPage} />
         <Route path="/approve/seo/:token" component={ApprovePage} />
         <Route path="/approve/outreach/:token" component={ApprovePage} />
         <Route path="/approve/outreach-plan/:token" component={ApprovePage} />
@@ -119,7 +120,6 @@ function Router() {
               <Route path="/crm/segments" component={CrmSegmentsPage} />
               <Route path="/crm/tasks" component={CrmTasksPage} />
               <Route path="/crm/tests" component={CrmTestsPage} />
-              <Route path="/crm" component={CrmPage} />
               <Route path="/contact" component={ContactPage} />
               <Route path="/privacy-policy" component={PrivacyPolicyPage} />
               <Route path="/terms" component={TermsPage} />

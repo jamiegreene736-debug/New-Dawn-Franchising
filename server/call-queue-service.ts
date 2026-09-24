@@ -192,7 +192,7 @@ export async function enqueueCall(input: EnqueueInput): Promise<EnqueueResult> {
 
   const existing = await existingOpenRow(email, phone);
   if (existing) {
-    if (existing.status === "booked" || existing.status === "dnc" || existing.status === "not_interested") {
+    if (["booked", "dnc", "not_interested", "needs_followup", "meeting_pending"].includes(existing.status)) {
       return { ok: false, reason: `already_${existing.status}` };
     }
     if (existing.status === "wrong_number") {

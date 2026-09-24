@@ -1,16 +1,18 @@
 # New Dawn Outreach Desk
 
-Design and implementation proposal · 24 September 2026
+Design and implementation · 24 September 2026
 
 **Decision:** Make Outreach Desk the first and default tab in the existing backend. Give the agent a prioritized list of people to contact, the evidence behind each recommendation, an actionable contact workspace, and a dependable follow-up engine.
 
-This package contains a researched plan and an interactive design prototype. It does not enable production automation, change the login destination, connect provider accounts, or send messages. All prototype people, metrics, timestamps, availability, and integration states are fictional examples.
+The approved design is implemented in the application. Outreach Desk is the default `/crm` tab, backed by real authenticated APIs, a shared call queue, persistent drafts and a bounded follow-up worker. See the [implementation and operating notes](IMPLEMENTATION.md) for shipped capabilities, provider requirements and activation controls. The original interactive prototype and renders remain fictional design examples.
 
 - [Open the interactive mockup](mockups/index.html)
 - [Implementation and operating plan](PLAN.md)
 - [Design and interaction specification](DESIGN.md)
 - [Research and provider decisions](RESEARCH.md)
+- [Implementation and operations](IMPLEMENTATION.md)
 - [Verification record](VERIFICATION.md)
+- Implemented application screenshots (local fixtures): [desk](renders/implemented/default-desk.png), [calling](renders/implemented/call-workspace.png), [campaign explorer](renders/implemented/campaign-explorer.png), [follow-ups](renders/implemented/followups.png), [automations](renders/implemented/automations.png), [mobile](renders/implemented/mobile-desk.png).
 - [Browse all eight renders](renders/index.html): [daily desk](renders/01-outreach-desk.png), [campaign explorer](renders/02-campaign-explorer.png), [call workspace](renders/03-call-workspace.png), [automations](renders/04-automations.png), [connections](renders/05-connections.png), [follow-ups](renders/06-follow-ups.png), [mobile](renders/07-mobile-desk.png), [performance](renders/08-performance.png).
 
 ## Review path
@@ -25,7 +27,7 @@ This package contains a researched plan and an interactive design prototype. It 
 
 From this directory: `python3 -m http.server 4179 --bind 127.0.0.1`
 
-Then open `http://127.0.0.1:4179/mockups/`. The prototype uses only local assets, performs no API calls, and stores simulation state only in memory. Refresh resets it. Production application code is unchanged.
+Then open `http://127.0.0.1:4179/mockups/`. The prototype uses only local assets, performs no API calls, and stores simulation state only in memory. Refresh resets it. This static preview remains separate from the implemented application.
 
 ## Basis and assumptions
 

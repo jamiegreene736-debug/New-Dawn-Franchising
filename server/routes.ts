@@ -46,6 +46,8 @@ import { generateFacebookPost } from "./facebook-generator";
 import { postToFacebook, getAutoPostStatus, setAutoPostEnabled, scheduleDailyFacebookPosting } from "./facebook-poster";
 import { registerContactRoutes } from "./contacts-routes";
 import { registerCallQueueRoutes } from "./call-queue-routes";
+import { registerDeskRoutes } from "./outreach-desk/routes";
+import { startDeskWorker } from "./outreach-desk/worker";
 import {
   attachQuoCall,
   enqueueFromDripSend,
@@ -5668,6 +5670,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
 
   registerContactRoutes(app);
   registerCallQueueRoutes(app);
+  await registerDeskRoutes(app);
   registerSeoRoutes(app);
   registerOutreachRoutes(app);
   registerVisitorRoutes(app);
@@ -6321,6 +6324,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
   seedGlobevisaCampaign();
   scheduleDailyFacebookPosting();
   scheduleAgentCrons();
+  startDeskWorker();
 
   return httpServer;
 }

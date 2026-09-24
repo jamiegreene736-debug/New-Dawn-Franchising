@@ -1,4 +1,17 @@
-# Verification record
+# Application verification — 24 September 2026
+
+- TypeScript: `npm run check` passed.
+- Production client/server build: `npm run build` passed (existing bundle-size warning).
+- Existing core unit suite: `npm run test:unit` passed.
+- Outreach Desk: `npm run test:outreach-desk` passed 21 policy/database/API tests with no skips using dedicated local PostgreSQL `new_dawn_outreach_desk_test`.
+- Database coverage: auth/origin/input validation, due filtering/keyset pagination, competing session claims, atomic/idempotent outcomes, DNC cancellation, concurrent dispatch exactly once, reply holds, ambiguous-response quarantine, saved views, campaign deduplication/filtering, handled-person requeue protection, cached verification/provider failure, stale draft edits and pause/recipient changes.
+- Pure coverage: channel evidence/expiry, timezones/local hours, WhatsApp service window, safe phone/profile URLs, schema limits, callback daylight-saving gaps/ambiguity and HTML escaping.
+- Real-browser application smoke passed: default landing, search, contact update, call workspace/outcome, persisted draft editing, campaign-open filtering, all desk sections, existing CRM tab navigation/reload, and 390px layout. No browser JavaScript errors or document overflow. Desktop and mobile screenshots were visually inspected.
+- CI now runs the desk tests against an ephemeral PostgreSQL 16 service, in addition to the existing typecheck/build/mobile checks.
+
+Database tests refuse destructive setup unless BOTH database environment variables identify the exact dedicated localhost test database. Provider sends and verification are injected fakes. No real outbound messages were sent during local verification.
+
+## Original prototype verification (historical)
 
 Verified locally on 24 September 2026 against the design package based on repository commit `1daa778`.
 

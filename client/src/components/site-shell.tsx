@@ -279,6 +279,7 @@ const DESKTOP_NAV: DesktopNavEntry[] = [
   {
     label: "Franchise", id: "franchise-group",
     items: [
+      { href: "/e2-snapon", label: "E-2 SnapOn", id: "e2-snapon" },
       { href: "/e2-visa-franchise", label: "E-2 Visa Franchise", id: "e2-visa-franchise" },
       { href: "/e-2-visa-process", label: "E-2 Visa Process", id: "e2-process" },
       { href: "/process", label: "Process", id: "process" },
@@ -323,6 +324,7 @@ const MOBILE_NAV: DesktopNavEntry[] = [
   {
     label: "Franchise", id: "franchise-group",
     items: [
+      { href: "/e2-snapon", label: "E-2 SnapOn", id: "e2-snapon" },
       { href: "/e2-visa-franchise", label: "E-2 Visa Franchise", id: "e2-visa-franchise" },
       { href: "/e-2-visa-process", label: "E-2 Visa Process", id: "e2-process" },
       { href: "/process", label: "Process", id: "process" },

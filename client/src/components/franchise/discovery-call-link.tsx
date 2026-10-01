@@ -6,23 +6,29 @@ export const DISCOVERY_CALL_URL =
 type DiscoveryCallLinkProps = {
   placement: "header" | "hero" | "dylan" | "mobile" | "telecom" | "insurance";
   testId?: string;
+  tabIndex?: number;
+  hideArrow?: boolean;
 };
 
 export function DiscoveryCallLink({
   placement,
   testId,
+  tabIndex,
+  hideArrow = false,
 }: DiscoveryCallLinkProps) {
   return (
     <a
       className="button primary"
       href={DISCOVERY_CALL_URL}
       target="_blank"
-      rel="noopener noreferrer"
+      rel="noopener"
+      tabIndex={tabIndex}
       data-booking={placement}
       data-testid={testId}
       onClick={() => trackEvent("discovery_call_click", { placement })}
     >
-      Book a discovery call <span aria-hidden="true">↗</span>
+      {placement === "dylan" ? "Choose a time with Dylan" : "Book a discovery call"}
+      {!hideArrow && <span aria-hidden="true">↗</span>}
     </a>
   );
 }

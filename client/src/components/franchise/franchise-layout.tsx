@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import logo from "@assets/Gemini_Generated_Image_t1u2o5t1u2o5t1u2_1771946732580.png";
 import { DiscoveryCallLink } from "./discovery-call-link";
 import "./franchise-site.css";
@@ -55,7 +55,7 @@ function Brand({ footer = false }: { footer?: boolean }) {
   );
 }
 
-function FranchiseFooter() {
+function FranchiseFooter({ isHome }: { isHome: boolean }) {
   return (
     <footer className="franchise-footer" data-testid="footer-site">
       <div className="footer-top">
@@ -67,19 +67,19 @@ function FranchiseFooter() {
             data-testid="link-footer-address"
             href="https://www.google.com/maps/search/?api=1&query=2601+N+Zaragoza+Rd+El+Paso+TX+79938"
             target="_blank"
-            rel="noopener noreferrer"
+            rel="noopener"
           >
-            Operating roots in El Paso, Texas.
+            Operating roots in El Paso, Texas.{isHome && " ↗"}
           </a>
         </p>
         <div>
-          <a href="/team">Meet the team ↗</a>
-          <a href="/partners">Partners &amp; referrals ↗</a>
+          <a href="/team">Meet the team{!isHome && " ↗"}</a>
+          <a href="/partners">Partners &amp; referrals{!isHome && " ↗"}</a>
         </div>
         <div>
-          <a href="/other-businesses">Other businesses ↗</a>
-          <a href="/blog">Resources ↗</a>
-          <a href="/login">Portal login ↗</a>
+          <a href="/other-businesses">Other businesses{!isHome && " ↗"}</a>
+          <a href="/blog">Resources{!isHome && " ↗"}</a>
+          <a href="/login">Portal login{!isHome && " ↗"}</a>
         </div>
       </div>
       <div className="footer-note">
@@ -124,6 +124,50 @@ function FranchiseFooter() {
   );
 }
 
+function MobileHomeCallBar() {
+  const [isMobile, setIsMobile] = useState(false);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 767px)");
+    const update = () => setIsMobile(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+
+  useEffect(() => {
+    setVisible(false);
+    if (!isMobile) return;
+    const hero = document.querySelector('[data-booking="hero"]');
+    const contact = document.getElementById("contact");
+    if (!hero || !contact) return;
+    let heroPassed = false;
+    let contactReached = false;
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.target === hero) {
+          heroPassed = !entry.isIntersecting && entry.boundingClientRect.bottom <= 0;
+        } else {
+          // Stay hidden below the final card, and restore when scrolling back above it.
+          contactReached = entry.isIntersecting || entry.boundingClientRect.top < 0;
+        }
+      }
+      setVisible(heroPassed && !contactReached);
+    });
+    observer.observe(hero);
+    observer.observe(contact);
+    return () => observer.disconnect();
+  }, [isMobile]);
+
+  if (!isMobile) return null;
+  return (
+    <div className="v5-mobile-cta" aria-hidden={!visible} inert={!visible}>
+      <DiscoveryCallLink placement="mobile" tabIndex={visible ? 0 : -1} hideArrow />
+    </div>
+  );
+}
+
 export function FranchiseLayout({
   children,
   isHome,
@@ -132,28 +176,37 @@ export function FranchiseLayout({
   isHome: boolean;
 }) {
   useLandingMetadata(isHome);
+  const [menuOpen, setMenuOpen] = useState(false);
   return (
-    <div className="franchise-site homepage-v4" data-testid="site-shell">
+    <div className={`franchise-site homepage-v4${isHome ? " homepage-refinements" : ""}`} data-testid="site-shell">
       <a className="franchise-skip-link" href="#main-content">
         Skip to content
       </a>
       <header className="franchise-header" data-testid="header-site">
         <Brand />
-        <nav aria-label="Main navigation" data-testid="nav-site">
+        {isHome && (
+          <button className="home-menu-toggle" aria-label="Toggle navigation" aria-expanded={menuOpen} aria-controls="home-navigation" onClick={() => setMenuOpen(!menuOpen)}>
+            <span aria-hidden="true">☰</span>
+          </button>
+        )}
+        <nav id="home-navigation" data-open={menuOpen} aria-label="Main navigation" data-testid="nav-site" onClick={() => setMenuOpen(false)}>
           <a href={isHome ? "#opportunities" : "/#opportunities"}>
             How it works
           </a>
           <a href={isHome ? "#how" : "/#how"}>E-2 pathway</a>
+          {isHome && <a href="#investment">The investment</a>}
         </nav>
         <DiscoveryCallLink placement="header" testId="button-top-cta" />
       </header>
       <main id="main-content" tabIndex={-1}>
         {children}
       </main>
-      <FranchiseFooter />
-      <div className="v5-mobile-cta" aria-label="Book a discovery call">
-        <DiscoveryCallLink placement="mobile" />
-      </div>
+      <FranchiseFooter isHome={isHome} />
+      {isHome ? <MobileHomeCallBar /> : (
+        <div className="v5-mobile-cta" aria-label="Book a discovery call">
+          <DiscoveryCallLink placement="mobile" />
+        </div>
+      )}
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { pool } from "./db";
 import { campaignOutcomes } from "./campaign-metrics";
 import { registerOutreachReviewRoutes } from "./outreach-review-routes";
 import { REPLY_POLICY_VERSION } from "./outreach-signals";

@@ -1,13 +1,4 @@
-// Public "Partners / Refer & Earn" page — a SEPARATE path from the investor
-// journey, reached from the footer + a secondary nav slot. It markets the referral
-// program to franchise brokers, immigration attorneys, and advisors, and gates the
-// 1-page broker brochure behind a light partner-inquiry form (BrochureDownload
-// kind="partner", tagged as a partner/broker lead in the CRM).
-//
-// COMPLIANCE: never surface commission/override figures here. Partner-comp numbers
-// live only in admin-gated server code (server/partner-sequence-service.ts) and are
-// disclosed privately in the Partner Commission Schedule on agreement — mirror the
-// gated portal's vague language ("earn a partner fee", "rate provided on agreement").
+// Broker referral program; attorney collaboration is a separate, uncompensated path.
 import { useEffect } from "react";
 import { Link } from "wouter";
 import {
@@ -31,15 +22,15 @@ const COMPANY = {
 };
 
 const SEO = {
-  title: "Partner Program — Refer & Earn | New Dawn Franchising",
+  title: "Broker Referral Program | New Dawn Franchising",
   description:
-    "Partner with New Dawn Franchising. Franchise brokers, immigration attorneys, and advisors earn a partner fee for every qualified E-2 investor they introduce who becomes a franchisee. Download the partner one-pager.",
+    "Partner with New Dawn Franchising. Eligible franchise and business brokers can earn referral fees under a written agreement. Attorneys can explore a separate collaboration pathway. Download the partner one-pager.",
   canonical: "https://www.newdawnfranchising.com/partners",
 };
 
 const AUDIENCE = [
   { icon: Handshake, title: "Franchise brokers & consultants", desc: "Add a differentiated, E-2-ready franchise to the opportunities you present to international clients." },
-  { icon: ShieldCheck, title: "Immigration attorneys", desc: "Refer clients to a real, operating U.S. business structured around E-2 Treaty Investor requirements." },
+  { icon: ShieldCheck, title: "Immigration attorneys", desc: "Explore franchise information for independent client review. Attorney collaboration is separate from the broker compensation program; no attorney referral fee is offered here." },
   { icon: Users, title: "Wealth & relocation advisors", desc: "Introduce clients exploring U.S. residency through investment to a director-led ownership model: they own and direct the business; New Dawn implements the day-to-day." },
 ];
 
@@ -116,13 +107,14 @@ export default function PartnersPage() {
               Partner Program
             </div>
             <h1 data-testid="partners-title" className="text-balance text-4xl font-semibold tracking-tight md:text-5xl">
-              Refer investors. Earn for every funded franchise.
+              Broker referrals. Clear written terms.
             </h1>
             <p data-testid="partners-subtitle" className="mt-4 text-pretty text-base leading-relaxed text-muted-foreground md:text-lg">
-              Franchise brokers, immigration attorneys, and advisors partner with New Dawn Franchising to introduce
-              qualified E-2 investors to a real, operating U.S. business — and earn a partner fee when they become
-              franchisees.
+              Eligible franchise and business brokers can introduce prospective franchise owners and earn a fee on
+              qualifying, completed and funded sales under a written referral agreement. Immigration attorneys
+              have a separate collaboration pathway without a referral compensation offer.
             </p>
+            <p className="mt-4"><a href="/#brokers" className="underline">View broker referral fees</a>{" · "}<a href="/#attorneys" className="underline">Explore attorney collaboration</a></p>
             <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
               <BrochureDownload
                 kind="partner"
@@ -265,7 +257,7 @@ export default function PartnersPage() {
             <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground/65">
               This page describes a referral relationship for professionals and is not an offer to sell a franchise.
               Franchises are offered solely through a Franchise Disclosure Document in compliance with the FTC Franchise
-              Rule and applicable state law. Partner fees are paid only under a written Referring Partner agreement; the
+              Rule and applicable state law. Broker fees are paid only to eligible brokers under a written Referring Partner agreement; the
               applicable rate and conditions are set out in the Partner Commission Schedule provided on agreement
               execution. New Dawn Franchising does not provide legal or immigration advice and does not guarantee any
               E-2 visa approval or any financial result.

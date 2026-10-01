@@ -1,3 +1,5 @@
+import { PARTNER_HOME_TITLE, PARTNER_HOME_DESCRIPTION } from "../shared/partner-homepage";
+
 export type PageShell = {
   title: string;
   description: string;
@@ -14,148 +16,230 @@ const EMAIL = "franchising@newdawnfranchising.com";
 
 const shells: Record<string, PageShell> = {
   "/": {
-    title: `${SITE} | Property Management Franchise & E-2 Plans`,
-    description:
-      "Own and direct a U.S. property management franchise with New Dawn’s day-to-day support. Explore the investment and your E-2 plans. Book a discovery call.",
+    title: PARTNER_HOME_TITLE,
+    description: PARTNER_HOME_DESCRIPTION,
     html: `
 <main>
+<link rel="preload" as="image" href="/images/arrival-hero.png"/>
+<div>
 <section aria-labelledby="hero-title">
-<div><div> E-2 INVESTOR VISA · PROPERTY MANAGEMENT</div><h1 id="hero-title">Live in the USA.<br><span>Build your<br>own business.</span></h1><h2>Own a property management franchise.</h2><p>Invest in America. Create local jobs.<br>We handle the day-to-day.<br><strong>You own and direct the business.</strong></p><a href="https://calendly.com/dylan-newdawnfranchising/30min" target="_blank" rel="noopener">Book a discovery call </a><span>30-minute call · Franchise, investment &amp; next steps</span></div>
-
+<div>
+<div>
+<i>
+</i> FOR IMMIGRATION ATTORNEYS &amp; BROKERS</div>
+<h1 id="hero-title">Your clients.<br/>
+<span>Their next chapter.</span>
+</h1>
+<h2>A U.S. business. A partner by your side.</h2>
+<p>Help your E-2 clients explore a property management franchise with local operating support. Choose the partnership that fits your work.</p>
+<div>
+<a href="#attorneys">For Attorneys <span aria-hidden="true">↓</span>
+</a>
+<a href="#brokers">For Brokers <span aria-hidden="true">↓</span>
+</a>
+</div>
+<div>
+<div>
+<strong>Property management expertise</strong>
+</div>
+<div>
+<strong>Operating roots in El Paso, Texas</strong>
+</div>
+<div>
+<strong>English &amp; Spanish support</strong>
+</div>
+</div>
+</div>
+<figure>
+<img src="/images/arrival-hero.png" alt="Concept image of the Statue of Liberty, New York skyline, and an American flag at sunrise"/>
+<figcaption>
+<span>A NEW CHAPTER IN AMERICA</span>
+<strong>Their ambition.<br/>Your trusted guidance.</strong>
+</figcaption>
+</figure>
 </section>
-<div><div><span>01</span><strong>Invest in the USA.</strong></div><div><span>02</span><strong>Create local jobs.</strong></div><div><span>03</span><strong>Own your franchise.</strong></div></div>
+<section id="attorneys" aria-labelledby="attorney-title">
+<div>
+<div>FOR IMMIGRATION ATTORNEYS</div>
+<h2 id="attorney-title">Stronger client relationships.<br/>A clearer business path.</h2>
+<p>Give clients a concrete franchise option to evaluate while you remain their independent legal adviser. Help them feel informed and supported through a major decision.</p>
+</div>
+<div>
+<article>
+<span>01</span>
+<h3>Support client retention.</h3>
+<p>Keep the legal relationship with your firm as clients explore business ownership. You advise on immigration strategy, applications and future legal needs.</p>
+</article>
+<article>
+<span>02</span>
+<h3>Build client confidence.</h3>
+<p>A clear explanation of the business, costs and owner responsibilities helps clients understand their options and the next step.</p>
+</article>
+<article>
+<span>03</span>
+<h3>Keep your focus on legal work.</h3>
+<p>Discuss the franchise and operating support with our team. Review the FDD and business information independently for your client’s circumstances.</p>
+</article>
+</div>
+<div>
+<a href="mailto:franchising@newdawnfranchising.com?subject=Attorney%20inquiry%20%E2%80%94%20E-2%20franchise%20collaboration&amp;body=Hello%20New%20Dawn%2C%0A%0AI%20am%20an%20immigration%20attorney%20interested%20in%20discussing%20your%20franchise%20and%20how%20we%20can%20coordinate%20for%20clients.%0A%0AName%3A%0AFirm%3A%0APreferred%20contact%3A%0A%0APlease%20send%20information%20about%20the%20business%20model%20and%20attorney%20collaboration%20process.">Discuss attorney collaboration <span aria-hidden="true">→</span>
+</a>
+<a href="https://calendly.com/dylan-newdawnfranchising/30min" target="_blank" rel="noopener">Book an attorney call<span aria-hidden="true">↗</span>
+</a>
+</div>
+<p>You retain independent professional judgment; clients choose their own counsel. Obtain client permission before an introduction or sharing information. This attorney pathway does not offer referral compensation.</p>
+</section>
+<section id="brokers" aria-labelledby="broker-title">
+<div>
+<div>
+<div>FOR FRANCHISE &amp; BUSINESS BROKERS</div>
+<h2 id="broker-title">A valuable introduction.<br/>A generous referral fee.</h2>
+<p>Connect a prospective franchise owner with New Dawn. We guide the franchise conversation, FDD review and onboarding process.</p>
+<ul>
+<li>A property management option for your E-2 clients</li>
+<li>A direct contact for franchise questions</li>
+<li>Written referral terms before you get started</li>
+</ul>
+<div>
+<a href="mailto:franchising@newdawnfranchising.com?subject=Broker%20inquiry%20%E2%80%94%20referral%20fees%20up%20to%2012.5%25&amp;body=Hello%20New%20Dawn%2C%0A%0AI%20am%20interested%20in%20your%20broker%20referral%20program.%20Please%20send%20the%20written%20agreement%2C%20eligibility%20requirements%2C%20commission%20basis%20and%20payment%20terms%20for%20the%20up%20to%2012.5%25%20referral%20fee.%0A%0AName%3A%0ACompany%3A%0APreferred%20contact%3A">Ask about referral fees <span aria-hidden="true">→</span>
+</a>
+</div>
+<div>
+<a href="https://calendly.com/dylan-newdawnfranchising/30min" target="_blank" rel="noopener">Book a broker call<span aria-hidden="true">↗</span>
+</a>
+<a href="/brokers">Broker portal</a>
+</div>
+</div>
+<div>
+<div>REFER ONE QUALIFYING CLIENT</div>
+<h3>Earn up to <strong>$31,250</strong>
+</h3>
+<p>12.5% × $250,000 franchise sale</p>
+<p>Illustrative maximum on a qualifying $250,000 franchise sale. Payment requires a completed, funded sale and satisfaction of the written referral agreement. Eligibility, commission basis, rate and payment timing are subject to its terms and applicable law. An introduction alone does not earn a fee.</p>
+<p>For eligible brokers. Not an attorney compensation offer or a promise of franchisee earnings.</p>
+</div>
+</div>
+</section>
 <section id="opportunities" aria-labelledby="business-title">
-  <div>
-    <div>THE PROPERTY MANAGEMENT FRANCHISE</div>
-    <h2 id="business-title">Your business.<br>Our day-to-day team.</h2>
-    <p>Your franchise serves rental property owners. Our local team and technology support the daily work. You set the direction.</p>
-  </div>
-  <div>
-    <article>
-      <div><span aria-hidden="true">↗</span><span>YOU OWN &amp; DIRECT</span></div>
-      <h3>Lead your business.</h3>
-      <ul><li>Set strategy and make key decisions</li><li>Control the business bank account</li><li>Oversee your team and performance</li></ul>
-    </article>
-    <article>
-      <div><span aria-hidden="true">⌘</span><span>WE HANDLE THE DAY-TO-DAY</span></div>
-      <h3>We support the work.</h3>
-      <ul><li>Tenant communication and property coordination</li><li>Local operating teams and training</li><li>Technology, workflows, and reporting</li></ul>
-    </article>
-  </div>
-  <div>
-    <div><span>A CLOSER LOOK</span><p>Open a topic to explore the details.</p></div>
-    <details id="owner-details">
-      <summary><strong>Your role as franchise owner</strong></summary>
-      <div>
-        <p>You own and actively direct the business. We implement the daily work under your direction, so you can focus on decisions, performance, and growth.</p>
-        <div>
-          <div><h4>You control the finances.</h4><p>You are the business bank account signatory and make payments for payroll, vendors, rent, and fees. You approve budgets and major expenditures.</p></div>
-          <div><h4>You lead the business.</h4><p>You make hiring and firing decisions, set pricing and strategy, supervise the team, and review results. Our operating support keeps you informed as you lead.</p></div>
-        </div>
-      </div>
-    </details>
-    <details id="support-details">
-      <summary><strong>Our day-to-day support</strong></summary>
-      <div>
-        <div><h4>A local team with a clear process.</h4><p>Property management brings together ongoing owner relationships, repeatable operations, and local staffing. We help staff and train the local operating team. That team handles client and tenant communication, coordinates property and field work, and reports to you.</p></div>
-        <div><h4>Support from setup onward.</h4><p>Our training, operating procedures, and technology support launch and ongoing operations. The franchise agreement and FDD explain the services, responsibilities, and fees. Our team can also support conversations in English and Spanish.</p></div>
-      </div>
-    </details>
-    <details id="technology-details">
-      <summary><strong>Technology and marketing tools</strong></summary>
-      <div>
-        <p>New Dawn’s systems bring daily workflows, communication, and performance reporting into the tools your team uses to run the business.</p>
-        <div>
-          <div><h4>Visibility into your operations.</h4><ul><li>Owner dashboards and performance reports</li><li>Client communication and follow-up workflows</li><li>Training and repeatable operating processes</li></ul></div>
-          <div><h4>Tools to support growth.</h4><ul><li>Property-focused campaigns and email/SMS follow-up</li><li>Paid campaign, social content, and referral tracking</li><li>AI-assisted prospect discovery and suggested follow-up</li></ul></div>
-        </div>
-        <p>Discuss the tools and marketing support included in your package, any additional costs, and expansion options. Additional territories depend on availability, readiness, and the franchise terms.</p>
-      </div>
-    </details>
-    <details id="team-details">
-      <summary><strong>The team behind New Dawn</strong></summary>
-      <div>
-        <p>Our team brings experience in business operations, real estate, finance, and technology. Our operating roots are in El Paso, Texas, including real estate experience through Star Spangled Banner Realty.</p>
-        <div>
-          <article><h4>Jeffrey Tung</h4><small>FOUNDING MEMBER</small><p>Small-business operations, private equity, and building businesses across markets.</p></article>
-          <article><h4>Chris von Pohlot</h4><small>MANAGING DIRECTOR</small><p>Real estate, alternative finance, and capital markets experience.</p></article>
-          <article><h4>Tom Meister</h4><small>FOUNDING MEMBER</small><p>Entrepreneurial, finance, and legal industry experience.</p></article>
-        </div>
-        <p>Dylan Delaney guides franchise conversations, FDD review, territory discussions, and launch planning. Your independently retained attorney handles immigration and legal advice.</p>
-        <a href="/team">Meet the full team ↗</a>
-      </div>
-    </details>
-  </div>
+<div>
+<div>THE BUSINESS BEHIND THE INTRODUCTION</div>
+<h2 id="business-title">Your client directs.<br/>Our team supports.</h2>
+<p>A property management franchise serving rental property owners. Your client owns and actively directs the business; New Dawn provides local operating support, training and technology.</p>
+</div>
+<div>
+<details id="owner-details">
+<summary>
+<strong>The owner’s role and our operating support</strong>
+<span aria-hidden="true">
+<b>Read more</b>
+<b>Show less</b>
+</span>
+<i aria-hidden="true">
+</i>
+</summary>
+<div>
+<div>
+<h4>Your client leads.</h4>
+<p>The owner sets strategy, controls the business bank account, approves budgets and oversees the team. This is an actively directed business.</p>
+</div>
+<div>
+<h4>Our team supports daily work.</h4>
+<p>Local teams, training, workflows and technology support tenant communication, property coordination and reporting. The current FDD and agreements define the services and responsibilities.</p>
+</div>
+</div>
+</details>
+<details id="how">
+<summary>
+<strong>From first conversation to client introduction</strong>
+<span aria-hidden="true">
+<b>Read more</b>
+<b>Show less</b>
+</span>
+<i aria-hidden="true">
+</i>
+</summary>
+<div>
+<ol>
+<li>
+<strong>Talk with our team.</strong> Attorneys discuss collaboration; brokers review eligibility and written referral terms.</li>
+<li>
+<strong>Explore the fit.</strong> Review the franchise, investment and territory availability. Obtain the client’s permission before making an introduction.</li>
+<li>
+<strong>Coordinate the next steps.</strong> New Dawn handles franchise discussions. The client’s attorney assesses eligibility and handles legal advice and applications.</li>
+</ol>
+<p>Share only professional contact details in your initial inquiry, not confidential client information. Brokers should disclose their financial interest when recommending the franchise, as required by applicable law.</p>
+</div>
+</details>
+<details id="investment">
+<summary>
+<strong>Investment, referral terms and the FDD</strong>
+<span aria-hidden="true">
+<b>Read more</b>
+<b>Show less</b>
+</span>
+<i aria-hidden="true">
+</i>
+</summary>
+<div>
+<p>Confirm the full investment, fees, working capital and operating responsibilities in the current Franchise Disclosure Document. The $250,000 broker illustration is a commission example, not a universal package price or total investment quote.</p>
+<p>Review the written referral agreement for the qualifying commission basis, eligibility, payment conditions and timing. Broker compensation is separate from franchisee financial performance. Review any financial performance representation in Item 19; no earnings or return is guaranteed.</p>
+<a href="/request-fdd">Review the FDD request information</a>
+</div>
+</details>
+<details id="eligibility-details">
+<summary>
+<strong>E-2 eligibility and independent legal advice</strong>
+<span aria-hidden="true">
+<b>Read more</b>
+<b>Show less</b>
+</span>
+<i aria-hidden="true">
+</i>
+</summary>
+<div>
+<p>E-2 requirements include treaty-country nationality, a substantial investment in a real operating enterprise, and developing and directing that business. The client’s independently retained attorney assesses all applicable criteria.</p>
+<p>Franchise ownership does not guarantee visa eligibility or approval. New Dawn provides franchise information and operational support, not legal or immigration advice. Attorney collaboration remains subject to the attorney’s professional obligations and applicable jurisdiction’s rules.</p>
+<a href="https://travel.state.gov/content/travel/en/us-visas/employment/treaty-trader-investor-visa-e.html" target="_blank" rel="noopener">About the E-2 visa ↗</a>
+</div>
+</details>
+</div>
 </section>
-<section id="how" aria-labelledby="path-title">
-  <div>
-    <div><div>YOUR BUSINESS. YOUR E-2 PLANS.</div><h2 id="path-title">A path worth exploring.</h2></div>
-    <p>The E-2 investor visa may allow eligible investors to live in the U.S. to develop and direct their business. Your immigration attorney assesses your eligibility and guides your application.</p>
-  </div>
-  <div>
-    <article><span>01</span><h3>Explore the franchise.</h3><p>Discuss your goals. Review the business model, investment details, and Franchise Disclosure Document.</p></article>
-    <article><span>02</span><h3>Plan your E-2 application.</h3><p>Work with your own immigration attorney while we help you understand and plan the franchise.</p></article>
-    <article><span>03</span><h3>Lead with our support.</h3><p>Following the required approvals, begin your U.S. chapter and direct your business with our operating team behind you.</p></article>
-  </div>
-  <div>Franchise ownership does not guarantee visa eligibility or approval. <a href="https://travel.state.gov/content/travel/en/us-visas/employment/treaty-trader-investor-visa-e.html" target="_blank" rel="noopener">About the E-2 visa ↗</a></div>
-  <div>
-    <details id="eligibility-details">
-      <summary><strong>Eligibility and your family’s plans</strong></summary>
-      <div>
-        <div><h4>Start with an individual assessment.</h4><p>E-2 requirements include treaty-country nationality, a substantial investment in a real operating enterprise, and developing and directing that business. The enterprise must meet the applicable economic requirements. Your attorney assesses the complete criteria against your circumstances.</p><p>New Dawn provides franchise information and operational support. Immigration advice and applications are handled by your attorney.</p></div>
-        <div><h4>Plan for your family, too.</h4><p>Your spouse and unmarried children under 21 may apply to accompany or join you. Discuss the principal applicant, dependent eligibility, work, and study with your attorney.</p><p>E-2 is a temporary visa category. Longer-term plans, renewals, and any separate permanent-residence option, including EB-5, need their own legal assessment.</p></div>
-      </div>
-    </details>
-    <details id="location-details">
-      <summary><strong>Location, timing and next steps</strong></summary>
-      <div>
-        <div><h4>Choose a business that fits your plans.</h4><p>New Dawn’s operating roots are in El Paso. We’ll discuss available territories and how you would oversee the local team. Review any plans to live elsewhere with your attorney and our franchise team.</p><p>Your franchise serves property owners; buying real estate is a separate decision from owning the property management business.</p></div>
-        <div><h4>Build a realistic timeline.</h4><p>Franchise review, business setup, application preparation, and consular processing each take time. Appointment availability and processing vary by location and individual case.</p><p>Start with a discovery call, review the FDD, and coordinate your business and immigration plans before making relocation commitments.</p><a href="https://www.usembassy.gov/" target="_blank" rel="noopener">Find your U.S. embassy or consulate ↗</a></div>
-      </div>
-    </details>
-  </div>
+<section id="contact">
+<div>
+<div>ONE CONVERSATION TO GET STARTED</div>
+<h2>Let’s talk about<br/>your clients.</h2>
+<p>Tell Dylan how you work with E-2 investors. We’ll walk through the franchise and the right next step for your practice or brokerage.</p>
+<ul>
+<li>Attorneys: client fit and franchise information</li>
+<li>Brokers: referral eligibility, fees and payment terms</li>
+<li>A clear introduction process for both</li>
+</ul>
+<p>Please keep initial inquiries free of confidential client information.</p>
+</div>
+<div>
+<div>
+<img src="/dylan-headshot.png" alt="Dylan Delaney"/>
+<div>
+<strong>Dylan Delaney</strong>
+<span>Director of Franchise Development</span>
+</div>
+</div>
+<div>
+<span>PARTNER CONVERSATION</span>
+<span>30 MINUTES</span>
+</div>
+<h3>A conversation.<br/>A clearer next step.</h3>
+<p>Choose a time on Dylan’s calendar.<br/>Bring your questions.</p>
+<a href="https://calendly.com/dylan-newdawnfranchising/30min" target="_blank" rel="noopener">Choose a time with Dylan<span aria-hidden="true">↗</span>
+</a>
+<small>Opens Calendly to select a time.</small>
+</div>
 </section>
-<section id="investment" aria-labelledby="investment-title">
-  <div>
-    <div>UNDERSTAND THE INVESTMENT</div>
-    <h2 id="investment-title">The numbers.<br> The details.<br> Your decision.</h2>
-    <div><span>FRANCHISE PACKAGES FROM</span><strong>$225,000</strong></div>
-    <p>Confirm the full property management investment, fees, and working capital in the current Franchise Disclosure Document.</p>
-  </div>
-  <div>
-    <details id="investment-details">
-      <summary><strong>What your investment includes</strong></summary>
-      <div>
-        <p>Franchise packages bring together the franchise license, initial training, technology access, and business setup support.</p>
-        <p>Review the property management package’s exact scope, initial and ongoing fees, operating capital, and any separate professional or immigration costs before deciding. The current FDD and agreements provide the full breakdown.</p>
-      </div>
-    </details>
-    <details id="financing-details">
-      <summary><strong>Financing and escrow terms</strong></summary>
-      <div>
-        <h4>Explore the funding options.</h4><p>Financing may be available through affiliates, subject to approval and applicable terms. Review the funding structure with your advisers, including whether it fits your E-2 plans.</p>
-        <h4>Understand the written conditions.</h4><p>Ask us to walk through the escrow agreement, release conditions, and any visa-denial refund or exit provisions. Eligibility, timing, deductions, and other conditions depend on the applicable documents.</p>
-        <p>Review these terms in the FDD and agreements with your advisers before committing funds.</p>
-      </div>
-    </details>
-    <details id="fdd-details">
-      <summary><strong>Financial performance and the FDD</strong></summary>
-      <div>
-        <p>The Franchise Disclosure Document explains the franchise offering, fees, obligations, and key terms. For financial performance information, review the representation provided in Item 19.</p>
-        <p>Read the full Item 19 disclosures, assumptions, and limitations with your advisers. Financial performance varies, and no earnings or return is guaranteed.</p>
-        <p>We can walk through the available materials and your questions on a discovery call.</p>
-        <a href="/request-fdd">Review the FDD request information ↗</a>
-      </div>
-    </details>
-  </div>
-</section>
-<section id="contact"><div><div>YOUR NEXT STEP</div><h2>Let’s talk about<br>your American chapter.</h2><p>Get your questions answered and understand whether a New Dawn property management franchise fits your plans.</p><ul><li>The franchise and your role as owner</li><li>Investment details and the FDD</li><li>Day-to-day support and next steps</li></ul></div><div><div><div><strong>Dylan Delaney</strong><span>Director of Franchise Development</span></div></div><div><span>DISCOVERY CALL</span><span>30 MINUTES</span></div><h3>A conversation.<br>A clearer next step.</h3><p>Choose a time on Dylan’s calendar.<br>Bring your goals and your questions.</p><a href="https://calendly.com/dylan-newdawnfranchising/30min" target="_blank" rel="noopener">Book a discovery call </a><small>Opens Calendly to select a time.</small></div></section>
-  <footer>
-    <p>A new chapter. A business of your own. Operating roots in El Paso, Texas.</p>
-    <p><a href="/team">Meet the team</a> · <a href="/partners">Partners &amp; referrals</a> · <a href="/other-businesses">Other businesses</a> · <a href="/blog">Resources</a> · <a href="/login">Portal login</a></p>
-    <p>New Dawn Franchising LLC is a franchisor, not a law firm. No visa or financial outcome is guaranteed. Franchise offers are made only through the applicable Franchise Disclosure Document and subject to applicable law.</p>
-  </footer>
-</main>`,
+</div>
+</main>
+<footer>
+<p>New York imagery expresses arrival in America and does not represent an available franchise territory. New Dawn Franchising LLC is a franchisor, not a law firm. No visa or financial outcome is guaranteed. Franchise offers are made only through the applicable Franchise Disclosure Document and subject to applicable law.</p>
+</footer>`,
   },
 
   "/other-businesses": {
@@ -925,43 +1009,9 @@ const shells: Record<string, PageShell> = {
 </main>`,
   },
   "/partners": {
-    title: `Partner Program — Refer & Earn | ${SITE}`,
-    description:
-      "Partner with New Dawn Franchising. Franchise brokers, immigration attorneys, and advisors earn a partner fee for every qualified E-2 investor they introduce who becomes a franchisee.",
-    html: `
-<main>
-  <h1>New Dawn Franchising Partner Program — Refer &amp; Earn</h1>
-  <p>Franchise brokers, immigration attorneys, and wealth or relocation advisors partner with New Dawn Franchising to introduce qualified E-2 Treaty Investor Visa prospects to a real, operating U.S. business. When a referred client becomes a franchisee, the partner earns a partner fee under a written Referring Partner agreement.</p>
-  <section>
-    <h2>Who partners with New Dawn</h2>
-    <ul>
-      <li>Franchise brokers and consultants presenting opportunities to international clients.</li>
-      <li>Immigration attorneys advising E-2 Treaty Investor Visa clients.</li>
-      <li>Wealth and relocation advisors whose clients are exploring U.S. residency through investment.</li>
-    </ul>
-  </section>
-  <section>
-    <h2>How the partnership works</h2>
-    <ol>
-      <li>Introduce a qualified investor from your network.</li>
-      <li>New Dawn manages the FDD, discovery process, and onboarding through signing.</li>
-      <li>You earn a partner fee when your referred client funds their franchise; the rate is set out in the Partner Commission Schedule provided on agreement.</li>
-    </ol>
-  </section>
-  <p>This page describes a referral relationship for professionals and is not an offer to sell a franchise. Franchises are offered solely through a Franchise Disclosure Document under the FTC Franchise Rule and applicable state law.</p>
-</main>`,
-    faq: [
-      {
-        question: "Who can become a New Dawn referral partner?",
-        answer:
-          "Franchise brokers, immigration attorneys, and wealth or relocation advisors who introduce qualified E-2 investors can partner with New Dawn Franchising.",
-      },
-      {
-        question: "How are referral partners paid?",
-        answer:
-          "Partners earn a partner fee when a referred client becomes a franchisee, paid under a written Referring Partner agreement. The applicable rate is set out in the Partner Commission Schedule provided on agreement execution.",
-      },
-    ],
+    title: `Broker Referral Program | ${SITE}`,
+    description: "Broker referrals with clear written terms. Explore broker referral fees or a separate attorney collaboration pathway.",
+    html: `<main><h1>Broker referrals. Clear written terms.</h1><p>Eligible franchise and business brokers can introduce prospective franchise owners and earn a fee on qualifying, completed and funded sales under a written referral agreement.</p><p>Immigration attorneys have a separate collaboration pathway without a referral compensation offer.</p><p><a href="/#brokers">View broker referral fees</a> · <a href="/#attorneys">Explore attorney collaboration</a></p><p>Eligibility, commission basis, rate and payment timing depend on the written agreement and applicable law. An introduction alone does not earn a fee.</p><p>New Dawn provides franchise information, not legal or immigration advice. No visa or financial result is guaranteed. Franchises are offered through the applicable FDD and subject to applicable law.</p></main>`,
   },
 };
 

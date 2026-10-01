@@ -4,7 +4,16 @@ export const DISCOVERY_CALL_URL =
   "https://calendly.com/dylan-newdawnfranchising/30min";
 
 type DiscoveryCallLinkProps = {
-  placement: "header" | "hero" | "dylan" | "mobile" | "telecom" | "insurance";
+  placement:
+    | "header"
+    | "hero"
+    | "dylan"
+    | "mobile"
+    | "telecom"
+    | "insurance"
+    | "attorney"
+    | "broker";
+  label?: string;
   testId?: string;
   tabIndex?: number;
   hideArrow?: boolean;
@@ -12,6 +21,7 @@ type DiscoveryCallLinkProps = {
 
 export function DiscoveryCallLink({
   placement,
+  label,
   testId,
   tabIndex,
   hideArrow = false,
@@ -27,7 +37,10 @@ export function DiscoveryCallLink({
       data-testid={testId}
       onClick={() => trackEvent("discovery_call_click", { placement })}
     >
-      {placement === "dylan" ? "Choose a time with Dylan" : "Book a discovery call"}
+      {label ??
+        (placement === "dylan"
+          ? "Choose a time with Dylan"
+          : "Book a discovery call")}
       {!hideArrow && <span aria-hidden="true">↗</span>}
     </a>
   );

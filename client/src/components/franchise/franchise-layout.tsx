@@ -1,4 +1,8 @@
 import { useEffect, useState, type ReactNode } from "react";
+import {
+  PARTNER_HOME_TITLE,
+  PARTNER_HOME_DESCRIPTION,
+} from "@shared/partner-homepage";
 import logo from "@assets/Gemini_Generated_Image_t1u2o5t1u2o5t1u2_1771946732580.png";
 import { DiscoveryCallLink } from "./discovery-call-link";
 import "./franchise-site.css";
@@ -6,10 +10,10 @@ import "./franchise-site.css";
 function useLandingMetadata(isHome: boolean) {
   useEffect(() => {
     const title = isHome
-      ? "New Dawn Franchising | Live in the USA. Own a Property Management Franchise."
+      ? PARTNER_HOME_TITLE
       : "Other Supported Businesses | New Dawn Franchising";
     const description = isHome
-      ? "Own and direct a property management franchise. New Dawn supports the day-to-day work. Explore the investment, operating support, and your E-2 plans. Book a discovery call."
+      ? PARTNER_HOME_DESCRIPTION
       : "Explore New Dawn’s other supported business verticals, Telecom and Insurance, with training, systems, and operational support. Book a discovery call.";
     const previousTitle = document.title;
     document.title = title;
@@ -74,7 +78,8 @@ function FranchiseFooter({ isHome }: { isHome: boolean }) {
         </p>
         <div>
           <a href="/team">Meet the team{!isHome && " ↗"}</a>
-          <a href="/partners">Partners &amp; referrals{!isHome && " ↗"}</a>
+          <a href="/#attorneys">For attorneys{!isHome && " ↗"}</a>
+          <a href="/#brokers">Broker referral fees{!isHome && " ↗"}</a>
         </div>
         <div>
           <a href="/other-businesses">Other businesses{!isHome && " ↗"}</a>
@@ -139,7 +144,7 @@ function MobileHomeCallBar() {
   useEffect(() => {
     setVisible(false);
     if (!isMobile) return;
-    const hero = document.querySelector('[data-booking="hero"]');
+    const hero = document.querySelector("[data-partner-hero]");
     const contact = document.getElementById("contact");
     if (!hero || !contact) return;
     let heroPassed = false;
@@ -147,10 +152,12 @@ function MobileHomeCallBar() {
     const observer = new IntersectionObserver((entries) => {
       for (const entry of entries) {
         if (entry.target === hero) {
-          heroPassed = !entry.isIntersecting && entry.boundingClientRect.bottom <= 0;
+          heroPassed =
+            !entry.isIntersecting && entry.boundingClientRect.bottom <= 0;
         } else {
           // Stay hidden below the final card, and restore when scrolling back above it.
-          contactReached = entry.isIntersecting || entry.boundingClientRect.top < 0;
+          contactReached =
+            entry.isIntersecting || entry.boundingClientRect.top < 0;
         }
       }
       setVisible(heroPassed && !contactReached);
@@ -163,7 +170,9 @@ function MobileHomeCallBar() {
   if (!isMobile) return null;
   return (
     <div className="v5-mobile-cta" aria-hidden={!visible} inert={!visible}>
-      <DiscoveryCallLink placement="mobile" tabIndex={visible ? 0 : -1} hideArrow />
+      <a className="button primary" href="#contact" tabIndex={visible ? 0 : -1}>
+        Talk with our team
+      </a>
     </div>
   );
 }
@@ -178,31 +187,73 @@ export function FranchiseLayout({
   useLandingMetadata(isHome);
   const [menuOpen, setMenuOpen] = useState(false);
   return (
-    <div className={`franchise-site homepage-v4${isHome ? " homepage-refinements" : ""}`} data-testid="site-shell">
+    <div
+      className={`franchise-site homepage-v4${isHome ? " homepage-refinements" : ""}`}
+      data-testid="site-shell"
+    >
       <a className="franchise-skip-link" href="#main-content">
         Skip to content
       </a>
       <header className="franchise-header" data-testid="header-site">
         <Brand />
         {isHome && (
-          <button className="home-menu-toggle" aria-label="Toggle navigation" aria-expanded={menuOpen} aria-controls="home-navigation" onClick={() => setMenuOpen(!menuOpen)}>
+          <button
+            className="home-menu-toggle"
+            aria-label="Toggle navigation"
+            aria-expanded={menuOpen}
+            aria-controls="home-navigation"
+            onClick={() => setMenuOpen(!menuOpen)}
+          >
             <span aria-hidden="true">☰</span>
           </button>
         )}
-        <nav id="home-navigation" data-open={menuOpen} aria-label="Main navigation" data-testid="nav-site" onClick={() => setMenuOpen(false)}>
-          <a href={isHome ? "#opportunities" : "/#opportunities"}>
-            How it works
-          </a>
-          <a href={isHome ? "#how" : "/#how"}>E-2 pathway</a>
-          {isHome && <a href="#investment">The investment</a>}
+        <nav
+          id="home-navigation"
+          data-open={menuOpen}
+          aria-label="Main navigation"
+          data-testid="nav-site"
+          onClick={() => setMenuOpen(false)}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              setMenuOpen(false);
+              document
+                .querySelector<HTMLButtonElement>(".home-menu-toggle")
+                ?.focus();
+            }
+          }}
+        >
+          {isHome ? (
+            <>
+              <a href="#attorneys">For Attorneys</a>
+              <a href="#brokers">For Brokers</a>
+              <a href="#opportunities">The franchise</a>
+            </>
+          ) : (
+            <>
+              <a href="/#opportunities">How it works</a>
+              <a href="/#how">E-2 pathway</a>
+            </>
+          )}
         </nav>
-        <DiscoveryCallLink placement="header" testId="button-top-cta" />
+        {isHome ? (
+          <a
+            className="button primary partner-header-link"
+            href="#brokers"
+            data-testid="button-top-cta"
+          >
+            Broker referral fees <span aria-hidden="true">↓</span>
+          </a>
+        ) : (
+          <DiscoveryCallLink placement="header" testId="button-top-cta" />
+        )}
       </header>
       <main id="main-content" tabIndex={-1}>
         {children}
       </main>
       <FranchiseFooter isHome={isHome} />
-      {isHome ? <MobileHomeCallBar /> : (
+      {isHome ? (
+        <MobileHomeCallBar />
+      ) : (
         <div className="v5-mobile-cta" aria-label="Book a discovery call">
           <DiscoveryCallLink placement="mobile" />
         </div>

@@ -1,8 +1,9 @@
+import { getOutreachReadiness } from "./outreach-readiness";
 import { greetingName, nextEmailAllowedAt, preferFirstContact } from "./drip-scheduling";
 import { campaignMessageId } from "./campaign-replies";
 import cron from "node-cron";
 import { storage } from "./storage";
-import { sendEmail, sendEmailFromSender, getTrackingPixelUrl, chooseSenderForKey, getAvailableSenders, getSenderPassword } from "./email-service";
+import { sendEmailFromSender, chooseSenderForKey, getAvailableSenders, getSenderPassword } from "./email-service";
 import {
   allSendersDisabled,
   isRecipientFailure,
@@ -10,9 +11,9 @@ import {
   loadSenderHealth,
 } from "./sender-health";
 import { sendSmsViaQuo, toSmsE164 } from "./quo-service";
-import { isOnDnc, addToDnc, removeFromDnc } from "./agent-service";
+import { isOnDnc, addToDnc } from "./agent-service";
 import { getDeliverabilitySettings, recordSenderUse } from "./deliverability-settings-service";
-import { verifyEmail } from "./zerobounce-service";
+import { verifyEmailForEnrollment } from "./email-verification-service";
 import {
   isOptimalEmailWindow,
   smartEmailDelay,
@@ -106,25 +107,6 @@ function evaluateTrigger(step: any, steps: any[], enrolledAt: Date, sends: any[]
   }
 }
 
-function getBaseUrl(): string {
-  // This URL is embedded into recipients' emails as the open-pixel and
-  // click-redirect host, so it MUST be publicly reachable from their inbox.
-  // Prefer an explicit env override, then known platform domains, and fall
-  // back to the production domain — never localhost (which records no opens).
-  const fromEnv = process.env.APP_BASE_URL || process.env.BASE_URL;
-  if (fromEnv) return fromEnv.replace(/\/+$/, "");
-  if (process.env.RAILWAY_PUBLIC_DOMAIN) {
-    return `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`;
-  }
-  if (process.env.REPLIT_DEPLOYMENT_URL) {
-    return `https://${process.env.REPLIT_DEPLOYMENT_URL}`;
-  }
-  if (process.env.REPL_SLUG && process.env.REPL_OWNER) {
-    return `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co`;
-  }
-  return "https://www.newdawnfranchising.com";
-}
-
 function defaultTaskTitle(stepType: string, firstName: string): string {
   switch (stepType) {
     case "call": return `Call ${firstName}`;
@@ -158,7 +140,7 @@ let dripRerunRequested = false;
 
 export async function processDripEmails(opts: { force?: boolean; campaignId?: string } = {}) {
   const { force = false, campaignId } = opts;
-  console.log(`[Drip] Processing scheduled emails...${campaignId ? ` (campaign ${campaignId} only)` : ""}${force ? " (manual override — bypassing window + hourly cap)" : ""}`);
+  console.log(`[Drip] Processing scheduled emails...${campaignId ? ` (campaign ${campaignId} only)` : ""}${force ? " (manual override — bypassing window only)" : ""}`);
 
   if (dripRunInProgress) {
     // Don't silently drop it — queue a follow-up sweep for after the current run.
@@ -187,6 +169,10 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
     // defaults, fetched fresh each run so changes apply without a restart. Falls
     // back to the env caps (EMAIL_DAILY_CAP etc.) when no override is set.
     const delivSettings = await getDeliverabilitySettings();
+    if (delivSettings.outreachAutopilotPaused) {
+      console.log("[Drip] Outreach paused; no scheduled or forced sends.");
+      return;
+    }
     const dailyCap = delivSettings.effectiveDailyCap;
     const hourlyCap = delivSettings.effectiveHourlyCap;
     const domainGapMs = delivSettings.effectiveDomainGapMs;
@@ -215,8 +201,8 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
     }
     // Respect hourly cap — spreads the day's volume across business hours so we
     // never burst the whole quota in one run (a classic bulk-sender spam signal).
-    // Skipped on a manual override.
-    if (!force && sentLastHour >= hourlyCap) {
+    // Manual overrides retain both volume caps.
+    if (sentLastHour >= hourlyCap) {
       console.log(`[Drip] Hourly email cap reached (${sentLastHour}/${hourlyCap} in last hour). Resuming next hour.`);
       return;
     }
@@ -255,7 +241,7 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
         console.log("[Drip] Daily cap hit mid-run. Stopping early.");
         break;
       }
-      if (!force && sentLastHour >= hourlyCap) {
+      if (sentLastHour >= hourlyCap) {
         console.log("[Drip] Hourly cap hit mid-run. Stopping — will resume next hour.");
         break;
       }
@@ -271,7 +257,8 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
       const enrolledAt = new Date(enrollment.enrolledAt);
       const firstName = (enrollment.prospectName || "").trim().split(/\s+/)[0] || enrollment.prospectName || "there";
       const prospect = enrollment.prospectId ? await storage.getProspect(enrollment.prospectId).catch(() => undefined) : undefined;
-      const firmHook = (prospect?.notes || "").trim();
+      const qualification = await pool.query<{ reason: string }>("SELECT reason FROM outreach_qualifications WHERE email=$1 AND status='approved'", [recipientKey]);
+      const firmHook = (qualification.rows[0]?.reason || "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
       const lang = firstTouchLang(prospect?.location, null);
       const personalize = makePersonalize(enrollment.prospectName, enrollment.prospectEmail, firmHook);
 
@@ -282,8 +269,11 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
         // Re-check the throttles before every send so a multi-step drain can't
         // burst past the daily/hourly caps.
         if (sentLast24h >= dailyCap) break;
-        if (!force && sentLastHour >= hourlyCap) break;
+        if (sentLastHour >= hourlyCap) break;
 
+        if ((await getDeliverabilitySettings()).outreachAutopilotPaused) return;
+        const campaign = await storage.getDripCampaign(enrollment.campaignId);
+        if (!campaign?.isActive) break;
         const step = steps[stepIdx];
         const now = new Date();
         const existingSends = await storage.getDripSends(enrollment.id);
@@ -302,6 +292,10 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
           continue;
         }
 
+        if (existingSends.some(s => s.stepId === step.id && s.channel === "email" && ["pending", "unknown"].includes(s.status))) {
+          await pool.query("UPDATE drip_enrollments SET hold_reason=$2 WHERE id=$1", [enrollment.id, "An earlier send has an uncertain outcome; reconcile provider history before retrying."]);
+          break;
+        }
         const alreadySent = existingSends.some(s => s.stepId === step.id && isTerminalDripSend(s));
         if (alreadySent) {
           stepIdx += 1;
@@ -312,9 +306,6 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
         const stepType = (step.stepType || "email").toLowerCase();
 
         if (stepType === "email" || stepType === "manual_email") {
-          // Manual forcing cannot bypass recipient cooldown or sequence spacing.
-          if (now.getTime() < nextEmailAllowedAt(step, steps, existingSends, lastSendByRecipient.get(recipientKey))) break;
-
           // Skip addresses that are suppressed (e.g. hard-bounced). Stop the
           // enrollment so it doesn't keep retrying a dead mailbox — the user
           // can fix the email from the Activity tab to resume it.
@@ -323,25 +314,34 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
           // every address under it — not just individually-listed emails.
           const recipientDomain = emailDomain(enrollment.prospectEmail);
           if (await isOnDnc(enrollment.prospectEmail, null, recipientDomain || null)) {
-            await storage.updateDripEnrollment(enrollment.id, { status: "bounced" } as any);
+            await storage.updateDripEnrollment(enrollment.id, { status: "suppressed" } as any);
             console.log(`[Drip] Skipping suppressed/bounced address ${enrollment.prospectEmail} — enrollment stopped`);
             break; // suppressed mailbox/domain — stop draining this enrollment
           }
 
-          // Optional pre-send verification gate (off by default). Only a clearly
-          // INVALID address is dropped + suppressed; unknown/catch-all/valid still
-          // send, so a soft verifier result never burns a deliverable contact.
-          if (delivSettings.verifyBeforeSend) {
-            try {
-              const v = await verifyEmail(enrollment.prospectEmail);
-              if (v.status === "invalid") {
-                await addToDnc(enrollment.prospectEmail, undefined, undefined, "Failed pre-send verification (invalid)");
-                await storage.updateDripEnrollment(enrollment.id, { status: "bounced" } as any);
-                console.log(`[Drip] Pre-send verify: ${enrollment.prospectEmail} is invalid — suppressed, enrollment stopped`);
-                break;
-              }
-            } catch { /* verifier hiccup — never block a send on it */ }
+          const hold = await getOutreachReadiness(enrollment.prospectEmail, campaign.audienceType || "broker", enrollment.enrolledAt);
+          if (hold) {
+            await pool.query("UPDATE drip_enrollments SET hold_reason=$2 WHERE id=$1", [enrollment.id, hold]);
+            break;
           }
+          // Manual forcing cannot bypass recipient cooldown or sequence spacing.
+          if (now.getTime() < nextEmailAllowedAt(step, steps, existingSends, lastSendByRecipient.get(recipientKey))) break;
+
+
+          // A provider outage or unknown result must not release unverified prospects.
+          const fresh = prospect?.emailStatus === "valid" && prospect.emailVerifiedAt
+            && Date.now() - new Date(prospect.emailVerifiedAt).getTime() < 30 * 86400_000
+            && prospect.email?.trim().toLowerCase() === recipientKey;
+          if (!fresh) {
+            const verification = await verifyEmailForEnrollment(enrollment.prospectEmail);
+            if (verification.status !== "valid") {
+              await pool.query("UPDATE drip_enrollments SET hold_reason=$2 WHERE id=$1", [enrollment.id, `Address verification required (${verification.status}).`]);
+              if (verification.status === "invalid") await addToDnc(enrollment.prospectEmail, undefined, undefined, "Invalid address confirmed by verifier");
+              break;
+            }
+            if (prospect) await storage.updateProspect(prospect.id, { emailStatus: "valid", emailVerifiedAt: new Date() });
+          }
+          await pool.query("UPDATE drip_enrollments SET hold_reason=NULL WHERE id=$1", [enrollment.id]);
 
           // Per-domain pacing: if we sent to this recipient's domain very
           // recently in this run, wait out the remainder of the domain gap
@@ -363,6 +363,8 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
 
           const freshEnrollment = await storage.getDripEnrollment(enrollment.id);
           if (freshEnrollment?.status !== "active") break;
+          const firstEmail = !existingSends.some(s => s.channel === "email" && s.sentAt);
+          const renderedBody = (firstEmail && firmHook ? `<p>${firmHook}</p>` : "") + personalize(step.bodyHtml);
           const send = await storage.createDripSend({
             enrollmentId: enrollment.id,
             stepId: step.id,
@@ -371,10 +373,9 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
             recipientName: enrollment.prospectName,
             subject: personalize(step.subject || step.stepName || "Email"),
             status: "pending",
+            fromAddress: chooseSenderForKey(enrollment.id, false),
+            renderedBodyHtml: renderedBody,
           });
-
-          const baseUrl = getBaseUrl();
-          const trackingUrl = getTrackingPixelUrl(baseUrl, send.id);
 
           // Keep every outreach email and reply on Dylan's mailbox.
           const fromEmail = chooseSenderForKey(enrollment.id, delivSettings.senderRotation);
@@ -382,8 +383,9 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
             fromEmail,
             enrollment.prospectEmail,
             personalize(step.subject),
-            personalize(step.bodyHtml),
-            trackingUrl, undefined, { messageId: campaignMessageId(send.id) }
+            renderedBody,
+            undefined, undefined, { messageId: campaignMessageId(send.id), outreach: true,
+              onPrepared: async (html) => { await storage.updateDripSend(send.id, { renderedBodyHtml: html, providerMessageId: campaignMessageId(send.id) }); } }
           );
 
           if (result.success) {
@@ -393,11 +395,11 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
             sentLast24h++;
             sentLastHour++;
             if (domain) lastSendByDomain.set(domain, Date.now());
-            await storage.updateDripSend(send.id, { status: "sent", sentAt: new Date() } as any);
+            await storage.updateDripSend(send.id, { status: "sent", sentAt: new Date(), providerMessageId: result.messageId } as any);
             recordSenderUse(fromEmail).catch(() => {});
             console.log(`[Drip] Sent email step ${stepIdx + 1} to ${enrollment.prospectEmail} from ${fromEmail} (today: ${sentLast24h}/${dailyCap}, hour: ${sentLastHour}/${hourlyCap})`);
           } else {
-            await storage.updateDripSend(send.id, { status: "failed", errorMessage: result.error } as any);
+            await storage.updateDripSend(send.id, { status: /timeout|timed out|socket|ECONNRESET|ETIMEDOUT/i.test(result.error || "") ? "unknown" : "failed", errorMessage: result.error } as any);
             console.error(`[Drip] Failed to email ${enrollment.prospectEmail}: ${result.error}`);
             // Auth / network / 421 — leave the step retryable. Recipient-level
             // 553s are terminal (alreadySent will treat them as consumed).
@@ -410,13 +412,8 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
             }
           }
 
-          // Organic jitter between emails — avoids burst-send spam signals. Applied
-          // even on a manual "Send Due Now" so a one-click whole-list send still
-          // paces itself (~5–18s/email): force skips only the optimal-window and
-          // hourly-cap GATES, not the spacing. Stops once the daily cap is hit
-          // (no point pacing when we're about to stop), and — on a normal run —
-          // once the hourly cap is hit (force ignores the hourly cap).
-          if (sentThisRun > 0 && sentLast24h < dailyCap && (force || sentLastHour < hourlyCap)) {
+          // Pace accepted messages while retaining both hourly and daily caps.
+          if (sentThisRun > 0 && sentLast24h < dailyCap && (sentLastHour < hourlyCap)) {
             const jitter = smartEmailDelay(sentThisRun);
             console.log(`[Drip] Waiting ${Math.round(jitter / 1000)}s before next send...`);
             await sleep(jitter);
@@ -543,139 +540,12 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
   }
 }
 
-// Force-resend ONE step to every enrolled contact in a campaign — used by the
-// per-step "Reprocess" button. Unlike processDripEmails this ignores delay
-// timing and the already-sent guard (that's the whole point) but still respects
-// suppression (DNC) for email and requires a phone for SMS.
-export async function reprocessStep(campaignId: string, stepId: string): Promise<{ attempted: number; sent: number; failed: number; skipped: number }> {
-  const steps = await storage.getDripSteps(campaignId);
-  const step = steps.find((s) => s.id === stepId);
-  const result = { attempted: 0, sent: 0, failed: 0, skipped: 0 };
-  if (!step) return result;
-
-  const stepType = (step.stepType || "email").toLowerCase();
-  if (!["email", "manual_email", "sms"].includes(stepType)) return result;
-
-  const enrollments = await storage.getDripEnrollments(campaignId);
-  console.log(`[Reprocess] Step "${step.stepName || step.subject}" → ${enrollments.length} enrolled contact(s)`);
-
-  for (const enrollment of enrollments) {
-    result.attempted++;
-    const prospect = enrollment.prospectId ? await storage.getProspect(enrollment.prospectId).catch(() => undefined) : undefined;
-    const lang = firstTouchLang(prospect?.location, null);
-    const personalize = makePersonalize(enrollment.prospectName, enrollment.prospectEmail, (prospect?.notes || "").trim());
-
-    try {
-      if (stepType === "sms") {
-        const prospect = await storage.getProspect(enrollment.prospectId);
-        const phoneCheck = toSmsE164(prospect?.phone);
-        const send = await storage.createDripSend({
-          enrollmentId: enrollment.id, stepId: step.id, channel: "sms",
-          recipientEmail: phoneCheck.ok ? phoneCheck.e164 : (prospect?.phone || enrollment.prospectEmail), recipientName: enrollment.prospectName,
-          subject: step.stepName || "Text message", status: "pending",
-        });
-        if (!phoneCheck.ok) {
-          await storage.updateDripSend(send.id, { status: "skipped", errorMessage: phoneCheck.error } as any);
-          result.skipped++;
-          continue;
-        }
-        const r = await sendSmsViaQuo(phoneCheck.e164, personalize(step.bodyHtml));
-        if (r.success) { await storage.updateDripSend(send.id, { status: "sent", sentAt: new Date() } as any); result.sent++; }
-        else { await storage.updateDripSend(send.id, { status: "failed", errorMessage: r.error } as any); result.failed++; }
-      } else {
-        // A manual reprocess is an explicit user action, so it overrides any
-        // prior suppression: lift the DNC entry and re-activate a stopped
-        // enrollment so the send goes out (and the campaign resumes).
-        if (await isOnDnc(enrollment.prospectEmail)) {
-          await removeFromDnc(enrollment.prospectEmail);
-        }
-        if (enrollment.status === "bounced" || enrollment.status === "paused") {
-          await storage.updateDripEnrollment(enrollment.id, { status: "active" } as any).catch(() => {});
-        }
-        const send = await storage.createDripSend({
-          enrollmentId: enrollment.id, stepId: step.id, channel: "email",
-          recipientEmail: enrollment.prospectEmail, recipientName: enrollment.prospectName,
-          subject: personalize(step.subject || step.stepName || "Email"), status: "pending",
-        });
-        const trackingUrl = getTrackingPixelUrl(getBaseUrl(), send.id);
-        const r = await sendEmail(enrollment.prospectEmail, personalize(step.subject), personalize(step.bodyHtml), trackingUrl, undefined, { messageId: campaignMessageId(send.id) });
-        if (r.success) { await storage.updateDripSend(send.id, { status: "sent", sentAt: new Date() } as any); result.sent++; }
-        else { await storage.updateDripSend(send.id, { status: "failed", errorMessage: r.error } as any); result.failed++; }
-        await sleep(1200); // gentle pacing so a reprocess isn't a hard burst
-      }
-    } catch (err: any) {
-      console.error(`[Reprocess] ${enrollment.prospectEmail} failed:`, err?.message || err);
-      result.failed++;
-    }
-  }
-
-  console.log(`[Reprocess] Done — attempted ${result.attempted}, sent ${result.sent}, failed ${result.failed}, skipped ${result.skipped}`);
-  return result;
-}
-
-// ─── Parallel reaction: re-send the first email if it wasn't opened ───────────
-// For each active campaign's first email step, if a contact's send is still
-// unopened after ~4 days (and we haven't already re-sent), send it once more
-// with a fresh subject. Idempotent: a second send for that step means done.
-export async function resendUnopenedFirstEmails(): Promise<void> {
-  const WAIT_MS = 96 * 3_600_000; // 4 days
-  try {
-    const campaigns = await storage.getDripCampaigns();
-    for (const c of campaigns as any[]) {
-      if (!c.isActive) continue;
-      const steps = await storage.getDripSteps(c.id);
-      const firstEmail = steps
-        .filter((s) => ["email", "manual_email"].includes((s.stepType || "email").toLowerCase()))
-        .sort((a, b) => a.stepOrder - b.stepOrder)[0];
-      if (!firstEmail) continue;
-
-      const enrollments = await storage.getActiveEnrollments(c.id);
-      for (const e of enrollments) {
-        if (e.status !== "active") continue;
-        const sends = (await storage.getDripSends(e.id)).filter((s) => s.stepId === firstEmail.id);
-        if (sends.length !== 1) continue; // 0 = not sent; >=2 = already re-sent
-        const s0 = sends[0];
-        if (s0.status !== "sent" || s0.openedAt) continue;
-        const sentAt = s0.sentAt ? new Date(s0.sentAt).getTime() : 0;
-        if (!sentAt || Date.now() - sentAt < WAIT_MS) continue;
-        if (await isOnDnc(e.prospectEmail)) continue;
-
-        const firstName = (e.prospectName || "").trim().split(/\s+/)[0] || "there";
-        const personalize = (str: string | null | undefined): string =>
-          (str || "")
-            .replace(/\[Contact First Name\]/gi, firstName)
-            .replace(/\{\{\s*firstName\s*\}\}/gi, firstName)
-            .replace(/\{\{\s*name\s*\}\}/gi, e.prospectName)
-            .replace(/\{\{\s*email\s*\}\}/gi, e.prospectEmail);
-        const newSubject = `Following up — ${personalize(firstEmail.subject)}`;
-        const send = await storage.createDripSend({
-          enrollmentId: e.id, stepId: firstEmail.id, channel: "email",
-          recipientEmail: e.prospectEmail, recipientName: e.prospectName,
-          subject: newSubject, status: "pending",
-        });
-        const trackingUrl = getTrackingPixelUrl(getBaseUrl(), send.id);
-        const r = await sendEmail(e.prospectEmail, newSubject, personalize(firstEmail.bodyHtml), trackingUrl);
-        if (r.success) {
-          await storage.updateDripSend(send.id, { status: "sent", sentAt: new Date() } as any);
-          console.log(`[Drip] No-open re-send → ${e.prospectEmail}`);
-        } else {
-          await storage.updateDripSend(send.id, { status: "failed", errorMessage: r.error } as any);
-        }
-        await sleep(1500);
-      }
-    }
-  } catch (e: any) {
-    console.error("[Drip] resendUnopenedFirstEmails error:", e?.message || e);
-  }
-}
-
 export function scheduleDripProcessing() {
   // Run hourly during business hours (8 AM–6 PM ET) — window check inside prevents off-hours sends
   // This ensures late-enrolling prospects don't have to wait until the next day
   cron.schedule("0 8-18 * * 1-5", () => {
     console.log("[Drip] Hourly window check — running drip processor...");
     processDripEmails();
-    resendUnopenedFirstEmails();
   }, { timezone: "America/New_York" });
 
   // Catch-up run shortly after boot. The hourly cron only fires at the top of the

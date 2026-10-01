@@ -86,7 +86,7 @@ export interface IStorage {
   recordBotEmailOpen(sendId: string): Promise<void>;
   recordBotEmailClick(sendId: string): Promise<void>;
   markEnrollmentsUnsubscribed(email: string): Promise<number>;
-  markDripSendBounced(recipientEmail: string, reason: string, receivedAt?: Date): Promise<DripSend | null>;
+  markDripSendBounced(recipientEmail: string, reason: string, receivedAt?: Date, originalIds?: string[], bounceMessageId?: string): Promise<DripSend | null>;
   getSmsCampaigns(): Promise<SmsCampaign[]>;
   createSmsCampaign(data: InsertSmsCampaign): Promise<SmsCampaign>;
   updateSmsCampaign(id: string, data: Partial<SmsCampaign>): Promise<SmsCampaign>;
@@ -782,7 +782,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Scanner/bot hits (see server/tracking-bot-filter.ts) — counted separately so
-  // openedAt/clickedAt + openCount/clickCount always mean a human engaged.
+  // remaining events may still include automation; they are not proof of intent.
   async recordBotEmailOpen(sendId: string): Promise<void> {
     await db.update(dripSends)
       .set({ botOpenCount: sql`${dripSends.botOpenCount} + 1` })
@@ -812,20 +812,22 @@ export class DatabaseStorage implements IStorage {
     return rows.length;
   }
 
-  async markDripSendBounced(recipientEmail: string, reason: string, receivedAt?: Date): Promise<DripSend | null> {
-    // Reprocessing the same NDR must not walk backwards through older sends
-    // or mark a call/SMS task as an email bounce.
+  async markDripSendBounced(recipientEmail: string, reason: string, receivedAt?: Date, originalIds?: string[], bounceMessageId?: string): Promise<DripSend | null> {
+    // Legacy address/time guesses are not sufficient evidence of a particular bounce.
+    if (!originalIds?.length || !bounceMessageId) return null;
     const rows = await db.select().from(dripSends)
       .where(and(
         sql`lower(trim(${dripSends.recipientEmail})) = ${recipientEmail.trim().toLowerCase()}`,
         eq(dripSends.channel, "email"),
-        sql`${dripSends.sentAt} <= ${receivedAt ?? new Date()}`,
+        or(inArray(dripSends.providerMessageId, originalIds),
+          sql`('<drip-' || ${dripSends.id} || '@newdawnfranchising.com>') IN (${sql.join(originalIds.map(id => sql`${id}`), sql`, `)})`),
+        sql`${dripSends.sentAt} <= ${(receivedAt ?? new Date()).toISOString()}`,
       ))
       .orderBy(desc(dripSends.sentAt));
     const target = rows[0];
-    if (!target || !["sent", "delivered", "opened", "clicked"].includes(target.status)) return null;
+    if (!target || target.bounceMessageId === bounceMessageId || !["sent", "delivered", "opened", "clicked", "bounced"].includes(target.status)) return null;
     const [updated] = await db.update(dripSends)
-      .set({ status: "bounced", errorMessage: reason.slice(0, 500) })
+      .set({ status: "bounced", errorMessage: reason.slice(0, 500), bounceVerifiedAt: receivedAt ?? new Date(), bounceMessageId })
       .where(eq(dripSends.id, target.id))
       .returning();
     return updated ?? target;

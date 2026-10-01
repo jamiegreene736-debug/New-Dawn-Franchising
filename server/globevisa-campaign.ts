@@ -1,3 +1,4 @@
+import { reviewedEmailSteps } from "@shared/outreach-copy";
 import { seedTrackCampaign } from "./grok-campaign";
 import { EMAIL_STYLE, WEBSITE, CALENDLY, type CampaignTrackStep } from "@shared/campaign-tracks";
 
@@ -21,12 +22,12 @@ const GLOBEVISA_WEBSITE = "https://www.globevisa.com";
 export const GLOBEVISA_CAMPAIGN_NAME = "GlobeVisa — E-2 Referral Partnership";
 
 const GLOBEVISA_DESCRIPTION =
-  "6-step omnichannel referral-partner sequence for GlobeVisa advisors with China-connected clients seeking U.S. relocation. LinkedIn → email → SMS → call across ~3 weeks (days 1, 3, 6, 11, 16, 22). Positions New Dawn as the E-2 U.S. business complement to GlobeVisa's CBI programs (Grenada, Türkiye, St. Kitts). Centred on the $28,125 referral commission (12.5% of the $225K investment) — pure added revenue on clients GlobeVisa already advises.";
+  "6-step omnichannel referral-partner sequence for GlobeVisa advisors with China-connected clients seeking U.S. relocation. LinkedIn → email → SMS → call across ~3 weeks (days 1, 3, 6, 11, 16, 22). Positions New Dawn as the E-2 U.S. business complement to GlobeVisa's CBI programs (eligibility assessed by independent immigration counsel). Centred on the $28,125 referral commission (12.5% of the $225K investment) — pure added revenue on clients GlobeVisa already advises.";
 
 const SIGNATURE_HTML = `<p>Best regards,<br/><strong>Dylan Delaney</strong><br/>New Dawn Franchising<br/><a href="${WEBSITE}">www.newdawnfranchising.com</a><br/>dylan@newdawnfranchising.com</p>`;
 const SIGNATURE_TEXT = `Best regards,\nDylan Delaney\nNew Dawn Franchising\n${WEBSITE}\ndylan@newdawnfranchising.com`;
 
-export const GLOBEVISA_TRACK: CampaignTrackStep[] = [
+const GLOBEVISA_TRACK_SOURCE: CampaignTrackStep[] = [
   {
     stepOrder: 1,
     delayDays: 1,
@@ -115,7 +116,7 @@ Dylan`,
 
 Talking points:
 - GlobeVisa: 20+ China offices, 110k+ clients, top CBI/RBI consultancy — huge base of China-connected HNWIs wanting the U.S.
-- Complete pathway: GlobeVisa CBI (Grenada/Türkiye/St. Kitts) → New Dawn E-2 U.S. business → life in America
+- Complete pathway: Individual treaty nationality and investment eligibility must be evaluated by independent immigration counsel
 - Lead with commission: $28,125 (12.5% of $225K) per referred client, paid when visa clears, tracked in partner portal
 - Pure added revenue on clients they already advise — zero fulfilment work
 - E-2 vs EB-5: faster, far cheaper ($225K vs $800K+), fits treaty-country nationals
@@ -148,7 +149,7 @@ export const GLOBEVISA_NURTURE_NAME = "GlobeVisa — E-2 Nurture (Non-Responders
 const GLOBEVISA_NURTURE_DESCRIPTION =
   "Light nurture track for GlobeVisa contacts who didn't respond to the main China-to-USA sequence. 3 soft touches (email → LinkedIn → email) over ~6 weeks (days 3, 21, 45). Keeps the complete CBI→E-2 pathway and $28,125 referral fee on their radar without pressure.";
 
-export const GLOBEVISA_NURTURE_TRACK: CampaignTrackStep[] = [
+const GLOBEVISA_NURTURE_TRACK_SOURCE: CampaignTrackStep[] = [
   {
     stepOrder: 1,
     delayDays: 3,
@@ -210,3 +211,6 @@ export async function seedGlobevisaCampaign(): Promise<void> {
     console.error("[Drip] Failed to seed GlobeVisa campaign(s):", err);
   }
 }
+export const GLOBEVISA_TRACK = reviewedEmailSteps(GLOBEVISA_TRACK_SOURCE, "broker");
+
+export const GLOBEVISA_NURTURE_TRACK = reviewedEmailSteps(GLOBEVISA_NURTURE_TRACK_SOURCE, "broker");

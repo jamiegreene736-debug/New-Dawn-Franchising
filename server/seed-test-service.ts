@@ -1,3 +1,4 @@
+import { simpleParser } from "mailparser";
 import { randomUUID } from "crypto";
 import { ImapFlow } from "imapflow";
 import { pool } from "./db";
@@ -87,7 +88,7 @@ function seedPassword(seed: SeedInbox): string | undefined {
 
 // ─── Run a test ───────────────────────────────────────────────────────────────
 
-export async function startSeedTest(subject: string, html: string, fromEmail = "franchising@newdawnfranchising.com"): Promise<{ testId: string; sent: number; skipped: string[] }> {
+export async function startSeedTest(subject: string, html: string, fromEmail = "dylan@newdawnfranchising.com"): Promise<{ testId: string; sent: number; skipped: string[] }> {
   const seeds = await listSeeds(true);
   if (!seeds.length) throw new Error("No active seed inboxes configured");
   const token = `seed-${randomUUID().slice(0, 8)}`;
@@ -102,7 +103,7 @@ export async function startSeedTest(subject: string, html: string, fromEmail = "
   let sent = 0;
   const skipped: string[] = [];
   for (const seed of seeds) {
-    const res = await sendEmailFromSender(fromEmail, seed.email, subj, html || "<p>Deliverability seed test.</p>");
+    const res = await sendEmailFromSender(fromEmail, seed.email, subj, html || "<p>Deliverability seed test.</p>", undefined, undefined, { minimalSignature: true });
     const placement = res.success ? "pending" : "send_failed";
     if (res.success) sent++; else skipped.push(`${seed.email}: ${res.error || "send failed"}`);
     await pool.query(
@@ -115,40 +116,37 @@ export async function startSeedTest(subject: string, html: string, fromEmail = "
 }
 
 // Read each seed inbox over IMAP and bucket where the tagged message landed.
-async function checkSeedPlacement(seed: SeedInbox, token: string): Promise<"inbox" | "spam" | "missing"> {
+export interface SeedPlacement {
+  placement: "inbox" | "spam" | "missing" | "unverified";
+  authenticationResults?: string;
+  error?: string;
+}
+async function checkSeedPlacement(seed: SeedInbox, token: string): Promise<SeedPlacement> {
   const password = seedPassword(seed);
-  if (!password) return "missing";
   const cfg = PROVIDERS[seed.provider] || PROVIDERS.other;
   const host = seed.imapHost || cfg.host;
-  if (!host) return "missing";
-
-  const client = new ImapFlow({ host, port: cfg.port, secure: true, auth: { user: seed.imapUser || seed.email, pass: password }, logger: false });
+  if (!password || !host) return { placement: "unverified", error: "Receiving mailbox access is not configured." };
+  const client = new ImapFlow({ host, port: cfg.port, secure: true, auth: { user: seed.imapUser || seed.email, pass: password }, logger: false,
+    connectionTimeout: 15000, socketTimeout: 30000 });
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
   try {
     await client.connect();
-    // Inbox first.
-    try {
-      const lock = await client.getMailboxLock("INBOX");
+    for (const [folder, placement] of [["INBOX", "inbox"], [cfg.spam, "spam"]] as const) {
+      const lock = await client.getMailboxLock(folder, { readOnly: true });
       try {
         const uids = await client.search({ since, subject: token }, { uid: true });
-        if (uids && (uids as number[]).length) return "inbox";
+        if (uids && uids.length) {
+          const message = await client.fetchOne(uids[uids.length - 1], { source: true }, { uid: true });
+          const parsed = message && message.source ? await simpleParser(message.source) : undefined;
+          const header = parsed?.headerLines.filter(h => h.key === "authentication-results").map(h => h.line).join("\n");
+          return { placement, authenticationResults: header || "Receiving server did not supply Authentication-Results." };
+        }
       } finally { lock.release(); }
-    } catch {}
-    // Then the provider's spam/junk folder.
-    try {
-      const lock = await client.getMailboxLock(cfg.spam);
-      try {
-        const uids = await client.search({ since, subject: token }, { uid: true });
-        if (uids && (uids as number[]).length) return "spam";
-      } finally { lock.release(); }
-    } catch {}
-    return "missing";
-  } catch (e: any) {
-    console.error(`[SeedTest] read ${seed.email} failed:`, e?.message);
-    return "missing";
-  } finally {
-    try { await client.logout(); } catch {}
-  }
+    }
+    return { placement: "missing" };
+  } catch {
+    return { placement: "unverified", error: "Could not read the receiving mailbox; delivery is not established." };
+  } finally { try { await client.logout(); } catch { client.close(); } }
 }
 
 export async function checkSeedTest(testId: string): Promise<void> {
@@ -158,18 +156,18 @@ export async function checkSeedTest(testId: string): Promise<void> {
   const seeds = await listSeeds(false);
   const { rows: results } = await pool.query(`SELECT * FROM seed_test_results WHERE test_id=$1`, [testId]);
 
-  let inbox = 0, spam = 0, missing = 0;
+  let inbox = 0, spam = 0, missing = 0, unverified = 0;
   for (const r of results) {
     if (r.placement === "send_failed") { missing++; continue; }
     const seed = seeds.find((s) => s.email === r.seed_email);
-    if (!seed) { missing++; continue; }
-    const placement = await checkSeedPlacement(seed, test.token);
-    await pool.query(`UPDATE seed_test_results SET placement=$2, checked_at=now() WHERE id=$1`, [r.id, placement]);
-    if (placement === "inbox") inbox++; else if (placement === "spam") spam++; else missing++;
+    if (!seed) { unverified++; continue; }
+    const result = await checkSeedPlacement(seed, test.token);
+    await pool.query(`UPDATE seed_test_results SET placement=$2, authentication_results=$3,check_error=$4,checked_at=now() WHERE id=$1`, [r.id, result.placement, result.authenticationResults || null, result.error || null]);
+    if (result.placement === "inbox") inbox++; else if (result.placement === "spam") spam++; else if (result.placement === "unverified") unverified++; else missing++;
   }
   await pool.query(
-    `UPDATE seed_tests SET status='complete', inbox=$2, spam=$3, missing=$4, completed_at=now() WHERE id=$1`,
-    [testId, inbox, spam, missing],
+    `UPDATE seed_tests SET status=$5, inbox=$2, spam=$3, missing=$4, completed_at=now() WHERE id=$1`,
+    [testId, inbox, spam, missing, unverified ? "needs_mailbox_access" : "complete"],
   );
 }
 
@@ -193,10 +191,10 @@ export async function getSeedOverview() {
   let latestResults: any[] = [];
   if (latest) {
     const { rows } = await pool.query(
-      `SELECT seed_email, provider, placement, checked_at FROM seed_test_results WHERE test_id=$1 ORDER BY provider, seed_email`,
+      `SELECT seed_email, provider, placement, checked_at,authentication_results,check_error FROM seed_test_results WHERE test_id=$1 ORDER BY provider, seed_email`,
       [latest.id],
     );
-    latestResults = rows.map((r) => ({ email: r.seed_email, provider: r.provider, placement: r.placement, checkedAt: r.checked_at ? new Date(r.checked_at).toISOString() : null }));
+    latestResults = rows.map((r) => ({ email: r.seed_email, provider: r.provider, placement: r.placement, authenticationResults: r.authentication_results, error: r.check_error, checkedAt: r.checked_at ? new Date(r.checked_at).toISOString() : null }));
   }
   return {
     seeds,

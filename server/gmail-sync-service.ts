@@ -1,3 +1,5 @@
+import { replyFolders, originalMessageIds } from "./mailbox-evidence";
+import { pool } from "./db";
 import { authoredReply, classifyReply, REPLY_POLICY_VERSION } from "./outreach-signals";
 import { suppressReplyOutreach } from "./call-queue-service";
 // ─── Gmail Inbox Sync (Dylan plus historical sender inboxes) ───────────────────
@@ -164,190 +166,197 @@ export async function syncSenderInbox(senderEmail: string, password: string, loo
     });
 
     await client.connect();
-    const lock = await client.getMailboxLock("INBOX");
+    const folders = replyFolders(await client.list());
+    for (const folder of folders) {
+      const lock = await client.getMailboxLock(folder, { readOnly: true });
 
-    try {
-      // Look back 7 days so recent bounces are caught even after a restart.
-      const since = new Date(Date.now() - Math.min(180, Math.max(1, lookbackDays)) * 24 * 60 * 60 * 1000);
-      // Whether transient (4.x.x) bounces are left alone instead of suppressed.
-      const softSkipDnc = (await getDeliverabilitySettings()).softBounceSkipDnc;
+      try {
+        // Look back 7 days so recent bounces are caught even after a restart.
+        const since = new Date(Date.now() - Math.min(180, Math.max(1, lookbackDays)) * 24 * 60 * 60 * 1000);
+        // Whether transient (4.x.x) bounces are left alone instead of suppressed.
+        const softSkipDnc = (await getDeliverabilitySettings()).softBounceSkipDnc;
 
-      // Fetch full raw source too — bounce parsing needs headers + all MIME
-      // parts (the decoded TEXT part alone is often MIME-encoded).
-      for await (const msg of client.fetch({ since }, { envelope: true, bodyParts: ["TEXT"], source: true, internalDate: true })) {
-        scanned++;
-        const msgId = msg.envelope?.messageId || `${senderEmail}:${client.mailbox && client.mailbox.uidValidity}:${msg.uid}`;
+        // Fetch full raw source too — bounce parsing needs headers + all MIME
+        // parts (the decoded TEXT part alone is often MIME-encoded).
+        for await (const msg of client.fetch({ since }, { envelope: true, bodyParts: ["TEXT"], source: true, internalDate: true })) {
+          scanned++;
+          const msgId = msg.envelope?.messageId || `${senderEmail}:${folder}:${client.mailbox && client.mailbox.uidValidity}:${msg.uid}`;
 
-        const fromAddr = msg.envelope?.from?.[0]?.address?.toLowerCase() || "";
-        const fromName = msg.envelope?.from?.[0]?.name || fromAddr;
-        const subject = msg.envelope?.subject || "(no subject)";
-        const rawSource = msg.source ? msg.source.toString("utf8") : "";
+          const fromAddr = msg.envelope?.from?.[0]?.address?.toLowerCase() || "";
+          const fromName = msg.envelope?.from?.[0]?.name || fromAddr;
+          const subject = msg.envelope?.subject || "(no subject)";
+          const rawSource = msg.source ? msg.source.toString("utf8") : "";
 
-        // Bounce / non-delivery reports FIRST — and intentionally NOT subject to
-        // the in-memory dedup, so a manual "Check for bounces" always re-scans.
-        // markDripSendBounced is idempotent (returns null once already bounced).
-        if (isBounceNotification(fromAddr, subject, rawSource.slice(0, 4000))) {
-          const kind = classifyBounce(rawSource || subject);
-          // Transient (soft) bounce: don't suppress — it's temporary and the
-          // contact should keep its enrollment to retry on the next cycle.
-          if (kind === "soft" && softSkipDnc) {
-            console.log(`[GmailSync] soft bounce (transient) — not suppressing (${subject})`);
+          // Bounce / non-delivery reports FIRST — and intentionally NOT subject to
+          // the in-memory dedup, so a manual "Check for bounces" always re-scans.
+          // markDripSendBounced is idempotent (returns null once already bounced).
+          if (isBounceNotification(fromAddr, subject, rawSource.slice(0, 4000))) {
+            const kind = classifyBounce(rawSource || subject);
+            const ids = originalMessageIds(rawSource);
+            const candidates = extractBouncedRecipients(rawSource || subject);
+            const bounceTime = msg.internalDate instanceof Date ? msg.internalDate : msg.envelope?.date || new Date();
+            for (const addr of candidates) await pool.query(`INSERT INTO email_delivery_reports
+              (mailbox,message_id,recipient,kind,diagnostic,original_ids,received_at) VALUES($1,$2,$3,$4,$5,$6,$7)
+              ON CONFLICT DO NOTHING`, [senderEmail,msgId,addr,kind,(rawSource.match(/^Diagnostic-Code:[^\n]+/im)?.[0] || subject).slice(0,1000),JSON.stringify(ids),bounceTime]);
+            // Transient (soft) bounce: don't suppress — it's temporary and the
+            // contact should keep its enrollment to retry on the next cycle.
+            if (kind === "soft" && softSkipDnc) {
+              console.log(`[GmailSync] soft bounce (transient) — not suppressing (${subject})`);
+              processedMessageIds.add(msgId);
+              continue;
+            }
+            for (const addr of candidates) {
+              const marked = await storage.markDripSendBounced(addr, `Bounced (${kind}): ${subject}`.slice(0, 200), bounceTime, ids, msgId);
+              if (marked) {
+                bounced++;
+                stored++;
+                // Suppress the address so future drip steps skip it, and stop the
+                // enrollment so it doesn't keep retrying a dead mailbox.
+                try { await addToDnc(addr, undefined, undefined, `Email hard-bounced (${kind})`); } catch {}
+                try {
+                  if (marked.enrollmentId) {
+                    await storage.updateDripEnrollment(marked.enrollmentId, { status: "bounced" } as any);
+                  }
+                } catch {}
+                console.log(`[GmailSync] bounce — marked ${addr} bounced + suppressed (${subject})`);
+              }
+            }
             processedMessageIds.add(msgId);
             continue;
           }
-          const candidates = extractBouncedRecipients(rawSource || subject);
-          for (const addr of candidates) {
-            const marked = await storage.markDripSendBounced(addr, `Bounced (${kind}): ${subject}`.slice(0, 200), msg.internalDate instanceof Date ? msg.internalDate : msg.envelope?.date);
-            if (marked) {
-              bounced++;
+
+          // From here on it's a normal message — apply the dedup cache.
+          if (processedMessageIds.has(msgId)) continue;
+
+          // Skip our own messages / anything without a sender.
+          if (!fromAddr || fromAddr === senderEmail) {
+            processedMessageIds.add(msgId);
+            continue;
+          }
+
+          const parsed = await simpleParser(msg.source || Buffer.alloc(0));
+          const bodyText = (parsed.text || "").replace(/\r\n/g, "\n").trim();
+          // Inspect only this message's headers, never headers quoted in its body.
+          const rawHeaders = rawSource.split(/\r?\n\r?\n/, 1)[0];
+          const replyText = authoredReply(bodyText);
+          const replySignal = classifyReply(replyText, subject);
+
+          // Skip newsletters / service welcome emails / notifications / auto-replies
+          // (e.g. "Welcome to PR Newswire!") — these aren't personal replies and
+          // shouldn't clutter the contact's timeline / Activity feed.
+          if (isAutomatedOrBulkEmail(fromAddr, subject, rawHeaders, replyText)) {
+            processedMessageIds.add(msgId);
+            continue;
+          }
+          const bodyHtml = `<pre style="white-space:pre-wrap;font-family:inherit;margin:0;">${escapeHtml(bodyText)}</pre>`;
+          const preview = replyText.slice(0, 240);
+          const replyMetadata = { subject, from: fromAddr, preview, messageId: msgId, replyText, replySignal, replyReceivedAt: (msg.envelope?.date || new Date()).toISOString(), replyPolicyVersion: REPLY_POLICY_VERSION };
+          if (replySignal === "opt_out" || replySignal === "declined") {
+            await suppressReplyOutreach(fromAddr, replySignal);
+          }
+
+          const enrolls = await storage.getDripEnrollmentsByEmail(fromAddr);
+          const sends = (await Promise.all(enrolls.map(e => storage.getDripSends(e.id)))).flat();
+          const references = [parsed.inReplyTo, ...(Array.isArray(parsed.references) ? parsed.references : [parsed.references])]
+            .filter((r): r is string => !!r);
+          const receivedAt = msg.internalDate instanceof Date ? msg.internalDate : parsed.date;
+          const matchedSend = receivedAt ? findReplySend(sends, { subject, receivedAt, references, bodyText }) : undefined;
+          const optOut = replySignal === "opt_out";
+          if (optOut && enrolls.length > 0) {
+            if (!(await isOnDnc(fromAddr))) await addToDnc(fromAddr, undefined, undefined, "Recipient requested unsubscribe");
+            await storage.markEnrollmentsUnsubscribed(fromAddr);
+          }
+          if (matchedSend) {
+            await storage.updateDripSend(matchedSend.id, { status: "replied", replySignal });
+            // Attribute only the matched sequence, but stop every active sequence
+            // for this person so another campaign cannot continue cold follow-ups.
+            for (const enrollment of enrolls) {
+              if (enrollment.status === "active" ||
+                  (enrollment.id === matchedSend.enrollmentId && enrollment.status === "completed")) {
+                await storage.updateDripEnrollment(enrollment.id, { status: optOut ? "unsubscribed" : "replied" });
+              }
+            }
+            if (matchedSend.status !== "replied" && replySignal !== "opt_out" && replySignal !== "declined") {
+              const alert = await sendEmail(DEFAULT_SENDER, `Reply from ${fromName} — campaign paused`,
+                `<p>${escapeHtml(fromName)} replied to ${escapeHtml(subject)}. Follow-ups have stopped.</p>${bodyHtml}`,
+                undefined, undefined, { skipUnsubscribe: true });
+              if (!alert.success) console.error("[GmailSync] Reply saved but team alert failed:", alert.error);
+            }
+          }
+
+          // Primary match: investor CRM client by email.
+          const clientRow = await storage.getCrmClientByEmail(fromAddr);
+          if (clientRow) {
+            const exists = await storage.getCrmDirectEmailByMessageId(msgId);
+            if (!exists) {
+              await storage.createCrmDirectEmail({
+                clientId: clientRow.id,
+                fromEmail: fromAddr,
+                fromName,
+                toEmail: senderEmail,
+                subject,
+                bodyHtml,
+                bodyText,
+                direction: "inbound",
+                messageId: msgId,
+                status: "received",
+              });
+              await storage.createCrmClientActivity({
+                clientId: clientRow.id,
+                activityType: "email_received",
+                metadata: replyMetadata,
+              });
               stored++;
-              // Suppress the address so future drip steps skip it, and stop the
-              // enrollment so it doesn't keep retrying a dead mailbox.
-              try { await addToDnc(addr, undefined, undefined, `Email hard-bounced (${kind})`); } catch {}
-              try {
-                if (marked.enrollmentId) {
-                  await storage.updateDripEnrollment(marked.enrollmentId, { status: "bounced" } as any);
-                }
-              } catch {}
-              console.log(`[GmailSync] bounce — marked ${addr} bounced + suppressed (${subject})`);
             }
+            matched++;
+            processedMessageIds.add(msgId);
+            continue;
           }
-          processedMessageIds.add(msgId);
-          continue;
-        }
 
-        // From here on it's a normal message — apply the dedup cache.
-        if (processedMessageIds.has(msgId)) continue;
-
-        // Skip our own messages / anything without a sender.
-        if (!fromAddr || fromAddr === senderEmail) {
-          processedMessageIds.add(msgId);
-          continue;
-        }
-
-        const parsed = await simpleParser(msg.source || Buffer.alloc(0));
-        const bodyText = (parsed.text || "").replace(/\r\n/g, "\n").trim();
-        // Inspect only this message's headers, never headers quoted in its body.
-        const rawHeaders = rawSource.split(/\r?\n\r?\n/, 1)[0];
-        const replyText = authoredReply(bodyText);
-        const replySignal = classifyReply(replyText, subject);
-
-        // Skip newsletters / service welcome emails / notifications / auto-replies
-        // (e.g. "Welcome to PR Newswire!") — these aren't personal replies and
-        // shouldn't clutter the contact's timeline / Activity feed.
-        if (isAutomatedOrBulkEmail(fromAddr, subject, rawHeaders, replyText)) {
-          processedMessageIds.add(msgId);
-          continue;
-        }
-        const bodyHtml = `<pre style="white-space:pre-wrap;font-family:inherit;margin:0;">${escapeHtml(bodyText)}</pre>`;
-        const preview = replyText.slice(0, 240);
-        const replyMetadata = { subject, from: fromAddr, preview, messageId: msgId, replyText, replySignal, replyReceivedAt: (msg.envelope?.date || new Date()).toISOString(), replyPolicyVersion: REPLY_POLICY_VERSION };
-        if (replySignal === "opt_out" || replySignal === "declined") {
-          await suppressReplyOutreach(fromAddr, replySignal);
-        }
-
-        const enrolls = await storage.getDripEnrollmentsByEmail(fromAddr);
-        const sends = (await Promise.all(enrolls.map(e => storage.getDripSends(e.id)))).flat();
-        const references = [parsed.inReplyTo, ...(Array.isArray(parsed.references) ? parsed.references : [parsed.references])]
-          .filter((r): r is string => !!r);
-        const receivedAt = msg.internalDate instanceof Date ? msg.internalDate : parsed.date;
-        const matchedSend = receivedAt ? findReplySend(sends, { subject, receivedAt, references, bodyText }) : undefined;
-        const optOut = replySignal === "opt_out";
-        if (optOut && enrolls.length > 0) {
-          if (!(await isOnDnc(fromAddr))) await addToDnc(fromAddr, undefined, undefined, "Recipient requested unsubscribe");
-          await storage.markEnrollmentsUnsubscribed(fromAddr);
-        }
-        if (matchedSend) {
-          await storage.updateDripSend(matchedSend.id, { status: "replied" });
-          // Attribute only the matched sequence, but stop every active sequence
-          // for this person so another campaign cannot continue cold follow-ups.
-          for (const enrollment of enrolls) {
-            if (enrollment.status === "active" ||
-                (enrollment.id === matchedSend.enrollmentId && enrollment.status === "completed")) {
-              await storage.updateDripEnrollment(enrollment.id, { status: optOut ? "unsubscribed" : "replied" });
-            }
-          }
-          if (matchedSend.status !== "replied" && replySignal !== "opt_out" && replySignal !== "declined") {
-            const alert = await sendEmail(DEFAULT_SENDER, `Reply from ${fromName} — campaign paused`,
-              `<p>${escapeHtml(fromName)} replied to ${escapeHtml(subject)}. Follow-ups have stopped.</p>${bodyHtml}`,
-              undefined, undefined, { skipUnsubscribe: true });
-            if (!alert.success) console.error("[GmailSync] Reply saved but team alert failed:", alert.error);
-          }
-        }
-
-        // Primary match: investor CRM client by email.
-        const clientRow = await storage.getCrmClientByEmail(fromAddr);
-        if (clientRow) {
-          const exists = await storage.getCrmDirectEmailByMessageId(msgId);
-          if (!exists) {
-            await storage.createCrmDirectEmail({
-              clientId: clientRow.id,
-              fromEmail: fromAddr,
-              fromName,
-              toEmail: senderEmail,
-              subject,
-              bodyHtml,
-              bodyText,
-              direction: "inbound",
-              messageId: msgId,
-              status: "received",
-            });
-            await storage.createCrmClientActivity({
-              clientId: clientRow.id,
+          // Log an inbound email reply once per Message-ID against a contact. The
+          // in-memory dedup resets on restart and the IMAP fetch re-scans 7 days,
+          // so guard at the DB layer too (matches the client + SMS reply paths).
+          const logContactReply = async (contactId: string) => {
+            const acts = await storage.getContactActivities(contactId);
+            if (acts.some((a) => ((a.metadata || {}) as any).messageId === msgId)) return false;
+            await storage.createContactActivity({
+              contactId,
               activityType: "email_received",
               metadata: replyMetadata,
             });
-            stored++;
-          }
-          matched++;
-          processedMessageIds.add(msgId);
-          continue;
-        }
+            return true;
+          };
 
-        // Log an inbound email reply once per Message-ID against a contact. The
-        // in-memory dedup resets on restart and the IMAP fetch re-scans 7 days,
-        // so guard at the DB layer too (matches the client + SMS reply paths).
-        const logContactReply = async (contactId: string) => {
-          const acts = await storage.getContactActivities(contactId);
-          if (acts.some((a) => ((a.metadata || {}) as any).messageId === msgId)) return false;
-          await storage.createContactActivity({
-            contactId,
-            activityType: "email_received",
-            metadata: replyMetadata,
-          });
-          return true;
-        };
-
-        // Fallback: attorney/partner contact by email → log as an activity.
-        const contactRow = await storage.getContactByEmail(fromAddr);
-        if (contactRow) {
-          if (await logContactReply(contactRow.id)) stored++;
-          matched++;
-        } else {
-          // Final fallback: a cold prospect (e.g. a Seamless import enrolled in a
-          // campaign) with no contact/client record yet. Mirror them into Contacts
-          // and log the reply so it surfaces in the campaign Activity feed.
-          // Wrapped best-effort so one bad row (e.g. a unique-email race) can't
-          // abort the rest of the inbox poll.
-          try {
-            const prospect = await storage.getProspectByEmail(fromAddr);
-            if (prospect) {
-              const contact = await storage.findOrCreateContactForProspect(prospect);
-              if (await logContactReply(contact.id)) stored++;
-              matched++;
+          // Fallback: attorney/partner contact by email → log as an activity.
+          const contactRow = await storage.getContactByEmail(fromAddr);
+          if (contactRow) {
+            if (await logContactReply(contactRow.id)) stored++;
+            matched++;
+          } else {
+            // Final fallback: a cold prospect (e.g. a Seamless import enrolled in a
+            // campaign) with no contact/client record yet. Mirror them into Contacts
+            // and log the reply so it surfaces in the campaign Activity feed.
+            // Wrapped best-effort so one bad row (e.g. a unique-email race) can't
+            // abort the rest of the inbox poll.
+            try {
+              const prospect = await storage.getProspectByEmail(fromAddr);
+              if (prospect) {
+                const contact = await storage.findOrCreateContactForProspect(prospect);
+                if (await logContactReply(contact.id)) stored++;
+                matched++;
+              }
+            } catch (err) {
+              throw new Error(`Could not store prospect reply ${msgId}`, { cause: err });
             }
-          } catch (err) {
-            throw new Error(`Could not store prospect reply ${msgId}`, { cause: err });
           }
+
+          if (processedMessageIds.size > 10_000) processedMessageIds.clear();
+          processedMessageIds.add(msgId);
         }
-
-        if (processedMessageIds.size > 10_000) processedMessageIds.clear();
-        processedMessageIds.add(msgId);
+      } finally {
+        lock.release();
       }
-    } finally {
-      lock.release();
     }
-
     await client.logout();
   } catch (e: any) {
     const error = e?.message || "IMAP sync error";

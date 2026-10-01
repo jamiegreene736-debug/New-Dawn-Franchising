@@ -59,10 +59,10 @@ export function blobOf(lead: IntroducerInput): string {
 }
 
 export function hasE2PracticeSignal(lead: IntroducerInput): boolean {
-  if (lead.namedAccount) return true;
-  const cat = (lead.category || "").toLowerCase();
-  if (PRACTICE_CATEGORIES.has(cat)) return true;
-  return E2_PRACTICE_RE.test(blobOf(lead));
+  // Provider categories and named-account lists identify research candidates, not fit.
+  const evidence = lead.notes || "";
+  return /\bE-?2\b|treaty investor/i.test(evidence)
+    || (/\b(?:U\.?S\.?|United States)\b/i.test(evidence) && /business broker|franchise (?:broker|buyer|placement)/i.test(evidence));
 }
 
 export function looksLikePersonName(name: string | null | undefined): boolean {
@@ -75,17 +75,10 @@ export function looksLikePersonName(name: string | null | undefined): boolean {
 }
 
 export function hasSeniority(lead: IntroducerInput): boolean {
-  if (lead.namedAccount) return true;
-  if (!looksLikePersonName(lead.fullName)) return true; // firm-level → expand later
+  if (!looksLikePersonName(lead.fullName)) return false;
   const title = lead.title || "";
-  if (JUNIOR_RE.test(title) && !SENIORITY_RE.test(title)) return false;
-  if (SENIORITY_RE.test(title)) return true;
-  // Attorneys often omit "Partner" on directory pages; category + practice is enough.
-  const cat = (lead.category || "").toLowerCase();
-  if (cat.includes("attorney") || cat.includes("consultant") || cat.includes("broker")) {
-    return !JUNIOR_RE.test(title);
-  }
-  return false;
+  if (/paralegal|assistant|coordinator|intern|student|receptionist|clerk|membership|cultur|program|communications/i.test(title)) return false;
+  return SENIORITY_RE.test(title) || /attorney|counsel|broker/i.test(title);
 }
 
 export function isReachable(lead: IntroducerInput): boolean {

@@ -11,6 +11,23 @@ import { pool } from "./db";
  * every boot.
  */
 const STATEMENTS: string[] = [
+  `CREATE TABLE IF NOT EXISTS email_delivery_reports (
+    mailbox text NOT NULL, message_id text NOT NULL, recipient text NOT NULL,
+    kind text NOT NULL, diagnostic text NOT NULL, original_ids jsonb NOT NULL,
+    received_at timestamptz NOT NULL, PRIMARY KEY(mailbox,message_id,recipient)
+  )`,
+  `CREATE TABLE IF NOT EXISTS outreach_qualifications (
+    email text PRIMARY KEY, status text NOT NULL, audience text NOT NULL,
+    source_url text NOT NULL, reason text NOT NULL, role text NOT NULL,
+    firm_domain text NOT NULL, reviewed_at timestamptz NOT NULL DEFAULT now()
+  )`,
+  `ALTER TABLE drip_enrollments ADD COLUMN IF NOT EXISTS hold_reason text`,
+  `ALTER TABLE drip_sends ADD COLUMN IF NOT EXISTS from_address text`,
+  `ALTER TABLE drip_sends ADD COLUMN IF NOT EXISTS rendered_body_html text`,
+  `ALTER TABLE drip_sends ADD COLUMN IF NOT EXISTS provider_message_id text`,
+  `ALTER TABLE drip_sends ADD COLUMN IF NOT EXISTS reply_signal text`,
+  `ALTER TABLE drip_sends ADD COLUMN IF NOT EXISTS bounce_verified_at timestamptz`,
+  `ALTER TABLE drip_sends ADD COLUMN IF NOT EXISTS bounce_message_id text`,
   `CREATE EXTENSION IF NOT EXISTS pgcrypto`,
   // Email-deliverability remediation roadmap. One row per action item; the admin
   // portal's Email Deliverability tab reads/writes `status` so progress persists.
@@ -175,7 +192,6 @@ const STATEMENTS: string[] = [
      ON outreach_daily_plans (plan_date)`,
   // DB-level autopilot pause switch (the emergency brake behind the SMS pause
   // link + admin UI); the env flag OUTREACH_AUTOPILOT is the master enable.
-  `ALTER TABLE deliverability_settings ADD COLUMN IF NOT EXISTS outreach_autopilot_paused boolean NOT NULL DEFAULT false`,
   // ─── AI search telemetry ─────────────────────────────────────────────────
   // search_events records every AI/lead search so we can measure quality and
   // tune scoring/prompts. Written fire-and-forget from the search routes.
@@ -475,6 +491,8 @@ const STATEMENTS: string[] = [
     updated_at                  timestamptz  NOT NULL DEFAULT now()
   )`,
 
+  `ALTER TABLE deliverability_settings ADD COLUMN IF NOT EXISTS outreach_autopilot_paused boolean NOT NULL DEFAULT true`,
+
   // Per-sender send counters (rotation visibility).
   `CREATE TABLE IF NOT EXISTS sender_stats (
     email        text         PRIMARY KEY,
@@ -537,6 +555,8 @@ const STATEMENTS: string[] = [
   `CREATE INDEX IF NOT EXISTS idx_seed_results_test ON seed_test_results (test_id)`,
 
   // ─── Phase 3: DMARC aggregate (rua) reports ──────────────────────────────────
+  `ALTER TABLE seed_test_results ADD COLUMN IF NOT EXISTS authentication_results text`,
+  `ALTER TABLE seed_test_results ADD COLUMN IF NOT EXISTS check_error text`,
   `CREATE TABLE IF NOT EXISTS dmarc_reports (
     id          varchar      PRIMARY KEY DEFAULT gen_random_uuid(),
     report_id   text         NOT NULL UNIQUE,

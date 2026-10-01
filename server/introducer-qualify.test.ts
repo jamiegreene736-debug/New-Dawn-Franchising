@@ -44,7 +44,7 @@ const usCounsel = qualifyIntroducer({
   country: "United States",
   notes: "employment and investor visas",
 });
-assert("US immigration partner passes without E-2 in notes", usCounsel.pass, JSON.stringify(usCounsel));
+assert("US immigration label alone requires practice research", !usCounsel.pass, JSON.stringify(usCounsel));
 assert("score is a number", Number.isFinite(partner.score));
 
 const generic = qualifyIntroducer({
@@ -76,11 +76,11 @@ const wealth = qualifyIntroducer({
   category: "wealth_manager",
   country: "UAE",
 });
-assert("wealth manager category passes practice filter", hasE2PracticeSignal({ category: "wealth_manager" }));
+assert("wealth manager category alone is not proof", !hasE2PracticeSignal({ category: "wealth_manager" }));
 assert("wealth MD is senior", hasSeniority({ fullName: "Priya Shah", title: "Managing Director", category: "wealth_manager" }));
-assert("wealth manager with website passes", wealth.pass, JSON.stringify(wealth));
+assert("wealth website without practice evidence needs review", !wealth.pass, JSON.stringify(wealth));
 
-assert("named account skips practice text", hasE2PracticeSignal({ namedAccount: true, category: "other" }));
+assert("named account still needs practice evidence", !hasE2PracticeSignal({ namedAccount: true, category: "other" }));
 assert("firm name is not a person", !looksLikePersonName("Lopez Immigration LLP"));
 assert("person name detected", looksLikePersonName("Maria Lopez"));
 

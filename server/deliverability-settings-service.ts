@@ -60,7 +60,7 @@ const DEFAULTS = {
   campaign_bounce_threshold_pct: 12,
   campaign_bounce_min: 50,
   soft_bounce_skip_dnc: true,
-  outreach_autopilot_paused: false,
+  outreach_autopilot_paused: true,
   ramp_mode: "off",
   ramp_start_cap: 20,
   ramp_days: 14,
@@ -133,7 +133,7 @@ export async function getDeliverabilitySettings(): Promise<DeliverabilitySetting
     // If the table isn't there yet (first boot before ensure-schema), fall back to
     // safe defaults so the send path never breaks.
     console.error("[Deliverability] settings read failed, using defaults:", e?.message);
-    return rowToSettings({ ...DEFAULTS });
+    return rowToSettings({ ...DEFAULTS, outreach_autopilot_paused: true });
   }
 }
 
@@ -228,7 +228,7 @@ export async function runBounceGuard(): Promise<BounceGuardResult> {
       const { rows } = await pool.query(
         `SELECT split_part(recipient_email,'@',2) AS domain,
            count(*) FILTER (WHERE ${ATTEMPTED}) AS attempted,
-           count(*) FILTER (WHERE status='bounced') AS bounced
+           count(*) FILTER (WHERE status='bounced' AND bounce_verified_at IS NOT NULL) AS bounced
          FROM drip_sends
          WHERE channel='email' AND recipient_email LIKE '%@%' AND created_at > now() - interval '30 days'
          GROUP BY 1
@@ -258,7 +258,7 @@ export async function runBounceGuard(): Promise<BounceGuardResult> {
       const { rows } = await pool.query(
         `SELECT e.campaign_id AS campaign_id,
            count(*) FILTER (WHERE ${ATTEMPTED}) AS attempted,
-           count(*) FILTER (WHERE s.status='bounced') AS bounced
+           count(*) FILTER (WHERE s.status='bounced' AND s.bounce_verified_at IS NOT NULL) AS bounced
          FROM drip_sends s
          JOIN drip_enrollments e ON s.enrollment_id = e.id
          WHERE s.channel='email' AND s.created_at > now() - interval '30 days'

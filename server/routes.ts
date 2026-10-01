@@ -1,3 +1,6 @@
+import { pool } from "./db";
+import { campaignOutcomes } from "./campaign-metrics";
+import { registerOutreachReviewRoutes } from "./outreach-review-routes";
 import { REPLY_POLICY_VERSION } from "./outreach-signals";
 import { ACCEPTED_EMAIL_STATUSES } from "./campaign-replies";
 import type { Express, Request, Response } from "express";
@@ -15,7 +18,7 @@ import { generateBlogPost, scheduleWeeklyBlogGeneration } from "./blog-generator
 import { generateBrochurePDF } from "./brochure";
 import { generateBrokerAgreementPDF } from "./broker-agreement-pdf";
 import { searchProspects, SEARCH_CATEGORIES } from "./prospect-search";
-import { scheduleDripProcessing, processDripEmails, reprocessStep } from "./drip-processor";
+import { scheduleDripProcessing, processDripEmails } from "./drip-processor";
 import { scheduleGmailSync, syncFranchisingInbox, getGmailSyncStatus, getGmailSyncLastResult } from "./gmail-sync-service";
 import { getDomainAuth, getDeliverabilityMetrics, getChecklist, updateChecklistItem, type ChecklistStatus } from "./deliverability-service";
 import { getDnsSetupReport } from "./dns-setup-service";
@@ -3393,6 +3396,8 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
   });
 
   // Per-step + overview analytics for the Seamless-style builder.
+  registerOutreachReviewRoutes(app, requireAdminAuth);
+
   app.get("/api/crm/campaigns/:id/stats", requireAdminAuth, async (req, res) => {
     try {
       const campaignId = String(req.params.id);
@@ -3414,7 +3419,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
         const sent = rows.filter(acceptedEmail).length;
         const opened = rows.filter((s) => acceptedEmail(s) && s.openedAt).length;
         const clicked = rows.filter((s) => acceptedEmail(s) && s.clickedAt).length;
-        const bounced = rows.filter((s) => s.channel === "email" && s.status === "bounced").length;
+        const bounced = rows.filter((s) => s.channel === "email" && s.bounceVerifiedAt).length;
         const tasks = rows.filter((s) => s.status === "task").length;
         const handled = sent + bounced + tasks;
         perStep[step.id] = {
@@ -3429,6 +3434,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
 
       const emailSends = sends.filter((s) => s.channel === "email");
       const overview = {
+        ...campaignOutcomes(sends),
         total: totalEnrollments,
         active: enrollments.filter((e) => e.status === "active").length,
         completed: enrollments.filter((e) => e.status === "completed").length,
@@ -3437,7 +3443,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
         opens: sends.filter((s) => acceptedEmail(s) && s.openedAt).length,
         clicks: sends.filter((s) => acceptedEmail(s) && s.clickedAt).length,
         replies: repliedCount,
-        bounced: emailSends.filter((s) => s.status === "bounced").length,
+        bounced: emailSends.filter((s) => s.bounceVerifiedAt).length,
         failed: emailSends.filter((s) => s.status === "failed").length,
         unsubscribed: enrollments.filter((e) => e.status === "unsubscribed").length,
         // Scanner/gateway hits filtered out of opens/clicks — kept visible so a
@@ -4259,7 +4265,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
   });
 
   // Apply a corrected email to a bounced send's enrollment: update the address,
-  // clear the dead send so the step re-sends, and resume the enrollment.
+  // retain history and require requalification of the corrected address.
   app.post("/api/crm/sends/:id/apply-email", requireAdminAuth, async (req, res) => {
     try {
       const email = String(req.body?.email || "").trim().toLowerCase();
@@ -4280,29 +4286,21 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
       //   2) the originating CRM contact (matched by the old email)
       //   3) the originating investor-CRM client (matched by the old email)
       const updated: string[] = [];
-      await storage.updateProspect(enrollment.prospectId, { email })
+      await storage.updateProspect(enrollment.prospectId, { email, emailStatus: null, emailVerifiedAt: null })
         .then(() => updated.push("prospect")).catch(() => {});
       if (oldEmail && oldEmail !== email) {
         try {
           const contact = await storage.getContactByEmail(oldEmail);
-          if (contact) { await storage.updateContact(contact.id, { email }); updated.push("contact"); }
+          if (contact) { await storage.updateContact(contact.id, { email, emailStatus: null, emailVerifiedAt: null }); updated.push("contact"); }
         } catch {}
         try {
           const client = await storage.getCrmClientByEmail(oldEmail);
-          if (client) { await storage.updateCrmClient(client.id, { email }); updated.push("client"); }
+          if (client) { await storage.updateCrmClient(client.id, { email, emailStatus: null, emailVerifiedAt: null }); updated.push("client"); }
         } catch {}
       }
 
-      // Re-send the step that bounced: drop the dead send and rewind currentStep
-      // to it so the processor re-attempts it to the new address next run.
-      const steps = await storage.getDripSteps(enrollment.campaignId);
-      const stepIndex = steps.findIndex((s) => s.id === send.stepId);
-      await storage.deleteDripSend(send.id).catch(() => {});
-      await storage.updateDripEnrollment(enrollment.id, {
-        prospectEmail: email,
-        status: "active",
-        ...(stepIndex >= 0 ? { currentStep: stepIndex } : {}),
-      } as any);
+      await storage.updateDripEnrollment(enrollment.id, { prospectEmail: email, status: "paused" });
+      await pool.query("UPDATE drip_enrollments SET hold_reason=$2 WHERE id=$1", [enrollment.id, "Address changed; verify the new mailbox and recipient qualification before resuming."]);
 
       console.log(`[ApplyEmail] ${oldEmail} → ${email} (updated: ${updated.join(", ") || "enrollment only"})`);
       res.json({ success: true, email, updated });
@@ -4316,12 +4314,15 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
   app.post("/api/crm/drip/process", requireAdminAuth, async (req, res) => {
     // Manual "Send Due Now". REQUIRES a campaignId so it only ever sends to the
     // enrollments of the campaign the user is looking at — never a global blast
-    // across every campaign. Overrides the optimal-window + hourly-cap gating so
+    // across every campaign. Overrides the optimal-window gating so
     // due emails go out immediately, runs in the BACKGROUND, and responds right
-    // away so the UI never hangs. The daily cap + in-progress guard remain.
+    // away so the UI never hangs. All pause, qualification and volume guards remain.
     const campaignId = (req.body?.campaignId as string | undefined)?.trim();
     if (!campaignId) {
       return res.status(400).json({ message: "campaignId is required for manual send." });
+    }
+    if ((await getDeliverabilitySettings()).outreachAutopilotPaused) {
+      return res.status(409).json({ message: "Outreach is paused. Review delivery and recipient readiness before resuming." });
     }
     processDripEmails({ force: true, campaignId }).catch((err) =>
       console.error("[Drip] Manual process error:", err),
@@ -4329,27 +4330,9 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
     res.status(202).json({ message: "Processing started", started: true, campaignId });
   });
 
-  // Reprocess a single step: force-resend it to every enrolled contact in the
-  // campaign now (ignores delay timing + the already-sent guard). Runs in the
-  // background and responds immediately with the contact count.
-  app.post("/api/crm/campaigns/:campaignId/steps/:stepId/reprocess", requireAdminAuth, async (req, res) => {
-    try {
-      const campaignId = String(req.params.campaignId);
-      const stepId = String(req.params.stepId);
-      const steps = await storage.getDripSteps(campaignId);
-      const step = steps.find((s) => s.id === stepId);
-      if (!step) return res.status(404).json({ message: "Step not found" });
-      const stepType = (step.stepType || "email").toLowerCase();
-      if (!["email", "manual_email", "sms"].includes(stepType)) {
-        return res.status(400).json({ message: "Only email and text steps can be reprocessed." });
-      }
-      const enrollments = await storage.getDripEnrollments(campaignId);
-      reprocessStep(campaignId, stepId).catch((err) => console.error("[Reprocess] error:", err));
-      res.status(202).json({ message: "Reprocessing started", started: true, count: enrollments.length });
-    } catch (err: any) {
-      console.error("[Reprocess] route failed:", err?.message || err);
-      res.status(500).json({ message: err?.message || "Failed to reprocess step" });
-    }
+  // Retain a clear response for old clients without exposing a bulk-replay bypass.
+  app.post("/api/crm/campaigns/:campaignId/steps/:stepId/reprocess", requireAdminAuth, (_req, res) => {
+    res.status(409).json({ message: "Bulk replay is disabled. Review recipient readiness and use normal scheduled sending; suppression and spacing remain in force." });
   });
 
   // Send a one-off test of a single step to an arbitrary recipient. Uses the

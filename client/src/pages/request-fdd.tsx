@@ -192,6 +192,7 @@ export default function RequestFddPage() {
 
   return (
     <div data-testid="page-request-fdd" className="min-h-screen">
+      <p className="text-center px-6 py-4 border-b">Reviewing options for a client? <a className="underline" href="/partner-review">Start with the professional review guide</a>.</p>
       <section data-testid="section-fdd-hero" id="request-fdd" className="border-b">
         <div className="nh-container py-10 md:py-14">
           <div className="mx-auto max-w-3xl text-center">

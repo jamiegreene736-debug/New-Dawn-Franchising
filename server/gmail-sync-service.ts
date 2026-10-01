@@ -1,3 +1,5 @@
+import { authoredReply, classifyReply, REPLY_POLICY_VERSION } from "./outreach-signals";
+import { suppressReplyOutreach } from "./call-queue-service";
 // ─── Gmail Inbox Sync (Dylan plus historical sender inboxes) ───────────────────
 // Two-way Gmail connection: outbound is handled by email-service.ts; this module
 // pulls the sender INBOX over IMAP and lands client replies on the matching
@@ -9,7 +11,7 @@
 // the reply as an inbound crm_direct_emails row + an activity. Deduped by Message-ID.
 
 import { simpleParser } from "mailparser";
-import { findReplySend, isOptOutReply } from "./campaign-replies";
+import { findReplySend } from "./campaign-replies";
 import { ImapFlow } from "imapflow";
 import cron from "node-cron";
 import { storage } from "./storage";
@@ -227,16 +229,22 @@ export async function syncSenderInbox(senderEmail: string, password: string, loo
         const bodyText = (parsed.text || "").replace(/\r\n/g, "\n").trim();
         // Inspect only this message's headers, never headers quoted in its body.
         const rawHeaders = rawSource.split(/\r?\n\r?\n/, 1)[0];
+        const replyText = authoredReply(bodyText);
+        const replySignal = classifyReply(replyText, subject);
 
         // Skip newsletters / service welcome emails / notifications / auto-replies
         // (e.g. "Welcome to PR Newswire!") — these aren't personal replies and
         // shouldn't clutter the contact's timeline / Activity feed.
-        if (isAutomatedOrBulkEmail(fromAddr, subject, rawHeaders, bodyText)) {
+        if (isAutomatedOrBulkEmail(fromAddr, subject, rawHeaders, replyText)) {
           processedMessageIds.add(msgId);
           continue;
         }
         const bodyHtml = `<pre style="white-space:pre-wrap;font-family:inherit;margin:0;">${escapeHtml(bodyText)}</pre>`;
-        const preview = bodyText.slice(0, 240);
+        const preview = replyText.slice(0, 240);
+        const replyMetadata = { subject, from: fromAddr, preview, messageId: msgId, replyText, replySignal, replyReceivedAt: (msg.envelope?.date || new Date()).toISOString(), replyPolicyVersion: REPLY_POLICY_VERSION };
+        if (replySignal === "opt_out" || replySignal === "declined") {
+          await suppressReplyOutreach(fromAddr, replySignal);
+        }
 
         const enrolls = await storage.getDripEnrollmentsByEmail(fromAddr);
         const sends = (await Promise.all(enrolls.map(e => storage.getDripSends(e.id)))).flat();
@@ -244,7 +252,7 @@ export async function syncSenderInbox(senderEmail: string, password: string, loo
           .filter((r): r is string => !!r);
         const receivedAt = msg.internalDate instanceof Date ? msg.internalDate : parsed.date;
         const matchedSend = receivedAt ? findReplySend(sends, { subject, receivedAt, references, bodyText }) : undefined;
-        const optOut = isOptOutReply(bodyText);
+        const optOut = replySignal === "opt_out";
         if (optOut && enrolls.length > 0) {
           if (!(await isOnDnc(fromAddr))) await addToDnc(fromAddr, undefined, undefined, "Recipient requested unsubscribe");
           await storage.markEnrollmentsUnsubscribed(fromAddr);
@@ -259,7 +267,7 @@ export async function syncSenderInbox(senderEmail: string, password: string, loo
               await storage.updateDripEnrollment(enrollment.id, { status: optOut ? "unsubscribed" : "replied" });
             }
           }
-          if (matchedSend.status !== "replied") {
+          if (matchedSend.status !== "replied" && replySignal !== "opt_out" && replySignal !== "declined") {
             const alert = await sendEmail(DEFAULT_SENDER, `Reply from ${fromName} — campaign paused`,
               `<p>${escapeHtml(fromName)} replied to ${escapeHtml(subject)}. Follow-ups have stopped.</p>${bodyHtml}`,
               undefined, undefined, { skipUnsubscribe: true });
@@ -287,7 +295,7 @@ export async function syncSenderInbox(senderEmail: string, password: string, loo
             await storage.createCrmClientActivity({
               clientId: clientRow.id,
               activityType: "email_received",
-              metadata: { subject, from: fromAddr, preview, messageId: msgId },
+              metadata: replyMetadata,
             });
             stored++;
           }
@@ -305,7 +313,7 @@ export async function syncSenderInbox(senderEmail: string, password: string, loo
           await storage.createContactActivity({
             contactId,
             activityType: "email_received",
-            metadata: { subject, from: fromAddr, preview, messageId: msgId },
+            metadata: replyMetadata,
           });
           return true;
         };

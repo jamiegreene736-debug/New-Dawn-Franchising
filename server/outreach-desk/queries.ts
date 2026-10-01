@@ -101,7 +101,7 @@ export async function personRow(
     throw new DeskError(404, "Contact is no longer in the queue.");
   return result.rows[0];
 }
-const QUEUE_RANK = `CASE WHEN q.status='callback' THEN 0 WHEN q.trigger_type='reply_no_meeting' THEN 1
+const QUEUE_RANK = `CASE WHEN q.status='callback' THEN 0 WHEN q.trigger_type IN ('call_requested','information_requested','reply_received') THEN 1
  WHEN q.trigger_type='link_click' THEN 2 ELSE 3 END`;
 export async function listPeople(filters: DeskQuery) {
   let cursor: { rank: number; id: string } | undefined;
@@ -125,8 +125,8 @@ export async function listPeople(filters: DeskQuery) {
   };
   const conditions = [
     filters.view === "history"
-      ? `q.status NOT IN ('queued','calling','callback','no_answer','voicemail','needs_phone')`
-      : `q.status IN ('queued','calling','callback','no_answer','voicemail','needs_phone')`,
+      ? `q.status NOT IN ('queued','calling','callback','no_answer','voicemail','needs_phone','needs_response')`
+      : `q.status IN ('queued','calling','callback','no_answer','voicemail','needs_phone','needs_response')`,
   ];
   if (["today", "callbacks", "replies", "opens"].includes(filters.view))
     conditions.push(
@@ -134,7 +134,7 @@ export async function listPeople(filters: DeskQuery) {
     );
   if (filters.view === "callbacks") conditions.push(`q.status='callback'`);
   if (filters.view === "replies")
-    conditions.push(`q.trigger_type='reply_no_meeting'`);
+    conditions.push(`q.trigger_type IN ('call_requested','information_requested','reply_received')`);
   if (filters.view === "opens")
     conditions.push(`q.trigger_type='engaged_open'`);
   if (filters.view === "research")

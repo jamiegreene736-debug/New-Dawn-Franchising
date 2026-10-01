@@ -29,13 +29,14 @@ function main() {
   console.log("signals:");
   assert("single open is not queueable", !isQueueableOpenSignal(1));
   assert("two opens still ignored", !isQueueableOpenSignal(2));
-  assert("three opens is engaged", isQueueableOpenSignal(3));
+  assert("even repeated opens do not qualify", !isQueueableOpenSignal(300));
   assert("engaged min is 3", ENGAGED_OPEN_MIN === 3);
 
   console.log("priority:");
-  assert("click is 1", priorityForTrigger("link_click") === 1);
-  assert("reply is 2", priorityForTrigger("reply_no_meeting") === 2);
-  assert("engaged open is 3", priorityForTrigger("engaged_open") === 3);
+  assert("passive clicks have no priority", priorityForTrigger("link_click") === 9);
+  assert("requested calls are first", priorityForTrigger("call_requested") === 1);
+  assert("reply is 2", priorityForTrigger("reply_no_meeting") === 9);
+  assert("engaged open is 3", priorityForTrigger("engaged_open") === 9);
   assert("upgrade click over open", shouldUpgradePriority(3, 1));
   assert("do not downgrade", !shouldUpgradePriority(1, 3));
 

@@ -65,6 +65,8 @@ type StepReady = "send" | "wait" | "skip";
 // open/click and fire (or skip after a window) accordingly.
 function evaluateTrigger(step: any, steps: any[], enrolledAt: Date, sends: any[], now: Date, force: boolean): StepReady {
   const tt = (step.triggerType || "time").toLowerCase();
+  // Passive campaign signals cannot create setter calls through the task path either.
+  if ((step.stepType || "").toLowerCase() === "call" && tt !== "time") return "skip";
 
   if (tt === "time") {
     if (force) return "send";
@@ -582,33 +584,6 @@ export async function reprocessStep(campaignId: string, stepId: string): Promise
 
   console.log(`[Reprocess] Done — attempted ${result.attempted}, sent ${result.sent}, failed ${result.failed}, skipped ${result.skipped}`);
   return result;
-}
-
-// ─── Parallel reaction: hot-lead alert + call task on first link click ───────
-// Fired from the click-tracking endpoint on the FIRST click of a drip send.
-export async function fireClickReaction(send: any): Promise<void> {
-  try {
-    const enrollment = send.enrollmentId ? await storage.getDripEnrollment(send.enrollmentId) : null;
-    const name = send.recipientName || enrollment?.prospectName || send.recipientEmail || "A contact";
-    if (enrollment?.prospectId) {
-      await storage.createContactTask({
-        prospectId: enrollment.prospectId,
-        title: `🔥 Call ${name} — clicked a link`,
-        subtitle: `High intent: clicked "${send.subject || "an email"}"`,
-        dueDate: new Date(),
-      } as any).catch(() => {});
-    }
-    const { enqueueFromDripSend } = await import("./call-queue-service");
-    enqueueFromDripSend(send, "link_click").catch((e) => console.error("[CallQueue] click enqueue:", e?.message || e));
-    await sendEmail(
-      "dylan@newdawnfranchising.com",
-      `🔥 ${name} clicked a link — in the Call Queue`,
-      `<p><strong>${name}</strong> (${send.recipientEmail || "—"}) just clicked a link in "${send.subject || "your email"}". They are in <a href="https://www.newdawnfranchising.com/crm?tab=call-queue">the Thailand Call Queue</a> for a setter call to book you.</p>`,
-    ).catch(() => {});
-    console.log(`[ClickReaction] hot-lead task + call queue + alert for ${name}`);
-  } catch (e: any) {
-    console.error("[ClickReaction] failed:", e?.message || e);
-  }
 }
 
 // ─── Parallel reaction: re-send the first email if it wasn't opened ───────────

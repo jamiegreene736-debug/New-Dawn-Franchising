@@ -248,7 +248,7 @@ export function createDeskRouter() {
       const send = await storage.getDripSend(sendId);
       if (!send)
         throw new DeskError(404, "Campaign activity no longer exists.");
-      // An agent can explicitly choose an observed opener, without presenting the open as verified intent.
+      // Passive engagement cannot authorize a call, even via a saved campaign action.
       const result = await enqueueFromDripSend(
         send,
         send.clickedAt ? "link_click" : "engaged_open",
@@ -391,9 +391,9 @@ export function createDeskRouter() {
     route(async (_req, res) => {
       const row = (
         await pool.query(`SELECT
-      (SELECT count(*)::int FROM call_queue WHERE status IN ('queued','calling','callback','no_answer','voicemail','needs_phone')) AS active,
+      (SELECT count(*)::int FROM call_queue WHERE status IN ('queued','calling','callback','no_answer','voicemail','needs_phone','needs_response')) AS active,
       (SELECT count(*)::int FROM call_queue WHERE status='callback' AND next_attempt_at<=now()) AS callbacks,
-      (SELECT count(*)::int FROM call_queue WHERE trigger_type='reply_no_meeting' AND status IN ('queued','calling')) AS replies,
+      (SELECT count(*)::int FROM call_queue WHERE trigger_type IN ('call_requested','information_requested','reply_received') AND status IN ('queued','calling','needs_response','needs_phone')) AS replies,
       (SELECT count(*)::int FROM call_queue q LEFT JOIN outreach_desk_profiles p ON p.queue_id=q.id WHERE q.status IN ('queued','needs_phone') AND (q.phone IS NULL OR p.timezone IS NULL)) AS "needsResearch",
       (SELECT count(*)::int FROM phone_calls WHERE direction='outbound' AND openphone_created_at>=date_trunc('day',now())) AS "confirmedCalls",
       (SELECT count(*)::int FROM phone_calls WHERE direction='outbound' AND status='completed' AND duration_seconds>0 AND openphone_created_at>=date_trunc('day',now())) AS "connectedCalls",

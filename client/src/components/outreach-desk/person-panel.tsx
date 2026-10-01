@@ -287,7 +287,7 @@ export function PersonPanel({
             </div>
             {p.outcomeNotes && (
               <div className="desk-brief">
-                <strong>Last conversation note</strong>
+                <strong>Supporting request / conversation note</strong>
                 <p>{p.outcomeNotes}</p>
               </div>
             )}

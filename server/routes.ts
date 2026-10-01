@@ -1,3 +1,4 @@
+import { REPLY_POLICY_VERSION } from "./outreach-signals";
 import { ACCEPTED_EMAIL_STATUSES } from "./campaign-replies";
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
@@ -14,7 +15,7 @@ import { generateBlogPost, scheduleWeeklyBlogGeneration } from "./blog-generator
 import { generateBrochurePDF } from "./brochure";
 import { generateBrokerAgreementPDF } from "./broker-agreement-pdf";
 import { searchProspects, SEARCH_CATEGORIES } from "./prospect-search";
-import { scheduleDripProcessing, processDripEmails, reprocessStep, fireClickReaction } from "./drip-processor";
+import { scheduleDripProcessing, processDripEmails, reprocessStep } from "./drip-processor";
 import { scheduleGmailSync, syncFranchisingInbox, getGmailSyncStatus, getGmailSyncLastResult } from "./gmail-sync-service";
 import { getDomainAuth, getDeliverabilityMetrics, getChecklist, updateChecklistItem, type ChecklistStatus } from "./deliverability-service";
 import { getDnsSetupReport } from "./dns-setup-service";
@@ -51,7 +52,6 @@ import { registerDeskRoutes } from "./outreach-desk/routes";
 import { startDeskWorker } from "./outreach-desk/worker";
 import {
   attachQuoCall,
-  enqueueFromDripSend,
   ensureCallQueueSchema,
   scanEngagedOpens,
   scanRepliesWithoutMeetings,
@@ -1111,6 +1111,14 @@ export async function registerRoutes(
         country: lead.country || null,
         notes: lead.message || null,
         leadSource,
+      }).then(async (client) => {
+        if (!client || !lead.message) return;
+        await storage.createCrmClientActivity({
+          clientId: client.id,
+          activityType: "email_received",
+          metadata: { subject: "Website information request", messageId: `website-lead:${lead.id}`, replyText: lead.message, replyPolicyVersion: REPLY_POLICY_VERSION },
+        });
+        await scanRepliesWithoutMeetings();
       }).catch((e) => console.error("Failed to auto-create CRM client from lead:", e));
 
       // TODO(CRM): push this lead to HubSpot and/or GoHighLevel here.
@@ -1173,7 +1181,7 @@ export async function registerRoutes(
                 <p style="margin:0;font-size:14px;color:#1a2a4a;font-weight:600;">What happens next?</p>
                 <ul style="margin:8px 0 0;padding-left:18px;font-size:14px;color:#374151;line-height:1.8;">
                   <li>We'll review your information and match you with the right territory</li>
-                  <li>A franchise consultant will schedule a discovery call with you</li>
+                  <li>We'll respond to your request; you can ask us for a call if useful</li>
                   <li>You'll receive our Franchise Disclosure Document (FDD)</li>
                 </ul>
               </div>
@@ -3309,12 +3317,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
           human = false;
           await storage.recordBotEmailOpen(sendId);
         } else {
-          const updated = await storage.recordEmailOpen(sendId);
-          if (updated && (updated.openCount ?? 0) >= 3) {
-            enqueueFromDripSend(updated, "engaged_open").catch((e) =>
-              console.error("[CallQueue] engaged-open enqueue:", e?.message || e),
-            );
-          }
+          await storage.recordEmailOpen(sendId);
         }
       }
     } catch (err) {
@@ -3354,11 +3357,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
         if (send && classifyTrackingHit(req, "click", send.sentAt, send.clickCount ?? 0) === "bot") {
           await storage.recordBotEmailClick(id);
         } else {
-          const updated = await storage.recordEmailClick(id);
-          // First HUMAN click = hot lead → create a call task + alert the team (once).
-          if (updated && (updated.clickCount ?? 0) === 1) {
-            fireClickReaction(updated).catch((e) => console.error("[ClickReaction]", e?.message || e));
-          }
+          await storage.recordEmailClick(id);
         }
       }
     } catch {
@@ -4834,6 +4833,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
             activityType: "sms_received",
             metadata: {
               message: body,
+              replyText: body, replyPolicyVersion: REPLY_POLICY_VERSION,
               messageId: msgData.id,
               from: fromNumber,
               direction: "incoming",
@@ -4859,6 +4859,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
           activityType: "sms_received",
           metadata: {
             message: body,
+            replyText: body, replyPolicyVersion: REPLY_POLICY_VERSION,
             messageId: msgData.id,
             from: fromNumber,
             direction: "incoming",
@@ -4995,7 +4996,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
             await storage.createCrmClientActivity({
               clientId: matched.id,
               activityType: "whatsapp_received",
-              metadata: { message: text, messageId: msgId, from, contactName },
+              metadata: { message: text, replyText: text, replyPolicyVersion: REPLY_POLICY_VERSION, messageId: msgId, from, contactName },
             });
           }
         }
@@ -5614,7 +5615,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
       await storage.createCrmClientActivity({
         clientId: matched.id,
         activityType: "sms_received",
-        metadata: { message: text, messageId: msgId, from, direction: "incoming" },
+        metadata: { message: text, replyText: text, replyPolicyVersion: REPLY_POLICY_VERSION, messageId: msgId, from, direction: "incoming" },
       });
     } catch (err) {
       console.error("[AgentSMS webhook]", err);

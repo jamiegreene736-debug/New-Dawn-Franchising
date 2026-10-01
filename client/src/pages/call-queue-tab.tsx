@@ -407,12 +407,12 @@ export default function CallQueueTab() {
                     </a>
                   </Button>
                 ) : (
-                  <Button disabled className="gap-2"><PhoneCall className="size-4" /> No phone</Button>
+                  <Button disabled className="gap-2"><PhoneCall className="size-4" /> Call unavailable</Button>
                 )}
                 <Button
                   variant="outline"
                   className="gap-2"
-                  disabled={!selected.phone || smsMut.isPending}
+                  disabled={!selected.phone || (selected.triggerType !== "call_requested" && selected.status !== "callback") || selected.status === "needs_response" || selected.status === "unqualified" || smsMut.isPending}
                   onClick={() => smsMut.mutate(selected.id)}
                 >
                   {smsMut.isPending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}

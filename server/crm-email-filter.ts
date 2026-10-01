@@ -1,3 +1,4 @@
+import { authoredReply } from "./outreach-signals";
 // Shared heuristics for filtering automated / newsletter / service mail from
 // CRM email history and Gmail inbox sync. Used by gmail-sync-service and routes.
 
@@ -19,7 +20,7 @@ const AUTOMATED_SUBJECT_RE =
   /\b(welcome to|newsletter|verify your|confirm your|password reset|your (receipt|invoice|statement)|notification|daily digest|out of office|automatic reply|do-?not-?reply|no-?reply|pr newswire|press release|subscription confirmed|account (created|activated)|get started with)\b/i;
 
 const AUTOMATED_BODY_RE =
-  /\b(unsubscribe|manage (your )?preferences|view in browser|email preferences|this (message|email) was sent (to|by)|pr newswire|business wire|you(?:'re| are) receiving this (email|message) because)\b/i;
+  /\b(manage (your )?preferences|view in browser|email preferences|this (message|email) was sent (to|by)|pr newswire|business wire|you(?:'re| are) receiving this (email|message) because)\b/i;
 
 /** True for newsletters, service mail, notifications, and auto-replies. */
 export function isAutomatedOrBulkEmail(
@@ -72,5 +73,5 @@ export function shouldShowInCrmEmailHistory(email: {
   if (email.direction !== "inbound") return true;
   const bodyText = email.bodyText
     || (email.bodyHtml || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-  return !isAutomatedOrBulkEmail(email.fromEmail || "", email.subject || "", "", bodyText);
+  return !isAutomatedOrBulkEmail(email.fromEmail || "", email.subject || "", "", authoredReply(bodyText));
 }

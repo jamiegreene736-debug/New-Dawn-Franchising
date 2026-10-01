@@ -224,7 +224,7 @@ export async function prepareDesk(): Promise<void> {
     await refreshContactEvidence();
     await client.query(`UPDATE outreach_desk_actions a SET status='cancelled',error='Contact opted out or booked a meeting.',updated_at=now()
       FROM call_queue q WHERE q.id=a.queue_id AND a.status IN ('draft','scheduled','held') AND
-      (q.status IN ('dnc','booked','not_interested') OR EXISTS(SELECT 1 FROM agent_dnc d WHERE lower(trim(d.email))=lower(trim(q.email)))
+      (q.status IN ('dnc','booked','not_interested','unqualified') OR EXISTS(SELECT 1 FROM agent_dnc d WHERE lower(trim(d.email))=lower(trim(q.email)))
       OR EXISTS(SELECT 1 FROM meetings m WHERE lower(trim(m.invitee_email))=lower(trim(q.email)) AND m.status IN ('confirmed','completed')))`);
     // Only requested-details drafts use this exact reviewed template; no AI-generated pitches auto-send.
     await client.query(`UPDATE outreach_desk_actions a SET status='scheduled',scheduled_at=now(),approved_by='playbook:requested-details',updated_at=now()

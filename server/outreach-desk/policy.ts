@@ -77,6 +77,7 @@ export type PolicyContext = {
   suppressed: boolean;
   booked: boolean;
   status: string;
+  triggerType: string;
   attemptCount: number;
   nextAttemptAt: string | null;
   linkedinUrl: string | null;
@@ -88,6 +89,9 @@ export function channelEligibility(
   now = new Date(),
 ): Eligibility {
   const held = (reason: string): Eligibility => ({ allowed: false, reason });
+  if (channel === "call" && context.status !== "callback" && context.triggerType !== "call_requested") return held("An explicit call request is required.");
+  if (context.status === "unqualified") return held("Activity alone does not qualify for outreach. Review a reply or submission first.");
+  if (context.status === "needs_response" && channel !== "email") return held("Respond to the request in writing; a call has not been requested.");
   if (context.suppressed || context.status === "dnc")
     return held("Do not contact: outreach is suppressed.");
   if (["not_interested", "booked"].includes(context.status) || context.booked)
@@ -155,7 +159,11 @@ export function briefFor(person: {
   const signal =
     person.status === "callback"
       ? "Start with the callback they requested."
-      : person.triggerType === "reply_no_meeting"
+      : person.triggerType === "call_requested"
+        ? "They explicitly requested a call. Read the supporting reply before calling."
+      : person.triggerType === "information_requested"
+        ? "Fulfill the information request in writing. Do not call without agreement."
+      : person.triggerType === "reply_received" || person.triggerType === "reply_no_meeting"
         ? "Read their reply first and respond to their question."
         : person.triggerType === "engaged_open"
           ? "Only email opens were observed; interest is unconfirmed."

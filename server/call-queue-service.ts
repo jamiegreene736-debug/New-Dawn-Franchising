@@ -1,3 +1,4 @@
+import { classifyReply, qualifiesForCall, replyEvidenceFromMetadata, type ReplyEvidence } from "./outreach-signals";
 import { and, desc, eq, gte, inArray, or, sql } from "drizzle-orm";
 import {
   callQueue,
@@ -6,7 +7,6 @@ import {
   contacts,
   crmClientActivities,
   crmClients,
-  dripSends,
   meetings,
   phoneCalls,
   type CallQueueItem,
@@ -25,16 +25,13 @@ import {
   MAX_ATTEMPTS,
   calendlySmsBody,
   inferTimezone,
-  inferTrack,
   isActiveStatus,
   isBlockingCrmStatus,
-  isQueueableOpenSignal,
   isTerminalStatus,
   isUsablePhone,
   nextAttemptAt,
   phoneDigits,
   priorityForTrigger,
-  shouldUpgradePriority,
   triggerLabel,
   type CallTriggerType,
 } from "./call-queue-helpers";
@@ -44,6 +41,7 @@ const FROM_EMAIL = "franchising@newdawnfranchising.com";
 
 export type EnqueueInput = {
   triggerType: CallTriggerType;
+  evidence?: ReplyEvidence;
   triggerAt?: Date;
   dripSendId?: string;
   emailSubject?: string;
@@ -102,6 +100,14 @@ export async function ensureCallQueueSchema(): Promise<void> {
           updated_at timestamp NOT NULL DEFAULT now()
         )
       `);
+      const retired = await db.execute(sql`
+        UPDATE call_queue SET status='unqualified', next_attempt_at=NULL, updated_at=now()
+        WHERE trigger_type IN ('link_click','engaged_open','reply_no_meeting')
+          AND status IN ('queued','calling','needs_phone','no_answer','voicemail','exhausted')
+        RETURNING id
+      `);
+      if (retired.rowCount) console.log(`[CallQueue] Retired ${retired.rowCount} unqualified legacy signals`);
+      await db.execute(sql`UPDATE contact_tasks SET completed=true WHERE completed=false AND title LIKE '🔥 Call % — clicked a link' AND subtitle LIKE 'High intent: clicked %'`);
       await db.execute(sql`CREATE INDEX IF NOT EXISTS call_queue_status_idx ON call_queue (status)`);
       await db.execute(sql`CREATE INDEX IF NOT EXISTS call_queue_email_idx ON call_queue (email)`);
       await db.execute(sql`CREATE INDEX IF NOT EXISTS call_queue_phone_idx ON call_queue (phone)`);
@@ -148,7 +154,7 @@ async function hasConfirmedMeeting(email?: string | null): Promise<boolean> {
     .where(
       and(
         sql`lower(${meetings.inviteeEmail}) = ${email.trim().toLowerCase()}`,
-        eq(meetings.status, "confirmed"),
+        inArray(meetings.status, ["confirmed", "completed"]),
       ),
     )
     .limit(1);
@@ -157,12 +163,29 @@ async function hasConfirmedMeeting(email?: string | null): Promise<boolean> {
 
 export async function enqueueCall(input: EnqueueInput): Promise<EnqueueResult> {
   await ensureCallQueueSchema();
+  // Scheduled collectors can overlap across replicas. A busy scan retries next cycle.
+  return db.transaction(async (tx) => {
+    const lock = await tx.execute(sql`SELECT pg_try_advisory_xact_lock(71283044) AS locked`);
+    if (!lock.rows[0]?.locked) return { ok: false, reason: "collector_busy_retry_next_scan" };
+    return enqueueQualifiedReply(input);
+  });
+}
+
+async function enqueueQualifiedReply(input: EnqueueInput): Promise<EnqueueResult> {
+  await ensureCallQueueSchema();
+  if (!["call_requested", "information_requested", "reply_received"].includes(input.triggerType)) {
+    return { ok: false, reason: "passive_signal_not_qualified" };
+  }
+  if (!input.evidence?.sourceId || !Number.isFinite(input.evidence.receivedAt.getTime())) return { ok: false, reason: "missing_reply_evidence" };
+  if (classifyReply(input.evidence.text, input.evidence.subject) !== input.triggerType) return { ok: false, reason: "reply_evidence_mismatch" };
+  if (input.triggerType === "call_requested" && !qualifiesForCall(input.evidence)) return { ok: false, reason: "call_not_requested" };
 
   const email = (input.email || "").trim() || null;
   const phone = (input.phone || "").trim() || null;
   const name = (input.name || "").trim() || email || "Unknown";
   const track = input.track || "client";
-  const triggerAt = input.triggerAt || new Date();
+  const triggerAt = input.evidence.receivedAt;
+  const evidenceNote = `Source: ${input.evidence.sourceId} · ${triggerAt.toISOString()}\n${input.evidence.text}`;
   const priority = priorityForTrigger(input.triggerType);
   const label = triggerLabel(input.triggerType, input.emailSubject);
   const timezone = input.timezone || inferTimezone(input.location, input.state, input.country);
@@ -199,18 +222,27 @@ export async function enqueueCall(input: EnqueueInput): Promise<EnqueueResult> {
       return { ok: false, reason: "already_wrong_number" };
     }
     if (isActiveStatus(existing.status) || existing.status === "exhausted") {
-      const patch: Partial<CallQueueItem> = { updatedAt: new Date() };
-      if (shouldUpgradePriority(existing.priority, priority)) {
-        patch.priority = priority;
-        patch.triggerType = input.triggerType;
-        patch.triggerAt = triggerAt;
-        patch.triggerLabel = label;
-        patch.emailSubject = input.emailSubject || existing.emailSubject;
-        patch.dripSendId = input.dripSendId || existing.dripSendId;
-      }
-      if (existing.status === "exhausted" && input.triggerType === "link_click") {
-        patch.status = "queued";
+      if (triggerAt <= existing.triggerAt) return { ok: true, item: existing, action: "updated" };
+      const patch: Partial<CallQueueItem> = {
+        updatedAt: new Date(),
+        assignedTo: input.triggerType === "call_requested" ? "thailand" : "dylan",
+        emailSubject: input.emailSubject || existing.emailSubject,
+      };
+      if ((existing.status === "exhausted" || existing.status === "needs_response") && input.triggerType === "call_requested") {
+        patch.status = isUsablePhone(phone || existing.phone) ? "queued" : "needs_phone";
         patch.nextAttemptAt = new Date();
+        if (existing.status === "exhausted") { patch.attemptCount = 0; patch.lastAttemptAt = null; }
+      }
+      if (triggerAt > existing.triggerAt) {
+        patch.triggerAt = triggerAt;
+        patch.triggerType = input.triggerType;
+        patch.triggerLabel = label;
+        patch.priority = priority;
+        patch.outcomeNotes = evidenceNote;
+        if (input.triggerType !== "call_requested") {
+          patch.status = "needs_response";
+          patch.nextAttemptAt = null;
+        }
       }
       if (phone && !existing.phone) patch.phone = phone;
       const [updated] = await db.update(callQueue).set(patch).where(eq(callQueue.id, existing.id)).returning();
@@ -218,7 +250,7 @@ export async function enqueueCall(input: EnqueueInput): Promise<EnqueueResult> {
     }
   }
 
-  const status = isUsablePhone(phone) ? "queued" : "needs_phone";
+  const status = input.triggerType === "call_requested" ? (isUsablePhone(phone) ? "queued" : "needs_phone") : "needs_response";
   const [created] = await db
     .insert(callQueue)
     .values({
@@ -237,9 +269,10 @@ export async function enqueueCall(input: EnqueueInput): Promise<EnqueueResult> {
       dripSendId: input.dripSendId || null,
       emailSubject: input.emailSubject || null,
       priority,
-      assignedTo: "thailand",
       status,
-      nextAttemptAt: new Date(),
+      nextAttemptAt: status === "needs_response" ? null : new Date(),
+      outcomeNotes: evidenceNote,
+      assignedTo: status === "needs_response" ? "dylan" : "thailand",
     })
     .returning();
 
@@ -247,71 +280,11 @@ export async function enqueueCall(input: EnqueueInput): Promise<EnqueueResult> {
 }
 
 export async function enqueueFromDripSend(
-  send: DripSend | any,
+  send: DripSend,
   triggerType: CallTriggerType,
 ): Promise<EnqueueResult> {
-  try {
-    if (triggerType === "engaged_open" && !isQueueableOpenSignal(send.openCount ?? 0)) {
-      return { ok: false, reason: "single_open_ignored" };
-    }
-
-    const enrollment = send.enrollmentId ? await storage.getDripEnrollment(send.enrollmentId) : null;
-    const prospect = enrollment?.prospectId ? await storage.getProspect(enrollment.prospectId) : null;
-    const campaign = enrollment?.campaignId ? await storage.getDripCampaign(enrollment.campaignId) : null;
-
-    const email = send.recipientEmail || enrollment?.prospectEmail || prospect?.email || null;
-    let phone = prospect?.phone || null;
-    let crmClientId: string | null = null;
-    let contactId: string | null = null;
-    let company = prospect?.company || null;
-    let location = prospect?.location || null;
-    let state: string | null = null;
-    let country: string | null = null;
-
-    if (email) {
-      const client = await storage.getCrmClientByEmail(email);
-      if (client) {
-        crmClientId = client.id;
-        phone = phone || client.phone || client.phone2 || null;
-        company = company || client.companyName || null;
-        location = location || client.contactCity || client.country || null;
-        state = client.contactState || null;
-        country = client.country || null;
-      }
-      const [contact] = await db
-        .select()
-        .from(contacts)
-        .where(sql`lower(${contacts.email}) = ${email.trim().toLowerCase()}`)
-        .limit(1);
-      if (contact) {
-        contactId = contact.id;
-        phone = phone || contact.phone || null;
-        company = company || contact.firmName || null;
-        country = country || contact.country || null;
-      }
-    }
-
-    return enqueueCall({
-      triggerType,
-      triggerAt: triggerType === "link_click" ? send.clickedAt || new Date() : send.openedAt || new Date(),
-      dripSendId: send.id,
-      emailSubject: send.subject,
-      name: send.recipientName || enrollment?.prospectName || prospect?.name || email || "Unknown",
-      email,
-      phone,
-      company,
-      track: inferTrack(campaign?.name, (campaign as any)?.audienceType),
-      prospectId: enrollment?.prospectId || prospect?.id || null,
-      crmClientId,
-      contactId,
-      location,
-      state,
-      country,
-    });
-  } catch (err: any) {
-    console.error("[CallQueue] enqueueFromDripSend failed:", err?.message || err);
-    return { ok: false, reason: err?.message || "enqueue_failed" };
-  }
+  // Kept as a defensive gate for old callers and saved campaign actions.
+  return { ok: false, reason: "A click or open is not a call request. Review an actual reply or submission." };
 }
 
 export async function listCallQueue(opts?: {
@@ -399,8 +372,18 @@ export async function getCallQueueStats(since?: Date) {
   };
 }
 
-export async function markDialing(id: string): Promise<CallQueueItem | undefined> {
+async function assertCallRequested(id: string): Promise<void> {
   await ensureCallQueueSchema();
+  const [item] = await db.select().from(callQueue).where(eq(callQueue.id, id));
+  if (!item) throw new Error("Call task not found");
+  if (item.status !== "callback" && (item.triggerType !== "call_requested" || !isActiveStatus(item.status) || item.status === "needs_response")) {
+    throw new Error("An explicit call request is required; clicks, opens and general replies do not qualify");
+  }
+  if (await isOnDnc(item.email, item.phone) || await hasConfirmedMeeting(item.email)) throw new Error("Outreach is suppressed or a meeting is already booked");
+}
+
+export async function markDialing(id: string): Promise<CallQueueItem | undefined> {
+  await assertCallRequested(id);
   const [row] = await db
     .update(callQueue)
     .set({ status: "calling", lastAttemptAt: new Date(), updatedAt: new Date() })
@@ -424,6 +407,7 @@ export async function recordCallOutcome(
   const [item] = await db.select().from(callQueue).where(eq(callQueue.id, id));
   if (!item) return undefined;
 
+  if (["queued", "calling", "no_answer", "voicemail", "callback"].includes(body.status)) await assertCallRequested(id);
   const status = body.status;
   const now = new Date();
   const attemptCount = (item.attemptCount || 0) + 1;
@@ -535,7 +519,7 @@ async function bookDylanMeeting(
 }
 
 export async function sendCalendlyLink(id: string): Promise<{ success: boolean; error?: string }> {
-  await ensureCallQueueSchema();
+  await assertCallRequested(id);
   const [item] = await db.select().from(callQueue).where(eq(callQueue.id, id));
   if (!item) return { success: false, error: "Not found" };
   if (!item.phone) return { success: false, error: "No phone number" };
@@ -610,20 +594,7 @@ export async function markQueueBookedByEmail(email: string, meetingId: string): 
 }
 
 export async function scanEngagedOpens(limit = 200): Promise<{ scanned: number; enqueued: number }> {
-  await ensureCallQueueSchema();
-  const sends = await db
-    .select()
-    .from(dripSends)
-    .where(and(sql`${dripSends.openCount} >= 3`, sql`${dripSends.openedAt} is not null`))
-    .orderBy(desc(dripSends.openedAt))
-    .limit(limit);
-
-  let enqueued = 0;
-  for (const send of sends) {
-    const result = await enqueueFromDripSend(send, "engaged_open");
-    if (result.ok && result.action === "created") enqueued++;
-  }
-  return { scanned: sends.length, enqueued };
+  return { scanned: 0, enqueued: 0 };
 }
 
 export async function scanRepliesWithoutMeetings(limit = 150): Promise<{ scanned: number; enqueued: number }> {
@@ -640,6 +611,8 @@ export async function scanRepliesWithoutMeetings(limit = 150): Promise<{ scanned
       country: contacts.country,
       contactId: contacts.id,
       createdAt: contactActivities.createdAt,
+      metadata: contactActivities.metadata,
+      activityId: contactActivities.id,
     })
     .from(contactActivities)
     .innerJoin(contacts, eq(contactActivities.contactId, contacts.id))
@@ -656,6 +629,8 @@ export async function scanRepliesWithoutMeetings(limit = 150): Promise<{ scanned
       country: crmClients.country,
       crmClientId: crmClients.id,
       createdAt: crmClientActivities.createdAt,
+      metadata: crmClientActivities.metadata,
+      activityId: crmClientActivities.id,
       status: crmClients.status,
     })
     .from(crmClientActivities)
@@ -678,27 +653,38 @@ export async function scanRepliesWithoutMeetings(limit = 150): Promise<{ scanned
     crmClientId?: string;
     createdAt: Date;
     status?: string;
+    metadata: unknown;
+    activityId: string;
   }> = [
     ...contactReplies.map((r) => ({ ...r, name: r.name || r.email })),
     ...clientReplies,
-  ];
+  ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
   for (const row of rows) {
-    const key = (row.email || "").trim().toLowerCase();
+    const key = (row.email || row.phone || "").trim().toLowerCase();
     if (!key || seen.has(key)) continue;
     seen.add(key);
     scanned++;
+    const evidence = replyEvidenceFromMetadata(row.metadata, row.createdAt, row.activityId);
+    if (!evidence) continue;
+    const signal = classifyReply(evidence.text, evidence.subject);
+    if (signal === "automated") continue;
+    if (signal === "declined" || signal === "opt_out") {
+      await suppressReplyOutreach(row.email || "", signal, row.phone);
+      continue;
+    }
     if (row.status && isBlockingCrmStatus(row.status)) continue;
-
     const result = await enqueueCall({
-      triggerType: "reply_no_meeting",
+      triggerType: signal,
+      evidence,
+      emailSubject: evidence.subject,
       triggerAt: row.createdAt,
       name: row.name || key,
       email: row.email,
       phone: row.phone,
       company: row.company,
       country: row.country,
-      track: "broker",
+      track: row.crmClientId ? "client" : "broker",
       contactId: row.contactId,
       crmClientId: row.crmClientId,
     });
@@ -709,21 +695,16 @@ export async function scanRepliesWithoutMeetings(limit = 150): Promise<{ scanned
 }
 
 export async function backfillCallQueue(): Promise<{ clicks: number; opens: number; replies: number }> {
-  await ensureCallQueueSchema();
-  const clicked = await db
-    .select()
-    .from(dripSends)
-    .where(sql`${dripSends.clickCount} >= 1 AND ${dripSends.clickedAt} is not null`)
-    .orderBy(desc(dripSends.clickedAt))
-    .limit(300);
-
-  let clicks = 0;
-  for (const send of clicked) {
-    const result = await enqueueFromDripSend(send, "link_click");
-    if (result.ok && result.action === "created") clicks++;
-  }
-
-  const opens = await scanEngagedOpens();
   const replies = await scanRepliesWithoutMeetings();
-  return { clicks, opens: opens.enqueued, replies: replies.enqueued };
+  return { clicks: 0, opens: 0, replies: replies.enqueued };
+}
+
+export async function suppressReplyOutreach(email: string, signal: "opt_out" | "declined", phone?: string | null): Promise<void> {
+  await ensureCallQueueSchema();
+  email = email.trim().toLowerCase();
+  if (!await isOnDnc(email, phone)) {
+    await addToDnc(email || undefined, phone || undefined, undefined, signal === "opt_out" ? "Recipient requested no further contact" : "Recipient declined outreach");
+  }
+  await db.update(callQueue).set({ status: signal === "opt_out" ? "dnc" : "not_interested", nextAttemptAt: null, updatedAt: new Date() })
+    .where(and(or(sql`lower(${callQueue.email}) = ${email.trim().toLowerCase()}`, phone ? eq(callQueue.phone, phone) : undefined), inArray(callQueue.status, [...ACTIVE_STATUSES, "exhausted"])));
 }

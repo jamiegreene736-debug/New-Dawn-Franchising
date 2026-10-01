@@ -68,6 +68,9 @@ function readFilters(): DeskQuery {
 }
 function reason(p: DeskPerson) {
   if (p.status === "callback") return "Requested callback";
+  if (p.triggerType === "call_requested") return "Explicitly requested a call";
+  if (p.triggerType === "information_requested") return "Information requested · written response";
+  if (p.triggerType === "reply_received") return "Reply · written response needed";
   if (p.triggerType === "reply_no_meeting") return "Replied · no meeting yet";
   if (p.triggerType === "link_click") return "Link clicked · review context";
   return "Observed opens · confidence uncertain";
@@ -594,14 +597,14 @@ export default function OutreachDesk() {
                         <td>
                           <button
                             className="desk-button"
-                            disabled={enqueue.isPending}
+                            disabled={enqueue.isPending || !p.queueId}
                             onClick={() =>
                               p.queueId
                                 ? select(p.queueId)
                                 : enqueue.mutate(p.sendId)
                             }
                           >
-                            {p.queueId ? "Open person" : "Add to my desk"}
+                            {p.queueId ? "Open person" : "Activity only"}
                             <ArrowUpRight size={13} />
                           </button>
                         </td>

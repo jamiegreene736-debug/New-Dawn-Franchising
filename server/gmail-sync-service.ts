@@ -13,7 +13,7 @@ import { findReplySend, isOptOutReply } from "./campaign-replies";
 import { ImapFlow } from "imapflow";
 import cron from "node-cron";
 import { storage } from "./storage";
-import { addToDnc } from "./agent-service";
+import { addToDnc, isOnDnc } from "./agent-service";
 import { isAutomatedOrBulkEmail } from "./crm-email-filter";
 import { sendEmail, ALL_SENDER_PROFILES, getSenderPassword, DEFAULT_SENDER } from "./email-service";
 import { getDeliverabilitySettings } from "./deliverability-settings-service";
@@ -246,7 +246,7 @@ export async function syncSenderInbox(senderEmail: string, password: string, loo
         const matchedSend = receivedAt ? findReplySend(sends, { subject, receivedAt, references, bodyText }) : undefined;
         const optOut = isOptOutReply(bodyText);
         if (optOut && enrolls.length > 0) {
-          await addToDnc(fromAddr, undefined, undefined, "Recipient requested unsubscribe");
+          if (!(await isOnDnc(fromAddr))) await addToDnc(fromAddr, undefined, undefined, "Recipient requested unsubscribe");
           await storage.markEnrollmentsUnsubscribed(fromAddr);
         }
         if (matchedSend) {

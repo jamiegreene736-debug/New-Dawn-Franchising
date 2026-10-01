@@ -47,7 +47,7 @@ async function dispatch(action: DispatchAction): Promise<DispatchResult> {
     return { success: false, error: "Manual channel cannot be dispatched." };
   const sender = ALL_SENDER_PROFILES.find(
     (profile) =>
-      profile.email === "franchising@newdawnfranchising.com" &&
+      profile.email === "dylan@newdawnfranchising.com" &&
       getSenderPassword(profile),
   );
   if (!sender) return { success: false, error: "Email sender not configured." };

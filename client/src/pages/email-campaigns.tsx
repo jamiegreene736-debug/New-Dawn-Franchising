@@ -93,6 +93,7 @@ interface CampaignStats {
     opens: number;
     clicks: number;
     replies: number;
+    failed?: number;
     bounced: number;
     unsubscribed?: number;
     // Scanner/security-gateway hits filtered out of opens/clicks (see
@@ -270,7 +271,7 @@ function ActivityStatusBadge({ item }: { item: ActivityItem }) {
 // ─── Step type catalog (Seamless-style "Add a Step" picker) ──────────────────
 
 const STEP_TYPES = [
-  { type: "email", label: "Automatic Email", desc: "Auto-sent email from franchising@", icon: Mail },
+  { type: "email", label: "Automatic Email", desc: "Auto-sent email from Dylan", icon: Mail },
   { type: "manual_email", label: "Manual Email", desc: "A reminder to send an email yourself", icon: MailOpen },
   { type: "sms", label: "SMS (Quo)", desc: "Auto-sent text message via Quo", icon: MessageSquare },
   { type: "call", label: "Call", desc: "A task to call the contact", icon: Phone },
@@ -1046,6 +1047,7 @@ function EmailCampaignTab() {
                   { label: "Opens", value: stats?.overview.opens ?? 0, color: "text-green-600" },
                   { label: "Clicks", value: stats?.overview.clicks ?? 0, color: "text-amber-600" },
                   { label: "Replies", value: stats?.overview.replies ?? 0, color: "text-purple-600" },
+                  { label: "Failed", value: stats?.overview.failed ?? 0, color: "text-red-600" },
                   { label: "Bounced", value: stats?.overview.bounced ?? 0, color: "text-red-600" },
                   { label: "Unsubscribed", value: stats?.overview.unsubscribed ?? 0, color: "text-orange-600" },
                   { label: "Bot hits filtered", value: (stats?.overview.botClicks ?? 0) + (stats?.overview.botOpens ?? 0), color: "text-gray-400",
@@ -1839,7 +1841,7 @@ function EmailCampaignTab() {
               data-testid="btn-sync-inbox"
               onClick={() => syncInboxMutation.mutate()}
               disabled={syncInboxMutation.isPending}
-              title="Pull replies and reconcile bounce notifications from the franchising@ inbox now"
+              title="Pull replies and reconcile bounce notifications from Dylan’s inbox now"
             >
               {syncInboxMutation.isPending
                 ? <><Loader2 className="size-4 animate-spin" /> Checking…</>

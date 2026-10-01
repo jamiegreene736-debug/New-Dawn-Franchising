@@ -797,7 +797,8 @@ export async function executeBatch(batchId: string, skippedItems: number[] = [])
 
         const bodyWithFooter = `${msg.body}\n\n---\nNew Dawn Franchising LLC | 1100 Montana Ave, El Paso, TX 79902\nnewdawnfranchising.com | (346) 597-9994\n\nNot a fit? Reply UNSUBSCRIBE and I'll remove you immediately.`;
 
-        await sendEmailFromSender(DYLAN_EMAIL, lead[0].email, msg.subject || "Following up", bodyWithFooter.replace(/\n/g, "<br/>"));
+        const result = await sendEmailFromSender(DYLAN_EMAIL, lead[0].email, msg.subject || "Following up", bodyWithFooter.replace(/\n/g, "<br/>"));
+        if (!result.success) throw new Error(result.error || "Email send failed");
 
         const touchDays: Record<number, number> = { 1: 4, 2: 5, 3: 7, 4: 0 };
         const nextTouchDays = touchDays[msg.touchNumber] || 0;
@@ -1096,7 +1097,8 @@ export async function sendSingleAgentMessage(messageId: string): Promise<{ ok: b
       if (await isOnDnc(lead.email)) throw new Error("Lead is on DNC list");
 
       const bodyWithFooter = `${msg.body}\n\n---\nNew Dawn Franchising LLC | 1100 Montana Ave, El Paso, TX 79902\nnewdawnfranchising.com | (346) 597-9994\n\nNot a fit? Reply UNSUBSCRIBE and I'll remove you immediately.`;
-      await sendEmailFromSender(DYLAN_EMAIL, lead.email, msg.subject || "Following up", bodyWithFooter.replace(/\n/g, "<br/>"));
+      const result = await sendEmailFromSender(DYLAN_EMAIL, lead.email, msg.subject || "Following up", bodyWithFooter.replace(/\n/g, "<br/>"));
+      if (!result.success) throw new Error(result.error || "Email send failed");
 
       await db.update(agentLeads).set({
         lastContactedAt: new Date(), sequenceStage: msg.touchNumber, stage: "contacted",

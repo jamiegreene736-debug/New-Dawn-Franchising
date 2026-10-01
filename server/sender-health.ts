@@ -93,7 +93,7 @@ async function persist(): Promise<void> {
 }
 
 export async function markSenderAuthFailure(email: string, error: string): Promise<void> {
-  if (!isSenderAuthFailure(error)) return;
+  if (!isSenderAuthFailure(error) && !/daily user sending limit exceeded|550[ -]5\.4\.5|too many login attempts/i.test(error)) return;
   const key = email.toLowerCase();
   cache.set(key, { disabledUntil: Date.now() + DISABLE_MS, reason: error.slice(0, 180) });
   console.error(`[SenderHealth] disabled ${email} for 24h — ${error.slice(0, 100)}`);

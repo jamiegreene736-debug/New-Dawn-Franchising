@@ -23,8 +23,8 @@ export const GLOBEVISA_CAMPAIGN_NAME = "GlobeVisa — E-2 Referral Partnership";
 const GLOBEVISA_DESCRIPTION =
   "6-step omnichannel referral-partner sequence for GlobeVisa advisors with China-connected clients seeking U.S. relocation. LinkedIn → email → SMS → call across ~3 weeks (days 1, 3, 6, 11, 16, 22). Positions New Dawn as the E-2 U.S. business complement to GlobeVisa's CBI programs (Grenada, Türkiye, St. Kitts). Centred on the $28,125 referral commission (12.5% of the $225K investment) — pure added revenue on clients GlobeVisa already advises.";
 
-const SIGNATURE_HTML = `<p>Best regards,<br/><strong>Dylan Delaney</strong><br/>New Dawn Franchising<br/><a href="${WEBSITE}">www.newdawnfranchising.com</a><br/>franchising@newdawnfranchising.com</p>`;
-const SIGNATURE_TEXT = `Best regards,\nDylan Delaney\nNew Dawn Franchising\n${WEBSITE}\nfranchising@newdawnfranchising.com`;
+const SIGNATURE_HTML = `<p>Best regards,<br/><strong>Dylan Delaney</strong><br/>New Dawn Franchising<br/><a href="${WEBSITE}">www.newdawnfranchising.com</a><br/>dylan@newdawnfranchising.com</p>`;
+const SIGNATURE_TEXT = `Best regards,\nDylan Delaney\nNew Dawn Franchising\n${WEBSITE}\ndylan@newdawnfranchising.com`;
 
 export const GLOBEVISA_TRACK: CampaignTrackStep[] = [
   {
@@ -47,74 +47,35 @@ Suggested note (300 chars max):
     stepOrder: 2,
     delayDays: 3,
     stepType: "email",
-    stepName: "Touch 1 — China-to-USA Partnership Intro",
+    stepName: "E-2 clients still choosing a business",
     priority: "High",
-    subject: "A U.S. pathway for your China clients — earn $28,125 per E-2 referral",
-    bodyHtml: `<div style="${EMAIL_STYLE}">
-  <p>Dear {{name}},</p>
-  <p><strong><a href="${GLOBEVISA_WEBSITE}">GlobeVisa</a></strong> has built one of the world's leading citizenship- and residency-by-investment practices — 20+ offices in China, 110,000+ clients across 114 countries, and 100+ programs in 40 countries. Many of those clients ultimately want more than a second passport: they want to <strong>live and build in the United States</strong>.</p>
-  <p>That's where <strong><a href="${WEBSITE}">New Dawn Franchising</a></strong> fits. We're the first franchise platform built specifically for <strong>E-2 Treaty Investor Visa</strong> candidates — a turnkey, qualifying U.S. business ($225,000) that your client directs without running day-to-day operations.</p>
-  <p>For GlobeVisa advisors, this is a natural complement to programs you already place — especially <strong>Grenada</strong>, <strong>Türkiye</strong>, and <strong>St. Kitts &amp; Nevis</strong>, which give Chinese entrepreneurs treaty-country nationality and open the E-2 door to America.</p>
-  <p>You advise. We deliver. You earn:</p>
-  <p style="font-size: 18px; color: #c9a227;"><strong>$225,000 × 12.5% = $28,125</strong> per referred client</p>
-  <p>That's a referral commission on clients you've <em>already won</em> — no fulfilment work, no added headcount, paid when the visa clears. Your client gets a clean China-to-USA pathway; you get a new revenue line on a conversation that today often stops at EB-5.</p>
-  <p>Would you be open to a 15-minute call? <a href="${CALENDLY}">${CALENDLY}</a></p>
-  ${SIGNATURE_HTML}
-</div>`,
-    bodyText: `Dear {{name}},
+    subject: "E-2 clients still choosing a business",
+    bodyHtml: `<p>Hi {{firstName}},</p><p>I'm Dylan at New Dawn Franchising. We work with people comparing U.S. franchise businesses as part of their E-2 planning.</p><p>Do you work with clients who are still choosing a business?</p><p>Best,<br/>Dylan</p>`,
+    bodyText: `Hi {{firstName}},
 
-GlobeVisa has built one of the world's leading CBI/RBI practices — 20+ offices in China, 110,000+ clients, 100+ programs in 40 countries. Many want to live and build in the United States.
+I'm Dylan at New Dawn Franchising. We work with people comparing U.S. franchise businesses as part of their E-2 planning.
 
-New Dawn Franchising is built for E-2 Treaty Investor Visa candidates — a turnkey $225,000 U.S. business your client directs without running day-to-day ops. It complements programs you already place (Grenada, Türkiye, St. Kitts) that give Chinese entrepreneurs treaty-country nationality.
+Do you work with clients who are still choosing a business?
 
-You advise. We deliver. You earn:
-$225,000 × 12.5% = $28,125 per referred client
-
-No fulfilment work, paid when the visa clears. Open to a 15-minute call? ${CALENDLY}
-
-${SIGNATURE_TEXT}`,
+Best,
+Dylan`,
   },
   {
     stepOrder: 3,
     delayDays: 6,
     stepType: "email",
-    stepName: "Touch 2 — CBI + E-2 Synergy + Commission Math",
+    stepName: "A short overview for your review",
     priority: "High",
-    subject: "{{name}}, GlobeVisa CBI → New Dawn E-2 → life in America (and $28,125/referral)",
-    bodyHtml: `<div style="${EMAIL_STYLE}">
-  <p>Dear {{name}},</p>
-  <p>Your China-connected clients often need <strong>two steps</strong> to reach the United States — and GlobeVisa already handles step one.</p>
-  <h3 style="color: #c9a227;">Step 1 — Treaty Nationality (GlobeVisa)</h3>
-  <p>Chinese nationals are not E-2 treaty-country citizens. GlobeVisa solves this — programs like <strong>Grenada</strong>, <strong>Türkiye</strong>, and <strong>St. Kitts &amp; Nevis</strong> give clients treaty-country nationality and global mobility.</p>
-  <h3 style="color: #c9a227;">Step 2 — U.S. Business Investment (New Dawn)</h3>
-  <p>Once a client holds treaty-country nationality, the E-2 visa requires a <strong>substantial investment in a real U.S. operating business</strong>. New Dawn provides exactly that — $225,000 across Property Management, Insurance, or Telecom, with a director model where your client oversees strategy while our team runs daily operations.</p>
-  <p>And for you, the math on referrals:</p>
-  <ul>
-    <li>5 referrals / year → <strong>$140,625</strong></li>
-    <li>10 referrals / year → <strong>$281,250</strong></li>
-    <li>25 referrals / year → <strong>$703,125</strong></li>
-  </ul>
-  <p>Complete pathway for your files: <strong>global citizenship → U.S. business → E-2 visa → life in America</strong>. No conflict with your CBI programs — it adds a U.S. option and a new commission line.</p>
-  <p>15 minutes to walk through it? <a href="${CALENDLY}">${CALENDLY}</a></p>
-  ${SIGNATURE_HTML}
-</div>`,
-    bodyText: `Dear {{name}},
+    subject: "A short overview for your review",
+    bodyHtml: `<p>Hi {{firstName}},</p><p>Following up on my note about New Dawn. I can send a short overview of our Property Management, Insurance, and Telecom franchise options, including the owner's role.</p><p>Would that be useful for your review?</p><p>Best,<br/>Dylan</p>`,
+    bodyText: `Hi {{firstName}},
 
-Your China-connected clients need two steps to reach the U.S.:
+Following up on my note about New Dawn. I can send a short overview of our Property Management, Insurance, and Telecom franchise options, including the owner's role.
 
-Step 1 — Treaty Nationality (GlobeVisa): Grenada, Türkiye, St. Kitts give Chinese entrepreneurs treaty-country nationality.
-Step 2 — U.S. Business (New Dawn): $225K franchise in PM, Insurance, or Telecom. Client directs; we run ops.
+Would that be useful for your review?
 
-Referral math:
-- 5/year  -> $140,625
-- 10/year -> $281,250
-- 25/year -> $703,125
-
-Complete pathway: global citizenship -> U.S. business -> E-2 visa -> life in America.
-
-15 minutes? ${CALENDLY}
-
-${SIGNATURE_TEXT}`,
+Best,
+Dylan`,
   },
   {
     stepOrder: 4,
@@ -130,41 +91,18 @@ ${SIGNATURE_TEXT}`,
     stepOrder: 5,
     delayDays: 16,
     stepType: "email",
-    stepName: "Touch 3 — Director Model for Chinese Entrepreneurs",
+    stepName: "What your client would manage",
     priority: "Medium",
-    subject: "Built for Chinese entrepreneurs who want U.S. presence without daily ops",
-    bodyHtml: `<div style="${EMAIL_STYLE}">
-  <p>Dear {{name}},</p>
-  <p>Your GlobeVisa clients — Chinese entrepreneurs, investors, and business owners exploring the U.S. — typically want three things:</p>
-  <ol>
-    <li><strong>A legitimate path to live in the United States</strong> with their family</li>
-    <li><strong>A real operating business</strong> that satisfies E-2 visa requirements</li>
-    <li><strong>Freedom from day-to-day management</strong> so they can focus on strategy, family, and lifestyle</li>
-  </ol>
-  <p>New Dawn's director model delivers all three:</p>
-  <ul>
-    <li><strong>What your client does:</strong> Invests $225K, sets strategy, reviews dashboards, maintains financial control</li>
-    <li><strong>What we handle:</strong> Daily operations in Property Management, Insurance, or Telecom</li>
-    <li><strong>Where they live:</strong> Anywhere in the United States — Miami, Los Angeles, New York, or between embassy appointments</li>
-  </ul>
-  <p>For you it's effortless: introduce the client, we handle fulfilment, you collect <strong>$28,125</strong> (12.5%) per qualified placement — tracked in your partner portal. It sits alongside your CBI programs as a simple add-on, not a competitor.</p>
-  <p>Worth a quick call to set up the partnership? <a href="${CALENDLY}">${CALENDLY}</a></p>
-  ${SIGNATURE_HTML}
-</div>`,
-    bodyText: `Dear {{name}},
+    subject: "What your client would manage",
+    bodyHtml: `<p>Hi {{firstName}},</p><p>One question worth resolving early is what the franchise owner actually does each week. I can share the division of responsibilities between the owner and the operating team.</p><p>Would you like that outline?</p><p>Best,<br/>Dylan</p>`,
+    bodyText: `Hi {{firstName}},
 
-Your China-connected clients want: (1) a path to live in the U.S., (2) a real E-2-qualifying business, (3) freedom from daily ops.
+One question worth resolving early is what the franchise owner actually does each week. I can share the division of responsibilities between the owner and the operating team.
 
-New Dawn's director model:
-- Client invests $225K, sets strategy, maintains control
-- We run daily ops in PM, Insurance, or Telecom
-- Client can live anywhere in the U.S.
+Would you like that outline?
 
-You introduce, we fulfil, you earn $28,125 (12.5%) per placement.
-
-Quick call? ${CALENDLY}
-
-${SIGNATURE_TEXT}`,
+Best,
+Dylan`,
   },
   {
     stepOrder: 6,
@@ -215,33 +153,18 @@ export const GLOBEVISA_NURTURE_TRACK: CampaignTrackStep[] = [
     stepOrder: 1,
     delayDays: 3,
     stepType: "email",
-    stepName: "Nurture 1 — China-to-USA Pathway Note",
+    stepName: "Documents before a recommendation",
     priority: "Low",
-    subject: "No rush, {{name}} — a quick China-to-USA pathway note for your clients",
-    bodyHtml: `<div style="${EMAIL_STYLE}">
-  <p>Hi {{name}},</p>
-  <p>No agenda — just leaving something useful in your inbox.</p>
-  <p>When your China-connected clients ask about the U.S., the pathway that often fits best:</p>
-  <ol>
-    <li><strong>GlobeVisa CBI</strong> — treaty-country nationality (Grenada, Türkiye, St. Kitts)</li>
-    <li><strong>New Dawn E-2</strong> — qualifying U.S. business from $225,000, client directs, we operate</li>
-    <li><strong>Life in America</strong> — E-2 visa, family relocation, live anywhere in the U.S.</li>
-  </ol>
-  <p>Compared to EB-5 ($800,000+, multi-year queues), E-2 is faster and far cheaper for treaty-country nationals — exactly the clients you already advise through GlobeVisa.</p>
-  <p>If a client ever fits, referral partners earn <strong>$28,125</strong> (12.5% of $225,000) per placement — no pressure, just on your radar.</p>
-  ${SIGNATURE_HTML}
-</div>`,
-    bodyText: `Hi {{name}},
+    subject: "Documents before a recommendation",
+    bodyHtml: `<p>Hi {{firstName}},</p><p>You may prefer to review the documents before discussing a client introduction. I can share the franchise disclosure materials and help identify where the operating model and investment terms are described.</p><p>Would you like me to send those?</p><p>Best,<br/>Dylan</p>`,
+    bodyText: `Hi {{firstName}},
 
-No agenda — useful note for your China-connected clients asking about the U.S.:
+You may prefer to review the documents before discussing a client introduction. I can share the franchise disclosure materials and help identify where the operating model and investment terms are described.
 
-1. GlobeVisa CBI — treaty nationality (Grenada, Türkiye, St. Kitts)
-2. New Dawn E-2 — $225K U.S. business, client directs, we operate
-3. Life in America — E-2 visa, family relocation
+Would you like me to send those?
 
-Faster and cheaper than EB-5. Partners earn $28,125 per placement — no pressure, just on your radar.
-
-${SIGNATURE_TEXT}`,
+Best,
+Dylan`,
   },
   {
     stepOrder: 2,
@@ -263,30 +186,18 @@ Suggested message:
     stepOrder: 3,
     delayDays: 45,
     stepType: "email",
-    stepName: "Nurture 3 — Door's Open",
+    stepName: "What would you need to evaluate?",
     priority: "Low",
-    subject: "Door's open whenever a China-to-USA client comes up, {{name}}",
-    bodyHtml: `<div style="${EMAIL_STYLE}">
-  <p>Hi {{name}},</p>
-  <p>I'll keep this short. The partnership stands whenever the timing's right:</p>
-  <ul>
-    <li>Your client gets GlobeVisa CBI → New Dawn E-2 → life in the United States</li>
-    <li>Turnkey, E-2-qualifying U.S. business they direct — not operate</li>
-    <li>You earn <strong>$28,125</strong> (12.5% of $225,000) per qualified placement, paid when the visa clears</li>
-  </ul>
-  <p>No pressure — reply or grab a time and we'll set you up as a referral partner: <a href="${CALENDLY}">${CALENDLY}</a></p>
-  ${SIGNATURE_HTML}
-</div>`,
-    bodyText: `Hi {{name}},
+    subject: "What would you need to evaluate?",
+    bodyHtml: `<p>Hi {{firstName}},</p><p>I want to make this useful to your practice. Is the main question the owner's responsibilities, the investment structure, or the available businesses?</p><p>A quick reply is enough; I can send the relevant information.</p><p>Best,<br/>Dylan</p>`,
+    bodyText: `Hi {{firstName}},
 
-The partnership stands whenever timing's right:
-- GlobeVisa CBI → New Dawn E-2 → life in the U.S.
-- Client directs the business; we run daily ops
-- You earn $28,125 per qualified placement
+I want to make this useful to your practice. Is the main question the owner's responsibilities, the investment structure, or the available businesses?
 
-Reply or grab a time: ${CALENDLY}
+A quick reply is enough; I can send the relevant information.
 
-${SIGNATURE_TEXT}`,
+Best,
+Dylan`,
   },
 ];
 

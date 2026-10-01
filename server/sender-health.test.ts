@@ -93,7 +93,7 @@ async function main() {
   console.log("chooseSenderForKey:");
   _resetSenderHealthForTests();
   const picked = chooseSenderForKey("enrollment-key-1", false);
-  assert("rotation off uses franchising@", picked === "franchising@newdawnfranchising.com");
+  assert("rotation off uses Dylan", picked === "dylan@newdawnfranchising.com");
 
   if (failures) {
     console.error(`\n${failures} assertion(s) failed`);

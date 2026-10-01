@@ -34,7 +34,7 @@ export function isAutomatedOrBulkEmail(
   const head = rawHead || "";
   const body = bodyText || "";
 
-  if (/^(?:list-unsubscribe|list-id|x-auto-response-suppress|feedback-id):|^precedence:\s*(?:bulk|list|junk)\b|^auto-submitted:\s*(?!no\b)\S+/im.test(head)) {
+  if (/^(?:(?:list-unsubscribe|list-id|feedback-id):|precedence:\s*(?:bulk|list|junk)\b|auto-submitted:\s*(?!no\b)\S+|x-auto-response-suppress:\s*(?:all|autoreply)\b)/im.test(head)) {
     return true;
   }
 
@@ -50,7 +50,11 @@ export function isAutomatedOrBulkEmail(
   }
 
   if (AUTOMATED_SUBJECT_RE.test(subj)) return true;
-  if (AUTOMATED_BODY_RE.test(body)) return true;
+  // Human replies commonly quote our original unsubscribe footer. Body-only
+  // newsletter heuristics must never suppress a threaded reply or an opt-out.
+  const threaded = /^(in-reply-to|references):/im.test(head) || /^(re|aw|sv):/i.test(subj);
+  if (!threaded && !/^\s*(?:please\s+)?(?:unsubscribe|remove me|stop emailing)/i.test(body)
+      && AUTOMATED_BODY_RE.test(body.split(/\n(?:On .+wrote:|>)/)[0])) return true;
 
   // Forwarded vendor mail that slipped through on subject alone.
   if (/^(fwd?|re):\s*(welcome to|your .* (account|subscription)|newsletter)/i.test(subj)) return true;

@@ -84,23 +84,22 @@ export const emailQueue = {
   },
 };
 
-async function processOne(item: QueuedEmail): Promise<void> {
+export async function processOne(item: QueuedEmail): Promise<void> {
   const now = Date.now();
   const waitMs = Math.max(0, MIN_DELAY_MS - (now - lastSendAt));
   if (waitMs > 0) await new Promise(r => setTimeout(r, waitMs));
   lastSendAt = Date.now();
 
   try {
-    if (item.from) {
-      await sendEmailFromSender(item.from, item.to, item.subject, item.html);
-    } else {
-      await sendEmail(item.to, item.subject, item.html);
-    }
+    const result = item.from
+      ? await sendEmailFromSender(item.from, item.to, item.subject, item.html)
+      : await sendEmail(item.to, item.subject, item.html);
+    if (!result.success) throw new Error(result.error || "Email provider rejected send");
     console.log(`[EmailQueue] Sent "${item.subject}" to ${item.to}`);
   } catch (err: any) {
     item.attempts++;
     if (item.attempts < item.maxAttempts) {
-      const delay = RETRY_DELAYS_MS[Math.min(item.attempts - 1, RETRY_DELAYS_MS.length - 1)];
+      const delay = Math.round(RETRY_DELAYS_MS[Math.min(item.attempts - 1, RETRY_DELAYS_MS.length - 1)] * (0.8 + Math.random() * 0.4));
       item.nextAttemptAt = new Date(Date.now() + delay);
       queue.push(item); // re-queue
       console.warn(`[EmailQueue] Failed "${item.subject}" — retry ${item.attempts}/${item.maxAttempts} in ${delay / 1000}s: ${err.message}`);

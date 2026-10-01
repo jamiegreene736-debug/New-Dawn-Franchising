@@ -52,7 +52,7 @@ export interface DeliverabilitySettings {
 
 const DEFAULTS = {
   verify_before_send: false,
-  sender_rotation: true,
+  sender_rotation: false,
   domain_guard: true,
   domain_bounce_threshold_pct: 40,
   domain_bounce_min: 8,
@@ -88,7 +88,7 @@ function rowToSettings(r: any): DeliverabilitySettings {
 
   return {
     verifyBeforeSend: !!r.verify_before_send,
-    senderRotation: !!r.sender_rotation,
+    senderRotation: false,
     domainGuard: !!r.domain_guard,
     domainBounceThresholdPct: Number(r.domain_bounce_threshold_pct),
     domainBounceMin: Number(r.domain_bounce_min),

@@ -16,10 +16,19 @@ test("classify only new reply, not quoted outreach", () => {
   assert.equal(authoredReply("Thanks\n> Please call me"), "Thanks");
   assert.equal(classifyReply("Not interested. Please call me."), "declined");
   assert.equal(classifyReply("Unsubscribe"), "opt_out");
+  assert.equal(classifyReply("Yes, send the details.\n\nUnsubscribe from this mailing list"), "information_requested");
   assert.equal(classifyReply("STOP"), "opt_out");
   assert.equal(classifyReply("Please send the FDD."), "information_requested");
   assert.equal(classifyReply("[FDD Request]"), "information_requested");
   assert.equal(classifyReply("Please call me", "Automatic reply: away"), "automated");
+});
+test("signatures and undelimited old footers do not create calls or opt-outs", () => {
+  assert.equal(classifyReply("Thanks for the details.\n\nPlease call me at 555-1234"), "reply_received");
+  assert.equal(classifyReply("Yes, send the details.\n\nIf not interested, unsubscribe here."), "reply_received");
+  assert.equal(classifyReply("Not interested in a call, but please send the details."), "reply_received");
+  assert.equal(classifyReply('My client said "not interested".'), "reply_received");
+  assert.equal(classifyReply("Hi Dylan,\n\nPlease call me tomorrow."), "call_requested");
+  assert.equal(classifyReply("Hello Dylan,\n\nPlease unsubscribe me."), "opt_out");
 });
 test("call evidence must have an actual source and timestamp", () => {
   assert.equal(qualifiesForCall(), false);

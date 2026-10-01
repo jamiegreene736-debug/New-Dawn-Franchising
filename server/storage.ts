@@ -71,6 +71,7 @@ export interface IStorage {
   createDripEnrollment(enrollment: InsertDripEnrollment): Promise<DripEnrollment>;
   updateDripEnrollment(id: string, data: Partial<DripEnrollment>): Promise<DripEnrollment>;
   getActiveEnrollments(campaignId?: string): Promise<DripEnrollment[]>;
+  getDripEmailActivity(): Promise<{ email: string; firstSentAt: Date; lastSentAt: Date }[]>;
   getDripSends(enrollmentId?: string): Promise<DripSend[]>;
   getAllDripSends(): Promise<DripSend[]>;
   countSentEmailsSince(since: Date): Promise<number>;
@@ -645,6 +646,18 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(dripEnrollments)
       .where(where)
       .orderBy(asc(dripEnrollments.enrolledAt));
+  }
+
+  async getDripEmailActivity(): Promise<{ email: string; firstSentAt: Date; lastSentAt: Date }[]> {
+    // Recipient-wide history prevents a duplicate enrollment from bypassing spacing.
+    const rows = await db.select({
+      email: sql<string>`lower(trim(${dripSends.recipientEmail}))`,
+      firstSentAt: sql<string>`min(${dripSends.sentAt})`,
+      lastSentAt: sql<string>`max(${dripSends.sentAt})`,
+    }).from(dripSends)
+      .where(and(eq(dripSends.channel, "email"), sql`${dripSends.sentAt} IS NOT NULL`))
+      .groupBy(sql`lower(trim(${dripSends.recipientEmail}))`);
+    return rows.map(row => ({ ...row, firstSentAt: new Date(row.firstSentAt), lastSentAt: new Date(row.lastSentAt) }));
   }
 
   async getDripSends(enrollmentId?: string): Promise<DripSend[]> {

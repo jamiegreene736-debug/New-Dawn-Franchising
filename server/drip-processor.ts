@@ -1,3 +1,4 @@
+import { greetingName, nextEmailAllowedAt, preferFirstContact } from "./drip-scheduling";
 import { campaignMessageId } from "./campaign-replies";
 import cron from "node-cron";
 import { storage } from "./storage";
@@ -22,7 +23,8 @@ import {
 import { FIRST_TOUCH, isLinkedInConnectStep } from "@shared/first-touch";
 import { firstTouchLang } from "./introducer-qualify";
 import { linkedInDailyQueueCap } from "./outreach-owner";
-import { db } from "./db";
+import { db, pool } from "./db";
+import type { PoolClient } from "pg";
 import { dripSends } from "@shared/schema";
 import { and, eq, gte, sql } from "drizzle-orm";
 
@@ -46,12 +48,12 @@ async function linkedInTasksCreatedToday(): Promise<number> {
 }
 
 function makePersonalize(name: string, email: string, firmHook: string) {
-  const firstName = (name || "").trim().split(/\s+/)[0] || name || "there";
+  const { firstName, fullName } = greetingName(name || "");
   return (s: string | null | undefined): string =>
     (s || "")
       .replace(/\[Contact First Name\]/gi, firstName)
       .replace(/\{\{\s*firstName\s*\}\}/gi, firstName)
-      .replace(/\{\{\s*name\s*\}\}/gi, name)
+      .replace(/\{\{\s*name\s*\}\}/gi, fullName)
       .replace(/\{\{\s*email\s*\}\}/gi, email || "")
       .replace(/\{\{\s*firmHook\s*\}\}/gi, firmHook || "");
 }
@@ -173,7 +175,14 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
   }
 
   dripRunInProgress = true;
+  let runLock: PoolClient | undefined;
+  let lockAcquired = false;
   try {
+    runLock = await pool.connect();
+    const lock = await runLock.query<{ locked: boolean }>("SELECT pg_try_advisory_lock(71283045) AS locked");
+    lockAcquired = lock.rows[0].locked;
+    if (!lockAcquired) return;
+
     // Effective throttles: "Sending & Safety" DB overrides win over the env-var
     // defaults, fetched fresh each run so changes apply without a restart. Falls
     // back to the env caps (EMAIL_DAILY_CAP etc.) when no override is set.
@@ -222,12 +231,21 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
     const allCampaigns = await storage.getDripCampaigns();
     const activeCampaignIds = new Set(allCampaigns.filter((c) => c.isActive).map((c) => c.id));
 
+    const activity = await storage.getDripEmailActivity();
+    const lastSendByRecipient = new Map(activity.map(row => [row.email, row.lastSentAt]));
+    let firstContactsLast24h = activity.filter(row => row.firstSentAt.getTime() >= now - 86_400_000).length;
+    const eligibleEnrollments = activeEnrollments.filter(e => activeCampaignIds.has(e.campaignId));
+    const firstContacts = eligibleEnrollments.filter(e => !lastSendByRecipient.has(e.prospectEmail.trim().toLowerCase()));
+    const followUps = eligibleEnrollments.filter(e => lastSendByRecipient.has(e.prospectEmail.trim().toLowerCase()));
     let sentThisRun = 0;
     // Last send time per recipient domain, to pace bursts to one ISP/domain.
     const lastSendByDomain = new Map<string, number>();
     console.log(`[Drip] ${activeEnrollments.length} active enrollments · ${dailyCap - sentLast24h} left today · ${hourlyCap - sentLastHour} left this hour`);
 
-    for (const enrollment of activeEnrollments) {
+    while (firstContacts.length || followUps.length) {
+      const preferNew = preferFirstContact(firstContactsLast24h, sentLast24h);
+      const enrollment = (preferNew ? firstContacts.shift() ?? followUps.shift() : followUps.shift() ?? firstContacts.shift())!;
+      const recipientKey = enrollment.prospectEmail.trim().toLowerCase();
       if (allSendersDisabled(configuredSenders)) {
         console.error("[Drip] All sending mailboxes are disabled mid-run — stopping.");
         break;
@@ -248,13 +266,8 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
       const steps = await storage.getDripSteps(enrollment.campaignId);
       if (steps.length === 0) continue;
 
-      // Drain every step that is due *now* for this enrollment in one pass — not
-      // just one step per cron run. A Day-0 sequence (e.g. a LinkedIn task plus
-      // the first email) should all go out in the same window instead of one step
-      // per hour, and an enrollment left behind by a restart should catch up. The
-      // loop stops at the first step that isn't due yet ("wait"), when the
-      // sequence is finished, or when a volume cap is hit; the per-step delayDays
-      // gate plus the daily/hourly caps keep the drain bounded.
+      // Tasks may advance in the same pass; email spacing always follows actual
+      // sends, so a late enrollment never receives a backlog of emails at once.
       const enrolledAt = new Date(enrollment.enrolledAt);
       const firstName = (enrollment.prospectName || "").trim().split(/\s+/)[0] || enrollment.prospectName || "there";
       const prospect = enrollment.prospectId ? await storage.getProspect(enrollment.prospectId).catch(() => undefined) : undefined;
@@ -299,6 +312,9 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
         const stepType = (step.stepType || "email").toLowerCase();
 
         if (stepType === "email" || stepType === "manual_email") {
+          // Manual forcing cannot bypass recipient cooldown or sequence spacing.
+          if (now.getTime() < nextEmailAllowedAt(step, steps, existingSends, lastSendByRecipient.get(recipientKey))) break;
+
           // Skip addresses that are suppressed (e.g. hard-bounced). Stop the
           // enrollment so it doesn't keep retrying a dead mailbox — the user
           // can fix the email from the Activity tab to resume it.
@@ -371,6 +387,8 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
           );
 
           if (result.success) {
+            if (!lastSendByRecipient.has(recipientKey)) firstContactsLast24h++;
+            lastSendByRecipient.set(recipientKey, new Date());
             sentThisRun++;
             sentLast24h++;
             sentLastHour++;
@@ -502,6 +520,15 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
   } catch (err) {
     console.error("[Drip] Processing error:", err);
   } finally {
+    if (runLock) {
+      try {
+        if (lockAcquired) await runLock.query("SELECT pg_advisory_unlock(71283045)");
+        runLock.release();
+      } catch (error) {
+        runLock.release(true);
+        console.error("[Drip] Failed to release scheduler lock:", error);
+      }
+    }
     dripRunInProgress = false;
     // If a trigger arrived mid-run, sweep once more (globally, non-force) to pick
     // up any enrollments that weren't in this run's snapshot. Deferred slightly so

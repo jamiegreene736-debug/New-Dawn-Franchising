@@ -7,9 +7,12 @@ export const ENGAGED_OPEN_MIN = 3;
 export const MAX_ATTEMPTS = 3;
 
 export const TRIGGER_PRIORITY = {
-  link_click: 1,
-  reply_no_meeting: 2,
-  engaged_open: 3,
+  call_requested: 1,
+  information_requested: 2,
+  reply_received: 2,
+  link_click: 9,
+  reply_no_meeting: 9,
+  engaged_open: 9,
 } as const;
 
 export type CallTriggerType = keyof typeof TRIGGER_PRIORITY;
@@ -30,6 +33,7 @@ export const ACTIVE_STATUSES = [
   "voicemail",
   "callback",
   "needs_phone",
+  "needs_response",
 ] as const;
 
 /** CRM statuses where Dylan is already working the person — do not requeue. */
@@ -60,9 +64,9 @@ export function priorityForTrigger(triggerType: string): number {
   return TRIGGER_PRIORITY[triggerType as CallTriggerType] ?? 9;
 }
 
-/** Single human-classified opens are too noisy (Apple Mail Privacy Protection). */
+/** Opens remain analytics only, including repeated human-classified opens. */
 export function isQueueableOpenSignal(openCount: number): boolean {
-  return openCount >= ENGAGED_OPEN_MIN;
+  return false; // Opens, regardless of count, do not establish permission to call.
 }
 
 export function inferTrack(
@@ -160,6 +164,9 @@ export function isUsablePhone(phone?: string | null): boolean {
 
 export function triggerLabel(triggerType: string, subject?: string | null): string {
   const sub = subject?.trim() ? `"${subject.trim()}"` : "an email";
+  if (triggerType === "call_requested") return `Requested a call in ${sub}`;
+  if (triggerType === "information_requested") return `Requested information — respond in writing`;
+  if (triggerType === "reply_received") return `Reply needs a written response`;
   if (triggerType === "link_click") return `Clicked a link in ${sub}`;
   if (triggerType === "reply_no_meeting") return `Replied to ${sub} — no meeting yet`;
   if (triggerType === "engaged_open") return `Opened ${sub} 3+ times`;

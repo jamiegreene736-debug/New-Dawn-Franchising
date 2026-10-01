@@ -1,3 +1,6 @@
+import { simpleParser } from "mailparser";
+import { authoredReply, classifyReply, REPLY_POLICY_VERSION } from "./outreach-signals";
+import { suppressReplyOutreach } from "./call-queue-service";
 // ─── Gmail Inbox Sync (franchising@newdawnfranchising.com) ───────────────────
 // Two-way Gmail connection: outbound is handled by email-service.ts; this module
 // pulls the franchising@ INBOX over IMAP and lands client replies on the matching
@@ -214,18 +217,24 @@ export async function syncSenderInbox(senderEmail: string, password: string): Pr
           continue;
         }
 
-        const textPart = msg.bodyParts?.get("TEXT");
-        const bodyText = (textPart ? Buffer.from(textPart).toString("utf8") : "").replace(/\r\n/g, "\n").trim();
+        const parsed = await simpleParser(rawSource, { skipHtmlToText: false });
+        const bodyText = parsed.text?.trim() || "";
+        const replyText = authoredReply(bodyText);
+        const replySignal = classifyReply(replyText, subject);
 
         // Skip newsletters / service welcome emails / notifications / auto-replies
         // (e.g. "Welcome to PR Newswire!") — these aren't personal replies and
         // shouldn't clutter the contact's timeline / Activity feed.
-        if (isAutomatedOrBulkEmail(fromAddr, subject, rawSource.slice(0, 8000), bodyText)) {
+        if (isAutomatedOrBulkEmail(fromAddr, subject, rawSource.split(/\r?\n\r?\n/, 1)[0], replyText)) {
           processedMessageIds.add(msgId);
           continue;
         }
         const bodyHtml = `<pre style="white-space:pre-wrap;font-family:inherit;margin:0;">${escapeHtml(bodyText)}</pre>`;
-        const preview = bodyText.slice(0, 240);
+        const preview = replyText.slice(0, 240);
+        const replyMetadata = { subject, from: fromAddr, preview, messageId: msgId, replyText, replySignal, replyReceivedAt: (msg.envelope?.date || new Date()).toISOString(), replyPolicyVersion: REPLY_POLICY_VERSION };
+        if (replySignal === "opt_out" || replySignal === "declined") {
+          await suppressReplyOutreach(fromAddr, replySignal);
+        }
 
         // Reply automation: a personal reply pauses any active campaign for this
         // person (so we stop drip-blasting someone who answered) and alerts the
@@ -247,7 +256,7 @@ export async function syncSenderInbox(senderEmail: string, password: string): Pr
               await storage.updateDripSend(latest.id, { status: "replied" } as any);
             }
           }
-          if (active.length > 0) {
+          if (active.length > 0 && replySignal !== "opt_out" && replySignal !== "declined") {
             console.log(`[GmailSync] reply from ${fromAddr} — paused ${active.length} active enrollment(s)`);
             try {
               await sendEmail(
@@ -282,7 +291,7 @@ export async function syncSenderInbox(senderEmail: string, password: string): Pr
             await storage.createCrmClientActivity({
               clientId: clientRow.id,
               activityType: "email_received",
-              metadata: { subject, from: fromAddr, preview, messageId: msgId },
+              metadata: replyMetadata,
             });
             stored++;
           }
@@ -300,7 +309,7 @@ export async function syncSenderInbox(senderEmail: string, password: string): Pr
           await storage.createContactActivity({
             contactId,
             activityType: "email_received",
-            metadata: { subject, from: fromAddr, preview, messageId: msgId },
+            metadata: replyMetadata,
           });
           return true;
         };

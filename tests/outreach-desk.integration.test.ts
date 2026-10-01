@@ -44,7 +44,7 @@ async function seedPerson(overrides: Record<string, unknown> = {}) {
   const id = randomUUID(),
     email = `${id}@example.com`;
   await pool.query(
-    `INSERT INTO call_queue(id,name,email,phone,track,trigger_type,trigger_at,status) VALUES($1,'Test person',$2,$3,'client','reply_no_meeting',now(),'queued')`,
+    `INSERT INTO call_queue(id,name,email,phone,track,trigger_type,trigger_at,status) VALUES($1,'Test person',$2,$3,'client','call_requested',now(),'queued')`,
     [id, email, phone],
   );
   const permission = {
@@ -670,3 +670,88 @@ test(
     );
   },
 );
+
+test("passive signals and missing evidence never create call tasks", { skip }, async () => {
+  for (const triggerType of ["link_click", "engaged_open", "reply_no_meeting", "call_requested"] as const) {
+    const email = `${randomUUID()}@example.com`;
+    assert.equal((await enqueueCall({ name: "Passive", email, triggerType })).ok, false);
+    assert.equal((await pool.query("SELECT count(*)::int AS n FROM call_queue WHERE email=$1", [email])).rows[0].n, 0);
+  }
+});
+
+test("explicit requests keep evidence, deduplicate and cannot restart exhausted attempts", { skip }, async () => {
+  const email = `${randomUUID()}@example.com`;
+  const evidence = { sourceId: "request-1", text: "Please call me tomorrow.", receivedAt: new Date() };
+  const input = { name: "Requested", email, phone: "+15125550188", triggerType: "call_requested" as const, evidence };
+  const result = await enqueueCall(input);
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.item.status, "queued");
+  assert.match(result.item.outcomeNotes!, /request-1/);
+  await pool.query("UPDATE call_queue SET status='exhausted',attempt_count=3 WHERE id=$1", [result.item.id]);
+  await Promise.all([enqueueCall(input), enqueueCall(input)]);
+  const rows = (await pool.query("SELECT * FROM call_queue WHERE email=$1", [email])).rows;
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].status, "exhausted");
+});
+
+test("questions need a written response and cannot dial; a later request qualifies", { skip }, async () => {
+  const email = `${randomUUID()}@example.com`;
+  const receivedAt = new Date(Date.now() - 10000);
+  const first = await enqueueCall({ name: "Question", email, phone: "+15125550189", triggerType: "reply_received", evidence: { sourceId: "question-1", text: "What are the fees?", receivedAt } });
+  assert.equal(first.ok, true);
+  if (!first.ok) return;
+  assert.equal(first.item.status, "needs_response");
+  assert.equal(first.item.assignedTo, "dylan");
+  const { markDialing } = await import("../server/call-queue-service");
+  await assert.rejects(markDialing(first.item.id), /explicit call request/);
+  const requested = await enqueueCall({ name: "Question", email, phone: "+15125550189", triggerType: "call_requested", evidence: { sourceId: "request-2", text: "Please call me", receivedAt: new Date() } });
+  assert.equal(requested.ok, true);
+  if (!requested.ok) return;
+  assert.equal(requested.item.id, first.item.id);
+  assert.equal(requested.item.status, "queued");
+  assert.equal(requested.item.assignedTo, "thailand");
+});
+
+test("negative replies suppress calls and future requests remain held", { skip }, async () => {
+  const { suppressReplyOutreach, markDialing } = await import("../server/call-queue-service");
+  const p = await seedPerson({ trigger_type: "call_requested" });
+  await suppressReplyOutreach(p.email, "opt_out");
+  await assert.rejects(markDialing(p.id));
+  const request = await enqueueCall({ name: "Suppressed", email: p.email, triggerType: "call_requested", evidence: { sourceId: "older", text: "Please call me", receivedAt: new Date() } });
+  assert.equal(request.ok, false);
+  assert.equal((await pool.query("SELECT status FROM call_queue WHERE id=$1", [p.id])).rows[0].status, "dnc");
+});
+
+test("booking closes pending requests and blocks new setter calls", { skip }, async () => {
+  const { markQueueBookedByEmail } = await import("../server/call-queue-service");
+  const p = await seedPerson({ trigger_type: "call_requested" });
+  await markQueueBookedByEmail(p.email, randomUUID());
+  assert.equal((await enqueueCall({ name: "Booked", email: p.email, triggerType: "call_requested", evidence: { sourceId: "old-request", text: "Please call me", receivedAt: new Date() } })).ok, false);
+  assert.equal((await pool.query("SELECT status FROM call_queue WHERE id=$1", [p.id])).rows[0].status, "booked");
+});
+
+test("reply scan ignores old previews, routes FDD requests and uses the latest reply", { skip }, async () => {
+  const { scanRepliesWithoutMeetings, scanEngagedOpens } = await import("../server/call-queue-service");
+  const contacts: Array<{ id: string; email: string }> = [];
+  for (let i=0; i<3; i++) {
+    const id = randomUUID(), email = `${id}@example.com`;
+    await pool.query("INSERT INTO contacts(id,first_name,last_name,email,phone) VALUES($1,'Signal','Test',$2,$3)", [id,email,`+1512555020${i}`]);
+    contacts.push({ id,email });
+  }
+  const add = (i: number, metadata: object, date: Date) => pool.query("INSERT INTO contact_activities(contact_id,activity_type,metadata,created_at) VALUES($1,'email_received',$2,$3)", [contacts[i].id,JSON.stringify(metadata),date]);
+  await add(0, { preview: "Please call me" }, new Date());
+  await add(1, { messageId: "fdd-1", replyText: "Please send the FDD", replyPolicyVersion: 1 }, new Date());
+  await add(2, { messageId: "request-before-decline", replyText: "Please call me", replyPolicyVersion: 1 }, new Date(Date.now()-20000));
+  await add(2, { messageId: "decline-1", replyText: "Not interested", replyPolicyVersion: 1 }, new Date());
+  await scanRepliesWithoutMeetings();
+  await scanRepliesWithoutMeetings();
+  assert.equal((await pool.query("SELECT count(*)::int AS n FROM call_queue WHERE email=$1", [contacts[0].email])).rows[0].n,0);
+  const fdd = (await pool.query("SELECT * FROM call_queue WHERE email=$1", [contacts[1].email])).rows;
+  assert.equal(fdd.length,1);
+  assert.equal(fdd[0].status,"needs_response");
+  assert.equal(fdd[0].trigger_type,"information_requested");
+  assert.equal((await pool.query("SELECT count(*)::int AS n FROM call_queue WHERE email=$1", [contacts[2].email])).rows[0].n,0);
+  assert.equal((await pool.query("SELECT count(*)::int AS n FROM agent_dnc WHERE email=$1", [contacts[2].email])).rows[0].n,1);
+  assert.deepEqual(await scanEngagedOpens(), { scanned:0,enqueued:0 });
+});

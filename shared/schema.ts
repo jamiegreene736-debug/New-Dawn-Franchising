@@ -1797,13 +1797,14 @@ export const callQueue = pgTable("call_queue", {
   timezone: text("timezone"),
   // Which script + framing: broker referral vs E-2 investor.
   track: text("track").notNull().default("client"),
-  // Why they are in the queue: link_click | engaged_open | reply_no_meeting
+  // Qualified work: call_requested | information_requested | reply_received.
+  // Historical link_click / engaged_open / reply_no_meeting rows are activity only.
   triggerType: text("trigger_type").notNull(),
   triggerAt: timestamp("trigger_at").notNull(),
   triggerLabel: text("trigger_label"),
   dripSendId: varchar("drip_send_id"),
   emailSubject: text("email_subject"),
-  // 1 = click, 2 = reply, 3 = engaged open
+  // 1 = explicit call request, 2 = written response needed, 9 = historical activity
   priority: integer("priority").notNull().default(2),
   assignedTo: text("assigned_to").notNull().default("thailand"),
   // queued | calling | no_answer | voicemail | callback | not_interested

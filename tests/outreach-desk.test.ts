@@ -30,6 +30,7 @@ const base = {
   suppressed: false,
   booked: false,
   status: "queued",
+  triggerType: "call_requested",
   attemptCount: 0,
   nextAttemptAt: null,
   linkedinUrl: null,

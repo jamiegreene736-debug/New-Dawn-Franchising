@@ -259,7 +259,6 @@ export async function syncSenderInbox(senderEmail: string, password: string, loo
               await storage.updateDripEnrollment(enrollment.id, { status: optOut ? "unsubscribed" : "replied" });
             }
           }
-          matched++;
           if (matchedSend.status !== "replied") {
             const alert = await sendEmail(DEFAULT_SENDER, `Reply from ${fromName} — campaign paused`,
               `<p>${escapeHtml(fromName)} replied to ${escapeHtml(subject)}. Follow-ups have stopped.</p>${bodyHtml}`,

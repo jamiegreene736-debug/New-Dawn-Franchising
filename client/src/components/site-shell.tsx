@@ -1,12 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
-import { ArrowRight, ChevronDown, Globe2, Loader2, Mail, MapPin, Menu, Phone, Send, X, MessageCircle, GraduationCap, Megaphone, ShieldCheck, Handshake } from "lucide-react";
+import { ChevronDown, Globe2, Loader2, Mail, MapPin, Menu, Phone, Send, X, GraduationCap, Megaphone, ShieldCheck, Handshake } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LanguageSwitcher } from "@/components/language-switcher";
-import logo from "@assets/Gemini_Generated_Image_t1u2o5t1u2o5t1u2_1771946732580.png";
-import mark from "@/assets/images/nhf-mark.png";
 
 const COMPANY = {
   email: "franchising@newdawnfranchising.com",
@@ -264,35 +262,32 @@ type DesktopNavEntry = NavItem | NavGroup;
 // order by label. (Portals stays a separate trailing utility dropdown.)
 const DESKTOP_NAV: DesktopNavEntry[] = [
   {
-    label: "About", id: "about-group",
+    label: "Franchises", id: "franchises",
     items: [
-      { href: "/about", label: "About Us", id: "about" },
-      { href: "/insurance", label: "Insurance", id: "insurance" },
-      { href: "/team", label: "Our Team", id: "team" },
       { href: "/property-management", label: "Property Management", id: "property-management" },
-      { href: "/telecom", label: "Telecom (VoIP)", id: "telecom" },
-      { href: "/why-new-dawn", label: "What Makes Us Different", id: "why-new-dawn" },
+      { href: "/telecom", label: "Telecom", id: "telecom" },
+      { href: "/insurance", label: "Insurance", id: "insurance" },
     ],
   },
-  { href: "/blog", label: "Blog", id: "blog" },
-  { href: "/contact", label: "Contact", id: "contact" },
-  {
-    label: "Franchise", id: "franchise-group",
-    items: [
-      { href: "/e2-visa-franchise", label: "E-2 Visa Franchise", id: "e2-visa-franchise" },
-      { href: "/e-2-visa-process", label: "E-2 Visa Process", id: "e2-process" },
-      { href: "/process", label: "Process", id: "process" },
-      { href: "/request-fdd", label: "Request FDD", id: "request-fdd" },
-      { href: "/territories", label: "Territories", id: "territories" },
-      { href: "/e2-fit", label: "Why E-2?", id: "e2" },
-    ],
-  },
+  { href: "/process", label: "Process", id: "process" },
+  { href: "/e2-fit", label: "E-2", id: "e2" },
+  { href: "/team", label: "Team", id: "team" },
   { href: "/partners", label: "Partners", id: "partners" },
   {
-    label: "Services", id: "services-group",
+    label: "More", id: "more-group",
     items: [
+      { href: "/about", label: "About", id: "about" },
+      { href: "/why-new-dawn", label: "Why New Dawn", id: "why-new-dawn" },
+      { href: "/e-2-visa-process", label: "E-2 process", id: "e2-process" },
+      { href: "/e2-visa-franchise", label: "E-2 franchise", id: "e2-visa-franchise" },
+      { href: "/territories", label: "Territories", id: "territories" },
+      { href: "/request-fdd", label: "Request FDD", id: "request-fdd" },
+      { href: "/quiz", label: "Readiness quiz", id: "quiz" },
+      { href: "/blog", label: "Blog", id: "blog" },
+      { href: "/contact", label: "Contact", id: "contact" },
       { href: "/marketing", label: "Marketing", id: "marketing" },
       { href: "/real-estate", label: "Real Estate", id: "real-estate" },
+      { href: "/legal", label: "Legal", id: "legal" },
     ],
   },
 ];
@@ -308,37 +303,32 @@ function isNavGroup(entry: DesktopNavEntry): entry is NavGroup {
 const MOBILE_NAV: DesktopNavEntry[] = [
   { href: "/", label: "Home", id: "home" },
   {
-    label: "About", id: "about-group",
+    label: "Franchises", id: "franchises",
     items: [
-      { href: "/about", label: "About Us", id: "about" },
-      { href: "/insurance", label: "Insurance", id: "insurance" },
-      { href: "/team", label: "Our Team", id: "team" },
       { href: "/property-management", label: "Property Management", id: "property-management" },
-      { href: "/telecom", label: "Telecom (VoIP)", id: "telecom" },
-      { href: "/why-new-dawn", label: "What Makes Us Different", id: "why-new-dawn" },
+      { href: "/telecom", label: "Telecom", id: "telecom" },
+      { href: "/insurance", label: "Insurance", id: "insurance" },
     ],
   },
-  { href: "/blog", label: "Blog", id: "blog" },
-  { href: "/contact", label: "Contact", id: "contact" },
-  {
-    label: "Franchise", id: "franchise-group",
-    items: [
-      { href: "/e2-visa-franchise", label: "E-2 Visa Franchise", id: "e2-visa-franchise" },
-      { href: "/e-2-visa-process", label: "E-2 Visa Process", id: "e2-process" },
-      { href: "/process", label: "Process", id: "process" },
-      { href: "/request-fdd", label: "Request FDD", id: "request-fdd" },
-      { href: "/territories", label: "Territories", id: "territories" },
-      { href: "/e2-fit", label: "Why E-2?", id: "e2" },
-    ],
-  },
-  { href: "/legal", label: "Legal & Disclaimers", id: "legal" },
-  { href: "/quiz", label: "Quiz", id: "quiz" },
+  { href: "/process", label: "Process", id: "process" },
+  { href: "/e2-fit", label: "E-2", id: "e2" },
+  { href: "/team", label: "Team", id: "team" },
   { href: "/partners", label: "Partners", id: "partners" },
   {
-    label: "Services", id: "services-group",
+    label: "More", id: "more-group",
     items: [
+      { href: "/about", label: "About", id: "about" },
+      { href: "/why-new-dawn", label: "Why New Dawn", id: "why-new-dawn" },
+      { href: "/e-2-visa-process", label: "E-2 process", id: "e2-process" },
+      { href: "/e2-visa-franchise", label: "E-2 franchise", id: "e2-visa-franchise" },
+      { href: "/territories", label: "Territories", id: "territories" },
+      { href: "/request-fdd", label: "Request FDD", id: "request-fdd" },
+      { href: "/quiz", label: "Readiness quiz", id: "quiz" },
+      { href: "/blog", label: "Blog", id: "blog" },
+      { href: "/contact", label: "Contact", id: "contact" },
       { href: "/marketing", label: "Marketing", id: "marketing" },
       { href: "/real-estate", label: "Real Estate", id: "real-estate" },
+      { href: "/legal", label: "Legal", id: "legal" },
     ],
   },
 ];
@@ -387,7 +377,6 @@ function PortalsDropdown({ location: loc }: { location: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const timeout = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  const isActive = PORTALS.some((p) => loc.startsWith(p.href) && p.href !== "/login") || loc === "/login";
   const handleEnter = () => { clearTimeout(timeout.current); setOpen(true); };
   const handleLeave = () => { timeout.current = setTimeout(() => setOpen(false), 150); };
 
@@ -397,10 +386,7 @@ function PortalsDropdown({ location: loc }: { location: string }) {
     <div ref={ref} className="relative" onMouseEnter={handleEnter} onMouseLeave={handleLeave}>
       <button
         data-testid="link-nav-portals"
-        className={
-          "flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm whitespace-nowrap transition-colors hover:bg-black/[0.03] " +
-          (isActive ? "text-foreground font-medium" : "text-foreground/70 hover:text-foreground")
-        }
+        className="nd-nav-link flex items-center gap-1 rounded-lg px-2.5 py-1.5 whitespace-nowrap transition-colors"
         onClick={() => setOpen((v) => !v)}
       >
         Portals
@@ -435,8 +421,6 @@ function NavDropdown({ group, location: loc }: { group: NavGroup; location: stri
   const ref = useRef<HTMLDivElement>(null);
   const timeout = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  const isGroupActive = group.items.some((item) => loc === item.href);
-
   const handleEnter = () => { clearTimeout(timeout.current); setOpen(true); };
   const handleLeave = () => { timeout.current = setTimeout(() => setOpen(false), 150); };
 
@@ -446,10 +430,7 @@ function NavDropdown({ group, location: loc }: { group: NavGroup; location: stri
     <div ref={ref} className="relative" onMouseEnter={handleEnter} onMouseLeave={handleLeave}>
       <button
         data-testid={`link-nav-${group.id}`}
-        className={
-          "flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm whitespace-nowrap transition-colors hover:bg-black/[0.03] " +
-          (isGroupActive ? "text-foreground font-medium" : "text-foreground/70 hover:text-foreground")
-        }
+        className="nd-nav-link flex items-center gap-1 rounded-lg px-2.5 py-1.5 whitespace-nowrap transition-colors"
         onClick={() => setOpen((v) => !v)}
       >
         {group.label}
@@ -569,7 +550,7 @@ function NewsletterSignup({ t }: { t: FooterCopy }) {
           onChange={(e) => { setEmail(e.target.value); if (status === "error") setStatus("idle"); }}
           className="h-9 bg-white text-sm"
         />
-        <Button data-testid="button-newsletter-submit" type="submit" size="sm" disabled={status === "loading"} className="shrink-0 gap-1.5">
+        <Button data-testid="button-newsletter-submit" type="submit" size="sm" disabled={status === "loading"} className="h-9 shrink-0 gap-1.5 rounded-md bg-[#1a1b1f] px-3 text-[11px] font-medium uppercase tracking-[0.12em] text-white hover:bg-black">
           {status === "loading" ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
           {t.subscribe}
         </Button>
@@ -849,15 +830,13 @@ function AIChatWidget() {
         <button
           data-testid="button-whatsapp-chat"
           onClick={() => setOpen((v) => !v)}
-          className="relative flex size-14 items-center justify-center rounded-full bg-[#25D366] text-white shadow-lg transition-transform hover:scale-105 active:scale-95"
+          className="relative flex h-10 items-center justify-center rounded-md bg-[#1a1b1f] px-4 text-[11px] font-medium uppercase tracking-[0.14em] text-white shadow-sm transition-colors hover:bg-black"
           aria-label="Chat with us"
         >
-          <span className="absolute inline-flex size-full animate-ping rounded-full bg-[#25D366] opacity-30" />
-          {open ? <X className="relative size-6" /> : <WAIcon className="relative size-7" />}
+          {open ? <X className="size-4" /> : "Ask"}
         </button>
-        {/* Red notification dot */}
         {notifDot && !open && (
-          <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-red-500 rounded-full border-2 border-white animate-pulse pointer-events-none" />
+          <span className="absolute -top-1 -right-1 size-2.5 rounded-full border-2 border-white bg-[#0c76f3] pointer-events-none" />
         )}
         {/* Tooltip */}
         {!open && (
@@ -955,21 +934,16 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   }, [mobileOpen]);
 
   return (
-    <div data-testid="site-shell" className="min-h-screen">
-      <header data-testid="header-site" className="sticky top-0 z-50 border-b bg-white">
-        <div className="nh-container flex h-20 items-center justify-between gap-4 md:h-20">
+    <div data-testid="site-shell" className="nd-mkt min-h-screen">
+      <header data-testid="header-site" className="sticky top-0 z-50 border-b">
+        <div className="nh-container flex h-16 items-center justify-between gap-4">
           <Link
             data-testid="link-brand"
             href="/"
-            className="flex items-center gap-3 rounded-xl px-2 py-1 transition-colors hover:bg-black/[0.03]"
+            className="rounded-lg px-1 py-1 text-[18px] font-medium tracking-[-0.045em] text-[#0c76f3]"
+            translate="no"
           >
-            <img
-              data-testid="img-logo"
-              src={logo}
-              alt="New Dawn Franchising logo"
-              translate="no"
-              className="h-16 sm:h-16 md:h-16 lg:h-20 w-auto"
-            />
+            New Dawn
           </Link>
 
           <nav data-testid="nav-site" className="hidden items-center gap-0.5 lg:flex">
@@ -977,16 +951,12 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
               if (isNavGroup(entry)) {
                 return <NavDropdown key={entry.id} group={entry} location={location} />;
               }
-              const isActive = location === entry.href;
               return (
                 <Link
                   key={entry.id}
                   data-testid={`link-nav-${entry.id}`}
                   href={entry.href}
-                  className={
-                    "rounded-lg px-2.5 py-1.5 text-sm whitespace-nowrap transition-colors hover:bg-black/[0.03] " +
-                    (isActive ? "text-foreground font-medium" : "text-foreground/70 hover:text-foreground")
-                  }
+                  className="nd-nav-link rounded-lg px-2.5 py-1.5 whitespace-nowrap transition-colors"
                 >
                   {entry.label}
                 </Link>
@@ -997,15 +967,8 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
 
           <div className="flex items-center gap-2">
             <LanguageSwitcher />
-            <span data-testid="badge-spanish" className="hidden items-center gap-1 rounded-full border bg-white/60 px-2.5 py-1 text-[11px] font-medium text-foreground/60 lg:inline-flex">
-              <Globe2 className="size-3" />
-              <span>E-2 investor guidance</span>
-            </span>
-            <Button data-testid="button-top-cta" className="hidden gap-2 lg:inline-flex" asChild>
-              <Link href="/request-fdd">
-                Request FDD
-                <ArrowRight className="size-4" />
-              </Link>
+            <Button data-testid="button-top-cta" className="hidden h-9 rounded-md bg-[#1a1b1f] px-4 text-[11px] font-medium uppercase tracking-[0.14em] text-white hover:bg-black lg:inline-flex" asChild>
+              <Link href="/contact">Get started</Link>
             </Button>
             <button
               data-testid="button-mobile-menu"
@@ -1090,11 +1053,8 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
             <Globe2 className="size-3" />
             <span>E-2 investor guidance</span>
           </div>
-          <Button data-testid="button-mobile-cta" className="w-full gap-2" asChild>
-            <Link href="/request-fdd">
-              Request FDD
-              <ArrowRight className="size-4" />
-            </Link>
+          <Button data-testid="button-mobile-cta" className="h-10 w-full rounded-md bg-[#1a1b1f] text-[11px] font-medium uppercase tracking-[0.14em] text-white hover:bg-black" asChild>
+            <Link href="/contact">Get started</Link>
           </Button>
           <div className="mt-3 flex flex-col gap-2">
             <a
@@ -1155,28 +1115,22 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
               </div>
             </div>
 
-            <div className="mt-8 flex flex-wrap items-center gap-2 border-t pt-6">
-              <Button data-testid="button-footer-phone" variant="secondary" className="gap-2" asChild>
-                <a href={`tel:${COMPANY.phoneTel}`}>
-                  <Phone className="size-4" />
-                  {COMPANY.phone}
-                </a>
-              </Button>
-              <Button data-testid="button-footer-email" variant="secondary" className="gap-2" asChild>
-                <a href={`mailto:${COMPANY.email}`}>
-                  <Mail className="size-4" />
-                  {COMPANY.email}
-                </a>
-              </Button>
-              <Button data-testid="button-footer-facebook" variant="secondary" className="gap-2" asChild>
-                <a href={COMPANY.facebook} target="_blank" rel="noopener noreferrer">
-                  <FacebookIcon className="size-4" />
-                  Facebook
-                </a>
-              </Button>
-              <Button data-testid="button-footer-contact" className="gap-2" asChild>
-                <Link href="/contact">{t.requestInfo}</Link>
-              </Button>
+            <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3 border-t pt-6 text-sm">
+              <a data-testid="button-footer-phone" href={`tel:${COMPANY.phoneTel}`} className="nd-link inline-flex items-center gap-2">
+                <Phone className="size-4" />
+                {COMPANY.phone}
+              </a>
+              <a data-testid="button-footer-email" href={`mailto:${COMPANY.email}`} className="nd-link inline-flex items-center gap-2">
+                <Mail className="size-4" />
+                {COMPANY.email}
+              </a>
+              <a data-testid="button-footer-facebook" href={COMPANY.facebook} target="_blank" rel="noopener noreferrer" className="nd-link inline-flex items-center gap-2">
+                <FacebookIcon className="size-4" />
+                Facebook
+              </a>
+              <Link data-testid="button-footer-contact" href="/contact" className="nd-btn">
+                {t.requestInfo}
+              </Link>
             </div>
             <div data-testid="footer-legal-disclaimer" className="mt-8 border-t pt-6">
               <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">

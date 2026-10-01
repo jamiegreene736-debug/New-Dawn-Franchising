@@ -15,13 +15,13 @@ import {
 export const GROK_CAMPAIGN_NAME = BROKER_CAMPAIGN_NAME;
 
 const BROKER_DESCRIPTION =
-  "13-step omnichannel broker outreach sequence for E-2 visa referral partners. Covers LinkedIn, email, SMS, and call tasks across 28 days — highlighting referral fees ($28,125), escrow protection, VC-backed team, director model, three verticals (PM/Insurance/Telecom), proprietary AI, and structured buy-back exits.";
+  "Broker outreach from Dylan: short, reply-focused emails about client fit, owner responsibilities, and written materials for independent review.";
 
 const BROKER_2_DESCRIPTION =
-  "13-step omnichannel broker outreach sequence (Grok 2.0) for E-2 referral partners — immigration attorneys, consultants, wealth managers, and business brokers. Mirrors the client Grok 2.0 structure across 28 days. Centers on what brokers need: credible client solutions (obtain & renew E-2 visa, live anywhere, escrow-protected funds, FDD Item 19, structured exit), plus 12.5% referral commission ($28,125), broker portal, and end-to-end referral journey. Emails link the multilingual brochures (EN/ES/中文): the broker one-pager in the intro (Touch 1) and the forward-to-client investor brochure in Touch 3.";
+  "Professional-partner outreach from Dylan with concise questions and document-led follow-ups. Emails avoid unsubstantiated investment or visa promises.";
 
 const CLIENT_DESCRIPTION =
-  "13-step omnichannel client outreach sequence (Grok 2.0) written directly to E-2 investor candidates. Centers on what clients want: obtain and renew an E-2 visa, live anywhere in the U.S., proven day-to-day operating systems, FDD Item 19 financial performance, a structured franchise exit plan, and escrow-protected funds held until visa approval — with no referral-fee language. The intro email (Touch 1) links the multilingual investor brochure (EN/ES/中文).";
+  "Investor outreach from Dylan: franchise interests, owner responsibilities, and disclosure materials. Client emails do not use partner or referral-fee language.";
 
 /**
  * Create or re-sync a single track's drip campaign.

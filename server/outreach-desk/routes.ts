@@ -445,7 +445,7 @@ export function createDeskRouter() {
                 ? "Awaiting sync"
                 : "Not configured",
           detail:
-            "Follow-ups use franchising@. Autonomous email dispatch holds if reply sync or email verification is stale.",
+            "Follow-ups use dylan@newdawnfranchising.com. Autonomous email dispatch holds if reply sync or email verification is stale.",
           lastEvidenceAt: iso(sync.lastRunAt),
         },
         {

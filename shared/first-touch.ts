@@ -20,21 +20,13 @@ const wrap = (inner: string) => `<div style="${EMAIL_STYLE}">${inner}</div>`;
 
 export const FIRST_TOUCH: Record<FirstTouchLang, FirstTouchCopy> = {
   en: {
-    subject: "When your E-2 client is ready — and still has no business",
-    bodyHtml: wrap(`
-  <p>Hi {{name}},</p>
-  <p>{{firmHook}}When an E-2 client is ready to file but still does not have a qualifying U.S. business, that is usually what stalls the petition.</p>
-  <p>That is the gap we fill. New Dawn is a franchise built for the E-2: the client's $225,000 sits in escrow — with an attorney they choose — until the visa is approved. Local teams run day-to-day so your client can direct the business from anywhere in the U.S.</p>
-  <p>I am not asking you to recommend anything from an email. I just want to know whether this is a problem you actually see. What kind of E-2 clients are in front of you right now?</p>
-  <p>Best,<br/>Dylan</p>
-`),
-    bodyText: `Hi {{name}},
+    subject: "E-2 clients still choosing a business",
+    bodyHtml: wrap(`<p>Hi {{firstName}},</p><p>I'm Dylan at New Dawn Franchising. We work with people comparing U.S. franchise businesses as part of their E-2 planning.</p><p>Do you work with clients who are still choosing a business?</p><p>Best,<br/>Dylan</p>`),
+    bodyText: `Hi {{firstName}},
 
-{{firmHook}}When an E-2 client is ready to file but still does not have a qualifying U.S. business, that is usually what stalls the petition.
+I'm Dylan at New Dawn Franchising. We work with people comparing U.S. franchise businesses as part of their E-2 planning.
 
-That is the gap we fill. New Dawn is a franchise built for the E-2: the client's $225,000 sits in escrow — with an attorney they choose — until the visa is approved. Local teams run day-to-day so your client can direct the business from anywhere in the U.S.
-
-I am not asking you to recommend anything from an email. I just want to know whether this is a problem you actually see. What kind of E-2 clients are in front of you right now?
+Do you work with clients who are still choosing a business?
 
 Best,
 Dylan`,

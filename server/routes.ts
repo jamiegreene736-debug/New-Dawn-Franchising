@@ -1,3 +1,4 @@
+import { ACCEPTED_EMAIL_STATUSES } from "./campaign-replies";
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { createHash } from "node:crypto";
@@ -3395,27 +3396,25 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
   app.get("/api/crm/campaigns/:id/stats", requireAdminAuth, async (req, res) => {
     try {
       const campaignId = String(req.params.id);
-      const [steps, enrollments, sends, replyAddrs] = await Promise.all([
+      const [steps, enrollments, sends] = await Promise.all([
         storage.getDripSteps(campaignId),
         storage.getDripEnrollments(campaignId),
         storage.getDripSendsByCampaign(campaignId),
-        storage.getInboundReplyAddresses(),
       ]);
 
       const totalEnrollments = enrollments.length;
-      const replySet = new Set(replyAddrs);
-      const repliedCount = enrollments.filter(
-        (e) => e.prospectEmail && replySet.has(e.prospectEmail.toLowerCase())
-      ).length;
+      const repliedCount = new Set(sends.filter(s => s.channel === "email" && s.status === "replied")
+        .map(s => s.recipientEmail.trim().toLowerCase())).size;
+      const acceptedEmail = (s: typeof sends[number]) => s.channel === "email" && ACCEPTED_EMAIL_STATUSES.includes(s.status);
 
       // Per-step breakdown keyed by stepId.
       const perStep: Record<string, { sent: number; opened: number; clicked: number; bounced: number; tasks: number; notSent: number }> = {};
       for (const step of steps) {
         const rows = sends.filter((s) => s.stepId === step.id);
-        const sent = rows.filter((s) => s.status === "sent").length;
-        const opened = rows.filter((s) => s.status === "sent" && s.openedAt).length;
-        const clicked = rows.filter((s) => s.status === "sent" && (s as any).clickedAt).length;
-        const bounced = rows.filter((s) => s.status === "failed" || s.status === "bounced").length;
+        const sent = rows.filter(acceptedEmail).length;
+        const opened = rows.filter((s) => acceptedEmail(s) && s.openedAt).length;
+        const clicked = rows.filter((s) => acceptedEmail(s) && s.clickedAt).length;
+        const bounced = rows.filter((s) => s.channel === "email" && s.status === "bounced").length;
         const tasks = rows.filter((s) => s.status === "task").length;
         const handled = sent + bounced + tasks;
         perStep[step.id] = {
@@ -3428,17 +3427,18 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
         };
       }
 
-      const emailSends = sends.filter((s) => s.status === "sent" || s.status === "failed");
+      const emailSends = sends.filter((s) => s.channel === "email");
       const overview = {
         total: totalEnrollments,
         active: enrollments.filter((e) => e.status === "active").length,
         completed: enrollments.filter((e) => e.status === "completed").length,
         paused: enrollments.filter((e) => e.status === "paused").length,
-        emails: sends.filter((s) => s.status === "sent").length,
-        opens: sends.filter((s) => s.status === "sent" && s.openedAt).length,
-        clicks: sends.filter((s) => s.status === "sent" && (s as any).clickedAt).length,
+        emails: sends.filter(acceptedEmail).length,
+        opens: sends.filter((s) => acceptedEmail(s) && s.openedAt).length,
+        clicks: sends.filter((s) => acceptedEmail(s) && s.clickedAt).length,
         replies: repliedCount,
-        bounced: emailSends.filter((s) => s.status === "failed" || s.status === "bounced").length,
+        bounced: emailSends.filter((s) => s.status === "bounced").length,
+        failed: emailSends.filter((s) => s.status === "failed").length,
         unsubscribed: enrollments.filter((e) => e.status === "unsubscribed").length,
         // Scanner/gateway hits filtered out of opens/clicks — kept visible so a
         // "quiet" campaign with heavy bot traffic is distinguishable from no reach.

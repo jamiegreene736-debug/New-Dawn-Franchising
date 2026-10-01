@@ -4,10 +4,8 @@ import { getPageShell } from "../server/page-shells";
 import { franchiseServiceNode } from "../server/structured-data";
 import express from "express";
 import {
-  BROKER_REFERRAL_RATE,
-  BROKER_SALE_EXAMPLE,
-  BROKER_FEE_EXAMPLE,
-  BROKER_FEE_TERMS,
+  BROKER_PAGE_TITLE,
+  BROKER_PAGE_DESCRIPTION,
   PARTNER_HOME_TITLE,
   PARTNER_HOME_DESCRIPTION,
 } from "../shared/partner-homepage";
@@ -21,15 +19,18 @@ import { serveStatic } from "../server/static";
 test("homepage search content describes the approved offer without old visa promises", () => {
   const home = getPageShell("/");
   assert.ok(home);
-  assert.match(home.html, /Your clients/);
+  assert.match(home.html, /Your next chapter/);
   assert.match(home.html, /FOR IMMIGRATION ATTORNEYS/);
   assert.match(home.html, /FOR FRANCHISE &amp; BUSINESS BROKERS/);
   assert.equal(home.title, PARTNER_HOME_TITLE);
   assert.equal(home.description, PARTNER_HOME_DESCRIPTION);
   assert.match(home.html, /property management franchise/i);
-  assert.match(home.html, /31,250/);
-  assert.match(home.html, /12.5% × \$250,000/);
-  assert.ok(home.html.includes(BROKER_FEE_TERMS));
+  assert.doesNotMatch(
+    home.html + home.description,
+    /31,250|31250|12[.]5|250,000|generous referral|earn up to/i,
+  );
+  assert.match(home.html, /New Dawn may compensate participating brokers/);
+  assert.match(home.html, /Ask your broker who pays them/);
   assert.match(
     home.html,
     /attorney pathway does not offer referral compensation/,
@@ -37,7 +38,7 @@ test("homepage search content describes the approved offer without old visa prom
   assert.match(home.html, /current Franchise Disclosure Document/);
   assert.match(home.html, /does not guarantee visa eligibility or approval/);
   assert.match(home.html, /calendly\.com\/dylan-newdawnfranchising\/30min/);
-  assert.equal((home.html.match(/<details\b/g) ?? []).length, 4);
+  assert.equal((home.html.match(/<details\b/g) ?? []).length, 6);
   assert.equal(home.faq, undefined);
   assert.doesNotMatch(
     home.html,
@@ -88,6 +89,8 @@ test("production HTML fallback preserves the requested page, metadata, and stati
     "/other-businesses",
     "/other-businesses/?utm_source=release-check",
     "/about",
+    "/partners",
+    "/partners/?utm_source=release-check",
   ]) {
     const response = await fetch(`${baseUrl}${route}`);
     assert.equal(response.status, 200);
@@ -112,15 +115,21 @@ test("production HTML fallback preserves the requested page, metadata, and stati
   assert.equal(await asset.text(), "static asset");
 });
 
-test("broker example uses the approved percentage and does not imply attorney compensation", () => {
-  assert.equal(BROKER_REFERRAL_RATE, 0.125);
-  assert.equal(BROKER_SALE_EXAMPLE, 250_000);
-  assert.equal(BROKER_FEE_EXAMPLE, 31_250);
+test("broker recruitment requests private terms while explaining the paid relationship", () => {
   const partners = getPageShell("/partners");
   assert.ok(partners);
+  assert.equal(partners.title, BROKER_PAGE_TITLE);
+  assert.equal(partners.description, BROKER_PAGE_DESCRIPTION);
+  assert.match(partners.html, /Request referral terms/);
+  assert.match(partners.html, /explain that New Dawn may pay you/);
+  assert.match(partners.html, /how your compensation is calculated/);
   assert.match(
     partners.html,
-    /separate collaboration pathway without a referral compensation offer/,
+    /That pathway does not offer referral compensation/,
+  );
+  assert.doesNotMatch(
+    partners.html + partners.description,
+    /31,250|31250|12[.]5|250,000|same price|no added cost|no extra charge/i,
   );
   assert.equal(partners.faq, undefined);
 });

@@ -1,15 +1,16 @@
-# Attorney and broker homepage
+# Homepage and professional partner pathways
 
-Approved direction: 2026-10-01. Focus on immigration attorneys and franchise/business brokers. Preserve the existing navy/gold design, photography, simple layout, and legal/FDD disclosure. The owner subsequently requested public broker compensation: up to 12.5% of $250,000 ($31,250); this supersedes the earlier private-fee presentation.
+Current direction: 2026-10-01. Keep attorney and broker acquisition paths while making the public homepage reassuring for referred clients. Preserve the existing navy/gold design, imagery and legal/FDD disclosures.
 
 ## Audience and conversion plan
 
-1. Hero: identify both audiences immediately; two anchor choices, For Attorneys and For Brokers. A persistent header link says Broker referral fees, including on mobile.
-2. Attorneys: lead with stronger client relationships and a clearer business decision. Explain continuity of legal representation, franchise information for independent review, and a coordinated introduction with client permission. Retention and satisfaction are intended benefits, not measured or guaranteed outcomes. Offer a direct attorney-specific email and call booking.
-3. Brokers: lead with Refer a client. Earn up to $31,250. Display the complete calculation, 12.5% × $250,000. State adjacent to the figure that this is a qualifying-sale example, not guaranteed income or payment for an introduction alone. Written terms govern eligibility, commission basis, funding, payment timing, and other conditions. One click opens a prefilled broker fee inquiry; booking is an alternative. Existing broker portal remains available; do not imply an unbuilt affiliate-link generator exists.
-4. Shared context: explain the property management franchise, investor direction and local operating support. Keep deeper investment/FDD and introduction-process information in closed, keyboard-accessible disclosures. Preserve existing #opportunities, #how, and #investment deep links.
-5. Contact: retain Dylan's existing calendar and verified business email. Ask for professional contact information only, with no confidential client information in initial inquiries.
-6. Search: keep homepage title, description, and server-rendered content aligned. Correct the existing partners-page blanket attorney-compensation statement so linked content does not contradict the new separation.
+1. Homepage: lead with the property management franchise, owner responsibilities, local support, team and discovery call. Put the business explanation before professional partner recruitment.
+2. Navigation: use a simple For Brokers link to the existing /partners route, now dedicated to franchise and business brokers. Keep a separate attorney collaboration anchor and preserve #brokers for older links without a public payout pitch.
+3. Professional pathways: concise, separate attorney and broker introductions. Attorneys see relationship continuity, independent review and client confidence; brokers see client fit and the introduction process. No attorney compensation offer.
+4. Broker page: request written referral terms through a direct email inquiry or book a conversation. Remove commission figures from public page content, metadata, email subjects/bodies and shared homepage code. Rates are discussed directly using the current agreement and internal partnership guide.
+5. Transparency: explain the paid broker relationship in a client-facing homepage disclosure. Ask brokers to explain the payer, calculation and conditions before introduction, answer client questions accurately and obtain permission to share information. Private marketing materials do not replace applicable disclosures.
+6. Pricing: invite clients to review a written fee breakdown. Do not claim direct/referred price parity, zero cost or no extra charge without verification of the actual proposal and arrangement.
+7. Internal materials: docs/partners/BROKER_REFERRAL_CONVERSATION_GUIDE.md preserves the approved compensation illustration and provides conversation/disclosure guidance. It is not served as a public website asset. No email campaign is sent and no payment contract or commission logic is changed.
 
 ## Research and boundaries
 
@@ -25,12 +26,10 @@ Reviewed 2026-10-01. These are marketing design decisions informed by primary so
 
 ## Delivery and acceptance
 
-- Use a clean branch from main, leaving the original checkout's unrelated edits intact.
-- Reuse existing sections, native details, analytics helper, booking destination, and scoped CSS. No new backend intake or payment system.
-- Verify distinct audience actions, the exact fee calculation and nearby conditions, mail subjects, no attorney payment pitch, no client-data request, and existing disclaimers.
-- Test 375/390/768/1280px, overflow, keyboard disclosure controls, mobile navigation, contextual CTA visibility, and reduced motion. Compare server HTML and browser copy; check other-businesses route regressions.
-- Run TypeScript, production build, homepage browser and server-shell tests; require PR CI before merge. Verify the merged commit deploys successfully and check the live page.
+- Use a clean branch from main and preserve unrelated local work.
+- Keep browser metadata and server-rendered content consistent for / and /partners.
+- Verify absence of public commission figures in page HTML, metadata, link destinations and inquiry copy; retain a transparent paid-relationship explanation.
+- Test homepage and broker page at 375/390/768/1280px, keyboard disclosures, navigation, contact destinations, overflow and mobile CTA behavior.
+- Run TypeScript, production build and regression checks; require PR CI before merge. Verify the exact merged commit deploys and repeat targeted checks on the live website.
 
-## Completion
-
-Implementation and verification results are recorded in the pull request and task delivery message.
+Implementation and production verification results are recorded in the pull request and task delivery message.

@@ -1,4 +1,4 @@
-import { PARTNER_HOME_TITLE, PARTNER_HOME_DESCRIPTION } from "../shared/partner-homepage";
+import { PARTNER_HOME_TITLE, PARTNER_HOME_DESCRIPTION, BROKER_PAGE_TITLE, BROKER_PAGE_DESCRIPTION } from "../shared/partner-homepage";
 
 export type PageShell = {
   title: string;
@@ -26,16 +26,16 @@ const shells: Record<string, PageShell> = {
 <div>
 <div>
 <i>
-</i> FOR IMMIGRATION ATTORNEYS &amp; BROKERS</div>
-<h1 id="hero-title">Your clients.<br/>
-<span>Their next chapter.</span>
+</i> PROPERTY MANAGEMENT · E-2 PLANS</div>
+<h1 id="hero-title">Your next chapter.<br/>
+<span>A business of your own.</span>
 </h1>
-<h2>A U.S. business. A partner by your side.</h2>
-<p>Help your E-2 clients explore a property management franchise with local operating support. Choose the partnership that fits your work.</p>
+<h2>Own and direct. We support the daily work.</h2>
+<p>Explore a U.S. property management franchise with local operating support, training and technology. Understand the business and your responsibilities, with your own advisers by your side.</p>
 <div>
-<a href="#attorneys">For Attorneys <span aria-hidden="true">↓</span>
+<a href="https://calendly.com/dylan-newdawnfranchising/30min" target="_blank" rel="noopener">Book a discovery call<span aria-hidden="true">↗</span>
 </a>
-<a href="#brokers">For Brokers <span aria-hidden="true">↓</span>
+<a href="#opportunities">Explore the franchise <span aria-hidden="true">↓</span>
 </a>
 </div>
 <div>
@@ -54,77 +54,15 @@ const shells: Record<string, PageShell> = {
 <img src="/images/arrival-hero.png" alt="Concept image of the Statue of Liberty, New York skyline, and an American flag at sunrise"/>
 <figcaption>
 <span>A NEW CHAPTER IN AMERICA</span>
-<strong>Their ambition.<br/>Your trusted guidance.</strong>
+<strong>Your ambition.<br/>Support for the journey.</strong>
 </figcaption>
 </figure>
 </section>
-<section id="attorneys" aria-labelledby="attorney-title">
-<div>
-<div>FOR IMMIGRATION ATTORNEYS</div>
-<h2 id="attorney-title">Stronger client relationships.<br/>A clearer business path.</h2>
-<p>Give clients a concrete franchise option to evaluate while you remain their independent legal adviser. Help them feel informed and supported through a major decision.</p>
-</div>
-<div>
-<article>
-<span>01</span>
-<h3>Support client retention.</h3>
-<p>Keep the legal relationship with your firm as clients explore business ownership. You advise on immigration strategy, applications and future legal needs.</p>
-</article>
-<article>
-<span>02</span>
-<h3>Build client confidence.</h3>
-<p>A clear explanation of the business, costs and owner responsibilities helps clients understand their options and the next step.</p>
-</article>
-<article>
-<span>03</span>
-<h3>Keep your focus on legal work.</h3>
-<p>Discuss the franchise and operating support with our team. Review the FDD and business information independently for your client’s circumstances.</p>
-</article>
-</div>
-<div>
-<a href="mailto:franchising@newdawnfranchising.com?subject=Attorney%20inquiry%20%E2%80%94%20E-2%20franchise%20collaboration&amp;body=Hello%20New%20Dawn%2C%0A%0AI%20am%20an%20immigration%20attorney%20interested%20in%20discussing%20your%20franchise%20and%20how%20we%20can%20coordinate%20for%20clients.%0A%0AName%3A%0AFirm%3A%0APreferred%20contact%3A%0A%0APlease%20send%20information%20about%20the%20business%20model%20and%20attorney%20collaboration%20process.">Discuss attorney collaboration <span aria-hidden="true">→</span>
-</a>
-<a href="https://calendly.com/dylan-newdawnfranchising/30min" target="_blank" rel="noopener">Book an attorney call<span aria-hidden="true">↗</span>
-</a>
-</div>
-<p>You retain independent professional judgment; clients choose their own counsel. Obtain client permission before an introduction or sharing information. This attorney pathway does not offer referral compensation.</p>
-</section>
-<section id="brokers" aria-labelledby="broker-title">
-<div>
-<div>
-<div>FOR FRANCHISE &amp; BUSINESS BROKERS</div>
-<h2 id="broker-title">A valuable introduction.<br/>A generous referral fee.</h2>
-<p>Connect a prospective franchise owner with New Dawn. We guide the franchise conversation, FDD review and onboarding process.</p>
-<ul>
-<li>A property management option for your E-2 clients</li>
-<li>A direct contact for franchise questions</li>
-<li>Written referral terms before you get started</li>
-</ul>
-<div>
-<a href="mailto:franchising@newdawnfranchising.com?subject=Broker%20inquiry%20%E2%80%94%20referral%20fees%20up%20to%2012.5%25&amp;body=Hello%20New%20Dawn%2C%0A%0AI%20am%20interested%20in%20your%20broker%20referral%20program.%20Please%20send%20the%20written%20agreement%2C%20eligibility%20requirements%2C%20commission%20basis%20and%20payment%20terms%20for%20the%20up%20to%2012.5%25%20referral%20fee.%0A%0AName%3A%0ACompany%3A%0APreferred%20contact%3A">Ask about referral fees <span aria-hidden="true">→</span>
-</a>
-</div>
-<div>
-<a href="https://calendly.com/dylan-newdawnfranchising/30min" target="_blank" rel="noopener">Book a broker call<span aria-hidden="true">↗</span>
-</a>
-<a href="/brokers">Broker portal</a>
-</div>
-</div>
-<div>
-<div>REFER ONE QUALIFYING CLIENT</div>
-<h3>Earn up to <strong>$31,250</strong>
-</h3>
-<p>12.5% × $250,000 franchise sale</p>
-<p>Illustrative maximum on a qualifying $250,000 franchise sale. Payment requires a completed, funded sale and satisfaction of the written referral agreement. Eligibility, commission basis, rate and payment timing are subject to its terms and applicable law. An introduction alone does not earn a fee.</p>
-<p>For eligible brokers. Not an attorney compensation offer or a promise of franchisee earnings.</p>
-</div>
-</div>
-</section>
 <section id="opportunities" aria-labelledby="business-title">
 <div>
-<div>THE BUSINESS BEHIND THE INTRODUCTION</div>
-<h2 id="business-title">Your client directs.<br/>Our team supports.</h2>
-<p>A property management franchise serving rental property owners. Your client owns and actively directs the business; New Dawn provides local operating support, training and technology.</p>
+<div>THE PROPERTY MANAGEMENT FRANCHISE</div>
+<h2 id="business-title">You direct.<br/>Our team supports.</h2>
+<p>Your business serves rental property owners. You set the direction, make key decisions and oversee performance. New Dawn supports the daily work with local teams, training and technology.</p>
 </div>
 <div>
 <details id="owner-details">
@@ -139,7 +77,7 @@ const shells: Record<string, PageShell> = {
 </summary>
 <div>
 <div>
-<h4>Your client leads.</h4>
+<h4>You lead the business.</h4>
 <p>The owner sets strategy, controls the business bank account, approves budgets and oversees the team. This is an actively directed business.</p>
 </div>
 <div>
@@ -150,7 +88,7 @@ const shells: Record<string, PageShell> = {
 </details>
 <details id="how">
 <summary>
-<strong>From first conversation to client introduction</strong>
+<strong>From first conversation to an informed decision</strong>
 <span aria-hidden="true">
 <b>Read more</b>
 <b>Show less</b>
@@ -161,18 +99,17 @@ const shells: Record<string, PageShell> = {
 <div>
 <ol>
 <li>
-<strong>Talk with our team.</strong> Attorneys discuss collaboration; brokers review eligibility and written referral terms.</li>
+<strong>Explore the business.</strong> Discuss your goals, owner responsibilities and available territories with our team.</li>
 <li>
-<strong>Explore the fit.</strong> Review the franchise, investment and territory availability. Obtain the client’s permission before making an introduction.</li>
+<strong>Review the details.</strong> Read the current FDD and agreements with your advisers. Understand the full investment, services and obligations.</li>
 <li>
-<strong>Coordinate the next steps.</strong> New Dawn handles franchise discussions. The client’s attorney assesses eligibility and handles legal advice and applications.</li>
+<strong>Plan your next steps.</strong> Your independently retained attorney assesses your E-2 eligibility and handles legal advice and applications.</li>
 </ol>
-<p>Share only professional contact details in your initial inquiry, not confidential client information. Brokers should disclose their financial interest when recommending the franchise, as required by applicable law.</p>
 </div>
 </details>
 <details id="investment">
 <summary>
-<strong>Investment, referral terms and the FDD</strong>
+<strong>Investment, fees and the FDD</strong>
 <span aria-hidden="true">
 <b>Read more</b>
 <b>Show less</b>
@@ -181,9 +118,39 @@ const shells: Record<string, PageShell> = {
 </i>
 </summary>
 <div>
-<p>Confirm the full investment, fees, working capital and operating responsibilities in the current Franchise Disclosure Document. The $250,000 broker illustration is a commission example, not a universal package price or total investment quote.</p>
-<p>Review the written referral agreement for the qualifying commission basis, eligibility, payment conditions and timing. Broker compensation is separate from franchisee financial performance. Review any financial performance representation in Item 19; no earnings or return is guaranteed.</p>
+<p>Confirm the full investment, initial and ongoing fees, working capital and operating responsibilities in the current Franchise Disclosure Document and written agreements.</p>
+<p>Ask our team for a written breakdown of your proposed package and any separate professional fees. Review any financial performance representation in Item 19; no earnings or return is guaranteed.</p>
 <a href="/request-fdd">Review the FDD request information</a>
+</div>
+</details>
+<details id="referral-details">
+<summary>
+<strong>If a broker introduced you</strong>
+<span aria-hidden="true">
+<b>Read more</b>
+<b>Show less</b>
+</span>
+<i aria-hidden="true">
+</i>
+</summary>
+<div>
+<p>New Dawn may compensate participating brokers when a referred client completes a qualifying franchise purchase. Ask your broker who pays them and how their compensation is calculated.</p>
+<p>You decide whether the business fits your goals. Review the recommendation, all fees and services, and your proposed investment with your own advisers. Ask our team to explain your written pricing and any referral-related charges before you commit.</p>
+</div>
+</details>
+<details id="team-details">
+<summary>
+<strong>Meet the people behind New Dawn</strong>
+<span aria-hidden="true">
+<b>Read more</b>
+<b>Show less</b>
+</span>
+<i aria-hidden="true">
+</i>
+</summary>
+<div>
+<p>Our team brings experience in business operations, real estate, finance and technology, with operating roots in El Paso, Texas. Dylan Delaney is your contact for franchise conversations, the FDD and next steps.</p>
+<a href="/team">Meet the full team</a>
 </div>
 </details>
 <details id="eligibility-details">
@@ -204,17 +171,51 @@ const shells: Record<string, PageShell> = {
 </details>
 </div>
 </section>
+<section aria-labelledby="professionals-title">
+<div>
+<div>FOR PROFESSIONAL PARTNERS</div>
+<h2 id="professionals-title">Help clients take an informed next step.</h2>
+<p>Separate ways to work together, with your client’s interests at the center.</p>
+</div>
+<div>
+<article id="attorneys" aria-labelledby="attorney-title">
+<div>FOR IMMIGRATION ATTORNEYS</div>
+<h3 id="attorney-title">Support your client relationships.</h3>
+<p>Help clients feel informed and supported while you remain their independent legal adviser. Review franchise information with our team and coordinate next steps with your client’s permission.</p>
+<ul>
+<li>Continuity of legal representation</li>
+<li>Clear business information for independent review</li>
+<li>Coordination that respects client choice and confidentiality</li>
+</ul>
+<a href="mailto:franchising@newdawnfranchising.com?subject=Attorney%20inquiry%20%E2%80%94%20E-2%20franchise%20collaboration&amp;body=Hello%20New%20Dawn%2C%0A%0AI%20am%20an%20immigration%20attorney%20interested%20in%20discussing%20your%20franchise%20and%20how%20we%20can%20coordinate%20for%20clients.%0A%0AName%3A%0AFirm%3A%0APreferred%20contact%3A%0A%0APlease%20send%20information%20about%20the%20business%20model%20and%20attorney%20collaboration%20process.">Discuss attorney collaboration <span aria-hidden="true">→</span>
+</a>
+<p>This attorney pathway does not offer referral compensation. Your professional obligations and independent judgment remain yours.</p>
+</article>
+<article id="brokers" aria-labelledby="broker-title">
+<div>FOR FRANCHISE &amp; BUSINESS BROKERS</div>
+<h3 id="broker-title">Make a thoughtful introduction.</h3>
+<p>Explore whether New Dawn’s property management franchise fits your client’s goals. Get a direct contact, a clear introduction process and written partnership terms.</p>
+<ul>
+<li>Business and operating support information</li>
+<li>A conversation about your client’s goals</li>
+<li>Clear roles from introduction onward</li>
+</ul>
+<a href="/partners">Explore the broker partnership <span aria-hidden="true">→</span>
+</a>
+</article>
+</div>
+</section>
 <section id="contact">
 <div>
 <div>ONE CONVERSATION TO GET STARTED</div>
-<h2>Let’s talk about<br/>your clients.</h2>
-<p>Tell Dylan how you work with E-2 investors. We’ll walk through the franchise and the right next step for your practice or brokerage.</p>
+<h2>Let’s talk about<br/>your next chapter.</h2>
+<p>Get your questions answered. Discuss the business, operating support and whether a New Dawn franchise fits your plans. Your broker or attorney is welcome to join with your permission.</p>
 <ul>
-<li>Attorneys: client fit and franchise information</li>
-<li>Brokers: referral eligibility, fees and payment terms</li>
-<li>A clear introduction process for both</li>
+<li>The business and your responsibilities as owner</li>
+<li>Investment, fees and the FDD</li>
+<li>Operating support and next steps</li>
 </ul>
-<p>Please keep initial inquiries free of confidential client information.</p>
+<p>Please keep initial inquiries free of sensitive personal or client information.</p>
 </div>
 <div>
 <div>
@@ -225,7 +226,7 @@ const shells: Record<string, PageShell> = {
 </div>
 </div>
 <div>
-<span>PARTNER CONVERSATION</span>
+<span>DISCOVERY CALL</span>
 <span>30 MINUTES</span>
 </div>
 <h3>A conversation.<br/>A clearer next step.</h3>
@@ -236,10 +237,7 @@ const shells: Record<string, PageShell> = {
 </div>
 </section>
 </div>
-</main>
-<footer>
-<p>New York imagery expresses arrival in America and does not represent an available franchise territory. New Dawn Franchising LLC is a franchisor, not a law firm. No visa or financial outcome is guaranteed. Franchise offers are made only through the applicable Franchise Disclosure Document and subject to applicable law.</p>
-</footer>`,
+</main><footer><p>New York imagery expresses arrival in America and does not represent an available franchise territory. New Dawn Franchising LLC is a franchisor, not a law firm. No visa or financial outcome is guaranteed. Franchise offers are made only through the applicable Franchise Disclosure Document and subject to applicable law.</p></footer>`,
   },
 
   "/other-businesses": {
@@ -1009,9 +1007,89 @@ const shells: Record<string, PageShell> = {
 </main>`,
   },
   "/partners": {
-    title: `Broker Referral Program | ${SITE}`,
-    description: "Broker referrals with clear written terms. Explore broker referral fees or a separate attorney collaboration pathway.",
-    html: `<main><h1>Broker referrals. Clear written terms.</h1><p>Eligible franchise and business brokers can introduce prospective franchise owners and earn a fee on qualifying, completed and funded sales under a written referral agreement.</p><p>Immigration attorneys have a separate collaboration pathway without a referral compensation offer.</p><p><a href="/#brokers">View broker referral fees</a> · <a href="/#attorneys">Explore attorney collaboration</a></p><p>Eligibility, commission basis, rate and payment timing depend on the written agreement and applicable law. An introduction alone does not earn a fee.</p><p>New Dawn provides franchise information, not legal or immigration advice. No visa or financial result is guaranteed. Franchises are offered through the applicable FDD and subject to applicable law.</p></main>`,
+    title: BROKER_PAGE_TITLE,
+    description: BROKER_PAGE_DESCRIPTION,
+    html: `
+<main>
+<div>
+<section>
+<div>
+<div>
+<p>For franchise &amp; business brokers</p>
+<h1>A partnership built around your client.</h1>
+<p>Introduce clients to a property management franchise with local operating support. Explore the business, understand the fit and agree on clear referral terms before making an introduction.</p>
+<div>
+<a href="mailto:franchising@newdawnfranchising.com?subject=Broker%20inquiry%20%E2%80%94%20request%20referral%20terms&amp;body=Hello%20New%20Dawn%2C%0A%0AI%20am%20interested%20in%20your%20broker%20referral%20program.%20Please%20send%20the%20written%20agreement%2C%20eligibility%20requirements%2C%20commission%20basis%2C%20rate%2C%20payment%20conditions%20and%20timing%2C%20and%20client%20disclosure%20guidance.%0A%0AName%3A%0ACompany%3A%0APreferred%20contact%3A">Request referral terms</a>
+<a href="#broker-conversation">Talk with our team</a>
+</div>
+<p>Already a partner? <a href="/brokers">Open the broker portal</a>
+</p>
+</div>
+</div>
+</section>
+<section aria-labelledby="broker-support-title">
+<div>
+<h2 id="broker-support-title">A clear opportunity. A supported introduction.</h2>
+<div>
+<article>
+<h3>A business to evaluate</h3>
+<p>Understand the property management model, owner responsibilities and operating support before recommending it to a client.</p>
+</article>
+<article>
+<h3>A direct team contact</h3>
+<p>Discuss client fit, territory availability, the FDD and the introduction process with our franchise team.</p>
+</article>
+<article>
+<h3>Written referral terms</h3>
+<p>Eligible brokers may receive compensation for qualifying franchise sales. Request the rate, commission basis, eligibility, payment conditions and timing.</p>
+</article>
+</div>
+</div>
+</section>
+<section aria-labelledby="broker-process-title">
+<div>
+<div>
+<h2 id="broker-process-title">Start with clarity.</h2>
+<ol>
+<li>
+<span>01</span>
+<h3>Review the partnership.</h3>
+<p>Talk through the business and request the written referral agreement. Confirm eligibility and compensation terms before referring.</p>
+</li>
+<li>
+<span>02</span>
+<h3>Explain your role early.</h3>
+<p>Before introducing a client, explain that New Dawn may pay you, how your compensation is calculated and any relevant conditions. Provide required disclosures and answer compensation questions accurately.</p>
+</li>
+<li>
+<span>03</span>
+<h3>Introduce with permission.</h3>
+<p>Get your client’s permission before sharing their information. New Dawn handles franchise discussions; the client’s independently retained attorney handles legal advice.</p>
+</li>
+</ol>
+<p>The written agreement and applicable law govern eligibility, commission basis, rate, payment conditions and timing. An introduction alone does not earn a fee.</p>
+</div>
+</div>
+</section>
+<section id="broker-conversation">
+<div>
+<p>DYLAN DELANEY · DIRECTOR OF FRANCHISE DEVELOPMENT</p>
+<h2>Let’s discuss the right fit.</h2>
+<p>Book a conversation about the franchise, your clients and the partnership. Bring professional contact details; please leave confidential client information out of your initial inquiry.</p>
+<div>
+<a href="https://calendly.com/dylan-newdawnfranchising/30min" target="_blank" rel="noopener">Book a broker call<span aria-hidden="true">↗</span>
+</a>
+</div>
+<p>Immigration attorney? <a href="/#attorneys">Explore attorney collaboration</a>. That pathway does not offer referral compensation.</p>
+</div>
+</section>
+<section>
+<div>
+<p>New Dawn Franchising LLC is a franchisor, not a law firm. This page describes a broker relationship and is not an offer to sell a franchise. Franchise offers are made through the applicable Franchise Disclosure Document and subject to applicable law. No visa or financial outcome is guaranteed. Clients should review the full investment, any referral-related charges and separate professional fees in their written documents with their advisers.</p>
+</div>
+</section>
+</div>
+</main>`,
   },
 };
 

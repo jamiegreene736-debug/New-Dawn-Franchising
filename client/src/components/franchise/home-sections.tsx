@@ -1,12 +1,7 @@
 import { DiscoveryCallLink } from "./discovery-call-link";
 import { ReadMore } from "./read-more";
 import { trackEvent } from "@/lib/analytics";
-import {
-  ATTORNEY_EMAIL_URL,
-  BROKER_EMAIL_URL,
-  BROKER_FEE_DISPLAY,
-  BROKER_FEE_TERMS,
-} from "@shared/partner-homepage";
+import { ATTORNEY_EMAIL_URL } from "@shared/partner-homepage";
 
 export function HeroSection() {
   return (
@@ -17,26 +12,25 @@ export function HeroSection() {
     >
       <div className="v4-hero-copy">
         <div className="eyebrow">
-          <i /> FOR IMMIGRATION ATTORNEYS &amp; BROKERS
+          <i /> PROPERTY MANAGEMENT · E-2 PLANS
         </div>
         <h1 id="hero-title" data-testid="text-hero-title">
-          Your clients.
+          Your next chapter.
           <br />
-          <span>Their next chapter.</span>
+          <span>A business of your own.</span>
         </h1>
         <h2 data-testid="text-hero-subtitle">
-          A U.S. business. A partner by your side.
+          Own and direct. We support the daily work.
         </h2>
         <p>
-          Help your E-2 clients explore a property management franchise with
-          local operating support. Choose the partnership that fits your work.
+          Explore a U.S. property management franchise with local operating
+          support, training and technology. Understand the business and your
+          responsibilities, with your own advisers by your side.
         </p>
         <div className="partner-actions" data-partner-hero>
-          <a className="button primary" href="#attorneys">
-            For Attorneys <span aria-hidden="true">↓</span>
-          </a>
-          <a className="button partner-secondary" href="#brokers">
-            For Brokers <span aria-hidden="true">↓</span>
+          <DiscoveryCallLink placement="hero" testId="button-hero-booking" />
+          <a className="v6-resource-link" href="#opportunities">
+            Explore the franchise <span aria-hidden="true">↓</span>
           </a>
         </div>
         <div className="v4-principles" data-testid="section-trust-strip">
@@ -62,9 +56,9 @@ export function HeroSection() {
         <figcaption>
           <span>A NEW CHAPTER IN AMERICA</span>
           <strong>
-            Their ambition.
+            Your ambition.
             <br />
-            Your trusted guidance.
+            Support for the journey.
           </strong>
         </figcaption>
       </figure>
@@ -72,137 +66,72 @@ export function HeroSection() {
   );
 }
 
-export function AttorneySection() {
-  return (
-    <section
-      className="v4-section partner-section"
-      id="attorneys"
-      aria-labelledby="attorney-title"
-    >
-      <div className="partner-section-heading">
-        <div className="eyebrow">FOR IMMIGRATION ATTORNEYS</div>
-        <h2 id="attorney-title">
-          Stronger client relationships.
-          <br />A clearer business path.
-        </h2>
-        <p>
-          Give clients a concrete franchise option to evaluate while you remain
-          their independent legal adviser. Help them feel informed and supported
-          through a major decision.
-        </p>
-      </div>
-      <div className="partner-benefits">
-        <article>
-          <span>01</span>
-          <h3>Support client retention.</h3>
-          <p>
-            Keep the legal relationship with your firm as clients explore
-            business ownership. You advise on immigration strategy, applications
-            and future legal needs.
-          </p>
-        </article>
-        <article>
-          <span>02</span>
-          <h3>Build client confidence.</h3>
-          <p>
-            A clear explanation of the business, costs and owner
-            responsibilities helps clients understand their options and the next
-            step.
-          </p>
-        </article>
-        <article>
-          <span>03</span>
-          <h3>Keep your focus on legal work.</h3>
-          <p>
-            Discuss the franchise and operating support with our team. Review
-            the FDD and business information independently for your client’s
-            circumstances.
-          </p>
-        </article>
-      </div>
-      <div className="partner-actions">
-        <a
-          className="button primary"
-          href={ATTORNEY_EMAIL_URL}
-          onClick={() =>
-            trackEvent("partner_inquiry_click", {
-              audience: "attorney",
-              method: "email",
-            })
-          }
-        >
-          Discuss attorney collaboration <span aria-hidden="true">→</span>
-        </a>
-        <DiscoveryCallLink placement="attorney" label="Book an attorney call" />
-      </div>
-      <p className="partner-note">
-        You retain independent professional judgment; clients choose their own
-        counsel. Obtain client permission before an introduction or sharing
-        information. This attorney pathway does not offer referral compensation.
-      </p>
-    </section>
-  );
-}
-
-export function BrokerSection() {
+export function ProfessionalPathsSection() {
   return (
     <section
       className="v4-section partner-section partner-brokers"
-      id="brokers"
-      aria-labelledby="broker-title"
+      aria-labelledby="professionals-title"
     >
-      <div className="partner-broker-grid">
-        <div className="partner-section-heading">
-          <div className="eyebrow">FOR FRANCHISE &amp; BUSINESS BROKERS</div>
-          <h2 id="broker-title">
-            A valuable introduction.
-            <br />A generous referral fee.
-          </h2>
+      <div className="partner-section-heading">
+        <div className="eyebrow">FOR PROFESSIONAL PARTNERS</div>
+        <h2 id="professionals-title">
+          Help clients take an informed next step.
+        </h2>
+        <p>
+          Separate ways to work together, with your client’s interests at the
+          center.
+        </p>
+      </div>
+      <div className="professional-paths">
+        <article id="attorneys" aria-labelledby="attorney-title">
+          <div className="eyebrow">FOR IMMIGRATION ATTORNEYS</div>
+          <h3 id="attorney-title">Support your client relationships.</h3>
           <p>
-            Connect a prospective franchise owner with New Dawn. We guide the
-            franchise conversation, FDD review and onboarding process.
+            Help clients feel informed and supported while you remain their
+            independent legal adviser. Review franchise information with our
+            team and coordinate next steps with your client’s permission.
           </p>
           <ul className="partner-list">
-            <li>A property management option for your E-2 clients</li>
-            <li>A direct contact for franchise questions</li>
-            <li>Written referral terms before you get started</li>
+            <li>Continuity of legal representation</li>
+            <li>Clear business information for independent review</li>
+            <li>
+              Coordination that respects client choice and confidentiality
+            </li>
           </ul>
-          <div className="partner-actions">
-            <a
-              className="button primary"
-              href={BROKER_EMAIL_URL}
-              data-testid="broker-fee-inquiry"
-              onClick={() =>
-                trackEvent("partner_inquiry_click", {
-                  audience: "broker",
-                  method: "email",
-                })
-              }
-            >
-              Ask about referral fees <span aria-hidden="true">→</span>
-            </a>
-          </div>
-          <div className="partner-inline-links">
-            <DiscoveryCallLink placement="broker" label="Book a broker call" />
-            <a className="v6-resource-link" href="/brokers">
-              Broker portal
-            </a>
-          </div>
-        </div>
-        <div className="partner-fee-card" data-testid="broker-fee-card">
-          <div className="eyebrow">REFER ONE QUALIFYING CLIENT</div>
-          <h3>
-            Earn up to <strong>{BROKER_FEE_DISPLAY}</strong>
-          </h3>
-          <p className="partner-fee-equation">
-            12.5% × $250,000 franchise sale
+          <a
+            className="button primary"
+            href={ATTORNEY_EMAIL_URL}
+            onClick={() =>
+              trackEvent("partner_inquiry_click", {
+                audience: "attorney",
+                method: "email",
+              })
+            }
+          >
+            Discuss attorney collaboration <span aria-hidden="true">→</span>
+          </a>
+          <p className="partner-note">
+            This attorney pathway does not offer referral compensation. Your
+            professional obligations and independent judgment remain yours.
           </p>
-          <p className="partner-fee-terms">{BROKER_FEE_TERMS}</p>
-          <p className="partner-fee-terms">
-            For eligible brokers. Not an attorney compensation offer or a
-            promise of franchisee earnings.
+        </article>
+        <article id="brokers" aria-labelledby="broker-title">
+          <div className="eyebrow">FOR FRANCHISE &amp; BUSINESS BROKERS</div>
+          <h3 id="broker-title">Make a thoughtful introduction.</h3>
+          <p>
+            Explore whether New Dawn’s property management franchise fits your
+            client’s goals. Get a direct contact, a clear introduction process
+            and written partnership terms.
           </p>
-        </div>
+          <ul className="partner-list">
+            <li>Business and operating support information</li>
+            <li>A conversation about your client’s goals</li>
+            <li>Clear roles from introduction onward</li>
+          </ul>
+          <a className="button primary" href="/partners">
+            Explore the broker partnership <span aria-hidden="true">→</span>
+          </a>
+        </article>
       </div>
     </section>
   );
@@ -216,16 +145,16 @@ export function BusinessSection() {
       aria-labelledby="business-title"
     >
       <div className="partner-section-heading">
-        <div className="eyebrow">THE BUSINESS BEHIND THE INTRODUCTION</div>
+        <div className="eyebrow">THE PROPERTY MANAGEMENT FRANCHISE</div>
         <h2 id="business-title">
-          Your client directs.
+          You direct.
           <br />
           Our team supports.
         </h2>
         <p>
-          A property management franchise serving rental property owners. Your
-          client owns and actively directs the business; New Dawn provides local
-          operating support, training and technology.
+          Your business serves rental property owners. You set the direction,
+          make key decisions and oversee performance. New Dawn supports the
+          daily work with local teams, training and technology.
         </p>
       </div>
       <div className="v6-detail-group">
@@ -235,7 +164,7 @@ export function BusinessSection() {
         >
           <div className="v6-detail-body v6-detail-columns">
             <div>
-              <h4>Your client leads.</h4>
+              <h4>You lead the business.</h4>
               <p>
                 The owner sets strategy, controls the business bank account,
                 approves budgets and oversees the team. This is an actively
@@ -254,54 +183,70 @@ export function BusinessSection() {
         </ReadMore>
         <ReadMore
           id="how"
-          title="From first conversation to client introduction"
+          title="From first conversation to an informed decision"
         >
           <div className="v6-detail-body">
             <ol>
               <li>
-                <strong>Talk with our team.</strong> Attorneys discuss
-                collaboration; brokers review eligibility and written referral
-                terms.
+                <strong>Explore the business.</strong> Discuss your goals, owner
+                responsibilities and available territories with our team.
               </li>
               <li>
-                <strong>Explore the fit.</strong> Review the franchise,
-                investment and territory availability. Obtain the client’s
-                permission before making an introduction.
+                <strong>Review the details.</strong> Read the current FDD and
+                agreements with your advisers. Understand the full investment,
+                services and obligations.
               </li>
               <li>
-                <strong>Coordinate the next steps.</strong> New Dawn handles
-                franchise discussions. The client’s attorney assesses
-                eligibility and handles legal advice and applications.
+                <strong>Plan your next steps.</strong> Your independently
+                retained attorney assesses your E-2 eligibility and handles
+                legal advice and applications.
               </li>
             </ol>
-            <p>
-              Share only professional contact details in your initial inquiry,
-              not confidential client information. Brokers should disclose their
-              financial interest when recommending the franchise, as required by
-              applicable law.
-            </p>
           </div>
         </ReadMore>
-        <ReadMore
-          id="investment"
-          title="Investment, referral terms and the FDD"
-        >
+        <ReadMore id="investment" title="Investment, fees and the FDD">
           <div className="v6-detail-body">
             <p>
-              Confirm the full investment, fees, working capital and operating
-              responsibilities in the current Franchise Disclosure Document. The
-              $250,000 broker illustration is a commission example, not a
-              universal package price or total investment quote.
+              Confirm the full investment, initial and ongoing fees, working
+              capital and operating responsibilities in the current Franchise
+              Disclosure Document and written agreements.
             </p>
             <p>
-              Review the written referral agreement for the qualifying
-              commission basis, eligibility, payment conditions and timing.
-              Broker compensation is separate from franchisee financial
-              performance. Review any financial performance representation in
-              Item 19; no earnings or return is guaranteed.
+              Ask our team for a written breakdown of your proposed package and
+              any separate professional fees. Review any financial performance
+              representation in Item 19; no earnings or return is guaranteed.
             </p>
             <a className="v6-resource-link" href="/request-fdd">
               Review the FDD request information
+            </a>
+          </div>
+        </ReadMore>
+        <ReadMore id="referral-details" title="If a broker introduced you">
+          <div className="v6-detail-body">
+            <p>
+              New Dawn may compensate participating brokers when a referred
+              client completes a qualifying franchise purchase. Ask your broker
+              who pays them and how their compensation is calculated.
+            </p>
+            <p>
+              You decide whether the business fits your goals. Review the
+              recommendation, all fees and services, and your proposed
+              investment with your own advisers. Ask our team to explain your
+              written pricing and any referral-related charges before you
+              commit.
+            </p>
+          </div>
+        </ReadMore>
+        <ReadMore id="team-details" title="Meet the people behind New Dawn">
+          <div className="v6-detail-body">
+            <p>
+              Our team brings experience in business operations, real estate,
+              finance and technology, with operating roots in El Paso, Texas.
+              Dylan Delaney is your contact for franchise conversations, the FDD
+              and next steps.
+            </p>
+            <a className="v6-resource-link" href="/team">
+              Meet the full team
             </a>
           </div>
         </ReadMore>
@@ -350,19 +295,21 @@ export function DiscoverySection() {
         <h2>
           Let’s talk about
           <br />
-          your clients.
+          your next chapter.
         </h2>
         <p>
-          Tell Dylan how you work with E-2 investors. We’ll walk through the
-          franchise and the right next step for your practice or brokerage.
+          Get your questions answered. Discuss the business, operating support
+          and whether a New Dawn franchise fits your plans. Your broker or
+          attorney is welcome to join with your permission.
         </p>
         <ul>
-          <li>Attorneys: client fit and franchise information</li>
-          <li>Brokers: referral eligibility, fees and payment terms</li>
-          <li>A clear introduction process for both</li>
+          <li>The business and your responsibilities as owner</li>
+          <li>Investment, fees and the FDD</li>
+          <li>Operating support and next steps</li>
         </ul>
         <p className="partner-note">
-          Please keep initial inquiries free of confidential client information.
+          Please keep initial inquiries free of sensitive personal or client
+          information.
         </p>
       </div>
       <div className="v5-call-card">
@@ -380,7 +327,7 @@ export function DiscoverySection() {
           </div>
         </div>
         <div className="v5-call-meta">
-          <span>PARTNER CONVERSATION</span>
+          <span>DISCOVERY CALL</span>
           <span>30 MINUTES</span>
         </div>
         <h3>

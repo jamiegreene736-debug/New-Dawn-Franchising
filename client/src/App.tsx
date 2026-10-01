@@ -9,6 +9,7 @@ import { SiteShell } from "@/components/site-shell";
 // Public marketing pages — eager (kept in the main bundle for fast first paint).
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
+import OtherBusinessesPage from "@/pages/other-businesses";
 import AboutPage from "@/pages/about";
 import EsPage from "@/pages/es";
 import FrPage from "@/pages/fr";
@@ -86,6 +87,7 @@ function Router() {
           <SiteShell>
             <Switch>
               <Route path="/" component={Home} />
+              <Route path="/other-businesses" component={OtherBusinessesPage} />
               <Route path="/about" component={AboutPage} />
               <Route path="/es" component={EsPage} />
               <Route path="/es/property-management" component={EsPropertyManagementPage} />

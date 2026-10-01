@@ -1,60 +1,102 @@
 import { test, expect } from "@playwright/test";
 
+const BOOKING_URL = "https://calendly.com/dylan-newdawnfranchising/30min";
+const DETAIL_IDS = [
+  "owner-details",
+  "support-details",
+  "technology-details",
+  "team-details",
+  "eligibility-details",
+  "location-details",
+  "investment-details",
+  "financing-details",
+  "fdd-details",
+];
+
 test.describe("Home Page", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/", { waitUntil: "domcontentloaded" });
-    await expect(page.locator('[data-testid="page-home"]')).toBeVisible();
+    await expect(page.getByTestId("page-home")).toBeVisible();
   });
 
-  test("hero section renders with title and CTAs", async ({ page }) => {
-    await expect(page.locator('[data-testid="section-hero"]')).toBeVisible();
-    await expect(page.locator('[data-testid="text-hero-title"]')).toBeVisible();
-    await expect(page.locator('[data-testid="text-hero-subtitle"]')).toBeVisible();
-    await expect(page.locator('[data-testid="button-hero-investor"]')).toBeVisible();
-    await expect(page.locator('[data-testid="button-hero-attorney"]')).toBeVisible();
+  test("hero introduces property management ownership and the discovery call", async ({ page }) => {
+    await expect(page.getByTestId("section-hero")).toBeVisible();
+    await expect(page.getByTestId("text-hero-title")).toContainText("Live in the USA.");
+    await expect(page.getByTestId("section-hero")).toContainText("Own a property management franchise.");
+    await expect(page.getByTestId("text-hero-subtitle")).toBeVisible();
+    await expect(page.getByTestId("button-hero-booking")).toBeVisible();
   });
 
-  test("investor CTA links to /contact", async ({ page }) => {
-    await page.locator('[data-testid="button-hero-investor"]').click();
-    await expect(page).toHaveURL(/\/contact/);
+  test("every primary CTA has the same discovery call destination", async ({ page }) => {
+    const bookingLinks = page.locator("a[data-booking]");
+    await expect(bookingLinks).toHaveCount(4);
+
+    for (const placement of ["header", "hero", "dylan", "mobile"]) {
+      const link = page.locator(`a[data-booking="${placement}"]`);
+      await expect(link).toContainText("Book a discovery call");
+      await expect(link).toHaveAttribute("href", BOOKING_URL);
+      await expect(link).toHaveAttribute("target", "_blank");
+      await expect(link).toHaveAttribute("rel", /noopener/);
+    }
   });
 
-  test("trust strip section renders", async ({ page }) => {
-    await expect(page.locator('[data-testid="section-trust-strip"]')).toBeVisible();
+  test("homepage keeps the discovery call as its only contact action", async ({ page }) => {
+    await expect(page.getByTestId("button-whatsapp-chat")).toHaveCount(0);
+    await expect(page.getByTestId("form-newsletter")).toHaveCount(0);
   });
 
-  test("tech section renders with title", async ({ page }) => {
-    await expect(page.locator('[data-testid="section-tech"]')).toBeVisible();
-    await expect(page.locator('[data-testid="text-tech-title"]')).toBeVisible();
+  test("essential business and E-2 information remains visible with details closed", async ({ page }) => {
+    await expect(page.getByTestId("section-trust-strip")).toBeVisible();
+    await expect(page.locator("#opportunities")).toContainText("Your business.");
+    await expect(page.getByTestId("section-how")).toBeVisible();
+    await expect(page.getByTestId("section-meet-dylan")).toBeVisible();
+    await expect(page.getByTestId("button-dylan-calendly")).toHaveAttribute("href", BOOKING_URL);
+    await expect(page.locator("details[open]")).toHaveCount(0);
   });
 
-  test("how-it-works section renders", async ({ page }) => {
-    await expect(page.locator('[data-testid="section-how"]')).toBeVisible();
+  test("nine read-more panels start closed and support keyboard expansion", async ({ page }) => {
+    await expect(page.locator("main details")).toHaveCount(DETAIL_IDS.length);
+
+    for (const id of DETAIL_IDS) {
+      const panel = page.locator(`details#${id}`);
+      const summary = panel.locator("summary");
+      await expect(panel).toHaveJSProperty("open", false);
+      await summary.focus();
+      await summary.press("Enter");
+      await expect(panel).toHaveJSProperty("open", true);
+      await summary.press("Space");
+      await expect(panel).toHaveJSProperty("open", false);
+    }
   });
 
-  test("Meet Dylan section renders with Calendly CTA", async ({ page }) => {
-    await expect(page.locator('[data-testid="section-meet-dylan"]')).toBeVisible();
-    await expect(page.locator('[data-testid="button-dylan-calendly"]')).toBeVisible();
+  test("readers can keep multiple detail panels open", async ({ page }) => {
+    const owner = page.locator("#owner-details");
+    const technology = page.locator("#technology-details");
+    await owner.locator("summary").click();
+    await technology.locator("summary").click();
+    await expect(owner).toHaveJSProperty("open", true);
+    await expect(technology).toHaveJSProperty("open", true);
+
+    await owner.locator("summary").click();
+    await expect(owner).toHaveJSProperty("open", false);
+    await expect(technology).toHaveJSProperty("open", true);
   });
 
-  test("Calendly button href points to calendly.com", async ({ page }) => {
-    const href = await page.locator('[data-testid="button-dylan-calendly"]').getAttribute("href");
-    expect(href).toMatch(/calendly\.com/i);
-  });
+  test("expanded details fit mobile screens and leave booking accessible", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
 
-  test("quiz CTA section renders", async ({ page }) => {
-    await expect(page.locator('[data-testid="section-quiz-cta"]')).toBeVisible();
-    await expect(page.locator('[data-testid="button-quiz-cta"]')).toBeVisible();
-  });
+    for (const id of DETAIL_IDS) {
+      const panel = page.locator(`details#${id}`);
+      await panel.locator("summary").click();
+      await expect(panel).toHaveJSProperty("open", true);
+    }
 
-  test("quiz CTA button navigates to /quiz", async ({ page }) => {
-    await page.locator('[data-testid="button-quiz-cta"]').click();
-    await expect(page).toHaveURL(/\/quiz/);
-  });
-
-  test("newsletter form renders", async ({ page }) => {
-    await expect(page.locator('[data-testid="form-newsletter"]')).toBeVisible();
-    await expect(page.locator('[data-testid="input-newsletter-email"]')).toBeVisible();
-    await expect(page.locator('[data-testid="button-newsletter-submit"]')).toBeVisible();
+    const horizontalOverflow = await page.evaluate(() => (
+      document.documentElement.scrollWidth - document.documentElement.clientWidth
+    ));
+    expect(horizontalOverflow).toBeLessThanOrEqual(1);
+    const mobileBooking = page.locator('a[data-booking="mobile"]');
+    await expect(mobileBooking).toBeInViewport();
+    await expect(mobileBooking).toHaveAttribute("href", BOOKING_URL);
   });
 });

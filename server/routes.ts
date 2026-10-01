@@ -882,6 +882,7 @@ export async function registerRoutes(
   const SITE_URL = "https://www.newdawnfranchising.com";
   const STATIC_PAGES = [
     { path: "/", priority: "1.0", changefreq: "weekly" },
+    { path: "/other-businesses", priority: "0.6", changefreq: "monthly" },
     { path: "/about", priority: "0.8", changefreq: "monthly" },
     { path: "/team", priority: "0.7", changefreq: "monthly" },
     { path: "/e2-visa-franchise", priority: "0.9", changefreq: "monthly" },

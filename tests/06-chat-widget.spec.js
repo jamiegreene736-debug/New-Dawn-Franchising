@@ -2,8 +2,9 @@ import { test, expect } from "@playwright/test";
 
 test.describe("AI Chat Widget", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await page.goto("/about", { waitUntil: "domcontentloaded" });
     await expect(page.locator('[data-testid="site-shell"]')).toBeVisible();
+    await expect(page.getByTestId("page-about")).toBeVisible();
   });
 
   test("chat trigger button is visible", async ({ page }) => {

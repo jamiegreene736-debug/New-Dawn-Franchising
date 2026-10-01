@@ -23,7 +23,7 @@ Seed tests use Dylan and the minimal signature, retain receiving Authentication-
 
 1. Back up settings, pause campaigns/autopilot/desk (completed before implementation).
 2. Deploy the merged release; startup adds only additive columns/tables.
-3. Run `script/apply-outreach-remediation.ts --apply --backup=/absolute/private/path.json` and `script/repair-outreach-email-copy.ts --apply --backup=/absolute/private/path.json`. Both preserve send/enrollment history and send no mail. The second updates known campaign families, retaining stable step IDs.
+3. Run `script/apply-outreach-remediation.ts --apply --backup=/absolute/private/path.json` and `script/repair-outreach-email-copy.ts --apply --backup=/absolute/private/path.json`. Both preserve send/enrollment history and send no mail. The second updates all email and manual-email steps, retaining stable step IDs.
 4. Read back paused settings, hold reasons, template changes, metrics and public page.
 5. Use owner-controlled external receiving mailboxes for placement tests. Recover credentials for historical accounts that cannot authenticate. No account access or external receipt can be manufactured by this release.
 6. Review a small cohort and supporting franchise documents before resuming a limited test. Reporting should use positive human requests per unique sender-accepted recipient; acceptance is not proof of inbox delivery.

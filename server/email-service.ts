@@ -1,4 +1,4 @@
-import nodemailer from "nodemailer";
+import nodemailer, { type Transporter } from "nodemailer";
 import type { CrmTemplateGroup } from "@shared/crm-template-groups";
 import { buildUnsubscribeHeaders, htmlToPlainText, unsubscribeUrl } from "./unsubscribe-service";
 import { markSenderAuthFailure, markSenderSuccess } from "./sender-health";
@@ -56,9 +56,9 @@ export function getSenderProfile(email: string): SenderProfile | undefined {
 }
 
 // ─── Transporter Cache ────────────────────────────────────────────────────────
-const transporterCache = new Map<string, nodemailer.Transporter>();
+const transporterCache = new Map<string, Transporter>();
 
-function getTransporter(senderEmail: string): nodemailer.Transporter {
+function getTransporter(senderEmail: string): Transporter {
   if (transporterCache.has(senderEmail)) {
     return transporterCache.get(senderEmail)!;
   }

@@ -315,7 +315,9 @@ export default function E2VisaProcessPage() {
             <p className="mt-3 text-pretty text-base leading-relaxed text-muted-foreground">
               The E-2 requires a substantial investment. There is no fixed legal minimum — instead, &ldquo;substantial&rdquo;
               is judged proportionally to the total cost of establishing or purchasing the business. The capital must
-              also be irrevocably committed and genuinely at commercial risk; it cannot be passive or fully refundable.
+              also be irrevocably committed and genuinely at commercial risk. A properly structured purchase
+              contingent on E-2 visa approval can use escrow; your independent attorney should review the
+              commitment, release and refund terms. This does not remove the risk of business losses.
             </p>
           </div>
 

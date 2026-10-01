@@ -1,7 +1,7 @@
 export const PARTNER_HOME_TITLE =
   "Property Management Franchise & E-2 Plans | New Dawn Franchising";
 export const PARTNER_HOME_DESCRIPTION =
-  "Explore a property management franchise with local operating support. Understand your role as owner, the investment, and your E-2 plans with independent legal guidance.";
+  "Own and direct a property management franchise with daily operating support, office space and visa-contingent escrow. Explore the business and full refund terms.";
 export const BROKER_PAGE_TITLE = "For Brokers | New Dawn Franchising";
 export const BROKER_PAGE_DESCRIPTION =
   "Introduce clients to New Dawn's property management franchise. Explore the broker partnership, a transparent introduction process, and request written referral terms.";

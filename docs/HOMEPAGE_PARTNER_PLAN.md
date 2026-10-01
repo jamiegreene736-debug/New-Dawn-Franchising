@@ -33,3 +33,41 @@ Reviewed 2026-10-01. These are marketing design decisions informed by primary so
 - Run TypeScript, production build and regression checks; require PR CI before merge. Verify the exact merged commit deploys and repeat targeted checks on the live website.
 
 Implementation and production verification results are recorded in the pull request and task delivery message.
+
+## Buyer reassurance restored — 2026-10-01
+
+### Implementation plan
+
+1. Keep the existing hero, business, professional pathways and discovery-call structure; preserve broker compensation privacy and independent attorney representation.
+2. Explain executive ownership in plain language: the investor directs; New Dawn handles daily work under that direction. Restore team experience in the existing trust strip.
+3. Add four short, always-visible benefits inside the existing business section: visa-contingent escrow/full refund; provided office space/remote oversight; staffing/job creation; training/reporting. Keep deeper terms in the six existing disclosures.
+4. Use the business's recurring management-fee model and documented oversight as additional reasons to inquire. Keep earnings, future visa decisions, job counts and legal eligibility unpromised.
+5. Correct the older E-2 process page's blanket statement against fully refundable investments to account for properly structured visa-contingent escrow. Match relevant server-rendered HTML and metadata.
+6. Verify public claims and disclosures, responsive layouts, calls to action and search content; merge after CI and verify the deployed commit and live pages.
+
+### Source review and claim decisions
+
+Reviewed all 35 public routes exposed by the app and sitemap using both current HTTP responses and rendered pages. Authenticated CRM, training, broker and marketing portals were outside this public-site audit. All 35 routes loaded successfully. Page presence is not independent proof of a marketing claim.
+
+| Buyer benefit | Evidence and wording decision |
+| --- | --- |
+| Daily operations handled for the owner | `/property-management`, `/why-new-dawn`, `/about`, `/e2-visa-franchise`: local execution, owner control of bank accounts, budgets and strategy. Use executive ownership with daily support; avoid describing a passive investment. |
+| Escrow and full refund without E-2 approval | `/process` describes attorney-held escrow pending approval; `/blog/how-much-to-invest-e2-visa-franchise` describes return if approval is not obtained. Jamie explicitly reconfirmed all funds in escrow and full refund in this request, consistent with `docs/BROKER_ESCROW_CAMPAIGN.md`. Publish all franchise investment funds, with written release/refund terms for review. No invented exclusions or refund deadline. This does not promise protection against subsequent business losses. |
+| Office space and remote oversight | Office provision is owner-confirmed in this request. `/territories` and `/why-new-dawn` describe flexibility with active oversight; `/about` and `/contact` identify the El Paso office. Publish office provision and remote business oversight, with individualized attorney review of location plans; do not turn this into unlimited work authorization. |
+| U.S. jobs | `/property-management` identifies leasing, coordination and back-office roles. Publish staffing/job-creation support linked to the business plan and operating needs, without fixed headcounts or asserting that any staffing arrangement automatically satisfies E-2 criteria. |
+| 70+ E-2 approvals supported by the team | Owner-confirmed in this request. Attribute experience to the team, not a New Dawn franchise approval rate or government endorsement. The public audit did not independently establish the count; do not invent a case list, success rate or verification badge. |
+| Recurring management fees | `/property-management` explains monthly management fees, leasing fees and applicable renewal fees. Publish the model, without income amounts, returns or guaranteed contracts. |
+| Training and visible performance | `/process` describes online training; `/property-management` and `/why-new-dawn` describe dashboards and documented decisions. Use online training without adding a timing guarantee, and records for attorney review of applications/renewals rather than guaranteed renewals. |
+| Independent advice and accessible team | `/legal`, `/partner-review`, `/request-fdd` and `/team`: FDD review, independent counsel, identifiable people, bilingual support. Retain these and the existing contact flow. |
+
+The additional selling points selected for the homepage are recurring management fees, control of the business bank account and key decisions, online training, owner dashboards, and records for applications/renewals. Financing, generalized family work rights, fixed approval/setup timelines and broad profitability language remain outside this homepage pitch because they need individual qualification and would add complexity.
+
+Primary legal sources consulted:
+
+- [State Department E visa requirements](https://travel.state.gov/content/travel/en/us-visas/employment/treaty-trader-investor-visa-e.html): the investor develops/directs a real enterprise and must meet the other individual criteria. This informs the ownership wording, not an endorsement of New Dawn's arrangement.
+- [9 FAM 402.9-6(B), investment commitment and escrow](https://fam.state.gov/fam/09FAM/09FAM040209.html): recognizes a purchase conditional on visa issuance where assets are held in escrow for transfer when that condition is met. Legal review of the particular agreement remains necessary; the general guidance does not verify New Dawn's contract.
+- The existing FTC/FDD research above continues to govern performance claims and investor review.
+
+Public routes reviewed: `/`, `/other-businesses`, `/about`, `/team`, `/property-management`, `/why-new-dawn`, `/process`, `/e-2-visa-process`, `/e2-fit`, `/e2-visa-franchise`, `/territories`, `/partner-review`, `/request-fdd`, `/legal`, `/partners`, `/contact`, `/marketing`, `/real-estate`, `/telecom`, `/insurance`, `/quiz`, `/blog`, `/es`, `/es/property-management`, `/fr`, `/zh`, `/ja`, `/ko`, `/tr`, `/privacy-policy`, `/terms`, and the four published articles: `/blog/e2-vs-eb5-visa`, `/blog/telecom-franchise-e2-visa`, `/blog/how-much-to-invest-e2-visa-franchise`, `/blog/best-franchise-for-e2-visa`.
+
+Audit follow-ups outside this homepage change: some older pages use broader family work-rights, profitability, in-house legal-services and timing language than this homepage. Those statements were not reused as homepage promises. Several translated/legal routes have minimal server-rendered text even though their rendered browser content is present; this revision updates only the affected homepage and E-2 process content.

@@ -15,14 +15,17 @@ export function normalizeReplySubject(subject: string): string {
   return subject.replace(/^(?:(?:re|fw|fwd|aw|sv):\s*)+/gi, "").trim().toLowerCase();
 }
 export function findReplySend<T extends ReplyCandidate>(
-  sends: T[], reply: { subject: string; receivedAt: Date; references: string[] },
+  sends: T[], reply: { subject: string; receivedAt: Date; references: string[]; bodyText?: string },
 ): T | undefined {
   const eligible = sends.filter(s => (s.channel || "email") === "email"
-    && ACCEPTED_EMAIL_STATUSES.includes(s.status) && s.sentAt
+    && (ACCEPTED_EMAIL_STATUSES.includes(s.status) || (s.status === "bounced" && isOptOutReply(reply.bodyText || ""))) && s.sentAt
     && new Date(s.sentAt).getTime() <= reply.receivedAt.getTime());
   const exact = eligible.filter(s => reply.references.includes(campaignMessageId(s.id)));
   // A known campaign ID must not fall back to a different sequence's subject.
   if (reply.references.some(r => r.startsWith("<drip-"))) return exact.sort(newest)[0];
+  // List-Unsubscribe mailto requests deliberately use a new subject. A known
+  // recipient's explicit opt-out still stops outreach and credits the latest send.
+  if (isOptOutReply(reply.bodyText || "")) return eligible.sort(newest)[0];
   const subject = normalizeReplySubject(reply.subject);
   if (!subject) return undefined;
   return eligible.filter(s => normalizeReplySubject(s.subject) === subject).sort(newest)[0];

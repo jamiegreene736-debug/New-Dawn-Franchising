@@ -243,10 +243,13 @@ export async function syncSenderInbox(senderEmail: string, password: string, loo
         const references = [parsed.inReplyTo, ...(Array.isArray(parsed.references) ? parsed.references : [parsed.references])]
           .filter((r): r is string => !!r);
         const receivedAt = msg.internalDate instanceof Date ? msg.internalDate : parsed.date;
-        const matchedSend = receivedAt ? findReplySend(sends, { subject, receivedAt, references }) : undefined;
+        const matchedSend = receivedAt ? findReplySend(sends, { subject, receivedAt, references, bodyText }) : undefined;
+        const optOut = isOptOutReply(bodyText);
+        if (optOut && enrolls.length > 0) {
+          await addToDnc(fromAddr, undefined, undefined, "Recipient requested unsubscribe");
+          await storage.markEnrollmentsUnsubscribed(fromAddr);
+        }
         if (matchedSend) {
-          const optOut = isOptOutReply(bodyText);
-          if (optOut) await addToDnc(fromAddr, undefined, undefined, "Recipient requested unsubscribe");
           await storage.updateDripSend(matchedSend.id, { status: "replied" });
           // Attribute only the matched sequence, but stop every active sequence
           // for this person so another campaign cannot continue cold follow-ups.

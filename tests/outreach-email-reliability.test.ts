@@ -75,3 +75,8 @@ test("SMTP rejection queues a retry; accepted send uses Dylan From and Reply-To"
     assert.equal(envelopes.at(-1)?.replyTo, "dylan@newdawnfranchising.com");
   } finally { transportMock.mock.restore(); delete process.env.GMAIL_APP_PASSWORD_DYLAN; }
 });
+
+test("mailto opt-outs with a changed subject match the latest preceding send", () => {
+  assert.equal(findReplySend([sent], { subject: "unsubscribe person@example.com", receivedAt: now, references: [], bodyText: "Unsubscribe" })?.id, "one");
+  assert.equal(findReplySend([sent], { subject: "unsubscribe person@example.com", receivedAt: new Date("2026-09-01"), references: [], bodyText: "Unsubscribe" }), undefined);
+});

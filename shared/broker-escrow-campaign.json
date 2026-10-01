@@ -1,0 +1,128 @@
+{
+  "id": "e8596cbe-2d2d-4478-93ad-acc34c8938e3",
+  "name": "Brokers — E-2 Escrow & Referrals — 10 Emails",
+  "description": "10 email-only touches over 90 days: 0, 3, 7, 14, 21, 30, 42, 56, 70, 90. Escrow pending E-2 approval; full refund if not approved (owner confirmed October 1, 2026). Weekdays 9 AM–noon America/Chicago pilot window. Ten-email / 120-day recipient cap; recipient fit re-review every 30 days remains required. Replies, bookings and opt-outs stop follow-ups. No LinkedIn, SMS or call tasks. Paused pending delivery verification; no recipients enrolled.",
+  "outreachPolicy": "broker_nurture_10",
+  "steps": [
+    {
+      "stepOrder": 0,
+      "delayDays": 0,
+      "stepType": "email",
+      "stepName": "E-2 referrals, protected",
+      "subject": "E-2 referrals, protected",
+      "previewText": "A full refund if the visa is not approved, plus broker commissions.",
+      "alternateSubject": "Your E-2 referrals",
+      "bodyHtml": "<p>Hi {{firstName}},</p><p>For clients weighing a U.S. franchise for an E-2 application, New Dawn holds funds in escrow pending visa approval. If approval is not granted, the funds are refunded in full.</p><p>We also pay commissions on eligible, registered broker referrals. Your client and their immigration attorney can review the business and written escrow terms before deciding.</p><p>Would you like the escrow terms and broker commission schedule?</p>",
+      "bodyText": "Hi {{firstName}},\n\nFor clients weighing a U.S. franchise for an E-2 application, New Dawn holds funds in escrow pending visa approval. If approval is not granted, the funds are refunded in full.\n\nWe also pay commissions on eligible, registered broker referrals. Your client and their immigration attorney can review the business and written escrow terms before deciding.\n\nWould you like the escrow terms and broker commission schedule?",
+      "triggerType": "time"
+    },
+    {
+      "stepOrder": 1,
+      "delayDays": 3,
+      "stepType": "email",
+      "stepName": "What escrow protects",
+      "subject": "What escrow protects",
+      "previewText": "See the approval, release and full-refund terms before referring a client.",
+      "alternateSubject": "Escrow before approval",
+      "bodyHtml": "<p>Hi {{firstName}},</p><p>A client's concern is often simple: what happens to their money if the E-2 visa is not approved?</p><p>With New Dawn, funds stay in escrow pending approval and are refunded in full if approval is not granted. The written agreement sets out how release and refund work.</p><p>Would you like a copy to review with your client?</p>",
+      "bodyText": "Hi {{firstName}},\n\nA client's concern is often simple: what happens to their money if the E-2 visa is not approved?\n\nWith New Dawn, funds stay in escrow pending approval and are refunded in full if approval is not granted. The written agreement sets out how release and refund work.\n\nWould you like a copy to review with your client?",
+      "triggerType": "time"
+    },
+    {
+      "stepOrder": 2,
+      "delayDays": 7,
+      "stepType": "email",
+      "stepName": "Your referral commission",
+      "subject": "Your referral commission",
+      "previewText": "Review eligibility and payment timing before making an introduction.",
+      "alternateSubject": "Broker payment terms",
+      "bodyHtml": "<p>Hi {{firstName}},</p><p>Before you introduce a client, it helps to know exactly how the referral will be credited and paid.</p><p>New Dawn's written broker agreement and commission schedule cover referral registration, eligibility and compensation. Commission payment follows New Dawn's receipt of funds from escrow, subject to the agreement.</p><p>Should I send you the broker terms?</p>",
+      "bodyText": "Hi {{firstName}},\n\nBefore you introduce a client, it helps to know exactly how the referral will be credited and paid.\n\nNew Dawn's written broker agreement and commission schedule cover referral registration, eligibility and compensation. Commission payment follows New Dawn's receipt of funds from escrow, subject to the agreement.\n\nShould I send you the broker terms?",
+      "triggerType": "time"
+    },
+    {
+      "stepOrder": 3,
+      "delayDays": 14,
+      "stepType": "email",
+      "stepName": "A client in mind?",
+      "subject": "A client in mind?",
+      "previewText": "A quick fit check for international buyers considering a U.S. franchise.",
+      "alternateSubject": "Your next E-2 buyer",
+      "bodyHtml": "<p>Hi {{firstName}},</p><p>Do you have an international buyer who is considering an E-2 application but still needs to choose a U.S. business?</p><p>New Dawn offers property management and other franchise businesses for clients to evaluate with their immigration counsel. Escrow pending approval, with a full refund if approval is not granted, is part of that review.</p><p>If someone comes to mind, reply with their broad business interests and budget range; no personal documents needed.</p>",
+      "bodyText": "Hi {{firstName}},\n\nDo you have an international buyer who is considering an E-2 application but still needs to choose a U.S. business?\n\nNew Dawn offers property management and other franchise businesses for clients to evaluate with their immigration counsel. Escrow pending approval, with a full refund if approval is not granted, is part of that review.\n\nIf someone comes to mind, reply with their broad business interests and budget range; no personal documents needed.",
+      "triggerType": "time"
+    },
+    {
+      "stepOrder": 4,
+      "delayDays": 21,
+      "stepType": "email",
+      "stepName": "The review package",
+      "subject": "The review package",
+      "previewText": "Business details, escrow terms and broker compensation in one review.",
+      "alternateSubject": "Details before commitment",
+      "bodyHtml": "<p>Hi {{firstName}},</p><p>A useful franchise introduction gives your client enough detail to evaluate the business as well as the visa plan.</p><p>I can share the franchise overview, written escrow terms and broker commission schedule. Your client can assess costs and owner responsibilities while their attorney reviews the immigration fit.</p><p>Would that review package be useful for your next international buyer?</p>",
+      "bodyText": "Hi {{firstName}},\n\nA useful franchise introduction gives your client enough detail to evaluate the business as well as the visa plan.\n\nI can share the franchise overview, written escrow terms and broker commission schedule. Your client can assess costs and owner responsibilities while their attorney reviews the immigration fit.\n\nWould that review package be useful for your next international buyer?",
+      "triggerType": "time"
+    },
+    {
+      "stepOrder": 5,
+      "delayDays": 30,
+      "stepType": "email",
+      "stepName": "Before visa approval",
+      "subject": "Before visa approval",
+      "previewText": "Clarify business activity, operating costs and responsibilities up front.",
+      "alternateSubject": "Operations before approval",
+      "bodyHtml": "<p>Hi {{firstName}},</p><p>When a business is active before E-2 approval, clients need a clear picture of who runs it, who funds operations and what obligations begin before approval.</p><p>Those operating arrangements should be reviewed alongside New Dawn's escrow and full-refund terms. Escrow protection does not replace reviewing how the business will operate.</p><p>Would you like us to walk through those arrangements for a client scenario?</p>",
+      "bodyText": "Hi {{firstName}},\n\nWhen a business is active before E-2 approval, clients need a clear picture of who runs it, who funds operations and what obligations begin before approval.\n\nThose operating arrangements should be reviewed alongside New Dawn's escrow and full-refund terms. Escrow protection does not replace reviewing how the business will operate.\n\nWould you like us to walk through those arrangements for a client scenario?",
+      "triggerType": "time"
+    },
+    {
+      "stepOrder": 6,
+      "delayDays": 42,
+      "stepType": "email",
+      "stepName": "Register the referral",
+      "subject": "Register the referral",
+      "previewText": "Confirm referral eligibility before the first substantive introduction.",
+      "alternateSubject": "Protect referral credit",
+      "bodyHtml": "<p>Hi {{firstName}},</p><p>One practical detail for a New Dawn referral: registration should happen before our first substantive contact with your client.</p><p>The broker agreement explains how eligibility is confirmed, including clients already known to New Dawn or registered by another broker. Confirming that early avoids confusion about referral credit later.</p><p>Would you like the registration requirements?</p>",
+      "bodyText": "Hi {{firstName}},\n\nOne practical detail for a New Dawn referral: registration should happen before our first substantive contact with your client.\n\nThe broker agreement explains how eligibility is confirmed, including clients already known to New Dawn or registered by another broker. Confirming that early avoids confusion about referral credit later.\n\nWould you like the registration requirements?",
+      "triggerType": "time"
+    },
+    {
+      "stepOrder": 7,
+      "delayDays": 56,
+      "stepType": "email",
+      "stepName": "Approval and next steps",
+      "subject": "Approval and next steps",
+      "previewText": "Know when escrow releases and how broker commission payment follows.",
+      "alternateSubject": "After E-2 approval",
+      "bodyHtml": "<p>Hi {{firstName}},</p><p>The escrow and commission timelines are connected. Funds are held pending E-2 approval, then released according to the escrow agreement. If approval is not granted, the funds are refunded in full.</p><p>For eligible referrals, the broker agreement provides payment within 30 days after New Dawn receives funds from escrow; installments are paid proportionally.</p><p>Would you like the written payment terms?</p>",
+      "bodyText": "Hi {{firstName}},\n\nThe escrow and commission timelines are connected. Funds are held pending E-2 approval, then released according to the escrow agreement. If approval is not granted, the funds are refunded in full.\n\nFor eligible referrals, the broker agreement provides payment within 30 days after New Dawn receives funds from escrow; installments are paid proportionally.\n\nWould you like the written payment terms?",
+      "triggerType": "time"
+    },
+    {
+      "stepOrder": 8,
+      "delayDays": 70,
+      "stepType": "email",
+      "stepName": "Questions from counsel",
+      "subject": "Questions from counsel",
+      "previewText": "Put the business and escrow documents in front of the client’s attorney.",
+      "alternateSubject": "For the client’s attorney",
+      "bodyHtml": "<p>Hi {{firstName}},</p><p>A client's immigration attorney should be part of the evaluation of any business proposed for an E-2 application.</p><p>We can provide New Dawn's business information and escrow terms for that review. The escrow arrangement provides a full refund if approval is not granted; it does not promise visa approval or future business results.</p><p>Is there a question from a client's attorney that I can help address?</p>",
+      "bodyText": "Hi {{firstName}},\n\nA client's immigration attorney should be part of the evaluation of any business proposed for an E-2 application.\n\nWe can provide New Dawn's business information and escrow terms for that review. The escrow arrangement provides a full refund if approval is not granted; it does not promise visa approval or future business results.\n\nIs there a question from a client's attorney that I can help address?",
+      "triggerType": "time"
+    },
+    {
+      "stepOrder": 9,
+      "delayDays": 90,
+      "stepType": "email",
+      "stepName": "Keep the broker details?",
+      "subject": "Keep the broker details?",
+      "previewText": "One final note about future E-2 referrals and the written broker terms.",
+      "alternateSubject": "For a future referral",
+      "bodyHtml": "<p>Hi {{firstName}},</p><p>I'll close out this email sequence here. If an international client later needs to evaluate a U.S. franchise, New Dawn's broker program may be worth considering.</p><p>The offer includes commissions on eligible registered referrals and funds held in escrow pending E-2 approval, with a full refund if approval is not granted.</p><p>Would you like the broker details to keep for a future client?</p>",
+      "bodyText": "Hi {{firstName}},\n\nI'll close out this email sequence here. If an international client later needs to evaluate a U.S. franchise, New Dawn's broker program may be worth considering.\n\nThe offer includes commissions on eligible registered referrals and funds held in escrow pending E-2 approval, with a full refund if approval is not granted.\n\nWould you like the broker details to keep for a future client?",
+      "triggerType": "time"
+    }
+  ]
+}

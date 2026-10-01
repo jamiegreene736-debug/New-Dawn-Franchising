@@ -58,6 +58,7 @@ interface Campaign {
   description: string | null;
   isActive: boolean;
   audienceType?: "broker" | "client";
+  outreachPolicy?: string;
   createdAt: string;
   steps?: Step[];
 }
@@ -68,6 +69,7 @@ interface Step {
   stepOrder: number;
   delayDays: number;
   subject: string;
+  previewText?: string | null;
   bodyHtml: string;
   stepType?: string;
   stepName?: string | null;
@@ -985,6 +987,7 @@ function EmailCampaignTab() {
                           <ChevronDown className="size-4 -rotate-90 text-muted-foreground" />
                         </div>
                       </div>
+                      {campaign.outreachPolicy === "broker_nurture_10" && <p className="mt-1 text-xs font-medium">10-email nurture · Weekdays 9 AM–noon Central · Recipient fit reviewed every 30 days</p>}
                       {campaign.description && <p className="mt-1 text-xs text-muted-foreground">{campaign.description}</p>}
                     </Card>
                   ))}
@@ -2076,6 +2079,7 @@ function StepEditorModal({
     stepName: step?.stepName || stepMeta(initialType).label,
     priority: step?.priority || "None",
     subject: step?.subject || "",
+    previewText: step?.previewText || "",
     bodyHtml: step?.bodyHtml || "",
     triggerType: step?.triggerType || "time",
     triggerRefStep: step?.triggerRefStep ?? null,
@@ -2193,6 +2197,11 @@ function StepEditorModal({
                     <Input data-testid="step-subject" value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} placeholder="e.g. The U.S. business piece for your clients" />
                   </div>
                 )}
+                {isEmail && <div className="mb-3">
+                  <Label>Inbox preview text</Label>
+                  <Input data-testid="step-preview-text" maxLength={150} value={form.previewText} onChange={e => setForm({ ...form, previewText: e.target.value })} placeholder="A short detail that complements the subject" />
+                  <p className="text-xs text-muted-foreground">Aim for 40–90 characters. Email clients may shorten this.</p>
+                </div>}
                 <Label>{mode === "ai" ? "AI prompt" : bodyLabel}</Label>
                 <p className="text-xs text-muted-foreground mb-1">Use <code className="bg-gray-100 px-1 rounded">[Contact First Name]</code> to personalize.</p>
                 <textarea
@@ -2210,6 +2219,7 @@ function StepEditorModal({
                 <Label>Preview</Label>
                 <div className="mt-1 rounded-md border bg-gray-50 p-3 text-sm min-h-[120px]">
                   {isEmail && form.subject && <div className="mb-2 font-medium">Subject: {previewMerge(form.subject)}</div>}
+                  {isEmail && form.previewText && <div className="mb-2 text-muted-foreground">Inbox preview: {previewMerge(form.previewText)}</div>}
                   {isEmail ? (
                     <div dangerouslySetInnerHTML={{ __html: previewMerge(form.bodyHtml) || '<span style="color:#9ca3af">Nothing to preview yet.</span>' }} />
                   ) : (
@@ -2247,6 +2257,7 @@ function StepEditorModal({
               stepName: form.stepName.trim() || stepMeta(form.stepType).label,
               priority: form.priority,
               subject: form.subject,
+              previewText: isEmail ? form.previewText.trim() : null,
               bodyHtml: form.bodyHtml,
               triggerType: form.triggerType,
               triggerRefStep: form.triggerType === "time" || form.triggerType === "engaged" ? null : (form.triggerRefStep ?? null),

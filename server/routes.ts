@@ -3460,10 +3460,12 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
 
   app.post("/api/crm/campaigns", requireAdminAuth, async (req, res) => {
     try {
-      const { name, description, isActive, steps, audienceType } = req.body;
+      const { name, description, isActive, steps, audienceType, outreachPolicy = "cold" } = req.body;
+      if (!["cold", "broker_nurture_10"].includes(outreachPolicy)) return res.status(400).json({ message: "Invalid outreach policy" });
+      if (outreachPolicy === "broker_nurture_10" && audienceType === "client") return res.status(400).json({ message: "Broker nurture requires a broker audience" });
       if (!name) return res.status(400).json({ message: "Campaign name is required" });
       const track = audienceType === "client" ? "client" : "broker";
-      const campaign = await storage.createDripCampaign({ name, description, isActive: isActive ?? true, audienceType: track } as any);
+      const campaign = await storage.createDripCampaign({ name, description, isActive: isActive ?? true, audienceType: track, outreachPolicy } as any);
       if (Array.isArray(steps)) {
         for (const step of steps) {
           await storage.createDripStep({
@@ -3471,6 +3473,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
             stepOrder: step.stepOrder,
             delayDays: step.delayDays,
             subject: step.subject,
+            previewText: typeof step.previewText === "string" ? step.previewText.slice(0, 150) : null,
             bodyHtml: step.bodyHtml,
           });
         }
@@ -3485,6 +3488,10 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
   app.patch("/api/crm/campaigns/:id", requireAdminAuth, async (req, res) => {
     try {
       const campaignId = String(req.params.id);
+      if (req.body.outreachPolicy !== undefined && !["cold", "broker_nurture_10"].includes(req.body.outreachPolicy)) return res.status(400).json({ message: "Invalid outreach policy" });
+      const existing = await storage.getDripCampaign(campaignId);
+      if (!existing) return res.status(404).json({ message: "Campaign not found" });
+      if ((req.body.outreachPolicy ?? existing.outreachPolicy) === "broker_nurture_10" && (req.body.audienceType ?? existing.audienceType) !== "broker") return res.status(400).json({ message: "Broker nurture requires a broker audience" });
       const updated = await storage.updateDripCampaign(campaignId, req.body);
       // Turning a campaign ON shouldn't wait for the next top-of-hour cron tick —
       // kick off a processing pass now (still gated by the optimal send window +
@@ -3519,7 +3526,8 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
         name: `Copy of ${src.name}`,
         description: src.description,
         isActive: false,
-        audienceType: (src as any).audienceType ?? "broker",
+        audienceType: src.audienceType ?? "broker",
+        outreachPolicy: src.outreachPolicy,
       } as any);
       for (const s of steps) {
         await storage.createDripStep({
@@ -3530,6 +3538,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
           stepName: s.stepName,
           priority: s.priority,
           subject: s.subject,
+          previewText: s.previewText,
           bodyHtml: s.bodyHtml,
         } as any);
       }
@@ -3542,6 +3551,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
 
   // --- Campaign Steps ---
   app.post("/api/crm/campaigns/:id/steps", requireAdminAuth, async (req, res) => {
+    if (req.body.previewText != null && (typeof req.body.previewText !== "string" || req.body.previewText.length > 150)) return res.status(400).json({ message: "Preview text must be at most 150 characters" });
     try {
       const step = await storage.createDripStep({
         campaignId: String(req.params.id) as string,
@@ -3554,6 +3564,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
   });
 
   app.patch("/api/crm/steps/:id", requireAdminAuth, async (req, res) => {
+    if (req.body.previewText != null && (typeof req.body.previewText !== "string" || req.body.previewText.length > 150)) return res.status(400).json({ message: "Preview text must be at most 150 characters" });
     try {
       const updated = await storage.updateDripStep(String(req.params.id) as string, req.body);
       res.json(updated);
@@ -3588,9 +3599,10 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
   app.get("/api/crm/campaigns/:id/schedule", requireAdminAuth, async (req, res) => {
     try {
       const campaignId = String(req.params.id);
-      const [steps, enrollments] = await Promise.all([
+      const [steps, enrollments, campaign] = await Promise.all([
         storage.getDripSteps(campaignId),       // ordered by stepOrder asc (matches the processor)
         storage.getDripEnrollments(campaignId),
+        storage.getDripCampaign(campaignId),
       ]);
 
       const result = enrollments.map((e) => {
@@ -3603,7 +3615,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
           stepType: s.stepType || "email",
           delayDays: s.delayDays,
           sendAt: (e.status === "active")
-            ? projectStepSendTime(enrolledAt, s.delayDays)
+            ? projectStepSendTime(enrolledAt, s.delayDays, campaign?.outreachPolicy)
             : null, // paused/completed enrollments aren't actively scheduled
         }));
         return {
@@ -3620,7 +3632,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
         };
       });
 
-      res.json({ windowSummary: EMAIL_WINDOW_SUMMARY, enrollments: result });
+      res.json({ windowSummary: campaign?.outreachPolicy === "broker_nurture_10" ? "Emails send weekdays 9 AM–noon Central. Ten-email / 120-day recipient limit; fit must be re-reviewed every 30 days. Actual sends can be later because of spacing, holds and volume caps." : EMAIL_WINDOW_SUMMARY, enrollments: result });
     } catch (err) {
       console.error("GET /api/crm/campaigns/:id/schedule error:", err);
       res.status(500).json({ message: "Failed to compute campaign schedule" });
@@ -4368,7 +4380,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) {
           return res.status(400).json({ message: "Enter a valid email address for this email step." });
         }
-        const result = await sendEmail(recipient, personalize(step.subject) || "(no subject)", personalize(step.bodyHtml));
+        const result = await sendEmail(recipient, personalize(step.subject) || "(no subject)", personalize(step.bodyHtml), undefined, undefined, { previewText: personalize(step.previewText), minimalSignature: true });
         if (result.success) return res.json({ success: true, channel, recipient });
         return res.status(500).json({ message: result.error || "Failed to send test email" });
       }

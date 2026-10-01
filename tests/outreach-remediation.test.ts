@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { qualificationIssue, sequenceIssue } from "../server/outreach-readiness";
+import { qualificationIssue, sequenceIssue, campaignWindowIssue } from "../server/outreach-readiness";
 import { campaignOutcomes } from "../server/campaign-metrics";
 import { replyFolders, originalMessageIds } from "../server/mailbox-evidence";
 import { qualifyIntroducer } from "../server/introducer-qualify";
@@ -36,4 +36,19 @@ test("sync includes archived, spam and trash while deduplicating Inbox through A
 test("bounce attribution excludes the report's own Message-ID", () => {
   assert.deepEqual(originalMessageIds("Message-ID: <report@google.com>\r\n\r\nStatus: 5.1.1\r\nMessage-ID: <drip-original@newdawnfranchising.com>"), ["<drip-original@newdawnfranchising.com>"]);
   assert.deepEqual(originalMessageIds("Message-ID: <report@google.com>\n\nDelivery failed"), []);
+});
+
+
+test("broker nurture permits step ten but preserves cold limits and monthly review", () => {
+  assert.equal(sequenceIssue("2026-07-03", 9, now, "broker_nurture_10"), null);
+  assert.ok(sequenceIssue("2026-07-03", 10, now, "broker_nurture_10"));
+  assert.ok(sequenceIssue("2026-05-01", 0, now, "broker_nurture_10"));
+  assert.ok(sequenceIssue(now, 3, now, "unknown"));
+  assert.ok(sequenceIssue("invalid", 0, now, "broker_nurture_10"));
+  assert.ok(qualificationIssue({ ...qualified, reviewed_at: "2026-08-01" }, "broker", now));
+});
+test("broker window observes weekdays and daylight saving time", () => {
+  for (const iso of ["2026-10-01T14:00:00Z", "2026-12-01T15:00:00Z"]) assert.equal(campaignWindowIssue("broker_nurture_10", new Date(iso)), null);
+  for (const iso of ["2026-10-01T13:59:00Z", "2026-10-01T17:00:00Z", "2026-10-03T15:00:00Z", "2026-12-01T14:59:00Z"]) assert.ok(campaignWindowIssue("broker_nurture_10", new Date(iso)));
+  assert.equal(campaignWindowIssue("cold", new Date("2026-10-03T15:00:00Z")), null);
 });

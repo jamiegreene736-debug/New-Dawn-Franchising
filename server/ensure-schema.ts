@@ -127,6 +127,8 @@ const STATEMENTS: string[] = [
     created_at           timestamp  NOT NULL DEFAULT now(),
     updated_at           timestamp  NOT NULL DEFAULT now()
   )`,
+  `ALTER TABLE drip_campaigns ADD COLUMN IF NOT EXISTS outreach_policy text NOT NULL DEFAULT 'cold'`,
+  `ALTER TABLE drip_steps ADD COLUMN IF NOT EXISTS preview_text text`,
   // ─── Multi-channel sequence builder ──────────────────────────────────────
   // drip_steps gains a channel/type, a display name, and a priority so the
   // Seamless-style builder can render day-grouped email / SMS / call / LinkedIn steps.

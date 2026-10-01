@@ -101,3 +101,30 @@ test("bounces require exact original Message-ID and are idempotent", { skip }, a
   assert.ok(match?.bounceVerifiedAt);
   assert.equal(await storage.markDripSendBounced('new@example.com','test',new Date(),[rows[0].provider_message_id],'ndr'), null);
 });
+
+test("broker nurture counts emails across campaigns for the full 120-day period", { skip }, async () => {
+  const { getOutreachReadiness } = await import("../server/outreach-readiness");
+  const email = "broker@nurture.example";
+  await pool.query("INSERT INTO outreach_qualifications(email,status,audience,source_url,reason,role,firm_domain) VALUES($1,'approved','broker','https://nurture.example/team','Your brokerage works with international franchise buyers.','Business broker','nurture.example') ON CONFLICT(email) DO UPDATE SET reviewed_at=now()", [email]);
+  const enrolled = new Date(Date.now() - 90 * 86400_000);
+  for (let i = 0; i < 9; i++) await pool.query("INSERT INTO drip_sends(enrollment_id,step_id,recipient_email,recipient_name,subject,channel,status,sent_at) VALUES('old','intro',$1,'Broker','Earlier outreach','email','sent',now()-interval '80 days')", [email]);
+  assert.equal(await getOutreachReadiness(email, "broker", enrolled, "broker_nurture_10"), null);
+  assert.ok(await getOutreachReadiness(email, "broker", enrolled));
+  await pool.query("INSERT INTO drip_sends(enrollment_id,step_id,recipient_email,recipient_name,subject,channel,status,sent_at) VALUES('old','intro',$1,'Broker','Earlier outreach','email','sent',now()-interval '80 days')", [email]);
+  assert.match((await getOutreachReadiness(email, "broker", enrolled, "broker_nurture_10"))!, /10 outreach emails/);
+});
+
+
+test("confirmed and completed meetings hold broker follow-ups", { skip }, async () => {
+  const { getOutreachReadiness } = await import("../server/outreach-readiness");
+  const email = "broker@nurture.example";
+  await pool.query("DELETE FROM drip_sends WHERE recipient_email=$1", [email]);
+  const meeting = await pool.query("INSERT INTO meetings(invitee_email,invitee_name,status) VALUES($1,'Broker','confirmed') RETURNING id", [email.toUpperCase()]);
+  try {
+    assert.match((await getOutreachReadiness(email, "broker", new Date(), "broker_nurture_10"))!, /meeting already exists/);
+    await pool.query("UPDATE meetings SET status='completed' WHERE id=$1", [meeting.rows[0].id]);
+    assert.match((await getOutreachReadiness(email, "broker", new Date(), "broker_nurture_10"))!, /meeting already exists/);
+    await pool.query("UPDATE meetings SET status='cancelled' WHERE id=$1", [meeting.rows[0].id]);
+    assert.equal(await getOutreachReadiness(email, "broker", new Date(), "broker_nurture_10"), null);
+  } finally { await pool.query("DELETE FROM meetings WHERE id=$1", [meeting.rows[0].id]); }
+});

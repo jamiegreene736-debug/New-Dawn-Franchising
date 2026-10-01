@@ -200,11 +200,13 @@ function zonedParts(date: Date): { year: number; month: number; day: number; hou
  * If `from` is already within a window, returns `from` unchanged. Used to project
  * when a drip email is actually "meant to go out" given the optimal-window gating.
  */
-export function nextEmailWindowFrom(from: Date): Date {
+export function nextEmailWindowFrom(from: Date, policy = "cold"): Date {
   for (let dayOffset = 0; dayOffset < 14; dayOffset++) {
     const candidate = new Date(from.getTime() + dayOffset * 86_400_000);
     const zp = zonedParts(candidate);
-    const windows = (EMAIL_WINDOWS[zp.dow] ?? []).slice().sort((a, b) => a.start - b.start);
+    const windows = policy === "broker_nurture_10"
+      ? (zp.dow >= 1 && zp.dow <= 5 ? [{ start: 9, end: 12 }] : [])
+      : (EMAIL_WINDOWS[zp.dow] ?? []).slice().sort((a, b) => a.start - b.start);
     const currentDecimal = zp.hour + zp.minute / 60;
     for (const w of windows) {
       if (dayOffset === 0) {
@@ -225,10 +227,10 @@ export function nextEmailWindowFrom(from: Date): Date {
  * window. Returns an ISO string. (Hourly/daily caps may push the real send a
  * little later, but this is the scheduled intent.)
  */
-export function projectStepSendTime(enrolledAt: Date, delayDays: number): string {
+export function projectStepSendTime(enrolledAt: Date, delayDays: number, policy = "cold"): string {
   const eligible = enrolledAt.getTime() + delayDays * 86_400_000;
   const from = new Date(Math.max(eligible, Date.now()));
-  return nextEmailWindowFrom(from).toISOString();
+  return nextEmailWindowFrom(from, policy).toISOString();
 }
 
 /** Human-readable summary of the email send windows, for UI captions. */

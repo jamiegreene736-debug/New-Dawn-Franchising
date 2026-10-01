@@ -22,24 +22,45 @@ export function qualificationIssue(q: Qualification | undefined, audience: strin
     return "Qualification needs a source, relevant role, firm and specific reason.";
   return null;
 }
-export function sequenceIssue(enrolledAt: Date | string, emailCount: number, now = new Date()): string | null {
-  if (now.getTime() - new Date(enrolledAt).getTime() > OUTREACH_SEQUENCE_DAYS * 86400_000)
-    return "This sequence is over 45 days old; review it instead of releasing its backlog.";
-  if (emailCount >= OUTREACH_MAX_EMAILS) return "Three outreach emails already sent in 45 days; further cold follow-ups are held.";
+export function sequenceLimits(policy = "cold") {
+  return policy === "broker_nurture_10"
+    ? { days: 120, emails: 10 }
+    : { days: OUTREACH_SEQUENCE_DAYS, emails: OUTREACH_MAX_EMAILS };
+}
+
+/** A pilot baseline in Central time, not an inferred recipient timezone. */
+export function campaignWindowIssue(policy: string, now = new Date()): string | null {
+  if (policy !== "broker_nurture_10") return null;
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", weekday: "short", hour: "numeric", hourCycle: "h23" }).formatToParts(now);
+  const day = parts.find(p => p.type === "weekday")?.value;
+  const hour = Number(parts.find(p => p.type === "hour")?.value);
+  return day !== "Sat" && day !== "Sun" && hour >= 9 && hour < 12
+    ? null : "Broker nurture sends weekdays, 9 AM–noon Central; deferred until that window.";
+}
+
+export function sequenceIssue(enrolledAt: Date | string, emailCount: number, now = new Date(), policy = "cold"): string | null {
+  const limits = sequenceLimits(policy);
+  const age = now.getTime() - new Date(enrolledAt).getTime();
+  if (!Number.isFinite(age) || age < 0) return "Enrollment date needs review.";
+  if (age > limits.days * 86400_000)
+    return `This sequence is over ${limits.days} days old; review it instead of releasing its backlog.`;
+  if (emailCount >= limits.emails) return `${limits.emails} outreach emails already sent in ${limits.days} days; further follow-ups are held.`;
   return null;
 }
-export async function getOutreachReadiness(email: string, audience: string, enrolledAt: Date | string): Promise<string | null> {
+export async function getOutreachReadiness(email: string, audience: string, enrolledAt: Date | string, policy = "cold"): Promise<string | null> {
   const key = email.trim().toLowerCase();
   const { rows } = await pool.query<Qualification>("SELECT * FROM outreach_qualifications WHERE email=$1", [key]);
   const q = rows[0];
   const issue = qualificationIssue(q, audience);
   if (issue) return issue;
-  const history = await pool.query<{ count: number; colleague: boolean }>(`SELECT
-    (SELECT count(*)::int FROM drip_sends WHERE lower(trim(recipient_email))=$1 AND channel='email' AND sent_at>now()-interval '45 days') AS count,
+  const history = await pool.query<{ count: number; colleague: boolean; meeting: boolean }>(`SELECT
+    EXISTS(SELECT 1 FROM meetings WHERE lower(trim(invitee_email))=$1 AND status IN ('confirmed','completed')) AS meeting,
+    (SELECT count(*)::int FROM drip_sends WHERE lower(trim(recipient_email))=$1 AND channel='email' AND sent_at>now()-($3::int * interval '1 day')) AS count,
     EXISTS(SELECT 1 FROM drip_sends s LEFT JOIN outreach_qualifications q ON q.email=lower(trim(s.recipient_email))
       WHERE s.channel='email' AND s.sent_at>now()-interval '7 days' AND lower(trim(s.recipient_email))<>$1
-      AND (q.firm_domain=$2 OR split_part(lower(trim(s.recipient_email)),'@',2)=$2)) AS colleague`, [key, q.firm_domain]);
-  const stale = sequenceIssue(enrolledAt, history.rows[0].count);
+      AND (q.firm_domain=$2 OR split_part(lower(trim(s.recipient_email)),'@',2)=$2)) AS colleague`, [key, q.firm_domain, sequenceLimits(policy).days]);
+  if (history.rows[0].meeting) return "A confirmed or completed meeting already exists; cold follow-ups are held.";
+  const stale = sequenceIssue(enrolledAt, history.rows[0].count, new Date(), policy);
   if (stale) return stale;
   if (history.rows[0].colleague) return "Another person at this firm received outreach in the last seven days.";
   return null;

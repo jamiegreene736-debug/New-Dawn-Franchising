@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { greetingName, nextEmailAllowedAt, preferFirstContact } from "../server/drip-scheduling";
 
+import { nextEmailWindowFrom } from "../server/smart-scheduler";
+
 const day = 86_400_000;
 const sentAt = new Date("2026-10-01T14:00:00Z");
 const steps = [{ id: "intro", delayDays: 0 }, { id: "follow", delayDays: 3 }, { id: "last", delayDays: 7 }];
@@ -38,4 +40,10 @@ test("invalid personal names fall back to a neutral greeting", () => {
   }
   assert.deepEqual(greetingName("Dr. María O'Neil"), { firstName: "María", fullName: "María O'Neil" });
   assert.deepEqual(greetingName("Karina Navarro"), { firstName: "Karina", fullName: "Karina Navarro" });
+});
+
+test("broker projected windows agree with the processor across weekends and DST", () => {
+  assert.equal(nextEmailWindowFrom(new Date("2026-10-02T17:00:00Z"), "broker_nurture_10").toISOString(), "2026-10-05T14:00:00.000Z");
+  assert.equal(nextEmailWindowFrom(new Date("2026-10-30T17:00:00Z"), "broker_nurture_10").toISOString(), "2026-11-02T15:00:00.000Z");
+  assert.equal(nextEmailWindowFrom(new Date("2026-10-01T14:30:00Z"), "broker_nurture_10").toISOString(), "2026-10-01T14:30:00.000Z");
 });

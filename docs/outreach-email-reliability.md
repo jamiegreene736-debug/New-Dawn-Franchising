@@ -21,3 +21,13 @@ The email queue checks the provider result before logging success and retries fa
 `npx tsx script/repair-outreach-email-copy.ts` previews updates to known campaign families and their daily clones. Apply with `--apply --backup=/absolute/path.json`. It updates email copy and disables rotation without changing enrollments, campaign activation, or send history. The private backup contains the exact prior values. No emails are dispatched by this repair.
 
 A successful SMTP verification establishes authentication only. Confirm an actual message's From/Reply-To and inbox receipt separately before claiming sending works. Inbox placement and prospect response rates remain outcomes to measure, not guarantees.
+
+## First-contact capacity and overdue sequences
+
+The scheduled drip processor allocates accepted volume toward 60% first introductions and 40% follow-ups, using recipient-wide first-send history and rolling 24-hour counts. At the current 80/day cap this targets 48 new recipients when both groups have eligible work; either group can use otherwise idle capacity. Discovery/enrollment counts are not contacts reached or deliveries.
+
+Untouched recipients no longer wait behind every overdue step in older enrollments. Follow-up timing is measured from actual previous email sends, retaining the difference between sequence delay days, with a 24-hour recipient-wide minimum across campaigns. Manual Send Due Now also respects this spacing. Tasks can still advance in the same pass. A database advisory lock serializes scheduled sweeps during overlapping deployments.
+
+Names that look like teams, organizations, placeholders, or New Dawn itself receive a neutral “Hi there” greeting. This protects newly rendered campaign emails; it cannot repair messages already sent. A corrective resend should be a separately reviewed recipient group, excluding opt-outs, bounces, replies, bookings, and recent contacts.
+
+Verification: `npm run test:outreach-email`; integration tests use the dedicated local database with `DRIP_TEST_DATABASE_URL=postgresql://localhost/new_dawn_outreach_desk_test DATABASE_URL=postgresql://localhost/new_dawn_outreach_desk_test npx tsx --test tests/drip-scheduling.integration.test.ts`. SMTP is mocked; no real email is sent by these tests.

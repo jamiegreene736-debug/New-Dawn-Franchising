@@ -31,7 +31,7 @@ in `server/page-shells.ts` and service structured data mirror the new positionin
 the sitemap includes the new secondary page. Keep both visible and search content
 in sync when editing copy.
 
-Local validation includes TypeScript, the production build, and the three
+Local validation includes TypeScript, the production build, and the four
 `tests/homepage-shell.test.ts` regression tests (also added to CI). Browser checks
 covered desktop navigation, nine-panel keyboard operation, independent panels,
 CTA destinations, hash navigation, the secondary page including trailing-slash
@@ -42,3 +42,8 @@ Navigation, homepage, and chat Playwright specs were updated and syntax-checked.
 The full browser suite was not run; the focused interactions above were exercised
 through the browser tools. Production verification uses read-only requests and
 the rendered website, without submitting forms or booking an appointment.
+
+Production read-back also uncovered and corrected an existing Express fallback
+issue: the wildcard mount strips `req.path`, so search HTML must use the original
+requested URL. Request-level regression coverage checks homepage, secondary page,
+query parameters, About metadata, canonical URLs, and static assets.

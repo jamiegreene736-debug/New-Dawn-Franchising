@@ -11,6 +11,15 @@ const DETAILS = [
 const PRIVATE_FIGURES =
   /31,250|31250|12[.]5|250,000|generous referral fee|earn up to/i;
 
+test("E-2 investment guidance explains visa-contingent escrow", async ({ page }) => {
+  await page.goto("/e-2-visa-process");
+  const investment = page.getByTestId("section-e2-investment");
+  await expect(investment).toContainText("purchase contingent on E-2 visa approval can use escrow");
+  await expect(investment).toContainText("independent attorney should review");
+  await expect(investment).toContainText("does not remove the risk of business losses");
+  await expect(investment).not.toContainText("cannot be passive or fully refundable");
+});
+
 async function expectNoCommissionPitch(page) {
   await expect(page.locator("body")).not.toContainText(PRIVATE_FIGURES);
   for (const meta of await page
@@ -54,6 +63,26 @@ for (const width of [375, 390, 768, 1280]) {
       "/partners",
     );
     await expectNoCommissionPitch(page);
+    await expect(page.getByTestId("section-trust-strip")).toContainText(
+      "70+ E-2 visa approvals",
+    );
+    await expect(page.getByTestId("text-hero-subtitle")).toHaveText(
+      "You direct. We handle the day-to-day.",
+    );
+    const benefits = page.getByTestId("buyer-benefits");
+    await expect(benefits.locator("article")).toHaveCount(4);
+    for (const heading of [
+      "Funds in escrow. Full refund if not approved.",
+      "Office space provided. Room to be flexible.",
+      "A real business creating U.S. jobs.",
+      "Training, visibility and ongoing support.",
+    ]) {
+      await expect(benefits.getByRole("heading", { name: heading })).toBeVisible();
+    }
+    await expect(benefits).toContainText("All franchise investment funds");
+    await expect(benefits).toContainText("refunded in full");
+    await expect(benefits).toContainText("Your attorney reviews your location plans");
+    await expect(benefits).toContainText("applications and renewals");
     expect(
       await page.evaluate(
         () =>
@@ -83,6 +112,15 @@ for (const width of [375, 390, 768, 1280]) {
     );
     await expect(page.locator("#referral-details")).toContainText(
       "Ask your broker who pays them",
+    );
+    await expect(page.locator("#investment")).toContainText(
+      "who holds them and how release or refund works",
+    );
+    await expect(page.locator("#investment")).toContainText(
+      "does not protect against business losses",
+    );
+    await expect(page.locator("#owner-details")).toContainText(
+      "controls the business bank account",
     );
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth),

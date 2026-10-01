@@ -25,6 +25,18 @@ test("homepage search content describes the approved offer without old visa prom
   assert.equal(home.title, PARTNER_HOME_TITLE);
   assert.equal(home.description, PARTNER_HOME_DESCRIPTION);
   assert.match(home.html, /property management franchise/i);
+  assert.match(home.html, /70\+ E-2 visa approvals/);
+  assert.match(home.html, /supported by our team/);
+  assert.match(home.html, /All franchise investment funds are held in escrow/);
+  assert.match(home.html, /refunded in full under the written escrow agreement/);
+  assert.match(home.html, /Office space provided/);
+  assert.match(home.html, /oversee your business remotely/);
+  assert.match(home.html, /Your attorney reviews your location plans/);
+  assert.match(home.html, /U.S. job creation/);
+  assert.match(home.html, /Online training and owner dashboards/);
+  assert.match(home.html, /applications and renewals/);
+  assert.match(home.html, /recurring monthly management fees/);
+  assert.match(home.html, /does not protect against business losses/);
   assert.doesNotMatch(
     home.html + home.description,
     /31,250|31250|12[.]5|250,000|generous referral|earn up to/i,
@@ -42,7 +54,7 @@ test("homepage search content describes the approved offer without old visa prom
   assert.equal(home.faq, undefined);
   assert.doesNotMatch(
     home.html,
-    /Three Industries|released only|live anywhere/i,
+    /Three Industries|passive income|hands.off|work anywhere|live anywhere|100% success/i,
   );
 });
 
@@ -54,6 +66,14 @@ test("secondary-business search content follows the same route variants as the U
   assert.equal(getPageShell("/other-businesses/"), other);
   assert.equal(getPageShell("/Other-Businesses"), other);
   assert.equal(getPageShell("/not-a-public-page"), null);
+});
+
+test("E-2 process search content explains visa-contingent escrow and commercial risk together", () => {
+  const process = getPageShell("/e-2-visa-process");
+  assert.ok(process);
+  assert.match(process.html, /purchase contingent on E-2 visa approval can use escrow/);
+  assert.match(process.html, /independent attorney should review/);
+  assert.match(process.html, /does not remove the risk of business losses/);
 });
 
 test("homepage structured data does not treat a general package minimum as every vertical's price", () => {

@@ -1781,6 +1781,14 @@
 .homepage-refinements .professional-paths h3 { margin: 16px 0; font-size: 25px; }
 .homepage-refinements .professional-paths p { font-size: 15px; }
 .homepage-refinements .professional-paths .partner-note { font-size: 13px; }
+.homepage-refinements .partner-hero .hero-experience-note { margin-top: 12px; font-size: 12px; line-height: 1.5; }
+.homepage-refinements .v4-principles > div:first-child { flex-direction: column; align-items: flex-start; gap: 2px; }
+.homepage-refinements .v4-principles > div:first-child span { color: var(--franchise-muted); font-size: 11px; }
+.homepage-refinements .buyer-benefits { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 26px 40px; margin-top: 32px; }
+.homepage-refinements .buyer-benefits article { border-top: 2px solid var(--brand-gold); padding-top: 18px; }
+.homepage-refinements .buyer-benefits h3 { margin: 0 0 10px; color: var(--brand-navy); font-size: 20px; line-height: 1.4; }
+.homepage-refinements .buyer-benefits p { margin: 0; font-size: 15px; line-height: 1.7; }
 @media (max-width: 767px) {
   .homepage-refinements .professional-paths { grid-template-columns: 1fr; gap: 40px; }
+  .homepage-refinements .buyer-benefits { grid-template-columns: 1fr; gap: 24px; }
 }

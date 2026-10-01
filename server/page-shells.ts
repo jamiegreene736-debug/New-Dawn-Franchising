@@ -30,8 +30,8 @@ const shells: Record<string, PageShell> = {
 <h1 id="hero-title">Your next chapter.<br/>
 <span>A business of your own.</span>
 </h1>
-<h2>Own and direct. We support the daily work.</h2>
-<p>Explore a U.S. property management franchise with local operating support, training and technology. Understand the business and your responsibilities, with your own advisers by your side.</p>
+<h2>You direct. We handle the day-to-day.</h2>
+<p>Own a U.S. property management business with a local team, office space and operating support. You keep control of the business and its key decisions, with your own advisers by your side.</p>
 <div>
 <a href="https://calendly.com/dylan-newdawnfranchising/30min" target="_blank" rel="noopener">Book a discovery call<span aria-hidden="true">↗</span>
 </a>
@@ -40,7 +40,8 @@ const shells: Record<string, PageShell> = {
 </div>
 <div>
 <div>
-<strong>Property management expertise</strong>
+<strong>70+ E-2 visa approvals</strong>
+<span>supported by our team</span>
 </div>
 <div>
 <strong>Operating roots in El Paso, Texas</strong>
@@ -49,6 +50,7 @@ const shells: Record<string, PageShell> = {
 <strong>English &amp; Spanish support</strong>
 </div>
 </div>
+<p>Past outcomes do not guarantee future visa approval.</p>
 </div>
 <figure>
 <img src="/images/arrival-hero.png" alt="Concept image of the Statue of Liberty, New York skyline, and an American flag at sunrise"/>
@@ -61,8 +63,26 @@ const shells: Record<string, PageShell> = {
 <section id="opportunities" aria-labelledby="business-title">
 <div>
 <div>THE PROPERTY MANAGEMENT FRANCHISE</div>
-<h2 id="business-title">You direct.<br/>Our team supports.</h2>
-<p>Your business serves rental property owners. You set the direction, make key decisions and oversee performance. New Dawn supports the daily work with local teams, training and technology.</p>
+<h2 id="business-title">You direct.<br/>We handle the daily work.</h2>
+<p>A business built around recurring property management fees. You set the direction and oversee performance. Our team handles leasing, tenant communication and property coordination under your direction.</p>
+</div>
+<div>
+<article>
+<h3>Funds in escrow. Full refund if not approved.</h3>
+<p>All franchise investment funds are held in escrow pending E-2 approval. If approval is not granted, they are refunded in full under the written escrow agreement.</p>
+</article>
+<article>
+<h3>Office space provided. Room to be flexible.</h3>
+<p>We provide office space and local operating support so you can oversee your business remotely. Your attorney reviews your location plans and E-2 responsibilities with you.</p>
+</article>
+<article>
+<h3>A real business creating U.S. jobs.</h3>
+<p>We help build your operating team, supporting U.S. job creation through leasing, property coordination and back-office roles. Staffing reflects your business plan and operating needs.</p>
+</article>
+<article>
+<h3>Training, visibility and ongoing support.</h3>
+<p>Online training and owner dashboards help you lead with confidence. Business reports document your active oversight and give your attorney records to review for applications and renewals.</p>
+</article>
 </div>
 <div>
 <details id="owner-details">
@@ -79,10 +99,11 @@ const shells: Record<string, PageShell> = {
 <div>
 <h4>You lead the business.</h4>
 <p>The owner sets strategy, controls the business bank account, approves budgets and oversees the team. This is an actively directed business.</p>
+<p>Remote oversight gives you flexibility without giving up those responsibilities. Discuss the office arrangement, territory and your proposed location with our team and your attorney.</p>
 </div>
 <div>
 <h4>Our team supports daily work.</h4>
-<p>Local teams, training, workflows and technology support tenant communication, property coordination and reporting. The current FDD and agreements define the services and responsibilities.</p>
+<p>Local teams handle daily operations under your direction. Online training, owner dashboards and reporting help you monitor the business and document decisions. The current FDD and agreements define the services and responsibilities.</p>
 </div>
 </div>
 </details>
@@ -109,7 +130,7 @@ const shells: Record<string, PageShell> = {
 </details>
 <details id="investment">
 <summary>
-<strong>Investment, fees and the FDD</strong>
+<strong>Escrow, the full refund and investment details</strong>
 <span aria-hidden="true">
 <b>Read more</b>
 <b>Show less</b>
@@ -118,8 +139,10 @@ const shells: Record<string, PageShell> = {
 </i>
 </summary>
 <div>
+<p>All franchise investment funds stay in escrow pending your E-2 visa approval. If approval is not granted, those funds are refunded in full. Review the written escrow agreement with your independent attorney before transferring funds, including who holds them and how release or refund works.</p>
 <p>Confirm the full investment, initial and ongoing fees, working capital and operating responsibilities in the current Franchise Disclosure Document and written agreements.</p>
 <p>Ask our team for a written breakdown of your proposed package and any separate professional fees. Review any financial performance representation in Item 19; no earnings or return is guaranteed.</p>
+<p>The business earns recurring monthly management fees from rental property owners, with leasing and renewal fees where applicable. Actual revenue depends on management agreements and business performance. The visa-contingent refund does not protect against business losses after funds are released.</p>
 <a href="/request-fdd">Review the FDD request information</a>
 </div>
 </details>
@@ -150,6 +173,7 @@ const shells: Record<string, PageShell> = {
 </summary>
 <div>
 <p>Our team brings experience in business operations, real estate, finance and technology, with operating roots in El Paso, Texas. Dylan Delaney is your contact for franchise conversations, the FDD and next steps.</p>
+<p>Our team has supported investors through more than 70 E-2 visa approvals. That experience belongs to the team; it is not a promise about any individual application. U.S. authorities make all visa decisions.</p>
 <a href="/team">Meet the full team</a>
 </div>
 </details>
@@ -184,7 +208,7 @@ const shells: Record<string, PageShell> = {
 <p>Help clients feel informed and supported while you remain their independent legal adviser. Review franchise information with our team and coordinate next steps with your client’s permission.</p>
 <ul>
 <li>Continuity of legal representation</li>
-<li>Clear business information for independent review</li>
+<li>Operating, staffing and ownership records for your review</li>
 <li>Coordination that respects client choice and confidentiality</li>
 </ul>
 <a href="mailto:franchising@newdawnfranchising.com?subject=Attorney%20inquiry%20%E2%80%94%20E-2%20franchise%20collaboration&amp;body=Hello%20New%20Dawn%2C%0A%0AI%20am%20an%20immigration%20attorney%20interested%20in%20discussing%20your%20franchise%20and%20how%20we%20can%20coordinate%20for%20clients.%0A%0AName%3A%0AFirm%3A%0APreferred%20contact%3A%0A%0APlease%20send%20information%20about%20the%20business%20model%20and%20attorney%20collaboration%20process.">Discuss attorney collaboration <span aria-hidden="true">→</span>
@@ -212,8 +236,8 @@ const shells: Record<string, PageShell> = {
 <p>Get your questions answered. Discuss the business, operating support and whether a New Dawn franchise fits your plans. Your broker or attorney is welcome to join with your permission.</p>
 <ul>
 <li>The business and your responsibilities as owner</li>
-<li>Investment, fees and the FDD</li>
-<li>Operating support and next steps</li>
+<li>Escrow, the full refund terms and the FDD</li>
+<li>Office space, staffing and ongoing support</li>
 </ul>
 <p>Please keep initial inquiries free of sensitive personal or client information.</p>
 </div>
@@ -828,7 +852,7 @@ const shells: Record<string, PageShell> = {
 
   <section>
     <h2>The substantial and at-risk investment requirement</h2>
-    <p>There is no fixed legal minimum, but the investment must be "substantial" relative to the total cost of the business and must be irrevocably committed and genuinely at commercial risk. A New Dawn franchise investment from $225,000 funds a real, operating U.S. business across Property Management, Telecom, or Insurance — capital placed at risk in an active enterprise.</p>
+    <p>There is no fixed legal minimum, but the investment must be "substantial" relative to the total cost of the business and must be irrevocably committed and genuinely at commercial risk. A properly structured purchase contingent on E-2 visa approval can use escrow; your independent attorney should review the commitment, release and refund terms. This does not remove the risk of business losses. A New Dawn franchise investment from $225,000 funds a real, operating U.S. business across Property Management, Telecom, or Insurance — capital placed at risk in an active enterprise.</p>
   </section>
 
   <section>

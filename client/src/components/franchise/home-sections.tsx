@@ -20,12 +20,12 @@ export function HeroSection() {
           <span>A business of your own.</span>
         </h1>
         <h2 data-testid="text-hero-subtitle">
-          Own and direct. We support the daily work.
+          You direct. We handle the day-to-day.
         </h2>
         <p>
-          Explore a U.S. property management franchise with local operating
-          support, training and technology. Understand the business and your
-          responsibilities, with your own advisers by your side.
+          Own a U.S. property management business with a local team, office
+          space and operating support. You keep control of the business and
+          its key decisions, with your own advisers by your side.
         </p>
         <div className="partner-actions" data-partner-hero>
           <DiscoveryCallLink placement="hero" testId="button-hero-booking" />
@@ -35,7 +35,8 @@ export function HeroSection() {
         </div>
         <div className="v4-principles" data-testid="section-trust-strip">
           <div>
-            <strong>Property management expertise</strong>
+            <strong>70+ E-2 visa approvals</strong>
+            <span>supported by our team</span>
           </div>
           <div>
             <strong>Operating roots in El Paso, Texas</strong>
@@ -44,6 +45,9 @@ export function HeroSection() {
             <strong>English &amp; Spanish support</strong>
           </div>
         </div>
+        <p className="partner-note hero-experience-note">
+          Past outcomes do not guarantee future visa approval.
+        </p>
       </div>
       <figure className="v4-hero-photo">
         <img
@@ -93,7 +97,7 @@ export function ProfessionalPathsSection() {
           </p>
           <ul className="partner-list">
             <li>Continuity of legal representation</li>
-            <li>Clear business information for independent review</li>
+            <li>Operating, staffing and ownership records for your review</li>
             <li>
               Coordination that respects client choice and confidentiality
             </li>
@@ -149,13 +153,47 @@ export function BusinessSection() {
         <h2 id="business-title">
           You direct.
           <br />
-          Our team supports.
+          We handle the daily work.
         </h2>
         <p>
-          Your business serves rental property owners. You set the direction,
-          make key decisions and oversee performance. New Dawn supports the
-          daily work with local teams, training and technology.
+          A business built around recurring property management fees. You set
+          the direction and oversee performance. Our team handles leasing,
+          tenant communication and property coordination under your direction.
         </p>
+      </div>
+      <div className="buyer-benefits" data-testid="buyer-benefits">
+        <article>
+          <h3>Funds in escrow. Full refund if not approved.</h3>
+          <p>
+            All franchise investment funds are held in escrow pending E-2
+            approval. If approval is not granted, they are refunded in full
+            under the written escrow agreement.
+          </p>
+        </article>
+        <article>
+          <h3>Office space provided. Room to be flexible.</h3>
+          <p>
+            We provide office space and local operating support so you can
+            oversee your business remotely. Your attorney reviews your
+            location plans and E-2 responsibilities with you.
+          </p>
+        </article>
+        <article>
+          <h3>A real business creating U.S. jobs.</h3>
+          <p>
+            We help build your operating team, supporting U.S. job creation
+            through leasing, property coordination and back-office roles.
+            Staffing reflects your business plan and operating needs.
+          </p>
+        </article>
+        <article>
+          <h3>Training, visibility and ongoing support.</h3>
+          <p>
+            Online training and owner dashboards help you lead with confidence.
+            Business reports document your active oversight and give your
+            attorney records to review for applications and renewals.
+          </p>
+        </article>
       </div>
       <div className="v6-detail-group">
         <ReadMore
@@ -170,13 +208,19 @@ export function BusinessSection() {
                 approves budgets and oversees the team. This is an actively
                 directed business.
               </p>
+              <p>
+                Remote oversight gives you flexibility without giving up those
+                responsibilities. Discuss the office arrangement, territory
+                and your proposed location with our team and your attorney.
+              </p>
             </div>
             <div>
               <h4>Our team supports daily work.</h4>
               <p>
-                Local teams, training, workflows and technology support tenant
-                communication, property coordination and reporting. The current
-                FDD and agreements define the services and responsibilities.
+                Local teams handle daily operations under your direction.
+                Online training, owner dashboards and reporting help you
+                monitor the business and document decisions. The current FDD
+                and agreements define the services and responsibilities.
               </p>
             </div>
           </div>
@@ -204,8 +248,15 @@ export function BusinessSection() {
             </ol>
           </div>
         </ReadMore>
-        <ReadMore id="investment" title="Investment, fees and the FDD">
+        <ReadMore id="investment" title="Escrow, the full refund and investment details">
           <div className="v6-detail-body">
+            <p>
+              All franchise investment funds stay in escrow pending your E-2
+              visa approval. If approval is not granted, those funds are
+              refunded in full. Review the written escrow agreement with your
+              independent attorney before transferring funds, including who
+              holds them and how release or refund works.
+            </p>
             <p>
               Confirm the full investment, initial and ongoing fees, working
               capital and operating responsibilities in the current Franchise
@@ -215,6 +266,13 @@ export function BusinessSection() {
               Ask our team for a written breakdown of your proposed package and
               any separate professional fees. Review any financial performance
               representation in Item 19; no earnings or return is guaranteed.
+            </p>
+            <p>
+              The business earns recurring monthly management fees from rental
+              property owners, with leasing and renewal fees where applicable.
+              Actual revenue depends on management agreements and business
+              performance. The visa-contingent refund does not protect against
+              business losses after funds are released.
             </p>
             <a className="v6-resource-link" href="/request-fdd">
               Review the FDD request information
@@ -244,6 +302,12 @@ export function BusinessSection() {
               finance and technology, with operating roots in El Paso, Texas.
               Dylan Delaney is your contact for franchise conversations, the FDD
               and next steps.
+            </p>
+            <p>
+              Our team has supported investors through more than 70 E-2 visa
+              approvals. That experience belongs to the team; it is not a
+              promise about any individual application. U.S. authorities make
+              all visa decisions.
             </p>
             <a className="v6-resource-link" href="/team">
               Meet the full team
@@ -304,8 +368,8 @@ export function DiscoverySection() {
         </p>
         <ul>
           <li>The business and your responsibilities as owner</li>
-          <li>Investment, fees and the FDD</li>
-          <li>Operating support and next steps</li>
+          <li>Escrow, the full refund terms and the FDD</li>
+          <li>Office space, staffing and ongoing support</li>
         </ul>
         <p className="partner-note">
           Please keep initial inquiries free of sensitive personal or client

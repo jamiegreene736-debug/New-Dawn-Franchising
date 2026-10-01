@@ -349,6 +349,7 @@ export const dripCampaigns = pgTable("drip_campaigns", {
   // Which audience the campaign's steps speak to: "broker" (referral-partner
   // pitch) or "client" (direct-to-E-2-investor pitch). Drives the Send-now track.
   audienceType: text("audience_type").notNull().default("broker"),
+  outreachPolicy: text("outreach_policy").notNull().default("cold"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -376,6 +377,7 @@ export const dripSteps = pgTable("drip_steps", {
   // content for every step type (email HTML, SMS text, or task instructions).
   subject: text("subject").notNull(),
   bodyHtml: text("body_html").notNull(),
+  previewText: text("preview_text"),
   // ── Automation triggers ──
   // How this step fires: "time" (delayDays, default) or a behavioural signal —
   // "email_opened" | "link_clicked" | "not_opened" | "engaged". Signal steps

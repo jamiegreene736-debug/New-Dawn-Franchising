@@ -16,9 +16,9 @@ export function registerOutreachReviewRoutes(app: Express, auth: RequestHandler)
   app.get("/api/crm/campaigns/:id/readiness", auth, async (req, res) => {
     try {
       const { rows } = await pool.query(`SELECT e.id,e.prospect_email AS email,e.prospect_name AS name,e.status,e.enrolled_at,
-        e.hold_reason,c.audience_type AS audience,p.email_status,p.email_verified_at,q.status AS qualification_status,
+        e.hold_reason,c.audience_type AS audience,c.outreach_policy,p.email_status,p.email_verified_at,q.status AS qualification_status,
         q.source_url,q.reason,q.role,q.firm_domain,q.reviewed_at,q.audience AS qualified_audience,
-        (SELECT count(*)::int FROM drip_sends ds WHERE ds.channel='email' AND lower(trim(ds.recipient_email))=lower(trim(e.prospect_email)) AND ds.sent_at>now()-interval '45 days') AS recent_emails,
+        (SELECT count(*)::int FROM drip_sends ds WHERE ds.channel='email' AND lower(trim(ds.recipient_email))=lower(trim(e.prospect_email)) AND ds.sent_at>now()-(CASE WHEN c.outreach_policy='broker_nurture_10' THEN 120 ELSE 45 END * interval '1 day')) AS recent_emails,
         EXISTS(SELECT 1 FROM drip_sends ds LEFT JOIN outreach_qualifications fq ON fq.email=lower(trim(ds.recipient_email))
           WHERE ds.channel='email' AND ds.sent_at>now()-interval '7 days' AND lower(trim(ds.recipient_email))<>lower(trim(e.prospect_email))
           AND (fq.firm_domain=q.firm_domain OR split_part(lower(trim(ds.recipient_email)),'@',2)=q.firm_domain)) AS colleague
@@ -28,7 +28,7 @@ export function registerOutreachReviewRoutes(app: Express, auth: RequestHandler)
       const results = [];
       for (const row of rows) {
         const issue = qualificationIssue({ ...row, status: row.qualification_status, audience: row.qualified_audience }, row.audience || "broker")
-          || sequenceIssue(row.enrolled_at, row.recent_emails)
+          || sequenceIssue(row.enrolled_at, row.recent_emails, new Date(), row.outreach_policy)
           || (row.colleague ? "Another person at this firm received outreach in the last seven days." : null);
         const fresh = row.email_status === "valid" && row.email_verified_at && Date.now() - new Date(row.email_verified_at).getTime() < 30 * 86400_000;
         results.push({ ...row, issue: issue || (!fresh ? "Current valid address verification required before sending." : row.status !== "active" ? `Enrollment is ${row.status}.` : null) });

@@ -1,4 +1,4 @@
-import { getOutreachReadiness } from "./outreach-readiness";
+import { getOutreachReadiness, campaignWindowIssue } from "./outreach-readiness";
 import { greetingName, nextEmailAllowedAt, preferFirstContact } from "./drip-scheduling";
 import { campaignMessageId } from "./campaign-replies";
 import cron from "node-cron";
@@ -319,7 +319,7 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
             break; // suppressed mailbox/domain — stop draining this enrollment
           }
 
-          const hold = await getOutreachReadiness(enrollment.prospectEmail, campaign.audienceType || "broker", enrollment.enrolledAt);
+          const hold = campaignWindowIssue(campaign.outreachPolicy) || await getOutreachReadiness(enrollment.prospectEmail, campaign.audienceType || "broker", enrollment.enrolledAt, campaign.outreachPolicy);
           if (hold) {
             await pool.query("UPDATE drip_enrollments SET hold_reason=$2 WHERE id=$1", [enrollment.id, hold]);
             break;
@@ -364,7 +364,7 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
           const freshEnrollment = await storage.getDripEnrollment(enrollment.id);
           if (freshEnrollment?.status !== "active") break;
           const firstEmail = !existingSends.some(s => s.channel === "email" && s.sentAt);
-          const renderedBody = (firstEmail && firmHook ? `<p>${firmHook}</p>` : "") + personalize(step.bodyHtml);
+          const renderedBody = (campaign.outreachPolicy !== "broker_nurture_10" && firstEmail && firmHook ? `<p>${firmHook}</p>` : "") + personalize(step.bodyHtml);
           const send = await storage.createDripSend({
             enrollmentId: enrollment.id,
             stepId: step.id,
@@ -384,7 +384,7 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
             enrollment.prospectEmail,
             personalize(step.subject),
             renderedBody,
-            undefined, undefined, { messageId: campaignMessageId(send.id), outreach: true,
+            undefined, undefined, { messageId: campaignMessageId(send.id), outreach: true, previewText: personalize(step.previewText || ""),
               onPrepared: async (html) => { await storage.updateDripSend(send.id, { renderedBodyHtml: html, providerMessageId: campaignMessageId(send.id) }); } }
           );
 

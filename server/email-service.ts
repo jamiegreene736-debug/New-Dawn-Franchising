@@ -111,6 +111,7 @@ export interface EmailSendOptions {
   messageId?: string;
   outreach?: boolean;
   minimalSignature?: boolean;
+  previewText?: string;
   onPrepared?: (html: string) => Promise<void>;
 }
 
@@ -231,6 +232,16 @@ ${innerHtml}${footerHtml}
 </div>${pixelHtml}
 </body>
 </html>`;
+    }
+
+    if (options?.previewText?.trim()) {
+      const preview = options.previewText.trim().slice(0, 150)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+      const preheader = `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">${preview}</div>`;
+      finalHtml = /<body\b[^>]*>/i.test(finalHtml)
+        ? finalHtml.replace(/(<body\b[^>]*>)/i, match => match + preheader)
+        : preheader + finalHtml;
     }
 
     // Deliverability headers. A real From-aligned Reply-To, a plain-text part

@@ -1,39 +1,55 @@
 import { DiscoveryCallLink } from "./discovery-call-link";
 import { ReadMore } from "./read-more";
+import { trackEvent } from "@/lib/analytics";
+import {
+  ATTORNEY_EMAIL_URL,
+  BROKER_EMAIL_URL,
+  BROKER_FEE_DISPLAY,
+  BROKER_FEE_TERMS,
+} from "@shared/partner-homepage";
 
 export function HeroSection() {
   return (
     <section
-      className="v4-hero"
+      className="v4-hero partner-hero"
       data-testid="section-hero"
       aria-labelledby="hero-title"
     >
       <div className="v4-hero-copy">
         <div className="eyebrow">
-          <i></i> E-2 INVESTOR VISA · PROPERTY MANAGEMENT
+          <i /> FOR IMMIGRATION ATTORNEYS &amp; BROKERS
         </div>
         <h1 id="hero-title" data-testid="text-hero-title">
-          Live in the USA.
+          Your clients.
           <br />
-          <span>
-            Build your <span style={{ whiteSpace: "nowrap" }}>own business.</span>
-          </span>
+          <span>Their next chapter.</span>
         </h1>
         <h2 data-testid="text-hero-subtitle">
-          Own a property management franchise.
+          A U.S. business. A partner by your side.
         </h2>
         <p>
-          Invest in America. Create local jobs.
-          <br />
-          We handle the day-to-day.
-          <br />
-          <strong>You own and direct the business.</strong>
+          Help your E-2 clients explore a property management franchise with
+          local operating support. Choose the partnership that fits your work.
         </p>
-        <DiscoveryCallLink placement="hero" testId="button-hero-booking" />
-        <span className="v5-call-note">
-          30-minute call · Franchise, investment &amp; next steps
-        </span>
-        <PrinciplesSection />
+        <div className="partner-actions" data-partner-hero>
+          <a className="button primary" href="#attorneys">
+            For Attorneys <span aria-hidden="true">↓</span>
+          </a>
+          <a className="button partner-secondary" href="#brokers">
+            For Brokers <span aria-hidden="true">↓</span>
+          </a>
+        </div>
+        <div className="v4-principles" data-testid="section-trust-strip">
+          <div>
+            <strong>Property management expertise</strong>
+          </div>
+          <div>
+            <strong>Operating roots in El Paso, Texas</strong>
+          </div>
+          <div>
+            <strong>English &amp; Spanish support</strong>
+          </div>
+        </div>
       </div>
       <figure className="v4-hero-photo">
         <img
@@ -46,8 +62,9 @@ export function HeroSection() {
         <figcaption>
           <span>A NEW CHAPTER IN AMERICA</span>
           <strong>
-            Your ambition.
-            <br />A business of your own.
+            Their ambition.
+            <br />
+            Your trusted guidance.
           </strong>
         </figcaption>
       </figure>
@@ -55,422 +72,264 @@ export function HeroSection() {
   );
 }
 
-export function PrinciplesSection() {
+export function AttorneySection() {
   return (
-    <div className="v4-principles" data-testid="section-trust-strip">
-      <div>
-        <strong>70+ E-2 franchise placements guided by our team</strong>
+    <section
+      className="v4-section partner-section"
+      id="attorneys"
+      aria-labelledby="attorney-title"
+    >
+      <div className="partner-section-heading">
+        <div className="eyebrow">FOR IMMIGRATION ATTORNEYS</div>
+        <h2 id="attorney-title">
+          Stronger client relationships.
+          <br />A clearer business path.
+        </h2>
+        <p>
+          Give clients a concrete franchise option to evaluate while you remain
+          their independent legal adviser. Help them feel informed and supported
+          through a major decision.
+        </p>
       </div>
-      <div>
-        <strong>Operating roots in El Paso, Texas</strong>
+      <div className="partner-benefits">
+        <article>
+          <span>01</span>
+          <h3>Support client retention.</h3>
+          <p>
+            Keep the legal relationship with your firm as clients explore
+            business ownership. You advise on immigration strategy, applications
+            and future legal needs.
+          </p>
+        </article>
+        <article>
+          <span>02</span>
+          <h3>Build client confidence.</h3>
+          <p>
+            A clear explanation of the business, costs and owner
+            responsibilities helps clients understand their options and the next
+            step.
+          </p>
+        </article>
+        <article>
+          <span>03</span>
+          <h3>Keep your focus on legal work.</h3>
+          <p>
+            Discuss the franchise and operating support with our team. Review
+            the FDD and business information independently for your client’s
+            circumstances.
+          </p>
+        </article>
       </div>
-      <div>
-        <strong>English &amp; Spanish support</strong>
+      <div className="partner-actions">
+        <a
+          className="button primary"
+          href={ATTORNEY_EMAIL_URL}
+          onClick={() =>
+            trackEvent("partner_inquiry_click", {
+              audience: "attorney",
+              method: "email",
+            })
+          }
+        >
+          Discuss attorney collaboration <span aria-hidden="true">→</span>
+        </a>
+        <DiscoveryCallLink placement="attorney" label="Book an attorney call" />
       </div>
-    </div>
+      <p className="partner-note">
+        You retain independent professional judgment; clients choose their own
+        counsel. Obtain client permission before an introduction or sharing
+        information. This attorney pathway does not offer referral compensation.
+      </p>
+    </section>
+  );
+}
+
+export function BrokerSection() {
+  return (
+    <section
+      className="v4-section partner-section partner-brokers"
+      id="brokers"
+      aria-labelledby="broker-title"
+    >
+      <div className="partner-broker-grid">
+        <div className="partner-section-heading">
+          <div className="eyebrow">FOR FRANCHISE &amp; BUSINESS BROKERS</div>
+          <h2 id="broker-title">
+            A valuable introduction.
+            <br />A generous referral fee.
+          </h2>
+          <p>
+            Connect a prospective franchise owner with New Dawn. We guide the
+            franchise conversation, FDD review and onboarding process.
+          </p>
+          <ul className="partner-list">
+            <li>A property management option for your E-2 clients</li>
+            <li>A direct contact for franchise questions</li>
+            <li>Written referral terms before you get started</li>
+          </ul>
+          <div className="partner-actions">
+            <a
+              className="button primary"
+              href={BROKER_EMAIL_URL}
+              data-testid="broker-fee-inquiry"
+              onClick={() =>
+                trackEvent("partner_inquiry_click", {
+                  audience: "broker",
+                  method: "email",
+                })
+              }
+            >
+              Ask about referral fees <span aria-hidden="true">→</span>
+            </a>
+          </div>
+          <div className="partner-inline-links">
+            <DiscoveryCallLink placement="broker" label="Book a broker call" />
+            <a className="v6-resource-link" href="/brokers">
+              Broker portal
+            </a>
+          </div>
+        </div>
+        <div className="partner-fee-card" data-testid="broker-fee-card">
+          <div className="eyebrow">REFER ONE QUALIFYING CLIENT</div>
+          <h3>
+            Earn up to <strong>{BROKER_FEE_DISPLAY}</strong>
+          </h3>
+          <p className="partner-fee-equation">
+            12.5% × $250,000 franchise sale
+          </p>
+          <p className="partner-fee-terms">{BROKER_FEE_TERMS}</p>
+          <p className="partner-fee-terms">
+            For eligible brokers. Not an attorney compensation offer or a
+            promise of franchisee earnings.
+          </p>
+        </div>
+      </div>
+    </section>
   );
 }
 
 export function BusinessSection() {
   return (
     <section
-      className="v4-section v4-business"
+      className="v4-section partner-section"
       id="opportunities"
       aria-labelledby="business-title"
     >
-      <div className="v4-intro">
-        <div className="eyebrow">THE PROPERTY MANAGEMENT FRANCHISE</div>
+      <div className="partner-section-heading">
+        <div className="eyebrow">THE BUSINESS BEHIND THE INTRODUCTION</div>
         <h2 id="business-title">
-          Your business.
+          Your client directs.
           <br />
-          Our day-to-day team.
+          Our team supports.
         </h2>
         <p>
-          Your franchise serves rental property owners. Our local team and
-          technology support the daily work. You set the direction.
+          A property management franchise serving rental property owners. Your
+          client owns and actively directs the business; New Dawn provides local
+          operating support, training and technology.
         </p>
       </div>
-      <div className="v4-responsibilities">
-        <article>
-          <div className="v4-role-label">
-            <span className="v4-symbol" aria-hidden="true">
-              ↗
-            </span>
-            <span>YOU OWN &amp; DIRECT</span>
-          </div>
-          <h3>Lead your business.</h3>
-          <ul>
-            <li>Set strategy and make key decisions</li>
-            <li>Control the business bank account</li>
-            <li>Oversee your team and performance</li>
-          </ul>
-        </article>
-        <article>
-          <div className="v4-role-label">
-            <span className="v4-symbol" aria-hidden="true">
-              ⌘
-            </span>
-            <span>WE HANDLE THE DAY-TO-DAY</span>
-          </div>
-          <h3>We support the work.</h3>
-          <ul>
-            <li>Tenant communication and property coordination</li>
-            <li>Local operating teams and training</li>
-            <li>Technology, workflows, and reporting</li>
-          </ul>
-        </article>
-      </div>
-      <div className="v6-detail-group v6-business-details">
-        <div className="v6-detail-intro">
-          <span>A CLOSER LOOK</span>
-          <p>Open a topic to explore the details.</p>
-        </div>
-        <ReadMore id="owner-details" title="Your role as franchise owner">
-          <div className="v6-detail-body">
-            <p>
-              You own and actively direct the business. We implement the daily
-              work under your direction, so you can focus on decisions,
-              performance, and growth.
-            </p>
-            <div className="v6-detail-columns">
-              <div>
-                <h4>You control the finances.</h4>
-                <p>
-                  You are the business bank account signatory and make payments
-                  for payroll, vendors, rent, and fees. You approve budgets and
-                  major expenditures.
-                </p>
-              </div>
-              <div>
-                <h4>You lead the business.</h4>
-                <p>
-                  You make hiring and firing decisions, set pricing and
-                  strategy, supervise the team, and review results. Our
-                  operating support keeps you informed as you lead.
-                </p>
-              </div>
-            </div>
-          </div>
-        </ReadMore>
-        <ReadMore id="support-details" title="Our day-to-day support">
+      <div className="v6-detail-group">
+        <ReadMore
+          id="owner-details"
+          title="The owner’s role and our operating support"
+        >
           <div className="v6-detail-body v6-detail-columns">
             <div>
-              <h4>A local team with a clear process.</h4>
+              <h4>Your client leads.</h4>
               <p>
-                Property management brings together ongoing owner relationships,
-                repeatable operations, and local staffing. We help staff and
-                train the local operating team. That team handles client and
-                tenant communication, coordinates property and field work, and
-                reports to you.
+                The owner sets strategy, controls the business bank account,
+                approves budgets and oversees the team. This is an actively
+                directed business.
               </p>
             </div>
             <div>
-              <h4>Support from setup onward.</h4>
+              <h4>Our team supports daily work.</h4>
               <p>
-                Our training, operating procedures, and technology support
-                launch and ongoing operations. The franchise agreement and FDD
-                explain the services, responsibilities, and fees. Our team can
-                also support conversations in English and Spanish.
+                Local teams, training, workflows and technology support tenant
+                communication, property coordination and reporting. The current
+                FDD and agreements define the services and responsibilities.
               </p>
             </div>
           </div>
         </ReadMore>
         <ReadMore
-          id="technology-details"
-          title="Technology and marketing tools"
+          id="how"
+          title="From first conversation to client introduction"
         >
           <div className="v6-detail-body">
+            <ol>
+              <li>
+                <strong>Talk with our team.</strong> Attorneys discuss
+                collaboration; brokers review eligibility and written referral
+                terms.
+              </li>
+              <li>
+                <strong>Explore the fit.</strong> Review the franchise,
+                investment and territory availability. Obtain the client’s
+                permission before making an introduction.
+              </li>
+              <li>
+                <strong>Coordinate the next steps.</strong> New Dawn handles
+                franchise discussions. The client’s attorney assesses
+                eligibility and handles legal advice and applications.
+              </li>
+            </ol>
             <p>
-              New Dawn’s systems bring daily workflows, communication, and
-              performance reporting into the tools your team uses to run the
-              business.
-            </p>
-            <div className="v6-detail-columns">
-              <div>
-                <h4>Visibility into your operations.</h4>
-                <ul>
-                  <li>Owner dashboards and performance reports</li>
-                  <li>Client communication and follow-up workflows</li>
-                  <li>Training and repeatable operating processes</li>
-                </ul>
-              </div>
-              <div>
-                <h4>Tools to support growth.</h4>
-                <ul>
-                  <li>Property-focused campaigns and email/SMS follow-up</li>
-                  <li>Paid campaign, social content, and referral tracking</li>
-                  <li>
-                    AI-assisted prospect discovery and suggested follow-up
-                  </li>
-                </ul>
-              </div>
-            </div>
-            <p>
-              Discuss the tools and marketing support included in your package,
-              any additional costs, and expansion options. Additional
-              territories depend on availability, readiness, and the franchise
-              terms.
+              Share only professional contact details in your initial inquiry,
+              not confidential client information. Brokers should disclose their
+              financial interest when recommending the franchise, as required by
+              applicable law.
             </p>
           </div>
         </ReadMore>
-        <ReadMore id="team-details" title="The team behind New Dawn">
-          <div className="v6-detail-body">
-            <p>
-              Our team brings experience in business operations, real estate,
-              finance, and technology. Our operating roots are in El Paso,
-              Texas, including real estate experience through Star Spangled
-              Banner Realty. Together, our team has guided more than 70 E-2
-              investors through franchise ownership and the visa process.
-            </p>
-            <div className="v6-team-grid">
-              <article>
-                <h4>Jeffrey Tung</h4>
-                <small>FOUNDING MEMBER</small>
-                <p>
-                  Small-business operations, private equity, and building
-                  businesses across markets.
-                </p>
-              </article>
-              <article>
-                <h4>Chris von Pohlot</h4>
-                <small>MANAGING DIRECTOR</small>
-                <p>
-                  Real estate, alternative finance, and capital markets
-                  experience.
-                </p>
-              </article>
-              <article>
-                <h4>Tom Meister</h4>
-                <small>FOUNDING MEMBER</small>
-                <p>Entrepreneurial, finance, and legal industry experience.</p>
-              </article>
-            </div>
-            <p>
-              Dylan Delaney guides franchise conversations, FDD review,
-              territory discussions, and launch planning. Your independently
-              retained attorney handles immigration and legal advice.
-            </p>
-            <a className="v6-resource-link" href="/team">
-              Meet the full team
-            </a>
-          </div>
-        </ReadMore>
-      </div>
-    </section>
-  );
-}
-
-export function PathwaySection() {
-  return (
-    <section
-      className="v4-section v4-path"
-      id="how"
-      data-testid="section-how"
-      aria-labelledby="path-title"
-    >
-      <div className="v4-path-heading">
-        <div>
-          <div className="eyebrow">YOUR BUSINESS. YOUR E-2 PLANS.</div>
-          <h2 id="path-title">A path worth exploring.</h2>
-        </div>
-        <p>
-          The E-2 investor visa may allow eligible investors to live in the U.S.
-          to develop and direct their business. Your immigration attorney
-          assesses your eligibility and guides your application.
-        </p>
-      </div>
-      <div className="v4-steps">
-        <article>
-          <span>01</span>
-          <h3>Explore the franchise.</h3>
-          <p>
-            Discuss your goals. Review the business model, investment details,
-            and Franchise Disclosure Document.
-          </p>
-        </article>
-        <article>
-          <span>02</span>
-          <h3>Plan your E-2 application.</h3>
-          <p>
-            Work with your own immigration attorney while we help you understand
-            and plan the franchise.
-          </p>
-        </article>
-        <article>
-          <span>03</span>
-          <h3>Lead with our support.</h3>
-          <p>
-            Following the required approvals, begin your U.S. chapter and direct
-            your business with our operating team behind you.
-          </p>
-        </article>
-      </div>
-      <div className="v4-path-note">
-        Franchise ownership does not guarantee visa eligibility or approval.{" "}
-        <a
-          href="https://travel.state.gov/content/travel/en/us-visas/employment/treaty-trader-investor-visa-e.html"
-          target="_blank"
-          rel="noopener"
-        >
-          About the E-2 visa ↗
-        </a>
-      </div>
-      <div className="v6-detail-group">
         <ReadMore
-          id="eligibility-details"
-          title="Eligibility and your family’s plans"
+          id="investment"
+          title="Investment, referral terms and the FDD"
         >
-          <div className="v6-detail-body v6-detail-columns">
-            <div>
-              <h4>Start with an individual assessment.</h4>
-              <p>
-                E-2 requirements include treaty-country nationality, a
-                substantial investment in a real operating enterprise, and
-                developing and directing that business. The enterprise must meet
-                the applicable economic requirements. Your attorney assesses the
-                complete criteria against your circumstances.
-              </p>
-              <p>
-                New Dawn provides franchise information and operational support.
-                Immigration advice and applications are handled by your
-                attorney.
-              </p>
-            </div>
-            <div>
-              <h4>Plan for your family, too.</h4>
-              <p>
-                Your spouse and unmarried children under 21 may apply to
-                accompany or join you. Discuss the principal applicant,
-                dependent eligibility, work, and study with your attorney.
-              </p>
-              <p>
-                E-2 is a temporary visa category. Longer-term plans, renewals,
-                and any separate permanent-residence option, including EB-5,
-                need their own legal assessment.
-              </p>
-            </div>
-          </div>
-        </ReadMore>
-        <ReadMore id="location-details" title="Location, timing and next steps">
-          <div className="v6-detail-body v6-detail-columns">
-            <div>
-              <h4>Choose a business that fits your plans.</h4>
-              <p>
-                New Dawn’s operating roots are in El Paso. We’ll discuss
-                available territories and how you would oversee the local team.
-                Review any plans to live elsewhere with your attorney and our
-                franchise team.
-              </p>
-              <p>
-                Your franchise serves property owners; buying real estate is a
-                separate decision from owning the property management business.
-              </p>
-            </div>
-            <div>
-              <h4>Build a realistic timeline.</h4>
-              <p>
-                Franchise review, business setup, application preparation, and
-                consular processing each take time. Appointment availability and
-                processing vary by location and individual case.
-              </p>
-              <p>
-                Start with a discovery call, review the FDD, and coordinate your
-                business and immigration plans before making relocation
-                commitments.
-              </p>
-              <a
-                className="v6-resource-link"
-                href="https://www.usembassy.gov/"
-                target="_blank"
-                rel="noopener"
-              >
-                Find your U.S. embassy or consulate ↗
-              </a>
-            </div>
-          </div>
-        </ReadMore>
-      </div>
-    </section>
-  );
-}
-
-export function InvestmentSection() {
-  return (
-    <section
-      className="v4-section v6-investment"
-      id="investment"
-      aria-labelledby="investment-title"
-    >
-      <div className="v6-investment-intro">
-        <div className="eyebrow">UNDERSTAND THE INVESTMENT</div>
-        <h2 id="investment-title">
-          The numbers.
-          <br /> The details.
-          <br /> Your decision.
-        </h2>
-        <div className="v6-price">
-          <span>FRANCHISE PACKAGES FROM</span>
-          <strong>$225,000</strong>
-        </div>
-        <p>
-          Confirm the full property management investment, fees, and working
-          capital in the current Franchise Disclosure Document.
-        </p>
-      </div>
-      <div className="v6-detail-group">
-        <ReadMore id="investment-details" title="What your investment includes">
           <div className="v6-detail-body">
             <p>
-              Franchise packages bring together the franchise license, initial
-              training, technology access, and business setup support.
+              Confirm the full investment, fees, working capital and operating
+              responsibilities in the current Franchise Disclosure Document. The
+              $250,000 broker illustration is a commission example, not a
+              universal package price or total investment quote.
             </p>
             <p>
-              Review the property management package’s exact scope, initial and
-              ongoing fees, operating capital, and any separate professional or
-              immigration costs before deciding. The current FDD and agreements
-              provide the full breakdown.
-            </p>
-          </div>
-        </ReadMore>
-        <ReadMore id="financing-details" title="Financing and escrow terms">
-          <div className="v6-detail-body">
-            <h4>Explore the funding options.</h4>
-            <p>
-              Financing may be available through affiliates, subject to approval
-              and applicable terms. Review the funding structure with your
-              advisers, including whether it fits your E-2 plans.
-            </p>
-            <h4>Understand the written conditions.</h4>
-            <p>
-              Ask us to walk through the escrow agreement, release conditions,
-              and any visa-denial refund or exit provisions. Eligibility,
-              timing, deductions, and other conditions depend on the applicable
-              documents.
-            </p>
-            <p>
-              Review these terms in the FDD and agreements with your advisers
-              before committing funds.
-            </p>
-          </div>
-        </ReadMore>
-        <ReadMore id="fdd-details" title="Financial performance and the FDD">
-          <div className="v6-detail-body">
-            <p>
-              The Franchise Disclosure Document explains the franchise offering,
-              fees, obligations, and key terms. For financial performance
-              information, review the representation provided in Item 19.
-            </p>
-            <p>
-              Read the full Item 19 disclosures, assumptions, and limitations
-              with your advisers. Financial performance varies, and no earnings
-              or return is guaranteed.
-            </p>
-            <p>
-              We can walk through the available materials and your questions on
-              a discovery call.
+              Review the written referral agreement for the qualifying
+              commission basis, eligibility, payment conditions and timing.
+              Broker compensation is separate from franchisee financial
+              performance. Review any financial performance representation in
+              Item 19; no earnings or return is guaranteed.
             </p>
             <a className="v6-resource-link" href="/request-fdd">
               Review the FDD request information
+            </a>
+          </div>
+        </ReadMore>
+        <ReadMore
+          id="eligibility-details"
+          title="E-2 eligibility and independent legal advice"
+        >
+          <div className="v6-detail-body">
+            <p>
+              E-2 requirements include treaty-country nationality, a substantial
+              investment in a real operating enterprise, and developing and
+              directing that business. The client’s independently retained
+              attorney assesses all applicable criteria.
+            </p>
+            <p>
+              Franchise ownership does not guarantee visa eligibility or
+              approval. New Dawn provides franchise information and operational
+              support, not legal or immigration advice. Attorney collaboration
+              remains subject to the attorney’s professional obligations and
+              applicable jurisdiction’s rules.
+            </p>
+            <a
+              className="v6-resource-link"
+              href="https://travel.state.gov/content/travel/en/us-visas/employment/treaty-trader-investor-visa-e.html"
+              target="_blank"
+              rel="noopener"
+            >
+              About the E-2 visa ↗
             </a>
           </div>
         </ReadMore>
@@ -487,21 +346,24 @@ export function DiscoverySection() {
       data-testid="section-meet-dylan"
     >
       <div className="v5-contact-copy">
-        <div className="eyebrow">YOUR NEXT STEP</div>
+        <div className="eyebrow">ONE CONVERSATION TO GET STARTED</div>
         <h2>
           Let’s talk about
           <br />
-          your American chapter.
+          your clients.
         </h2>
         <p>
-          Get your questions answered and understand whether a New Dawn property
-          management franchise fits your plans.
+          Tell Dylan how you work with E-2 investors. We’ll walk through the
+          franchise and the right next step for your practice or brokerage.
         </p>
         <ul>
-          <li>The franchise and your role as owner</li>
-          <li>Investment details and the FDD</li>
-          <li>Day-to-day support and next steps</li>
+          <li>Attorneys: client fit and franchise information</li>
+          <li>Brokers: referral eligibility, fees and payment terms</li>
+          <li>A clear introduction process for both</li>
         </ul>
+        <p className="partner-note">
+          Please keep initial inquiries free of confidential client information.
+        </p>
       </div>
       <div className="v5-call-card">
         <div className="v5-advisor">
@@ -518,7 +380,7 @@ export function DiscoverySection() {
           </div>
         </div>
         <div className="v5-call-meta">
-          <span>DISCOVERY CALL</span>
+          <span>PARTNER CONVERSATION</span>
           <span>30 MINUTES</span>
         </div>
         <h3>
@@ -528,7 +390,7 @@ export function DiscoverySection() {
         <p>
           Choose a time on Dylan’s calendar.
           <br />
-          Bring your goals and your questions.
+          Bring your questions.
         </p>
         <DiscoveryCallLink placement="dylan" testId="button-dylan-calendly" />
         <small>Opens Calendly to select a time.</small>

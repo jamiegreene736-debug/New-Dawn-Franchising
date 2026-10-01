@@ -1745,3 +1745,48 @@
     transition: none;
   }
 }
+
+/* Partner homepage preserves the existing typography, photography and palette. */
+.homepage-refinements .partner-hero h1 { font-size: clamp(42px, 4.6vw, 68px); }
+.homepage-refinements .partner-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.homepage-refinements .partner-secondary { background: #fff; color: var(--brand-navy); border: 1px solid var(--brand-navy); }
+.homepage-refinements .partner-section-heading { max-width: 710px; }
+.homepage-refinements .partner-section-heading > p { margin-top: 22px; }
+.homepage-refinements .partner-benefits { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 38px; margin: 36px 0; }
+.homepage-refinements .partner-benefits article > span { color: var(--franchise-accent); font-size: 12px; }
+.homepage-refinements .partner-benefits h3 { margin: 14px 0 12px; font-size: 21px; }
+.homepage-refinements .partner-benefits p { font-size: 15px; }
+.homepage-refinements .partner-note { margin-top: 22px; max-width: 800px; font-size: 13px; line-height: 1.7; }
+.homepage-refinements .partner-brokers { background: var(--franchise-soft); }
+.homepage-refinements .partner-broker-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 60px; align-items: center; }
+.homepage-refinements .partner-list { padding-left: 20px; margin: 24px 0; color: var(--franchise-muted); line-height: 1.9; font-size: 15px; }
+.homepage-refinements .partner-fee-card { padding: 38px; border: 1px solid var(--franchise-line); border-top: 4px solid var(--brand-gold); background: #fff; border-radius: 4px 4px 38px 4px; }
+.homepage-refinements .partner-fee-card h3 { margin: 24px 0 12px; font-size: 22px; font-weight: 500; }
+.homepage-refinements .partner-fee-card h3 strong { display: block; margin-top: 10px; font-size: clamp(48px, 5vw, 72px); letter-spacing: -.06em; font-weight: 550; }
+.homepage-refinements .partner-fee-equation { color: var(--franchise-ink); font-size: 17px; }
+.homepage-refinements .partner-fee-terms { margin-top: 20px; font-size: 13px; line-height: 1.7; }
+.homepage-refinements .partner-inline-links { display: flex; flex-wrap: wrap; align-items: center; gap: 20px; margin-top: 18px; }
+.homepage-refinements :is(.partner-inline-links, #attorneys .partner-actions) [data-booking] { padding: 0; background: transparent; color: var(--brand-navy); border: 0; font-size: 14px; text-decoration: underline; text-underline-offset: 4px; }
+.homepage-refinements .partner-section .v6-detail-group { margin-top: 35px; }
+.homepage-refinements details[id] { scroll-margin-top: 145px; }
+.homepage-refinements .v6-detail-body ol { padding-left: 22px; line-height: 1.8; }
+.homepage-refinements .v6-detail-body ol li + li { margin-top: 12px; }
+@media (max-width: 1000px) {
+  .homepage-refinements .partner-broker-grid { gap: 28px; }
+  .homepage-refinements .partner-fee-card { padding: 26px; }
+  .homepage-refinements .franchise-header nav { gap: 13px; font-size: 11px; }
+  .homepage-refinements .partner-header-link { padding: 13px; font-size: 12px; gap: 8px; white-space: nowrap; }
+}
+@media (max-width: 767px) {
+  .homepage-refinements .partner-benefits, .homepage-refinements .partner-broker-grid { grid-template-columns: 1fr; gap: 26px; }
+  .homepage-refinements .partner-benefits { margin: 28px 0; }
+  .homepage-refinements .partner-hero h1 { font-size: 44px; }
+  .homepage-refinements .partner-hero .button { padding: 14px 16px; gap: 12px; }
+  .homepage-refinements .franchise-header { gap: 8px; padding: 0 16px; }
+  .homepage-refinements .franchise-header .official-brand img { width: 116px; height: 56px; }
+  .homepage-refinements .home-menu-toggle { display: block; margin-left: auto; padding: 8px; border: 0; background: transparent; color: var(--brand-navy); font-size: 22px; cursor: pointer; }
+  .homepage-refinements .franchise-header nav { position: absolute; top: 100%; left: 0; right: 0; width: 100%; display: none; justify-content: center; padding: 18px 12px; border-bottom: 1px solid var(--franchise-line); background: #fff; }
+  .homepage-refinements .franchise-header nav[data-open="true"] { display: flex; }
+  .homepage-refinements .partner-header-link { font-size: 11px; padding: 12px 10px; }
+  .homepage-refinements .partner-fee-card h3 strong { font-size: 58px; }
+}

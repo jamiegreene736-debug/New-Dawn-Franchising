@@ -3,6 +3,14 @@ import { test } from "node:test";
 import { getPageShell } from "../server/page-shells";
 import { franchiseServiceNode } from "../server/structured-data";
 import express from "express";
+import {
+  BROKER_REFERRAL_RATE,
+  BROKER_SALE_EXAMPLE,
+  BROKER_FEE_EXAMPLE,
+  BROKER_FEE_TERMS,
+  PARTNER_HOME_TITLE,
+  PARTNER_HOME_DESCRIPTION,
+} from "../shared/partner-homepage";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -13,13 +21,23 @@ import { serveStatic } from "../server/static";
 test("homepage search content describes the approved offer without old visa promises", () => {
   const home = getPageShell("/");
   assert.ok(home);
-  assert.match(home.html, /Live in the USA/);
+  assert.match(home.html, /Your clients/);
+  assert.match(home.html, /FOR IMMIGRATION ATTORNEYS/);
+  assert.match(home.html, /FOR FRANCHISE &amp; BUSINESS BROKERS/);
+  assert.equal(home.title, PARTNER_HOME_TITLE);
+  assert.equal(home.description, PARTNER_HOME_DESCRIPTION);
   assert.match(home.html, /property management franchise/i);
-  assert.match(home.html, /225,000/);
+  assert.match(home.html, /31,250/);
+  assert.match(home.html, /12.5% × \$250,000/);
+  assert.ok(home.html.includes(BROKER_FEE_TERMS));
+  assert.match(
+    home.html,
+    /attorney pathway does not offer referral compensation/,
+  );
   assert.match(home.html, /current Franchise Disclosure Document/);
   assert.match(home.html, /does not guarantee visa eligibility or approval/);
   assert.match(home.html, /calendly\.com\/dylan-newdawnfranchising\/30min/);
-  assert.equal((home.html.match(/<details\b/g) ?? []).length, 9);
+  assert.equal((home.html.match(/<details\b/g) ?? []).length, 4);
   assert.equal(home.faq, undefined);
   assert.doesNotMatch(
     home.html,
@@ -92,4 +110,17 @@ test("production HTML fallback preserves the requested page, metadata, and stati
   const asset = await fetch(`${baseUrl}/asset.txt`);
   assert.equal(asset.status, 200);
   assert.equal(await asset.text(), "static asset");
+});
+
+test("broker example uses the approved percentage and does not imply attorney compensation", () => {
+  assert.equal(BROKER_REFERRAL_RATE, 0.125);
+  assert.equal(BROKER_SALE_EXAMPLE, 250_000);
+  assert.equal(BROKER_FEE_EXAMPLE, 31_250);
+  const partners = getPageShell("/partners");
+  assert.ok(partners);
+  assert.match(
+    partners.html,
+    /separate collaboration pathway without a referral compensation offer/,
+  );
+  assert.equal(partners.faq, undefined);
 });

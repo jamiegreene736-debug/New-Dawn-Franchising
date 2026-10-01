@@ -121,7 +121,9 @@ test("access tokens are short-lived, audience-bound, and reject tampering", asyn
   assert.deepEqual(verified.roles, ["investor"]);
   assert.equal(verified.expiresAt.getTime() - verified.issuedAt.getTime(), 600_000);
 
-  const tamperedToken = `${token.slice(0, -1)}${token.endsWith("a") ? "b" : "a"}`;
+  // The last base64url character can change only unused bits, leaving the signature intact.
+  const signatureStart = token.lastIndexOf(".") + 1;
+  const tamperedToken = `${token.slice(0, signatureStart)}${token[signatureStart] === "a" ? "b" : "a"}${token.slice(signatureStart + 1)}`;
   await assert.rejects(() => service.verify(tamperedToken, NOW), MobileAuthenticationError);
   await assert.rejects(
     () => service.verify(token, new Date(NOW.getTime() + 11 * 60_000)),

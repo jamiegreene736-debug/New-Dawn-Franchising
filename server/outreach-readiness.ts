@@ -53,11 +53,13 @@ export async function getOutreachReadiness(email: string, audience: string, enro
   const q = rows[0];
   const issue = qualificationIssue(q, audience);
   if (issue) return issue;
-  const history = await pool.query<{ count: number; colleague: boolean }>(`SELECT
+  const history = await pool.query<{ count: number; colleague: boolean; meeting: boolean }>(`SELECT
+    EXISTS(SELECT 1 FROM meetings WHERE lower(trim(invitee_email))=$1 AND status IN ('confirmed','completed')) AS meeting,
     (SELECT count(*)::int FROM drip_sends WHERE lower(trim(recipient_email))=$1 AND channel='email' AND sent_at>now()-($3::int * interval '1 day')) AS count,
     EXISTS(SELECT 1 FROM drip_sends s LEFT JOIN outreach_qualifications q ON q.email=lower(trim(s.recipient_email))
       WHERE s.channel='email' AND s.sent_at>now()-interval '7 days' AND lower(trim(s.recipient_email))<>$1
       AND (q.firm_domain=$2 OR split_part(lower(trim(s.recipient_email)),'@',2)=$2)) AS colleague`, [key, q.firm_domain, sequenceLimits(policy).days]);
+  if (history.rows[0].meeting) return "A confirmed or completed meeting already exists; cold follow-ups are held.";
   const stale = sequenceIssue(enrolledAt, history.rows[0].count, new Date(), policy);
   if (stale) return stale;
   if (history.rows[0].colleague) return "Another person at this firm received outreach in the last seven days.";

@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useRoute } from "wouter";
 import { ArrowRight, ChevronDown, Globe2, Loader2, Mail, MapPin, Menu, Phone, Send, X, MessageCircle, GraduationCap, Megaphone, ShieldCheck, Handshake } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LanguageSwitcher } from "@/components/language-switcher";
+import { FranchiseLayout } from "@/components/franchise/franchise-layout";
 import logo from "@assets/Gemini_Generated_Image_t1u2o5t1u2o5t1u2_1771946732580.png";
 import mark from "@/assets/images/nhf-mark.png";
 
@@ -930,6 +931,7 @@ function useVisitorTracking(location: string) {
 
 export function SiteShell({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
+  const [isOtherBusinesses] = useRoute("/other-businesses");
   const [mobileOpen, setMobileOpen] = useState(false);
   const t = FOOTER_I18N[localeFromPath(location)];
 
@@ -940,7 +942,11 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   }, [location]);
 
   useEffect(() => {
-    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    const target = location === "/" && window.location.hash
+      ? document.getElementById(window.location.hash.slice(1))
+      : null;
+    if (target) target.scrollIntoView({ behavior: "instant" });
+    else window.scrollTo({ top: 0, left: 0, behavior: "instant" });
   }, [location]);
 
   useEffect(() => {
@@ -953,6 +959,10 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
       document.body.style.overflow = "";
     };
   }, [mobileOpen]);
+
+  if (location === "/" || isOtherBusinesses) {
+    return <FranchiseLayout isHome={location === "/"}>{children}</FranchiseLayout>;
+  }
 
   return (
     <div data-testid="site-shell" className="min-h-screen">

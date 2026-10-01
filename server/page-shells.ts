@@ -14,151 +14,159 @@ const EMAIL = "franchising@newdawnfranchising.com";
 
 const shells: Record<string, PageShell> = {
   "/": {
-    title: `${SITE} | E-2 Visa Franchise Platform — Property Management, Telecom & Insurance | El Paso, TX`,
+    title: `${SITE} | Property Management Franchise & E-2 Plans`,
     description:
-      "New Dawn Franchising is a multi-vertical franchisor for E-2 visa investors. Choose from three recurring-revenue franchises — Property Management, Telecom, or Insurance. You own and direct the business, control the bank account, and make the payments; New Dawn implements the day-to-day operations under your direction. Investment from $225,000. FDD available upon request.",
+      "Own and direct a U.S. property management franchise with New Dawn’s day-to-day support. Explore the investment and your E-2 plans. Book a discovery call.",
     html: `
 <main>
-  <h1>Three Industries. One E-2 Platform.</h1>
-  <p>New Dawn Franchising is a multi-vertical franchisor built specifically for E-2 Treaty Investor Visa investors. Choose from three recurring-revenue franchise verticals — Property Management, Telecom, or Insurance — and own, develop, and direct a real, operating U.S. business. You control the business bank account, make the payments, approve hiring and major decisions, and set strategy. New Dawn implements the day-to-day operations under your direction — the "develop and direct" structure the E-2 visa requires.</p>
-  <p>${TAGLINE}</p>
-  <p>Franchise Disclosure Document (FDD) available upon request. New Dawn Franchising is a registered franchisor.</p>
+<section aria-labelledby="hero-title">
+<div><div> E-2 INVESTOR VISA · PROPERTY MANAGEMENT</div><h1 id="hero-title">Live in the USA.<br><span>Build your<br>own business.</span></h1><h2>Own a property management franchise.</h2><p>Invest in America. Create local jobs.<br>We handle the day-to-day.<br><strong>You own and direct the business.</strong></p><a href="https://calendly.com/dylan-newdawnfranchising/30min" target="_blank" rel="noopener">Book a discovery call </a><span>30-minute call · Franchise, investment &amp; next steps</span></div>
 
-  <section>
-    <h2>Our Three E-2 Franchise Verticals</h2>
-    <p>New Dawn selected three industries that lend themselves to recurring revenue, documented operating systems, supervisory control, staffing, and renewal-ready reporting — traits that support a credible E-2 business.</p>
-    <ul>
-      <li><strong>Property Management</strong> — Long-term rental management operations with local execution teams and owner-level reporting.</li>
-      <li><strong>Telecom</strong> — Recurring-service telecom operations supported by centralized systems, sales workflows, and oversight dashboards.</li>
-      <li><strong>Insurance</strong> — Insurance-sector franchise operations designed around compliant supervision, client service, and recurring revenue.</li>
-    </ul>
-  </section>
-
-  <section>
-    <h2>Proprietary Technology Across Every Vertical</h2>
-    <p>Every New Dawn franchisee benefits from proprietary technology built exclusively for our multi-vertical system — from owner dashboards and client communications to marketing, reporting, and workflow automation. This isn't off-the-shelf software. It's infrastructure designed around E-2 investor oversight across Property Management, Telecom, and Insurance.</p>
-    <ul>
-      <li>Owner dashboards and operational reporting</li>
-      <li>Automated client communication &amp; follow-up</li>
-      <li>Marketing and lead generation that runs around the clock</li>
-    </ul>
-  </section>
-
-  <section>
-    <h2>How It Works</h2>
-    <ol>
-      <li><strong>Choose Your Vertical &amp; Invest</strong> — Select Property Management, Telecom, or Insurance and acquire your New Dawn franchise starting at $225,000. This structured investment is designed to meet E-2 visa capital requirements and gives you a real, operating business.</li>
-      <li><strong>Apply for Your E-2 Visa</strong> — Our partner immigration attorneys guide you through the E-2 visa application. You own and direct a legitimate U.S. business — the foundation of a strong E-2 petition.</li>
-      <li><strong>You Direct; New Dawn Implements the Day-to-Day</strong> — You direct the business: you control the bank account, make the payments, approve hiring and major decisions, and set strategy. New Dawn's trained local team implements the day-to-day operations in your chosen vertical under your direction and reports to you.</li>
-      <li><strong>Grow Your U.S. Enterprise</strong> — Scale your business, build equity, and maintain executive control while living anywhere in the United States.</li>
-    </ol>
-  </section>
-
-  <section>
-    <h2>Who Does What: The Franchisee Directs, New Dawn Implements</h2>
-    <p>The franchisee (the E-2 investor) owns and directs the business. New Dawn Franchising is the franchisor: it implements the day-to-day operations under the franchisee's direction. New Dawn does not own, control, or direct the franchisee's business.</p>
-    <h3>The franchisee (owner and director)</h3>
-    <ul>
-      <li>Owns the franchise entity — at least 50% ownership, as the E-2 visa requires — and is the legal owner of the business.</li>
-      <li>Controls and manages the business bank account and is the signatory on it.</li>
-      <li>Makes all payments: payroll, vendors, rent, and franchise fees are paid by the franchisee from the franchisee's own account.</li>
-      <li>Approves hiring and firing, budgets, major expenditures, and pricing.</li>
-      <li>Sets strategy and growth targets, and reviews performance through owner dashboards and reports.</li>
-      <li>Supervises the operating team and holds it accountable.</li>
-    </ul>
-    <h3>New Dawn Franchising (franchisor and operations implementer)</h3>
-    <ul>
-      <li>Provides the franchise system, training, and proprietary technology.</li>
-      <li>Implements the day-to-day operations the franchisee directs — client service, customer and tenant coordination, field work, provisioning, billing support, and the reporting cadence.</li>
-      <li>Staffs and trains the local operating team, which reports to the franchisee.</li>
-      <li>Provides in-house immigration, financing, real estate, and legal support.</li>
-    </ul>
-  </section>
-
-  <section>
-    <h2>Why New Dawn Franchising?</h2>
-    <ul>
-      <li>A multi-vertical E-2 platform — choose Property Management, Telecom, or Insurance</li>
-      <li>Franchise investment from $225,000 — structured to meet E-2 visa requirements</li>
-      <li>Proprietary technology powers every vertical</li>
-      <li>You direct the business; New Dawn implements day-to-day operations under your direction</li>
-      <li>In-house E-2 immigration, finance, real estate, and legal professionals</li>
-      <li>Headquartered in El Paso, Texas, with domestic geographic flexibility for owners</li>
-      <li>Part of the New Dawn Franchising Group of Companies™</li>
-    </ul>
-  </section>
-
-  <section>
-    <h2>Investment Overview</h2>
-    <p>Franchise investment starts at $225,000, covering your franchise license, training, technology platform access, and operational setup. Financing options are available through our affiliated lending partners.</p>
-    <p>The E-2 visa requires a substantial and at-risk investment in a U.S. business. Each New Dawn vertical is structured specifically to meet this requirement.</p>
-  </section>
-
-  <section>
-    <h2>Frequently Asked Questions</h2>
-    <h3>What is New Dawn Franchising?</h3>
-    <p>New Dawn Franchising is a multi-vertical franchisor specializing in E-2 Treaty Investor Visa-qualifying franchises. Investors choose from three recurring-revenue industries — Property Management, Telecom, or Insurance.</p>
-    <h3>What is the E-2 visa?</h3>
-    <p>The E-2 Treaty Investor Visa allows nationals of treaty countries to enter and work in the U.S. based on a substantial investment in a U.S. business. The investor must own and direct the enterprise.</p>
-    <h3>How much do I need to invest?</h3>
-    <p>New Dawn franchise investment starts at $225,000. The E-2 visa does not have a fixed minimum, but the investment must be "substantial" relative to the total cost of the business.</p>
-    <h3>How do I choose between Property Management, Telecom, and Insurance?</h3>
-    <p>The FDD and discovery process help you compare the three options. We look at your goals, market fit, investment preferences, operational comfort, and E-2 strategy, then walk you through which vertical is the strongest fit.</p>
-    <h3>Who directs the business — the franchisee or New Dawn?</h3>
-    <p>The franchisee directs the business. You are the owner and director: you control the business bank account, make all payments, approve hiring and major decisions, and set strategy. New Dawn implements the day-to-day operations under your direction and reports to you. New Dawn does not own, control, or direct your business.</p>
-    <h3>Do I have to do the day-to-day work myself?</h3>
-    <p>No. Each New Dawn vertical is structured so you are the business director and decision-maker while New Dawn's trained local team implements the day-to-day work. You keep ownership control, manage the bank account, make the payments, and supervise the team — the substantive "develop and direct" role the E-2 visa requires.</p>
-    <h3>Can I live anywhere in the USA on the E-2 visa?</h3>
-    <p>Yes. New Dawn is headquartered in El Paso, Texas, but qualified E-2 owners can live elsewhere in the United States while maintaining executive oversight of the franchise.</p>
-  </section>
-
-  <section>
-    <h2>Contact New Dawn Franchising</h2>
-    <p>Ready to learn more? Contact us to request the FDD and schedule an intro call.</p>
-    <address>
-      <p>${ADDR}</p>
-      <p>Phone: <a href="tel:+13465979994">${PHONE}</a></p>
-      <p>Email: <a href="mailto:${EMAIL}">${EMAIL}</a></p>
-    </address>
-  </section>
+</section>
+<div><div><span>01</span><strong>Invest in the USA.</strong></div><div><span>02</span><strong>Create local jobs.</strong></div><div><span>03</span><strong>Own your franchise.</strong></div></div>
+<section id="opportunities" aria-labelledby="business-title">
+  <div>
+    <div>THE PROPERTY MANAGEMENT FRANCHISE</div>
+    <h2 id="business-title">Your business.<br>Our day-to-day team.</h2>
+    <p>Your franchise serves rental property owners. Our local team and technology support the daily work. You set the direction.</p>
+  </div>
+  <div>
+    <article>
+      <div><span aria-hidden="true">↗</span><span>YOU OWN &amp; DIRECT</span></div>
+      <h3>Lead your business.</h3>
+      <ul><li>Set strategy and make key decisions</li><li>Control the business bank account</li><li>Oversee your team and performance</li></ul>
+    </article>
+    <article>
+      <div><span aria-hidden="true">⌘</span><span>WE HANDLE THE DAY-TO-DAY</span></div>
+      <h3>We support the work.</h3>
+      <ul><li>Tenant communication and property coordination</li><li>Local operating teams and training</li><li>Technology, workflows, and reporting</li></ul>
+    </article>
+  </div>
+  <div>
+    <div><span>A CLOSER LOOK</span><p>Open a topic to explore the details.</p></div>
+    <details id="owner-details">
+      <summary><strong>Your role as franchise owner</strong></summary>
+      <div>
+        <p>You own and actively direct the business. We implement the daily work under your direction, so you can focus on decisions, performance, and growth.</p>
+        <div>
+          <div><h4>You control the finances.</h4><p>You are the business bank account signatory and make payments for payroll, vendors, rent, and fees. You approve budgets and major expenditures.</p></div>
+          <div><h4>You lead the business.</h4><p>You make hiring and firing decisions, set pricing and strategy, supervise the team, and review results. Our operating support keeps you informed as you lead.</p></div>
+        </div>
+      </div>
+    </details>
+    <details id="support-details">
+      <summary><strong>Our day-to-day support</strong></summary>
+      <div>
+        <div><h4>A local team with a clear process.</h4><p>Property management brings together ongoing owner relationships, repeatable operations, and local staffing. We help staff and train the local operating team. That team handles client and tenant communication, coordinates property and field work, and reports to you.</p></div>
+        <div><h4>Support from setup onward.</h4><p>Our training, operating procedures, and technology support launch and ongoing operations. The franchise agreement and FDD explain the services, responsibilities, and fees. Our team can also support conversations in English and Spanish.</p></div>
+      </div>
+    </details>
+    <details id="technology-details">
+      <summary><strong>Technology and marketing tools</strong></summary>
+      <div>
+        <p>New Dawn’s systems bring daily workflows, communication, and performance reporting into the tools your team uses to run the business.</p>
+        <div>
+          <div><h4>Visibility into your operations.</h4><ul><li>Owner dashboards and performance reports</li><li>Client communication and follow-up workflows</li><li>Training and repeatable operating processes</li></ul></div>
+          <div><h4>Tools to support growth.</h4><ul><li>Property-focused campaigns and email/SMS follow-up</li><li>Paid campaign, social content, and referral tracking</li><li>AI-assisted prospect discovery and suggested follow-up</li></ul></div>
+        </div>
+        <p>Discuss the tools and marketing support included in your package, any additional costs, and expansion options. Additional territories depend on availability, readiness, and the franchise terms.</p>
+      </div>
+    </details>
+    <details id="team-details">
+      <summary><strong>The team behind New Dawn</strong></summary>
+      <div>
+        <p>Our team brings experience in business operations, real estate, finance, and technology. Our operating roots are in El Paso, Texas, including real estate experience through Star Spangled Banner Realty.</p>
+        <div>
+          <article><h4>Jeffrey Tung</h4><small>FOUNDING MEMBER</small><p>Small-business operations, private equity, and building businesses across markets.</p></article>
+          <article><h4>Chris von Pohlot</h4><small>MANAGING DIRECTOR</small><p>Real estate, alternative finance, and capital markets experience.</p></article>
+          <article><h4>Tom Meister</h4><small>FOUNDING MEMBER</small><p>Entrepreneurial, finance, and legal industry experience.</p></article>
+        </div>
+        <p>Dylan Delaney guides franchise conversations, FDD review, territory discussions, and launch planning. Your independently retained attorney handles immigration and legal advice.</p>
+        <a href="/team">Meet the full team ↗</a>
+      </div>
+    </details>
+  </div>
+</section>
+<section id="how" aria-labelledby="path-title">
+  <div>
+    <div><div>YOUR BUSINESS. YOUR E-2 PLANS.</div><h2 id="path-title">A path worth exploring.</h2></div>
+    <p>The E-2 investor visa may allow eligible investors to live in the U.S. to develop and direct their business. Your immigration attorney assesses your eligibility and guides your application.</p>
+  </div>
+  <div>
+    <article><span>01</span><h3>Explore the franchise.</h3><p>Discuss your goals. Review the business model, investment details, and Franchise Disclosure Document.</p></article>
+    <article><span>02</span><h3>Plan your E-2 application.</h3><p>Work with your own immigration attorney while we help you understand and plan the franchise.</p></article>
+    <article><span>03</span><h3>Lead with our support.</h3><p>Following the required approvals, begin your U.S. chapter and direct your business with our operating team behind you.</p></article>
+  </div>
+  <div>Franchise ownership does not guarantee visa eligibility or approval. <a href="https://travel.state.gov/content/travel/en/us-visas/employment/treaty-trader-investor-visa-e.html" target="_blank" rel="noopener">About the E-2 visa ↗</a></div>
+  <div>
+    <details id="eligibility-details">
+      <summary><strong>Eligibility and your family’s plans</strong></summary>
+      <div>
+        <div><h4>Start with an individual assessment.</h4><p>E-2 requirements include treaty-country nationality, a substantial investment in a real operating enterprise, and developing and directing that business. The enterprise must meet the applicable economic requirements. Your attorney assesses the complete criteria against your circumstances.</p><p>New Dawn provides franchise information and operational support. Immigration advice and applications are handled by your attorney.</p></div>
+        <div><h4>Plan for your family, too.</h4><p>Your spouse and unmarried children under 21 may apply to accompany or join you. Discuss the principal applicant, dependent eligibility, work, and study with your attorney.</p><p>E-2 is a temporary visa category. Longer-term plans, renewals, and any separate permanent-residence option, including EB-5, need their own legal assessment.</p></div>
+      </div>
+    </details>
+    <details id="location-details">
+      <summary><strong>Location, timing and next steps</strong></summary>
+      <div>
+        <div><h4>Choose a business that fits your plans.</h4><p>New Dawn’s operating roots are in El Paso. We’ll discuss available territories and how you would oversee the local team. Review any plans to live elsewhere with your attorney and our franchise team.</p><p>Your franchise serves property owners; buying real estate is a separate decision from owning the property management business.</p></div>
+        <div><h4>Build a realistic timeline.</h4><p>Franchise review, business setup, application preparation, and consular processing each take time. Appointment availability and processing vary by location and individual case.</p><p>Start with a discovery call, review the FDD, and coordinate your business and immigration plans before making relocation commitments.</p><a href="https://www.usembassy.gov/" target="_blank" rel="noopener">Find your U.S. embassy or consulate ↗</a></div>
+      </div>
+    </details>
+  </div>
+</section>
+<section id="investment" aria-labelledby="investment-title">
+  <div>
+    <div>UNDERSTAND THE INVESTMENT</div>
+    <h2 id="investment-title">The numbers.<br> The details.<br> Your decision.</h2>
+    <div><span>FRANCHISE PACKAGES FROM</span><strong>$225,000</strong></div>
+    <p>Confirm the full property management investment, fees, and working capital in the current Franchise Disclosure Document.</p>
+  </div>
+  <div>
+    <details id="investment-details">
+      <summary><strong>What your investment includes</strong></summary>
+      <div>
+        <p>Franchise packages bring together the franchise license, initial training, technology access, and business setup support.</p>
+        <p>Review the property management package’s exact scope, initial and ongoing fees, operating capital, and any separate professional or immigration costs before deciding. The current FDD and agreements provide the full breakdown.</p>
+      </div>
+    </details>
+    <details id="financing-details">
+      <summary><strong>Financing and escrow terms</strong></summary>
+      <div>
+        <h4>Explore the funding options.</h4><p>Financing may be available through affiliates, subject to approval and applicable terms. Review the funding structure with your advisers, including whether it fits your E-2 plans.</p>
+        <h4>Understand the written conditions.</h4><p>Ask us to walk through the escrow agreement, release conditions, and any visa-denial refund or exit provisions. Eligibility, timing, deductions, and other conditions depend on the applicable documents.</p>
+        <p>Review these terms in the FDD and agreements with your advisers before committing funds.</p>
+      </div>
+    </details>
+    <details id="fdd-details">
+      <summary><strong>Financial performance and the FDD</strong></summary>
+      <div>
+        <p>The Franchise Disclosure Document explains the franchise offering, fees, obligations, and key terms. For financial performance information, review the representation provided in Item 19.</p>
+        <p>Read the full Item 19 disclosures, assumptions, and limitations with your advisers. Financial performance varies, and no earnings or return is guaranteed.</p>
+        <p>We can walk through the available materials and your questions on a discovery call.</p>
+        <a href="/request-fdd">Review the FDD request information ↗</a>
+      </div>
+    </details>
+  </div>
+</section>
+<section id="contact"><div><div>YOUR NEXT STEP</div><h2>Let’s talk about<br>your American chapter.</h2><p>Get your questions answered and understand whether a New Dawn property management franchise fits your plans.</p><ul><li>The franchise and your role as owner</li><li>Investment details and the FDD</li><li>Day-to-day support and next steps</li></ul></div><div><div><div><strong>Dylan Delaney</strong><span>Director of Franchise Development</span></div></div><div><span>DISCOVERY CALL</span><span>30 MINUTES</span></div><h3>A conversation.<br>A clearer next step.</h3><p>Choose a time on Dylan’s calendar.<br>Bring your goals and your questions.</p><a href="https://calendly.com/dylan-newdawnfranchising/30min" target="_blank" rel="noopener">Book a discovery call </a><small>Opens Calendly to select a time.</small></div></section>
+  <footer>
+    <p>A new chapter. A business of your own. Operating roots in El Paso, Texas.</p>
+    <p><a href="/team">Meet the team</a> · <a href="/partners">Partners &amp; referrals</a> · <a href="/other-businesses">Other businesses</a> · <a href="/blog">Resources</a> · <a href="/login">Portal login</a></p>
+    <p>New Dawn Franchising LLC is a franchisor, not a law firm. No visa or financial outcome is guaranteed. Franchise offers are made only through the applicable Franchise Disclosure Document and subject to applicable law.</p>
+  </footer>
 </main>`,
-    faq: [
-      {
-        question: "What is New Dawn Franchising?",
-        answer:
-          "New Dawn Franchising is a multi-vertical franchisor specializing in E-2 Treaty Investor Visa-qualifying franchises. Investors choose from three recurring-revenue industries — Property Management, Telecom, or Insurance — and own and direct a real U.S. business. The franchisee controls the bank account, makes the payments, and sets strategy; New Dawn implements the day-to-day operations under the franchisee's direction.",
-      },
-      {
-        question: "What is the E-2 visa?",
-        answer:
-          "The E-2 Treaty Investor Visa allows nationals of treaty countries to enter and work in the U.S. based on a substantial investment in a U.S. business. The investor must own and direct the enterprise.",
-      },
-      {
-        question: "How much do I need to invest?",
-        answer:
-          "New Dawn franchise investment starts at $225,000. The E-2 visa does not have a fixed minimum, but the investment must be \"substantial\" relative to the total cost of the business.",
-      },
-      {
-        question: "How do I choose between Property Management, Telecom, and Insurance?",
-        answer:
-          "The FDD and discovery process help you compare the three options. We look at your goals, market fit, investment preferences, operational comfort, and E-2 strategy, then walk you through which vertical is the strongest fit.",
-      },
-      {
-        question: "Who directs the business — the franchisee or New Dawn?",
-        answer:
-          "The franchisee directs the business. You are the owner and director: you control the business bank account, make all payments, approve hiring and major decisions, and set strategy. New Dawn implements the day-to-day operations under your direction and reports to you. New Dawn does not own, control, or direct your business.",
-      },
-      {
-        question: "Do I have to do the day-to-day work myself?",
-        answer:
-          "No. Each New Dawn vertical is structured so you are the business director and decision-maker while New Dawn's trained local team implements the day-to-day work. You keep ownership control, manage the bank account, make the payments, and supervise the team — the substantive \"develop and direct\" role the E-2 visa requires.",
-      },
-      {
-        question: "Can I live anywhere in the USA on the E-2 visa?",
-        answer:
-          "Yes. New Dawn is headquartered in El Paso, Texas, but qualified E-2 owners can live elsewhere in the United States while maintaining executive oversight of the franchise.",
-      },
-    ],
+  },
+
+  "/other-businesses": {
+    title: `Other Supported Businesses | ${SITE}`,
+    description:
+      "Explore New Dawn’s other supported business verticals: telecom and insurance. Own and direct your business with training and operational support. Book a discovery call.",
+    html: `
+<main><section><a href="/">← Back to property management</a><div>OTHER SUPPORTED BUSINESSES</div><h1>More ways to build<br><span>your American chapter.</span></h1><p>Property management is our lead franchise opportunity.<br>If your interests point elsewhere, explore these other supported business verticals with our team.</p></section>
+<section><article><span>⌁</span><div>01 / TELECOM</div><h2>Keep people<br>connected.</h2><p>A service business centered on connectivity, with centralized sales workflows, training, and reporting tools.</p><ul><li>Sales and service workflows</li><li>Team training and operational support</li><li>Owner oversight and performance reporting</li></ul><a href="https://calendly.com/dylan-newdawnfranchising/30min" target="_blank" rel="noopener">Book a discovery call </a></article><article><span>◇</span><div>02 / INSURANCE</div><h2>Build lasting<br>relationships.</h2><p>A client-service business with systems and training to support the operating team you lead.</p><ul><li>Client relationship workflows</li><li>Operational training and support</li><li>Owner direction and team supervision</li></ul><a href="https://calendly.com/dylan-newdawnfranchising/30min" target="_blank" rel="noopener">Book a discovery call </a></article></section>
+<section><div><div>START WITH OUR LEAD OPPORTUNITY</div><h2>Explore property management.</h2><p>Understand the model, your role, and the support behind your business.</p></div><a href="/#opportunities">See the franchise <span>↗</span></a></section><p>New Dawn Franchising LLC is a franchisor, not a law firm. No visa or financial outcome is guaranteed. Franchise offers are made only through the applicable Franchise Disclosure Document and subject to applicable law.</p>
+</main>`,
   },
 
   "/about": {
@@ -953,7 +961,8 @@ const shells: Record<string, PageShell> = {
 };
 
 export function getPageShell(pathname: string): PageShell | null {
-  return shells[pathname] ?? null;
+  const route = pathname.replace(/\/$/, "").toLowerCase() || "/";
+  return shells[route] ?? null;
 }
 
 export const defaultShell: PageShell = {

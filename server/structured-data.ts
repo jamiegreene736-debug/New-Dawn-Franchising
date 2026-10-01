@@ -84,60 +84,20 @@ export function websiteNode(): Record<string, unknown> {
   };
 }
 
-/** The three E-2 franchise verticals New Dawn offers. */
-const FRANCHISE_VERTICALS = [
-  {
-    name: "Property Management Franchise",
-    description:
-      "Long-term rental management operations with local execution teams and owner-level reporting.",
-  },
-  {
-    name: "Telecom Franchise",
-    description:
-      "Recurring-service telecom operations supported by centralized systems, sales workflows, and oversight dashboards.",
-  },
-  {
-    name: "Insurance Franchise",
-    description:
-      "Insurance-sector franchise operations designed around compliant supervision, client service, and recurring revenue.",
-  },
-];
-
-/** The multi-vertical franchise opportunity as a Service with a priced offer catalog. */
+/** The lead opportunity described on the homepage, without unverified package pricing. */
 export function franchiseServiceNode(): Record<string, unknown> {
   return {
     "@type": "Service",
     "@id": `${SITE_URL}/#franchise-offer`,
-    name: "E-2 Visa Franchise Opportunities",
-    serviceType: "Franchise opportunities for E-2 Treaty Investor Visa investors",
+    name: "Property Management Franchise",
+    serviceType: "Property management franchise with operational support",
     provider: { "@id": ORG_ID },
     areaServed: { "@type": "Country", name: "United States" },
+    url: `${SITE_URL}/`,
     description:
-      "New Dawn franchises three recurring-revenue verticals — Property Management, Telecom, and Insurance — " +
-      "each structured to meet E-2 Treaty Investor Visa requirements. Franchise investment starts at $225,000 and " +
-      "includes training, proprietary technology, and operational support.",
-    hasOfferCatalog: {
-      "@type": "OfferCatalog",
-      name: "E-2 Visa Franchise Verticals",
-      itemListElement: FRANCHISE_VERTICALS.map((v) => ({
-        "@type": "Offer",
-        itemOffered: {
-          "@type": "Service",
-          name: v.name,
-          description: v.description,
-          provider: { "@id": ORG_ID },
-        },
-        price: "225000",
-        priceCurrency: "USD",
-        availability: "https://schema.org/InStock",
-        url: `${SITE_URL}/`,
-        priceSpecification: {
-          "@type": "PriceSpecification",
-          priceCurrency: "USD",
-          minPrice: "225000",
-        },
-      })),
-    },
+      "Own and actively direct a property management franchise while New Dawn supports the day-to-day work, " +
+      "training, technology, and local operations. Review investment details in the current FDD. " +
+      "E-2 eligibility requires individual legal assessment; franchise ownership does not guarantee visa approval.",
   };
 }
 

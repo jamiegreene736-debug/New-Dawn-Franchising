@@ -469,7 +469,7 @@ Return JSON array of suggestion objects with fields: id (short string), title (s
       campaignId: req.params.id,
       totalContacted: sent,
       sent,
-      delivered: sent,
+      delivered: activity.filter(a => a.deliveredAt).length,
       opened,
       replied,
       openRate: sent ? opened / sent : 0,

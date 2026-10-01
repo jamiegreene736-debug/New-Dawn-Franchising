@@ -85,7 +85,7 @@ export interface IStorage {
   recordBotEmailOpen(sendId: string): Promise<void>;
   recordBotEmailClick(sendId: string): Promise<void>;
   markEnrollmentsUnsubscribed(email: string): Promise<number>;
-  markDripSendBounced(recipientEmail: string, reason: string): Promise<DripSend | null>;
+  markDripSendBounced(recipientEmail: string, reason: string, receivedAt?: Date): Promise<DripSend | null>;
   getSmsCampaigns(): Promise<SmsCampaign[]>;
   createSmsCampaign(data: InsertSmsCampaign): Promise<SmsCampaign>;
   updateSmsCampaign(id: string, data: Partial<SmsCampaign>): Promise<SmsCampaign>;
@@ -670,7 +670,7 @@ export class DatabaseStorage implements IStorage {
       .from(dripSends)
       .where(and(
         eq(dripSends.channel, "email"),
-        eq(dripSends.status, "sent"),
+        inArray(dripSends.status, ["sent", "delivered", "opened", "clicked", "replied", "bounced"]),
         gte(dripSends.sentAt, since),
       ));
     return Number(row?.n ?? 0);
@@ -799,16 +799,18 @@ export class DatabaseStorage implements IStorage {
     return rows.length;
   }
 
-  async markDripSendBounced(recipientEmail: string, reason: string): Promise<DripSend | null> {
-    // A bounce NDR arrives asynchronously (minutes after Gmail accepted the
-    // message), so flip the most recent delivered send to this address from
-    // "sent" → "bounced" and store the reason. Falls back to the newest send.
+  async markDripSendBounced(recipientEmail: string, reason: string, receivedAt?: Date): Promise<DripSend | null> {
+    // Reprocessing the same NDR must not walk backwards through older sends
+    // or mark a call/SMS task as an email bounce.
     const rows = await db.select().from(dripSends)
-      .where(eq(dripSends.recipientEmail, recipientEmail))
+      .where(and(
+        sql`lower(trim(${dripSends.recipientEmail})) = ${recipientEmail.trim().toLowerCase()}`,
+        eq(dripSends.channel, "email"),
+        sql`${dripSends.sentAt} <= ${receivedAt ?? new Date()}`,
+      ))
       .orderBy(desc(dripSends.sentAt));
-    if (rows.length === 0) return null;
-    const target = rows.find((r) => r.status === "sent" || r.status === "pending") || rows[0];
-    if (target.status === "bounced") return null; // already recorded
+    const target = rows[0];
+    if (!target || !["sent", "delivered", "opened", "clicked"].includes(target.status)) return null;
     const [updated] = await db.update(dripSends)
       .set({ status: "bounced", errorMessage: reason.slice(0, 500) })
       .where(eq(dripSends.id, target.id))

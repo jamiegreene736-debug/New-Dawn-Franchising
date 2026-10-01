@@ -1,6 +1,7 @@
+import { campaignMessageId } from "./campaign-replies";
 import cron from "node-cron";
 import { storage } from "./storage";
-import { sendEmail, sendEmailFromSender, getTrackingPixelUrl, chooseSenderForKey, getAvailableSenders } from "./email-service";
+import { sendEmail, sendEmailFromSender, getTrackingPixelUrl, chooseSenderForKey, getAvailableSenders, getSenderPassword } from "./email-service";
 import {
   allSendersDisabled,
   isRecipientFailure,
@@ -18,7 +19,7 @@ import {
   emailDomain,
   nextWindowDescription,
 } from "./smart-scheduler";
-import { FIRST_TOUCH, isFirstEmailStep, isLinkedInConnectStep } from "@shared/first-touch";
+import { FIRST_TOUCH, isLinkedInConnectStep } from "@shared/first-touch";
 import { firstTouchLang } from "./introducer-qualify";
 import { linkedInDailyQueueCap } from "./outreach-owner";
 import { db } from "./db";
@@ -181,6 +182,10 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
 
     await loadSenderHealth();
     const configuredSenders = getAvailableSenders().map((p) => p.email);
+    if (!getAvailableSenders().some(p => getSenderPassword(p))) {
+      console.error("[Drip] Dylan mailbox is not configured; no outreach sent.");
+      return;
+    }
     if (allSendersDisabled(configuredSenders)) {
       console.error("[Drip] All sending mailboxes are disabled (Gmail 535/534). Pausing until a mailbox is re-authed.");
       return;
@@ -338,29 +343,29 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
             }
           }
 
+          const freshEnrollment = await storage.getDripEnrollment(enrollment.id);
+          if (freshEnrollment?.status !== "active") break;
           const send = await storage.createDripSend({
             enrollmentId: enrollment.id,
             stepId: step.id,
             channel: "email",
             recipientEmail: enrollment.prospectEmail,
             recipientName: enrollment.prospectName,
-            subject: step.subject || step.stepName || "Email",
+            subject: personalize(step.subject || step.stepName || "Email"),
             status: "pending",
           });
 
           const baseUrl = getBaseUrl();
           const trackingUrl = getTrackingPixelUrl(baseUrl, send.id);
 
-          // Sender rotation (off by default → always DEFAULT_SENDER). Sticky per
-          // enrollment so a contact's whole sequence threads from one mailbox.
+          // Keep every outreach email and reply on Dylan's mailbox.
           const fromEmail = chooseSenderForKey(enrollment.id, delivSettings.senderRotation);
-          const first = isFirstEmailStep(step) ? FIRST_TOUCH[lang] : null;
           const result = await sendEmailFromSender(
             fromEmail,
             enrollment.prospectEmail,
-            personalize(first?.subject ?? step.subject),
-            personalize(first?.bodyHtml ?? step.bodyHtml),
-            trackingUrl
+            personalize(step.subject),
+            personalize(step.bodyHtml),
+            trackingUrl, undefined, { messageId: campaignMessageId(send.id) }
           );
 
           if (result.success) {
@@ -561,11 +566,10 @@ export async function reprocessStep(campaignId: string, stepId: string): Promise
         const send = await storage.createDripSend({
           enrollmentId: enrollment.id, stepId: step.id, channel: "email",
           recipientEmail: enrollment.prospectEmail, recipientName: enrollment.prospectName,
-          subject: step.subject || step.stepName || "Email", status: "pending",
+          subject: personalize(step.subject || step.stepName || "Email"), status: "pending",
         });
         const trackingUrl = getTrackingPixelUrl(getBaseUrl(), send.id);
-        const first = isFirstEmailStep(step) ? FIRST_TOUCH[lang] : null;
-        const r = await sendEmail(enrollment.prospectEmail, personalize(first?.subject ?? step.subject), personalize(first?.bodyHtml ?? step.bodyHtml), trackingUrl);
+        const r = await sendEmail(enrollment.prospectEmail, personalize(step.subject), personalize(step.bodyHtml), trackingUrl, undefined, { messageId: campaignMessageId(send.id) });
         if (r.success) { await storage.updateDripSend(send.id, { status: "sent", sentAt: new Date() } as any); result.sent++; }
         else { await storage.updateDripSend(send.id, { status: "failed", errorMessage: r.error } as any); result.failed++; }
         await sleep(1200); // gentle pacing so a reprocess isn't a hard burst

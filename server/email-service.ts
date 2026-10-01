@@ -1,7 +1,7 @@
-import nodemailer from "nodemailer";
+import nodemailer, { type Transporter } from "nodemailer";
 import type { CrmTemplateGroup } from "@shared/crm-template-groups";
 import { buildUnsubscribeHeaders, htmlToPlainText, unsubscribeUrl } from "./unsubscribe-service";
-import { isSenderDisabled, markSenderAuthFailure, markSenderSuccess } from "./sender-health";
+import { markSenderAuthFailure, markSenderSuccess } from "./sender-health";
 
 // ─── Sender Profiles ──────────────────────────────────────────────────────────
 // Each profile maps an email address to its Gmail App Password env var name.
@@ -18,7 +18,7 @@ export const ALL_SENDER_PROFILES: SenderProfile[] = [
   // From over a "Dylan Delaney" sign-off reads as a mismatch to both spam
   // filters and skeptical recipients.
   { email: "franchising@newdawnfranchising.com", name: "Dylan Delaney — New Dawn Franchising", envVar: "GMAIL_APP_PASSWORD_FRANCHISING" },
-  { email: "dylan@newdawnfranchising.com", name: "Dylan – New Dawn Franchising", envVar: "GMAIL_APP_PASSWORD_DYLAN" },
+  { email: "dylan@newdawnfranchising.com", name: "Dylan Delaney", envVar: "GMAIL_APP_PASSWORD_DYLAN" },
   { email: "info@newdawnfranchising.com", name: "New Dawn Franchising — Info", envVar: "GMAIL_APP_PASSWORD_INFO" },
   { email: "support@newdawnfranchising.com", name: "New Dawn Franchising Support", envVar: "GMAIL_APP_PASSWORD_SUPPORT" },
   // Volume-scaling senders (2026-08-19): a profile only enters the rotation
@@ -41,21 +41,14 @@ export function getSenderPassword(profile: SenderProfile): string | undefined {
   return clean || undefined;
 }
 
-/**
- * How many sender mailboxes are actually credentialed (app password present).
- * Drives the default daily send cap: ~100/day per real mailbox is the safe
- * per-address Gmail volume, so total capacity scales as mailboxes are added.
- */
+/** Outreach sending capacity is limited to Dylan's mailbox. */
 export function countConfiguredSenders(): number {
-  const n = ALL_SENDER_PROFILES.filter((p) => !!getSenderPassword(p)).length;
-  return Math.max(1, n);
+  // Outreach is owned by Dylan; other inboxes do not add sending capacity.
+  return 1;
 }
 
 export function getAvailableSenders(): SenderProfile[] {
-  // franchising@ is the primary sender — always included (even before its app password
-  // is confirmed) so the UI has at least one option; the actual send surfaces any error.
-  const others = ALL_SENDER_PROFILES.slice(1).filter((p) => !!getSenderPassword(p));
-  return [ALL_SENDER_PROFILES[0], ...others];
+  return ALL_SENDER_PROFILES.filter(p => p.email === DEFAULT_SENDER);
 }
 
 export function getSenderProfile(email: string): SenderProfile | undefined {
@@ -63,9 +56,9 @@ export function getSenderProfile(email: string): SenderProfile | undefined {
 }
 
 // ─── Transporter Cache ────────────────────────────────────────────────────────
-const transporterCache = new Map<string, nodemailer.Transporter>();
+const transporterCache = new Map<string, Transporter>();
 
-function getTransporter(senderEmail: string): nodemailer.Transporter {
+function getTransporter(senderEmail: string): Transporter {
   if (transporterCache.has(senderEmail)) {
     return transporterCache.get(senderEmail)!;
   }
@@ -96,24 +89,12 @@ function getTransporter(senderEmail: string): nodemailer.Transporter {
 }
 
 // Default sender for system emails (signatures, drip campaigns, etc.)
-const DEFAULT_SENDER = "franchising@newdawnfranchising.com";
+export const DEFAULT_SENDER = "dylan@newdawnfranchising.com";
 
-// Pick the From address for a drip send. When rotation is OFF we always return
-// DEFAULT_SENDER (unchanged behaviour). When ON we deterministically map a stable
-// key (the enrollment id) to one of the configured senders — so a given contact's
-// whole sequence always threads from the SAME mailbox (preserving threading) while
-// volume is spread evenly across mailboxes to protect any single one's reputation.
-export function chooseSenderForKey(key: string, rotate: boolean): string {
-  const senders = getAvailableSenders().filter((p) => !isSenderDisabled(p.email));
-  if (senders.length === 0) return DEFAULT_SENDER;
-  if (!rotate) {
-    const def = senders.find((p) => p.email === DEFAULT_SENDER);
-    return (def || senders[0]).email;
-  }
-  if (senders.length === 1) return senders[0].email;
-  let h = 0;
-  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) | 0;
-  return senders[Math.abs(h) % senders.length].email;
+// Retain the call signature for existing campaign callers; rotation is disabled.
+export function chooseSenderForKey(_key: string, _rotate: boolean): string {
+  // Never silently substitute another identity when Dylan needs reconnecting.
+  return DEFAULT_SENDER;
 }
 
 // ─── Email Attachment ─────────────────────────────────────────────────────────
@@ -130,7 +111,7 @@ export async function sendEmail(
   html: string,
   trackingPixelUrl?: string,
   attachments?: EmailAttachment[],
-  options?: { skipSignature?: boolean; skipUnsubscribe?: boolean }
+  options?: { skipSignature?: boolean; skipUnsubscribe?: boolean; messageId?: string }
 ): Promise<{ success: boolean; error?: string; messageId?: string }> {
   return sendEmailFromSender(DEFAULT_SENDER, to, subject, html, trackingPixelUrl, attachments, options);
 }
@@ -145,7 +126,7 @@ export async function sendEmailFromSender(
   // skipUnsubscribe: omit List-Unsubscribe headers + the text-part unsubscribe
   // line. Pass this for genuinely transactional 1:1 mail (FDD receipts, wire
   // instructions, internal alerts) where an "unsubscribe" affordance is wrong.
-  options?: { skipSignature?: boolean; skipUnsubscribe?: boolean; cc?: string }
+  options?: { skipSignature?: boolean; skipUnsubscribe?: boolean; cc?: string; messageId?: string }
 ): Promise<{ success: boolean; error?: string; messageId?: string }> {
   try {
     const profile = getSenderProfile(fromEmail);
@@ -247,6 +228,7 @@ ${innerHtml}${footerHtml}
       to,
       ...(options?.cc ? { cc: options.cc } : {}),
       replyTo: fromEmail,
+      messageId: options?.messageId,
       subject,
       html: finalHtml,
       text: textBody,
@@ -322,12 +304,11 @@ export async function cacheDylanCalendlyUrl(): Promise<void> {
 }
 
 const SIGNER_MAP: Record<string, SignerInfo> = {
-  // Dylan signs the shared franchising@ inbox — his mailbox moved from dylan@
-  // to franchising@, and outreach must sign off from a person, not a brand.
+  // Retain historical sender profiles for mailbox reconciliation.
   "franchising@newdawnfranchising.com": {
     name: "Dylan Delaney",
     title: "Director of Franchise Development",
-    email: "franchising@newdawnfranchising.com",
+    email: "dylan@newdawnfranchising.com",
     phone: "(346) 597-9994",
     linkedin: "https://www.linkedin.com/in/dylanmdelaney",
     photoKey: "dylan-headshot-email.jpg",
@@ -343,7 +324,7 @@ const SIGNER_MAP: Record<string, SignerInfo> = {
     linkedin: "https://www.linkedin.com/in/dylanmdelaney",
     photoKey: "dylan-headshot-email.jpg",
     whatsappUrl: "https://wa.me/13465979994",
-    calendlyUrl: "https://calendly.com",
+    calendlyUrl: "https://calendly.com/dylan-newdawnfranchising",
     usePhoto: true,
   },
 };
@@ -351,7 +332,7 @@ const SIGNER_MAP: Record<string, SignerInfo> = {
 const DEFAULT_SIGNER: SignerInfo = {
   name: "Dylan Delaney",
   title: "Director of Franchise Development",
-  email: "franchising@newdawnfranchising.com",
+  email: "dylan@newdawnfranchising.com",
   phone: "(346) 597-9994",
   linkedin: "https://www.linkedin.com/in/dylanmdelaney",
   whatsappUrl: "https://wa.me/13465979994",

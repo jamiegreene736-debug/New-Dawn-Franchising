@@ -1,6 +1,6 @@
-// ─── Gmail Inbox Sync (franchising@newdawnfranchising.com) ───────────────────
+// ─── Gmail Inbox Sync (Dylan plus historical sender inboxes) ───────────────────
 // Two-way Gmail connection: outbound is handled by email-service.ts; this module
-// pulls the franchising@ INBOX over IMAP and lands client replies on the matching
+// pulls the sender INBOX over IMAP and lands client replies on the matching
 // CRM record so conversations stay in one place.
 //
 // Modeled on the IMAP reply listener in agent-service.ts (pollForApprovalReply).
@@ -8,27 +8,29 @@
 // messages, matches the sender to a CRM client (or attorney contact), and stores
 // the reply as an inbound crm_direct_emails row + an activity. Deduped by Message-ID.
 
+import { simpleParser } from "mailparser";
+import { findReplySend, isOptOutReply } from "./campaign-replies";
 import { ImapFlow } from "imapflow";
 import cron from "node-cron";
 import { storage } from "./storage";
-import { addToDnc } from "./agent-service";
+import { addToDnc, isOnDnc } from "./agent-service";
 import { isAutomatedOrBulkEmail } from "./crm-email-filter";
-import { sendEmail, ALL_SENDER_PROFILES, getSenderPassword } from "./email-service";
+import { sendEmail, ALL_SENDER_PROFILES, getSenderPassword, DEFAULT_SENDER } from "./email-service";
 import { getDeliverabilitySettings } from "./deliverability-settings-service";
 
-const FRANCHISING_EMAIL = "franchising@newdawnfranchising.com";
+const PRIMARY_EMAIL = DEFAULT_SENDER;
 
 function getAppPassword(): string | undefined {
   // Strip whitespace (Gmail app passwords are 16 contiguous chars; pasted env
   // values often carry a trailing newline/space that would break IMAP auth).
-  const clean = process.env.GMAIL_APP_PASSWORD_FRANCHISING?.replace(/\s+/g, "");
-  return clean || undefined;
+  const profile = ALL_SENDER_PROFILES.find(p => p.email === DEFAULT_SENDER)!;
+  return getSenderPassword(profile);
 }
 
 export function getGmailSyncStatus() {
   const pass = (getAppPassword() || "").replace(/\s/g, "");
   return {
-    email: FRANCHISING_EMAIL,
+    email: PRIMARY_EMAIL,
     configured: !!pass,
     appPasswordValid: pass.length === 16,
   };
@@ -115,16 +117,16 @@ function classifyBounce(raw: string): "hard" | "soft" {
 }
 
 /**
- * Poll the franchising@ inbox once and import any new client replies.
+ * Poll Dylan's inbox once and import any new client replies.
  * No-ops (with a clear reason) when the app password isn't configured.
  */
 export async function syncFranchisingInbox(): Promise<SyncResult> {
   const password = getAppPassword();
   if (!password) {
-    lastResult = { scanned: 0, matched: 0, stored: 0, bounced: 0, error: "GMAIL_APP_PASSWORD_FRANCHISING not set", lastRunAt: new Date() };
+    lastResult = { scanned: 0, matched: 0, stored: 0, bounced: 0, error: "GMAIL_APP_PASSWORD_DYLAN not set", lastRunAt: new Date() };
     return lastResult;
   }
-  lastResult = await syncSenderInbox(FRANCHISING_EMAIL, password);
+  lastResult = await syncSenderInbox(PRIMARY_EMAIL, password);
   return lastResult;
 }
 
@@ -136,7 +138,11 @@ export async function syncFranchisingInbox(): Promise<SyncResult> {
  * inboxes needs this treatment, not just franchising@ (a reply to dylan@ that
  * nobody sees is exactly the "no one ever replies" failure mode).
  */
-export async function syncSenderInbox(senderEmail: string, password: string): Promise<SyncResult> {
+const syncingMailboxes = new Set<string>();
+
+export async function syncSenderInbox(senderEmail: string, password: string, lookbackDays = 7): Promise<SyncResult> {
+  if (syncingMailboxes.has(senderEmail)) return { scanned: 0, matched: 0, stored: 0, bounced: 0, error: "Mailbox sync already running", lastRunAt: new Date() };
+  syncingMailboxes.add(senderEmail);
   let client: ImapFlow | null = null;
   let scanned = 0;
   let matched = 0;
@@ -150,6 +156,9 @@ export async function syncSenderInbox(senderEmail: string, password: string): Pr
       secure: true,
       auth: { user: senderEmail, pass: password },
       logger: false,
+      connectionTimeout: 15_000,
+      greetingTimeout: 15_000,
+      socketTimeout: 30_000,
     });
 
     await client.connect();
@@ -157,15 +166,15 @@ export async function syncSenderInbox(senderEmail: string, password: string): Pr
 
     try {
       // Look back 7 days so recent bounces are caught even after a restart.
-      const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const since = new Date(Date.now() - Math.min(180, Math.max(1, lookbackDays)) * 24 * 60 * 60 * 1000);
       // Whether transient (4.x.x) bounces are left alone instead of suppressed.
       const softSkipDnc = (await getDeliverabilitySettings()).softBounceSkipDnc;
 
       // Fetch full raw source too — bounce parsing needs headers + all MIME
       // parts (the decoded TEXT part alone is often MIME-encoded).
-      for await (const msg of client.fetch({ since }, { envelope: true, bodyParts: ["TEXT"], source: true })) {
+      for await (const msg of client.fetch({ since }, { envelope: true, bodyParts: ["TEXT"], source: true, internalDate: true })) {
         scanned++;
-        const msgId = msg.envelope?.messageId || `seq-${msg.seq}`;
+        const msgId = msg.envelope?.messageId || `${senderEmail}:${client.mailbox && client.mailbox.uidValidity}:${msg.uid}`;
 
         const fromAddr = msg.envelope?.from?.[0]?.address?.toLowerCase() || "";
         const fromName = msg.envelope?.from?.[0]?.name || fromAddr;
@@ -186,7 +195,7 @@ export async function syncSenderInbox(senderEmail: string, password: string): Pr
           }
           const candidates = extractBouncedRecipients(rawSource || subject);
           for (const addr of candidates) {
-            const marked = await storage.markDripSendBounced(addr, `Bounced (${kind}): ${subject}`.slice(0, 200));
+            const marked = await storage.markDripSendBounced(addr, `Bounced (${kind}): ${subject}`.slice(0, 200), msg.internalDate instanceof Date ? msg.internalDate : msg.envelope?.date);
             if (marked) {
               bounced++;
               stored++;
@@ -214,53 +223,49 @@ export async function syncSenderInbox(senderEmail: string, password: string): Pr
           continue;
         }
 
-        const textPart = msg.bodyParts?.get("TEXT");
-        const bodyText = (textPart ? Buffer.from(textPart).toString("utf8") : "").replace(/\r\n/g, "\n").trim();
+        const parsed = await simpleParser(msg.source || Buffer.alloc(0));
+        const bodyText = (parsed.text || "").replace(/\r\n/g, "\n").trim();
+        // Inspect only this message's headers, never headers quoted in its body.
+        const rawHeaders = rawSource.split(/\r?\n\r?\n/, 1)[0];
 
         // Skip newsletters / service welcome emails / notifications / auto-replies
         // (e.g. "Welcome to PR Newswire!") — these aren't personal replies and
         // shouldn't clutter the contact's timeline / Activity feed.
-        if (isAutomatedOrBulkEmail(fromAddr, subject, rawSource.slice(0, 8000), bodyText)) {
+        if (isAutomatedOrBulkEmail(fromAddr, subject, rawHeaders, bodyText)) {
           processedMessageIds.add(msgId);
           continue;
         }
         const bodyHtml = `<pre style="white-space:pre-wrap;font-family:inherit;margin:0;">${escapeHtml(bodyText)}</pre>`;
         const preview = bodyText.slice(0, 240);
 
-        // Reply automation: a personal reply pauses any active campaign for this
-        // person (so we stop drip-blasting someone who answered) and alerts the
-        // team to take it over. Idempotent — only acts on still-active enrollments.
-        try {
-          const enrolls = await storage.getDripEnrollmentsByEmail(fromAddr);
-          const active = enrolls.filter((e) => e.status === "active");
-          for (const e of active) {
-            await storage.updateDripEnrollment(e.id, { status: "replied" } as any);
-            const sends = await storage.getDripSends(e.id);
-            const latest = sends
-              .filter((s) => (s.channel || "email") === "email" && ["sent", "delivered", "opened", "clicked"].includes(s.status))
-              .sort((a, b) => {
-                const ta = new Date(a.sentAt || a.createdAt).getTime();
-                const tb = new Date(b.sentAt || b.createdAt).getTime();
-                return tb - ta;
-              })[0];
-            if (latest) {
-              await storage.updateDripSend(latest.id, { status: "replied" } as any);
+        const enrolls = await storage.getDripEnrollmentsByEmail(fromAddr);
+        const sends = (await Promise.all(enrolls.map(e => storage.getDripSends(e.id)))).flat();
+        const references = [parsed.inReplyTo, ...(Array.isArray(parsed.references) ? parsed.references : [parsed.references])]
+          .filter((r): r is string => !!r);
+        const receivedAt = msg.internalDate instanceof Date ? msg.internalDate : parsed.date;
+        const matchedSend = receivedAt ? findReplySend(sends, { subject, receivedAt, references, bodyText }) : undefined;
+        const optOut = isOptOutReply(bodyText);
+        if (optOut && enrolls.length > 0) {
+          if (!(await isOnDnc(fromAddr))) await addToDnc(fromAddr, undefined, undefined, "Recipient requested unsubscribe");
+          await storage.markEnrollmentsUnsubscribed(fromAddr);
+        }
+        if (matchedSend) {
+          await storage.updateDripSend(matchedSend.id, { status: "replied" });
+          // Attribute only the matched sequence, but stop every active sequence
+          // for this person so another campaign cannot continue cold follow-ups.
+          for (const enrollment of enrolls) {
+            if (enrollment.status === "active" ||
+                (enrollment.id === matchedSend.enrollmentId && enrollment.status === "completed")) {
+              await storage.updateDripEnrollment(enrollment.id, { status: optOut ? "unsubscribed" : "replied" });
             }
           }
-          if (active.length > 0) {
-            console.log(`[GmailSync] reply from ${fromAddr} — paused ${active.length} active enrollment(s)`);
-            try {
-              await sendEmail(
-                "dylan@newdawnfranchising.com",
-                `Reply from ${fromName} — campaign paused`,
-                `<p><strong>${escapeHtml(fromName)}</strong> (${escapeHtml(fromAddr)}) just replied — their campaign has been paused so they get a personal response.</p><p><strong>Subject:</strong> ${escapeHtml(subject)}</p><p><strong>Message:</strong></p>${bodyHtml}`,
-                undefined,
-                undefined,
-                { skipUnsubscribe: true },
-              );
-            } catch { /* alert is best-effort */ }
+          if (matchedSend.status !== "replied") {
+            const alert = await sendEmail(DEFAULT_SENDER, `Reply from ${fromName} — campaign paused`,
+              `<p>${escapeHtml(fromName)} replied to ${escapeHtml(subject)}. Follow-ups have stopped.</p>${bodyHtml}`,
+              undefined, undefined, { skipUnsubscribe: true });
+            if (!alert.success) console.error("[GmailSync] Reply saved but team alert failed:", alert.error);
           }
-        } catch { /* best-effort */ }
+        }
 
         // Primary match: investor CRM client by email.
         const clientRow = await storage.getCrmClientByEmail(fromAddr);
@@ -323,11 +328,12 @@ export async function syncSenderInbox(senderEmail: string, password: string): Pr
               if (await logContactReply(contact.id)) stored++;
               matched++;
             }
-          } catch (err: any) {
-            console.error(`[GmailSync] prospect-mirror failed for ${fromAddr} (msg ${msgId}): ${err?.message || err}`);
+          } catch (err) {
+            throw new Error(`Could not store prospect reply ${msgId}`, { cause: err });
           }
         }
 
+        if (processedMessageIds.size > 10_000) processedMessageIds.clear();
         processedMessageIds.add(msgId);
       }
     } finally {
@@ -342,6 +348,8 @@ export async function syncSenderInbox(senderEmail: string, password: string): Pr
       try { await client.logout(); } catch {}
     }
     return { scanned, matched, stored, bounced, error, lastRunAt: new Date() };
+  } finally {
+    syncingMailboxes.delete(senderEmail);
   }
 
   if (stored > 0 || bounced > 0) {
@@ -358,13 +366,13 @@ export function scheduleGmailSync(): void {
   scheduled = true;
 
   if (!getAppPassword()) {
-    console.log("[GmailSync] franchising@ app password not set — inbox sync idle until GMAIL_APP_PASSWORD_FRANCHISING is configured");
+    console.log("[GmailSync] Dylan app password not set — inbox sync idle until GMAIL_APP_PASSWORD_DYLAN is configured");
   }
 
   cron.schedule("*/2 * * * *", () => {
     syncFranchisingInbox().catch((e) => console.error("[GmailSync] scheduled run failed:", e?.message || e));
   });
-  console.log("[GmailSync] franchising@ inbox sync scheduled (every 2 min)");
+  console.log("[GmailSync] Dylan inbox sync scheduled (every 2 min)");
 }
 
 // ─── Full sync for the OTHER sender inboxes ────────────────────────────────────
@@ -379,7 +387,7 @@ let allInboxScheduled = false;
 export function scheduleAllInboxBounceScan(): void {
   if (allInboxScheduled) return;
   allInboxScheduled = true;
-  const others = () => ALL_SENDER_PROFILES.filter((p) => p.email !== FRANCHISING_EMAIL && !!getSenderPassword(p));
+  const others = () => ALL_SENDER_PROFILES.filter((p) => p.email !== PRIMARY_EMAIL && !!getSenderPassword(p));
   cron.schedule("*/15 * * * *", async () => {
     for (const p of others()) {
       const pass = getSenderPassword(p);

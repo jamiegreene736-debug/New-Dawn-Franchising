@@ -435,10 +435,15 @@ export const dripSends = pgTable("drip_sends", {
   clickedAt: timestamp("clicked_at"),
   clickCount: integer("click_count").default(0).notNull(),
   // Scanner/bot hits on the pixel + click redirect (security gateways, link
-  // checkers). Kept separate so opened_at/clicked_at + the counts above mean
-  // "a human engaged" — see server/tracking-bot-filter.ts.
+  // checkers). Remaining events may still be automated; they do not prove readership.
   botOpenCount: integer("bot_open_count").default(0).notNull(),
   botClickCount: integer("bot_click_count").default(0).notNull(),
+  fromAddress: text("from_address"),
+  renderedBodyHtml: text("rendered_body_html"),
+  providerMessageId: text("provider_message_id"),
+  replySignal: text("reply_signal"),
+  bounceVerifiedAt: timestamp("bounce_verified_at", { withTimezone: true }),
+  bounceMessageId: text("bounce_message_id"),
   errorMessage: text("error_message"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

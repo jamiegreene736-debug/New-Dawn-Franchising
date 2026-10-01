@@ -20,6 +20,7 @@ import TrPage from "@/pages/tr";
 import E2FitPage from "@/pages/e2-fit";
 import E2VisaFranchisePage from "@/pages/e2-visa-franchise";
 import E2VisaProcessPage from "@/pages/e2-visa-process";
+import PartnerReviewPage from "@/pages/partner-review";
 import RequestFddPage from "@/pages/request-fdd";
 import LegalPage from "@/pages/legal";
 import EsPropertyManagementPage from "@/pages/es-property-management";
@@ -97,6 +98,7 @@ function Router() {
               <Route path="/ko" component={KoPage} />
               <Route path="/tr" component={TrPage} />
               <Route path="/e-2-visa-process" component={E2VisaProcessPage} />
+              <Route path="/partner-review" component={PartnerReviewPage} />
               <Route path="/request-fdd" component={RequestFddPage} />
               <Route path="/legal" component={LegalPage} />
               <Route path="/e2-fit" component={E2FitPage} />

@@ -104,6 +104,16 @@ interface EmailAttachment {
   contentType?: string;
 }
 
+export interface EmailSendOptions {
+  skipSignature?: boolean;
+  skipUnsubscribe?: boolean;
+  cc?: string;
+  messageId?: string;
+  outreach?: boolean;
+  minimalSignature?: boolean;
+  onPrepared?: (html: string) => Promise<void>;
+}
+
 // ─── Core Send Function ───────────────────────────────────────────────────────
 export async function sendEmail(
   to: string,
@@ -111,7 +121,7 @@ export async function sendEmail(
   html: string,
   trackingPixelUrl?: string,
   attachments?: EmailAttachment[],
-  options?: { skipSignature?: boolean; skipUnsubscribe?: boolean; messageId?: string }
+  options?: EmailSendOptions
 ): Promise<{ success: boolean; error?: string; messageId?: string }> {
   return sendEmailFromSender(DEFAULT_SENDER, to, subject, html, trackingPixelUrl, attachments, options);
 }
@@ -126,9 +136,17 @@ export async function sendEmailFromSender(
   // skipUnsubscribe: omit List-Unsubscribe headers + the text-part unsubscribe
   // line. Pass this for genuinely transactional 1:1 mail (FDD receipts, wire
   // instructions, internal alerts) where an "unsubscribe" affordance is wrong.
-  options?: { skipSignature?: boolean; skipUnsubscribe?: boolean; cc?: string; messageId?: string }
+  options?: EmailSendOptions
 ): Promise<{ success: boolean; error?: string; messageId?: string }> {
   try {
+    if (options?.outreach) {
+      const { getDeliverabilitySettings } = await import("./deliverability-settings-service");
+      if ((await getDeliverabilitySettings()).outreachAutopilotPaused) return { success: false, error: "Outreach sending is paused." };
+      const { isOnDnc } = await import("./agent-service");
+      if (await isOnDnc(to, null, to.split("@")[1])) return { success: false, error: "Recipient is suppressed." };
+      fromEmail = DEFAULT_SENDER;
+      trackingPixelUrl = undefined;
+    }
     const profile = getSenderProfile(fromEmail);
     const transport = getTransporter(fromEmail);
 
@@ -152,7 +170,9 @@ export async function sendEmailFromSender(
       const baseUrl = "https://www.newdawnfranchising.com";
       const sigHtml = finalHtml.includes(SIGNATURE_SENTINEL)
         ? ""  // Signature already embedded (e.g. signature-service emails)
-        : buildEmailSignature(fromEmail, baseUrl);
+        : options?.outreach || options?.minimalSignature
+          ? `<p>Dylan Delaney<br>New Dawn Franchising<br>dylan@newdawnfranchising.com</p>`
+          : buildEmailSignature(fromEmail, baseUrl);
 
       // Extract inner content — strip any outer <html>/<body> envelope
       let bodyContent = finalHtml
@@ -223,6 +243,7 @@ ${innerHtml}${footerHtml}
       textBody += `\n\n—\nNot interested? Unsubscribe: ${unsubscribeUrl(recipientAddr)}`;
     }
 
+    await options?.onPrepared?.(finalHtml);
     const info = await transport.sendMail({
       from: `"${profile?.name || "New Dawn Franchising"}" <${fromEmail}>`,
       to,

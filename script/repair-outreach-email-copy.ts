@@ -17,16 +17,16 @@ function trackFor(name: string, audience: string): CampaignTrackStep[] | undefin
 const connection = await pool.connect();
 try {
   await connection.query("BEGIN");
-  const { rows } = await connection.query<{ id: string; name: string; audience_type: string; step_order: number; subject: string; body_html: string; step_name: string }>(`SELECT s.id,c.name,c.audience_type,s.step_order,s.subject,s.body_html,s.step_name FROM drip_steps s JOIN drip_campaigns c ON c.id=s.campaign_id WHERE s.step_type='email' ORDER BY c.name,s.step_order`);
+  const { rows } = await connection.query<{ id: string; name: string; audience_type: string; step_order: number; subject: string; body_html: string; step_name: string; delay_days: number }>(`SELECT s.id,c.name,c.audience_type,s.step_order,s.subject,s.body_html,s.step_name,s.delay_days FROM drip_steps s JOIN drip_campaigns c ON c.id=s.campaign_id WHERE s.step_type='email' ORDER BY c.name,s.step_order`);
   const updates = rows.flatMap(row => {
     const step = trackFor(row.name, row.audience_type)?.find(s => s.stepOrder === row.step_order && s.stepType === "email");
     if (!step) return [];
     const body = withSpacing(step.bodyHtml);
-    return row.subject === step.subject && row.body_html === body ? [] : [{ before: row, subject: step.subject, body }];
+    return row.subject === step.subject && row.body_html === body && row.delay_days === step.delayDays ? [] : [{ before: row, subject: step.subject, body, delayDays: step.delayDays }];
   });
   if (apply) {
     await writeFile(backupPath!, JSON.stringify(updates, null, 2), { mode: 0o600, flag: "wx" });
-    for (const update of updates) await connection.query("UPDATE drip_steps SET subject=$1, body_html=$2, step_name=$1 WHERE id=$3", [update.subject, update.body, update.before.id]);
+    for (const update of updates) await connection.query("UPDATE drip_steps SET subject=$1, body_html=$2, step_name=$1,delay_days=$4 WHERE id=$3", [update.subject, update.body, update.before.id, update.delayDays]);
     await connection.query("UPDATE deliverability_settings SET sender_rotation=false,updated_at=now() WHERE id='singleton'");
   }
   console.log(JSON.stringify({ apply, campaigns: new Set(updates.map(u => u.before.name)).size, emailSteps: updates.length, enrollmentChanges: 0, emailsSent: 0 }));

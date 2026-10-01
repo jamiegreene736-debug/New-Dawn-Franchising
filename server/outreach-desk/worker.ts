@@ -56,6 +56,7 @@ async function dispatch(action: DispatchAction): Promise<DispatchResult> {
     action.recipient,
     action.subject,
     `<p>${escapeHtml(action.body).replaceAll("\n", "<br>")}</p>`,
+    undefined, undefined, { outreach: true },
   );
   return { ...result, id: result.messageId };
 }

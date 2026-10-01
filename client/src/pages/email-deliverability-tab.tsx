@@ -640,7 +640,7 @@ function WarmupPanel() {
 
 // ─── Sending & Safety panel (Phase 2) ────────────────────────────────────────
 interface SafetySettings {
-  verifyBeforeSend: boolean; senderRotation: boolean; domainGuard: boolean;
+  outreachAutopilotPaused: boolean; verifyBeforeSend: boolean; senderRotation: boolean; domainGuard: boolean;
   domainBounceThresholdPct: number; domainBounceMin: number;
   campaignPauseEnabled: boolean; campaignBounceThresholdPct: number; campaignBounceMin: number;
   softBounceSkipDnc: boolean;
@@ -705,7 +705,7 @@ function SendingSafetyPanel() {
     <div className="space-y-4">
       <div>
         <h3 className="flex items-center gap-2 font-semibold"><Server className="size-4" /> Sending &amp; safety</h3>
-        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Opt-in guards on the live send path. Defaults preserve current behaviour — verify-gate and rotation are off; the domain bounce-guard is on (protective, high threshold); transient soft bounces are no longer auto-suppressed.</p>
+        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Automated outreach requires current recipient qualification and valid address verification. Dylan is the sender. Pausing here stops campaign sends, including Send Due Now.</p>
       </div>
       {q.isLoading ? (
         <div className="text-sm text-muted-foreground">Loading…</div>
@@ -716,8 +716,9 @@ function SendingSafetyPanel() {
           <div className="grid gap-3 md:grid-cols-2">
             <Card className="p-4 space-y-2">
               <h4 className="text-sm font-semibold">Send-path guards</h4>
-              <BoolRow label="Verify before send" desc="Drop & suppress addresses ZeroBounce flags INVALID at send time (needs ZEROBOUNCE_API_KEY)." value={s.verifyBeforeSend} onChange={(b) => patch.mutate({ verifyBeforeSend: b })} />
-              <BoolRow label="Sender rotation" desc="Spread sends across all configured mailboxes; sticky per contact to preserve threading." value={s.senderRotation} onChange={(b) => patch.mutate({ senderRotation: b })} />
+              <BoolRow label="Pause automated outreach" desc="Stop sending while delivery or recipient readiness needs attention." value={s.outreachAutopilotPaused} onChange={(b) => patch.mutate({ outreachAutopilotPaused: b })} />
+              <p className="text-sm">Current valid address verification is required; unknown and risky results are held.</p>
+              <p className="text-sm">Sender: Dylan Delaney · dylan@newdawnfranchising.com</p>
               <BoolRow label="Skip DNC on soft bounces" desc="Don't suppress transient 4.x.x bounces (full mailbox, greylisting) — let them retry." value={s.softBounceSkipDnc} onChange={(b) => patch.mutate({ softBounceSkipDnc: b })} />
             </Card>
 
@@ -866,7 +867,7 @@ function InboxPlacementTest() {
   return (
     <Card className="p-4">
       <h3 className="mb-1 flex items-center gap-2 font-semibold">
-        <FlaskConical className="size-4" /> Inbox placement test
+        <FlaskConical className="size-4" /> Content checks (not measured inbox placement)
       </h3>
       <p className="mb-3 text-xs text-muted-foreground">
         Content + authentication health score that predicts Inbox vs Promotions vs Spam — modelled on Mail-Tester / SpamAssassin. Optionally send a live copy to an inbox you control.
@@ -1039,7 +1040,7 @@ interface SeedTestRow { id: string; subject: string; status: string; total: numb
 interface SeedOverview {
   seeds: SeedInbox[];
   tests: SeedTestRow[];
-  latestResults: { email: string; provider: string; placement: string; checkedAt: string | null }[];
+  latestResults: { email: string; provider: string; placement: string; checkedAt: string | null; authenticationResults?: string; error?: string }[];
 }
 
 function SeedTestPanel() {
@@ -1116,7 +1117,7 @@ function SeedTestPanel() {
               <div key={i} className="flex items-center gap-2 text-sm">
                 <span className="flex-1 truncate">{r.email}</span>
                 <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] uppercase text-slate-600">{r.provider}</span>
-                <span className={`w-16 text-right font-medium ${placeColor(r.placement)}`}>{r.placement}</span>
+                <span className={`text-right font-medium ${placeColor(r.placement)}`} title={r.authenticationResults || r.error}>{r.placement}{r.error && <small className="block">{r.error}</small>}{r.authenticationResults && <details className="text-xs"><summary>Authentication headers</summary><pre className="whitespace-pre-wrap text-left">{r.authenticationResults}</pre></details>}</span>
               </div>
             ))}
           </div>
@@ -1313,7 +1314,7 @@ const SECTION_TABS: { id: DeliverabilitySection; label: string; Icon: any }[] = 
   { id: "dns", label: "Subdomain & DNS", Icon: Globe },
   { id: "warmup", label: "Warmup", Icon: Flame },
   { id: "safety", label: "Sending & safety", Icon: Server },
-  { id: "content", label: "Inbox placement", Icon: FlaskConical },
+  { id: "content", label: "Content checks", Icon: FlaskConical },
   { id: "monitoring", label: "Monitoring", Icon: ShieldCheck },
   { id: "blacklist", label: "Blacklist", Icon: Ban },
 ];

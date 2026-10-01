@@ -1,3 +1,4 @@
+import { OutreachReadiness } from "@/components/outreach-readiness";
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -93,6 +94,12 @@ interface CampaignStats {
     opens: number;
     clicks: number;
     replies: number;
+    positiveReplies: number;
+    optOutReplies: number;
+    declinedReplies: number;
+    unclassifiedReplies: number;
+    acceptedRecipients: number;
+    legacyBounces: number;
     failed?: number;
     bounced: number;
     unsubscribed?: number;
@@ -604,28 +611,6 @@ function EmailCampaignTab() {
     },
   });
 
-  // Force-resend a single step to all enrolled contacts in the campaign.
-  const reprocessStepMutation = useMutation({
-    mutationFn: async ({ stepId }: { stepId: string; count: number }) => {
-      const res = await apiRequest("POST", `/api/crm/campaigns/${selectedCampaign}/steps/${stepId}/reprocess`, {});
-      return res.json();
-    },
-    onSuccess: (data: any) => {
-      const refresh = () => {
-        queryClient.invalidateQueries({ queryKey: ["/api/crm/activity"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/crm/campaigns", selectedCampaign] });
-        queryClient.invalidateQueries({ queryKey: ["/api/crm/enrollments"] });
-      };
-      refresh();
-      setTimeout(refresh, 4000);
-      setTimeout(refresh, 12000);
-      toast({ title: "Reprocessing started", description: `Re-sending to ${data?.count ?? 0} contact(s) — counts update in a few seconds.` });
-    },
-    onError: (err: Error) => {
-      toast({ title: "Reprocess failed", description: err.message, variant: "destructive" });
-    },
-  });
-
   // Send a one-off test of a single step to a typed-in email/phone — a real
   // email/text, just to the tester. Doesn't touch any enrolled contact.
   const sendTestStepMutation = useMutation({
@@ -1043,12 +1028,16 @@ function EmailCampaignTab() {
                   { label: "Active", value: stats?.overview.active ?? 0, color: "text-green-600" },
                   { label: "Completed", value: stats?.overview.completed ?? 0, color: "text-blue-600" },
                   { label: "Paused", value: stats?.overview.paused ?? 0, color: "text-gray-500" },
-                  { label: "Emails", value: stats?.overview.emails ?? 0, color: "text-blue-600" },
-                  { label: "Opens", value: stats?.overview.opens ?? 0, color: "text-green-600" },
-                  { label: "Clicks", value: stats?.overview.clicks ?? 0, color: "text-amber-600" },
-                  { label: "Replies", value: stats?.overview.replies ?? 0, color: "text-purple-600" },
+                  { label: "Accepted emails", value: stats?.overview.emails ?? 0, color: "text-blue-600" },
+                  { label: "Open events", value: stats?.overview.opens ?? 0, color: "text-green-600" },
+                  { label: "Click events", value: stats?.overview.clicks ?? 0, color: "text-amber-600" },
+                  { label: "Positive replies", value: stats?.overview.positiveReplies ?? 0, color: "text-purple-600" },
+                  { label: "Reply needs review", value: stats?.overview.unclassifiedReplies ?? 0, color: "text-purple-600" },
+                  { label: "Opt-out replies", value: stats?.overview.optOutReplies ?? 0, color: "text-orange-600" },
+                  { label: "Declined replies", value: stats?.overview.declinedReplies ?? 0, color: "text-orange-600" },
+                  { label: "Unverified old bounces", value: stats?.overview.legacyBounces ?? 0, color: "text-gray-500" },
                   { label: "Failed", value: stats?.overview.failed ?? 0, color: "text-red-600" },
-                  { label: "Bounced", value: stats?.overview.bounced ?? 0, color: "text-red-600" },
+                  { label: "Verified bounces", value: stats?.overview.bounced ?? 0, color: "text-red-600" },
                   { label: "Unsubscribed", value: stats?.overview.unsubscribed ?? 0, color: "text-orange-600" },
                   { label: "Bot hits filtered", value: (stats?.overview.botClicks ?? 0) + (stats?.overview.botOpens ?? 0), color: "text-gray-400",
                     title: "Scanner/security-gateway opens+clicks excluded from the Opens and Clicks counts" },
@@ -1059,6 +1048,9 @@ function EmailCampaignTab() {
                   </Card>
                 ))}
               </div>
+
+              <p className="text-sm text-muted-foreground mb-4">Accepted means the sending provider accepted the message, not that it reached an inbox. Open and click events may include automated activity. Positive replies are explicit requests for information or a call; opt-outs are separate. Historical bounce outcomes without message evidence remain unverified.</p>
+              <OutreachReadiness campaignId={campaignDetail.id} />
 
               {/* Automations summary — all active triggers/reactions for this campaign at a glance */}
               <AutomationsPanel steps={campaignDetail.steps ?? []} />
@@ -1161,28 +1153,6 @@ function EmailCampaignTab() {
                                           onClick={() => { setTestStep({ step, channel }); setTestRecipient(""); }}
                                         >
                                           <Send className="size-3" /> Send Test
-                                        </Button>
-                                      )}
-                                      {(channel === "email" || channel === "sms") && (
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          data-testid={`button-reprocess-${step.id}`}
-                                          className="h-7 gap-1 px-2 text-[11px]"
-                                          disabled={reprocessStepMutation.isPending}
-                                          onClick={() => {
-                                            const n = enrollments.length;
-                                            if (n === 0) {
-                                              toast({ title: "No enrolled contacts", description: "Add contacts to this campaign before reprocessing.", variant: "destructive" });
-                                              return;
-                                            }
-                                            const kind = channel === "sms" ? "text" : "email";
-                                            if (confirm(`Reprocess this ${kind} step now for ${n} enrolled contact${n === 1 ? "" : "s"}?\n\nThis re-sends it to them immediately.`)) {
-                                              reprocessStepMutation.mutate({ stepId: step.id, count: n });
-                                            }
-                                          }}
-                                        >
-                                          <RefreshCw className="size-3" /> Reprocess
                                         </Button>
                                       )}
                                       <Button size="sm" variant="ghost" onClick={() => setViewingStep(viewingStep?.id === step.id ? null : step)}><Eye className="size-3" /></Button>
@@ -2295,7 +2265,7 @@ function StepEditorModal({
 // ─── Automations Summary Panel ───────────────────────────────────────────────
 // At-a-glance view of every behavioural automation active on the open campaign:
 // the step-level triggers configured on its steps PLUS the system-wide reactions
-// (click→call/alert, no-open→resend, reply→pause) that apply to every campaign.
+// (click→call/alert, reply→pause) that apply to every campaign.
 
 function AutomationsPanel({ steps }: { steps: Step[] }) {
   const sorted = [...steps].sort((a, b) => a.stepOrder - b.stepOrder);
@@ -2326,8 +2296,8 @@ function AutomationsPanel({ steps }: { steps: Step[] }) {
 
   // Built-in system-wide reactions — these apply to every campaign automatically.
   const SYSTEM_REACTIONS: { icon: React.ReactNode; title: string; desc: string }[] = [
-    { icon: <Phone className="size-3.5 text-red-600" />, title: "Click → Call task + alert", desc: "First click on any campaign email creates a 🔥 call task and emails Dylan." },
-    { icon: <RefreshCw className="size-3.5 text-amber-600" />, title: "No open → Auto-resend", desc: "Intro email unopened after 4 days auto-resends once with a fresh subject." },
+    { icon: <Phone className="size-3.5 text-red-600" />, title: "Call request → Review", desc: "Only an explicit request for a call can create a call task; clicks do not establish intent." },
+    { icon: <RefreshCw className="size-3.5 text-amber-600" />, title: "No open → No extra send", desc: "Missing opens do not trigger a resend. Scheduled follow-ups retain their spacing and limits." },
     { icon: <Pause className="size-3.5 text-violet-600" />, title: "Reply → Pause + alert", desc: "Any personal reply pauses this contact's enrollment and notifies Dylan." },
   ];
 

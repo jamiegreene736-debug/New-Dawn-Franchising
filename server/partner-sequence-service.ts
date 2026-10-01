@@ -494,7 +494,7 @@ async function executeEvent(event: PartnerSequenceEvent, lead: PartnerLead): Pro
       "dylan@newdawnfranchising.com",
       lead.email,
       subject,
-      html,
+      html, undefined, undefined, { outreach: true },
     );
 
     await markEvent(event.id, result.success ? "sent" : "failed", {

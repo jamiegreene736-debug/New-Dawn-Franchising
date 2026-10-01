@@ -821,6 +821,11 @@ const shells: Record<string, PageShell> = {
     ],
   },
 
+  "/partner-review": {
+    title: "Professional review guide | New Dawn Franchising",
+    description: "A diligence starting point for attorneys and referral partners evaluating franchise ownership, costs, operating evidence and disclosure materials.",
+    html: `<main><h1>Evaluate New Dawn for a client</h1><p>Review owner responsibilities, investment and ongoing costs, operating evidence, escrow and exit conditions, immigration suitability and referral arrangements.</p><p>Request the current FDD and the actual agreements before considering a referral. This guide is a starting point, not a substitute for those documents or independent professional advice.</p><h2>Request documents for professional review</h2><p>Email Dylan with your firm, role and the materials you want to review. No client identity, citizenship or investment timeline is needed to start this conversation.</p><a href="mailto:dylan@newdawnfranchising.com?subject=Professional%20review%20materials">Email Dylan</a></main>`,
+  },
   "/request-fdd": {
     title: `Request the FDD | E-2 Visa Franchise Information | ${SITE}`,
     description:

@@ -84,7 +84,7 @@ async function sendWhatsApp(to: string, body: string): Promise<{ success: boolea
 async function sendEmail(opts: {
   to: string; subject: string; html: string; text?: string;
 }): Promise<{ success: boolean; error?: string }> {
-  return sendEmailFromSender("dylan@newdawnfranchising.com", opts.to, opts.subject, opts.html);
+  return sendEmailFromSender("dylan@newdawnfranchising.com", opts.to, opts.subject, opts.html, undefined, undefined, { outreach: true });
 }
 
 function trackingPixel(token: string): string {

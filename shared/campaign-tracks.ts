@@ -1,3 +1,4 @@
+import { reviewedEmailSteps } from "./outreach-copy";
 /**
  * Two-track outreach content — the single source of truth for the New Dawn
  * Franchising "Grok Campaign" voice across every surface that can fire a
@@ -69,14 +70,8 @@ export function withSpacing(html: string): string {
 // ─────────────────────────────────────────────────────────────────────────────
 // BROCHURE LINKS — multilingual download links for the email steps.
 //
-// DELIVERABILITY: we LINK to the hosted PDFs, we never ATTACH them. These steps
-// send as cold drip mail over Gmail SMTP on a domain that's being actively warmed
-// (see the DNSBL monitor, List-Unsubscribe headers, and warmup engine). A binary
-// PDF attachment on cold outreach is one of the strongest spam/quarantine signals
-// there is — corporate mail gateways routinely defang or block it — and it would
-// undermine all of that warmup work. A first-party https:// link to a PDF on the
-// SAME domain we send from carries sender trust instead of risk, keeps the message
-// light, and lets the recipient open the brochure on their terms.
+// Links let recipients choose whether to retrieve a brochure. Delivery and
+// inbox placement still require independent verification.
 //
 // The six brochures are already published at /brochures (see client/public/brochures)
 // in the three languages New Dawn translates — English, Spanish, and Traditional
@@ -128,7 +123,7 @@ export function renderTrackText(text: string, name: string): string {
 // step for the override compose box.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const BROKER_TRACK: CampaignTrackStep[] = [
+const BROKER_TRACK_SOURCE: CampaignTrackStep[] = [
   {
     stepOrder: 1,
     delayDays: 0,
@@ -355,7 +350,7 @@ Dylan`,
 // LOAD-BEARING: NO referral-fee / commission / broker-portal language.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const CLIENT_TRACK: CampaignTrackStep[] = [
+const CLIENT_TRACK_SOURCE: CampaignTrackStep[] = [
   {
     stepOrder: 1,
     delayDays: 0,
@@ -594,7 +589,7 @@ Dylan`,
 // link (brochures/FDD are offered as a "reply and I'll send it" — the reply IS
 // the goal), asks ONE question per email, and signs off "Dylan" (the send path
 // auto-appends his full signature, so a long sign-off block would double up).
-export const BROKER_2_TRACK: CampaignTrackStep[] = [
+const BROKER_2_TRACK_SOURCE: CampaignTrackStep[] = [
   {
     stepOrder: 1,
     delayDays: 0,
@@ -816,6 +811,12 @@ Best,
 Dylan`,
   },
 ];
+
+export const BROKER_TRACK = reviewedEmailSteps(BROKER_TRACK_SOURCE, "broker");
+
+export const BROKER_2_TRACK = reviewedEmailSteps(BROKER_2_TRACK_SOURCE, "broker");
+
+export const CLIENT_TRACK = reviewedEmailSteps(CLIENT_TRACK_SOURCE, "client");
 
 export const CAMPAIGN_TRACKS: Record<TrackId, CampaignTrackStep[]> = {
   broker: BROKER_2_TRACK,

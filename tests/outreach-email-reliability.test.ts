@@ -15,6 +15,7 @@ test("human replies quoting unsubscribe footer are kept", () => {
   assert.equal(isAutomatedOrBulkEmail("person@example.com", "Unsubscribe", "", "Please unsubscribe me"), false);
   assert.equal(isOptOutReply("Yes please\nOn Monday Dylan wrote:\nUnsubscribe"), false);
   assert.equal(isOptOutReply("Please remove me"), true);
+  assert.equal(isOptOutReply("Yes, send the details.\n\nUnsubscribe from this mailing list"), false);
 });
 test("automated responses and newsletters remain excluded", () => {
   for (const head of ["Auto-Submitted: auto-replied", "Precedence: bulk", "List-Unsubscribe: <https://example.com>"]) {

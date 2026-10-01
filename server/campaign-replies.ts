@@ -34,6 +34,9 @@ function newest(a: ReplyCandidate, b: ReplyCandidate): number {
   return new Date(b.sentAt!).getTime() - new Date(a.sentAt!).getTime();
 }
 export function isOptOutReply(body: string): boolean {
-  const ownText = body.split(/\n(?:On .+wrote:|>|From:)/i)[0];
-  return /\b(unsubscribe|remove me|stop (?:emailing|contacting|sending)|do not (?:email|contact))\b/i.test(ownText);
+  // Only inspect the opening paragraph and require a direct request. Quoted
+  // signatures/footers may lack a standard "On ... wrote" delimiter.
+  const ownText = body.trimStart().split(/\r?\n\s*\r?\n|\n(?:On .+wrote:|>|From:)/i)[0];
+  return /^(?:please\s+)?(?:unsubscribe\b|remove me\b|stop (?:emailing|contacting|sending)\b|do not (?:email|contact)\b)/i.test(ownText)
+    || /\bplease (?:unsubscribe|remove me|stop (?:emailing|contacting|sending))\b/i.test(ownText);
 }

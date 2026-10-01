@@ -79,7 +79,7 @@ function FranchiseFooter({ isHome }: { isHome: boolean }) {
         <div>
           <a href="/team">Meet the team{!isHome && " ↗"}</a>
           <a href="/#attorneys">For attorneys{!isHome && " ↗"}</a>
-          <a href="/#brokers">Broker referral fees{!isHome && " ↗"}</a>
+          <a href="/partners">For brokers{!isHome && " ↗"}</a>
         </div>
         <div>
           <a href="/other-businesses">Other businesses{!isHome && " ↗"}</a>
@@ -225,7 +225,7 @@ export function FranchiseLayout({
           {isHome ? (
             <>
               <a href="#attorneys">For Attorneys</a>
-              <a href="#brokers">For Brokers</a>
+              <a href="/team">Meet the team</a>
               <a href="#opportunities">The franchise</a>
             </>
           ) : (
@@ -238,10 +238,10 @@ export function FranchiseLayout({
         {isHome ? (
           <a
             className="button primary partner-header-link"
-            href="#brokers"
+            href="/partners"
             data-testid="button-top-cta"
           >
-            Broker referral fees <span aria-hidden="true">↓</span>
+            For Brokers <span aria-hidden="true">→</span>
           </a>
         ) : (
           <DiscoveryCallLink placement="header" testId="button-top-cta" />

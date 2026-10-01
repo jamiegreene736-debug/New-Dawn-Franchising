@@ -1,6 +1,5 @@
 import {
   HeroSection,
-  PrinciplesSection,
   BusinessSection,
   PathwaySection,
   InvestmentSection,
@@ -11,7 +10,6 @@ export default function Home() {
   return (
     <div data-testid="page-home">
       <HeroSection />
-      <PrinciplesSection />
       <BusinessSection />
       <PathwaySection />
       <InvestmentSection />

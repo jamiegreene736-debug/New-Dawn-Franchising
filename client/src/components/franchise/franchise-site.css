@@ -1608,3 +1608,140 @@
     transition: none;
   }
 }
+
+/* Homepage-only navigation and contextual booking CTA. */
+.homepage-refinements .home-menu-toggle {
+  display: none;
+}
+
+.homepage-refinements .v4-principles {
+  gap: 12px;
+  margin: 0;
+  padding: 24px 0 27px;
+}
+
+.homepage-refinements .v4-principles > div {
+  justify-content: flex-start;
+  padding-right: 12px;
+}
+
+.homepage-refinements .v4-principles strong {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+@media (min-width: 768px) and (max-width: 1100px) {
+  .homepage-refinements .franchise-header {
+    gap: 12px;
+    padding: 0 24px;
+  }
+
+  .homepage-refinements .franchise-header nav {
+    gap: 16px;
+    margin-right: 0;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 767px) {
+  .homepage-refinements .franchise-header {
+    flex-wrap: nowrap;
+    gap: 12px;
+    height: 72px;
+    min-height: 72px;
+    padding: 0 22px;
+  }
+
+  .homepage-refinements .franchise-header .official-brand img {
+    width: 144px;
+    height: 66px;
+  }
+
+  .homepage-refinements .franchise-header [data-booking="header"] {
+    display: none;
+  }
+
+  .homepage-refinements .franchise-header nav {
+    order: initial;
+    width: auto;
+    gap: 16px;
+    margin: 0 0 0 auto;
+    padding: 0;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  .homepage-refinements .v4-principles {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 18px 0 22px;
+  }
+
+  .homepage-refinements .v4-principles > div {
+    border: 0;
+    padding: 0;
+  }
+
+  .homepage-refinements .v5-mobile-cta {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 18;
+    display: flex;
+    padding: 7.5px 20px calc(7.5px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--franchise-line);
+    background: #fff;
+    transform: translateY(100%);
+    visibility: hidden;
+    transition: transform 200ms ease, visibility 200ms;
+  }
+
+  .homepage-refinements .v5-mobile-cta[aria-hidden="false"] {
+    transform: translateY(0);
+    visibility: visible;
+  }
+
+  .homepage-refinements .v5-mobile-cta .button {
+    width: 100%;
+    padding: 13px 20px;
+    font-size: 13px;
+  }
+}
+
+/* Three plain-text items plus the existing logo need more than a narrow phone row. */
+@media (max-width: 443px) {
+  .homepage-refinements .home-menu-toggle {
+    display: block;
+    margin-left: auto;
+    padding: 10px;
+    border: 0;
+    background: transparent;
+    color: var(--brand-navy);
+    font: inherit;
+    font-size: 22px;
+    cursor: pointer;
+  }
+
+  .homepage-refinements .franchise-header nav {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    left: 0;
+    display: none;
+    justify-content: center;
+    padding: 16px 22px;
+    border-bottom: 1px solid var(--franchise-line);
+    background: #fff;
+  }
+
+  .homepage-refinements .franchise-header nav[data-open="true"] {
+    display: flex;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .homepage-refinements .v5-mobile-cta {
+    transition: none;
+  }
+}

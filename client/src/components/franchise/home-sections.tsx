@@ -16,9 +16,7 @@ export function HeroSection() {
           Live in the USA.
           <br />
           <span>
-            Build your
-            <br />
-            own business.
+            Build your <span style={{ whiteSpace: "nowrap" }}>own business.</span>
           </span>
         </h1>
         <h2 data-testid="text-hero-subtitle">
@@ -35,6 +33,7 @@ export function HeroSection() {
         <span className="v5-call-note">
           30-minute call · Franchise, investment &amp; next steps
         </span>
+        <PrinciplesSection />
       </div>
       <figure className="v4-hero-photo">
         <img
@@ -60,16 +59,13 @@ export function PrinciplesSection() {
   return (
     <div className="v4-principles" data-testid="section-trust-strip">
       <div>
-        <span>01</span>
-        <strong>Invest in the USA.</strong>
+        <strong>70+ E-2 franchise placements guided by our team</strong>
       </div>
       <div>
-        <span>02</span>
-        <strong>Create local jobs.</strong>
+        <strong>Operating roots in El Paso, Texas</strong>
       </div>
       <div>
-        <span>03</span>
-        <strong>Own your franchise.</strong>
+        <strong>English &amp; Spanish support</strong>
       </div>
     </div>
   );
@@ -223,7 +219,8 @@ export function BusinessSection() {
               Our team brings experience in business operations, real estate,
               finance, and technology. Our operating roots are in El Paso,
               Texas, including real estate experience through Star Spangled
-              Banner Realty.
+              Banner Realty. Together, our team has guided more than 70 E-2
+              investors through franchise ownership and the visa process.
             </p>
             <div className="v6-team-grid">
               <article>
@@ -253,13 +250,8 @@ export function BusinessSection() {
               territory discussions, and launch planning. Your independently
               retained attorney handles immigration and legal advice.
             </p>
-            <a
-              className="v6-resource-link"
-              href="/team"
-              target="_blank"
-              rel="noopener"
-            >
-              Meet the full team ↗
+            <a className="v6-resource-link" href="/team">
+              Meet the full team
             </a>
           </div>
         </ReadMore>
@@ -477,13 +469,8 @@ export function InvestmentSection() {
               We can walk through the available materials and your questions on
               a discovery call.
             </p>
-            <a
-              className="v6-resource-link"
-              href="/request-fdd"
-              target="_blank"
-              rel="noopener"
-            >
-              Review the FDD request information ↗
+            <a className="v6-resource-link" href="/request-fdd">
+              Review the FDD request information
             </a>
           </div>
         </ReadMore>

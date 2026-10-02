@@ -7,12 +7,16 @@ export class PlacementError extends Error {
 const truth = z.union([z.boolean(), z.enum(["true", "false"])]).transform(v => v === true || v === "true");
 export const createdTestSchema = z.object({
   status: z.literal("success"), testId: z.string().min(1).max(200),
-  emails: z.array(z.string().email().max(254)).min(1).max(12),
+  // GlockApps adds its authentication diagnostic address to the selected seeds.
+  emails: z.array(z.string().email().max(254)).min(1).max(13),
   insertHeader: z.string().regex(/^X-API-Campaign-id: [^\r\n]{1,200}$/i),
 });
 const reportSchema = z.object({ status: z.literal("success"), result: z.object({
   testId: z.string(), finished: truth, failedReport: truth.optional(),
-  inboxes: z.array(z.object({ email: z.string().email(), iType: z.string(), finished: truth,
+  authenticationResult: z.object({ email: z.string(), finished: truth,
+    spfAuth: z.string().optional(), dkimAuth: z.string().optional(), dmarcAuth: z.string().optional(),
+  }).optional(),
+  inboxes: z.array(z.object({ email: z.string().email(), iType: z.string(), finished: truth, visible: truth.optional(),
     spf: z.string().optional(), dkim: z.string().optional(), dmarc: z.string().optional(),
   })).max(200).default([]),
 }) });
@@ -39,7 +43,7 @@ export async function createGlockTest(note: string) {
   // A paid POST is never retried: a timed-out request may already have used a credit.
   const raw = await request(`/projects/${config.projectId}/manualTest`, "POST", { testType: "ManualTest", seedAccountIds: config.seedIds, note, linkChecker: true });
   const parsed = createdTestSchema.safeParse(raw);
-  if (!parsed.success || parsed.data.insertHeader.slice(parsed.data.insertHeader.indexOf(":") + 1).trim() !== parsed.data.testId || new Set(parsed.data.emails.map(e => e.toLowerCase())).size !== parsed.data.emails.length) throw new PlacementError("GlockApps returned an invalid or oversized seed panel. No emails were sent; check the provider account before retrying.");
+  if (!parsed.success || parsed.data.emails.length > config.seedIds.length + 1 || parsed.data.insertHeader.slice(parsed.data.insertHeader.indexOf(":") + 1).trim() !== parsed.data.testId || new Set(parsed.data.emails.map(e => e.toLowerCase())).size !== parsed.data.emails.length) throw new PlacementError("GlockApps returned an invalid or oversized seed panel. No emails were sent; check the provider account before retrying.");
   return parsed.data;
 }
 export async function getGlockReport(projectId: string, testId: string) {
@@ -52,7 +56,7 @@ export function normalizePlacement(value: string): "inbox" | "tabs" | "spam" | "
     case "inbox": return "inbox";
     case "other": case "tabs": case "promotions": case "social": case "updates": return "tabs";
     case "spam": case "junk": return "spam";
-    case "notdelivered": case "missing": return "missing";
+    case "x": case "notdelivered": case "missing": return "missing";
     default: return "unknown";
   }
 }

@@ -43,12 +43,12 @@ export function CampaignPlacementTest({ campaignId, revision, steps }: { campaig
     </select>
     <label className="mt-3 block text-sm" htmlFor={`placement-reason-${campaignId}`}>What changed? Required for a repeat of the same email within seven days.</label>
     <input id={`placement-reason-${campaignId}`} className="mt-1 w-full rounded border p-2 text-sm" value={reason} onChange={e=>setReason(e.target.value)} maxLength={500} placeholder="For example, describe the DNS or sender change." />
-    <p className="mt-2 text-xs">Tests use sample recipient Alex Morgan and an empty firm introduction. Subject and body stay unchanged except personalization; a test header identifies the message. Save edits before testing. Sending respects the 15/hour and 80/day limits; each copy is paced five minutes apart.</p>
+    <p className="mt-2 text-xs">Tests use sample recipient Alex Morgan and an empty firm introduction. Subject and body stay unchanged except personalization; a test header identifies the message. Save edits before testing. GlockApps also adds one authentication diagnostic address. Sending respects the 15/hour and 80/day limits; each copy is paced five minutes apart.</p>
     <Button type="button" className="mt-3" disabled={!ready || !stepId || active || mutate.isPending} onClick={()=>mutate.mutate({action:"start"})}>Start test · 1 credit{data?.configured ? ` · ${data.seedCount} mailboxes` : ""}</Button>
     {mutate.isError && <p role="alert" className="mt-2 text-sm text-red-700">{mutate.error.message}</p>}
     <div className="mt-4 space-y-3" aria-live="polite">
       {data?.tests.map(test=>{
-        const counts = { inbox: 0, tabs: 0, spam: 0, missing: 0, unknown: 0 };
+        const counts = { inbox: 0, tabs: 0, spam: 0, missing: 0, unknown: 0, diagnostic: 0 };
         for (const m of test.messages) {
           if (m.placement in counts) counts[m.placement as keyof typeof counts]++;
           else counts.unknown++;
@@ -56,6 +56,7 @@ export function CampaignPlacementTest({ campaignId, revision, steps }: { campaig
         return <details key={test.id} className={`rounded border p-3 ${counts.spam ? "border-red-400" : "border-slate-200"}`} open={data.tests[0].id === test.id}>
           <summary className="cursor-pointer text-sm font-semibold">{test.snapshot.subject} · {test.status.replaceAll("_"," ")} · {new Date(test.created_at).toLocaleString()}</summary>
           <p className="mt-2 text-sm">{counts.inbox} inbox · {counts.tabs} tabs/other · {counts.spam} spam · {counts.missing} missing · {counts.unknown} unknown/pending</p>
+          {counts.diagnostic > 0 && <p className="text-xs">{counts.diagnostic} diagnostic checks completed separately from inbox placement.</p>}
           <p className="text-xs">{test.messages.filter(m=>m.send_status === "accepted").length} sender accepted of {test.messages.length} test copies. Acceptance alone is not confirmed delivery.</p>
           {(!test.current || test.stale) && <p className="mt-2 text-sm font-semibold text-amber-800">{!test.current ? "The saved email has changed; this report does not test the current version." : "This test is more than seven days old. Placement may have changed."}</p>}
           {test.error && <p className="mt-2 text-sm text-red-700">{test.error}</p>}

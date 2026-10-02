@@ -104,6 +104,10 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npm run test:unit
       - run: npm run test:outreach-email
+      - name: Campaign templates and permission integration
+        env:
+          TEMPLATE_TEST_DATABASE_URL: postgresql://postgres:test-only-password@localhost:5432/new_dawn_outreach_desk_test
+        run: npm run test:campaign-templates
       - name: Campaign inbox placement integration
         env:
           PGPASSWORD: test-only-password

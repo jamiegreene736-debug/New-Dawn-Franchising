@@ -4,6 +4,7 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
+    "test:campaign-templates": "tsx --test tests/campaign-templates.test.ts tests/campaign-templates.integration.test.ts",
     "dev:client": "vite dev --port 5000",
     "dev": "NODE_ENV=development tsx server/index.ts",
     "build": "tsx script/build.ts",

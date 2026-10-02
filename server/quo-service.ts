@@ -21,7 +21,7 @@ export async function sendSmsViaQuo(
   content: string,
   fromPhoneNumberId?: string,
   signal?: AbortSignal,
-): Promise<{ success: boolean; id?: string; error?: string }> {
+): Promise<{ success: boolean; id?: string; error?: string; uncertain?: boolean }> {
   if (!QUO_API_KEY) {
     return { success: false, error: "QUO_API_KEY not configured. Add it in Secrets." };
   }
@@ -63,12 +63,14 @@ export async function sendSmsViaQuo(
       return {
         success: false,
         error: json.message || json.error || `Quo API error ${res.status}`,
+        uncertain: res.status >= 500,
       };
     }
 
     return { success: true, id: json.data?.id };
   } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : "Network error" };
+    // A lost response or malformed response may follow provider acceptance.
+    return { success: false, uncertain: true, error: err instanceof Error ? err.message : "Network error" };
   }
 }
 

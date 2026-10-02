@@ -62,6 +62,7 @@ export interface IStorage {
   updateDripCampaign(id: string, data: Partial<InsertDripCampaign>): Promise<DripCampaign>;
   deleteDripCampaign(id: string): Promise<void>;
   getDripSteps(campaignId: string): Promise<DripStep[]>;
+  getDripStep(id: string): Promise<DripStep | undefined>;
   createDripStep(step: InsertDripStep): Promise<DripStep>;
   updateDripStep(id: string, data: Partial<InsertDripStep>): Promise<DripStep>;
   deleteDripStep(id: string): Promise<void>;
@@ -590,6 +591,11 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(dripSteps)
       .where(eq(dripSteps.campaignId, campaignId))
       .orderBy(asc(dripSteps.stepOrder));
+  }
+
+  async getDripStep(id: string): Promise<DripStep | undefined> {
+    const [step] = await db.select().from(dripSteps).where(eq(dripSteps.id, id));
+    return step;
   }
 
   async createDripStep(step: InsertDripStep): Promise<DripStep> {

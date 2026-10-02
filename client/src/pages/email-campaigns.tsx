@@ -1,4 +1,6 @@
 import { CampaignSpamGauge } from "@/components/campaign-spam-gauge";
+import { CampaignTemplates } from "@/components/campaign-templates";
+import { TEMPLATE_OUTREACH_POLICY } from "@shared/campaign-templates";
 import { OutreachReadiness } from "@/components/outreach-readiness";
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -60,6 +62,7 @@ interface Campaign {
   isActive: boolean;
   audienceType?: "broker" | "client";
   outreachPolicy?: string;
+  templateId?: string | null;
   createdAt: string;
   steps?: Step[];
 }
@@ -324,11 +327,11 @@ function testMerge(text: string, recipient: string): string {
     .replace(/\{\{\s*email\s*\}\}/gi, recipient || "you@example.com");
 }
 
-function EmailCampaignTab() {
+function EmailCampaignTab({ initialCampaignId }: { initialCampaignId?: string | null }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<"campaigns" | "sends">("campaigns");
-  const [selectedCampaign, setSelectedCampaign] = useState<string | null>(null);
+  const [selectedCampaign, setSelectedCampaign] = useState<string | null>(initialCampaignId || null);
   const [editCampaign, setEditCampaign] = useState<{ id: string; name: string; description: string } | null>(null);
   const [showEnrollModal, setShowEnrollModal] = useState(false);
   const [showEnrollListModal, setShowEnrollListModal] = useState(false);
@@ -1306,6 +1309,7 @@ function EmailCampaignTab() {
 
               {showAddStep && (
                 <AddStepModal
+                  emailTextOnly={campaignDetail.outreachPolicy === TEMPLATE_OUTREACH_POLICY}
                   onPick={(type) => { setShowAddStep(false); setAddStepType(type); setEditingStep(null); setShowStepEditor(true); }}
                   onClose={() => setShowAddStep(false)}
                 />
@@ -1319,6 +1323,7 @@ function EmailCampaignTab() {
                   onSave={(data) => saveStepMutation.mutate(data)}
                   onCancel={() => { setShowStepEditor(false); setEditingStep(null); }}
                   isPending={saveStepMutation.isPending}
+                  timedOnly={campaignDetail.outreachPolicy === TEMPLATE_OUTREACH_POLICY}
                 />
               )}
             </div>
@@ -2023,7 +2028,7 @@ function UserPlus(props: any) {
 
 // ─── "Add a Step" type picker (Seamless-style) ───────────────────────────────
 
-function AddStepModal({ onPick, onClose }: { onPick: (type: string) => void; onClose: () => void }) {
+function AddStepModal({ onPick, onClose, emailTextOnly = false }: { onPick: (type: string) => void; onClose: () => void; emailTextOnly?: boolean }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <Card className="w-full max-w-2xl p-6" onClick={(e) => e.stopPropagation()}>
@@ -2033,7 +2038,7 @@ function AddStepModal({ onPick, onClose }: { onPick: (type: string) => void; onC
         </div>
         <p className="text-sm text-muted-foreground mb-4">Choose the type of step to add to the sequence.</p>
         <div className="grid gap-3 sm:grid-cols-2">
-          {STEP_TYPES.map((t) => {
+          {STEP_TYPES.filter(t => !emailTextOnly || ["email", "sms"].includes(t.type)).map((t) => {
             const Icon = t.icon;
             return (
               <button
@@ -2065,6 +2070,7 @@ function StepEditorModal({
   onSave,
   onCancel,
   isPending,
+  timedOnly = false,
 }: {
   step: Step | null;
   defaultType: string;
@@ -2072,6 +2078,7 @@ function StepEditorModal({
   onSave: (data: any) => void;
   onCancel: () => void;
   isPending: boolean;
+  timedOnly?: boolean;
 }) {
   const initialType = step?.stepType || defaultType || "email";
   const [form, setForm] = useState({
@@ -2140,6 +2147,7 @@ function StepEditorModal({
           <div className="mt-2 grid gap-3 sm:grid-cols-3">
             <select
               data-testid="step-trigger-type"
+              disabled={timedOnly}
               value={form.triggerType}
               onChange={(e) => setForm({ ...form, triggerType: e.target.value })}
               className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring sm:col-span-1"
@@ -2766,12 +2774,14 @@ function BlastCampaignTab({ channel }: { channel: "sms" | "whatsapp" }) {
 // ─── Campaigns Hub (outer sub-tab switcher) ──────────────────────────────────
 
 export default function CampaignsHub() {
-  const [tab, setTab] = useState<"email" | "sms" | "whatsapp">("email");
+  const [tab, setTab] = useState<"email" | "sms" | "whatsapp" | "templates">("email");
+  const [templateCampaignId, setTemplateCampaignId] = useState<string | null>(null);
 
   const tabs = [
     { key: "email" as const, label: "Email", Icon: Mail },
     { key: "sms" as const, label: "SMS", Icon: Smartphone },
     { key: "whatsapp" as const, label: "WhatsApp", Icon: MessageSquare },
+    { key: "templates" as const, label: "Templates", Icon: Copy },
   ];
 
   return (
@@ -2790,9 +2800,10 @@ export default function CampaignsHub() {
         ))}
       </div>
 
-      {tab === "email" && <EmailCampaignTab />}
+      {tab === "email" && <EmailCampaignTab initialCampaignId={templateCampaignId} />}
       {tab === "sms" && <BlastCampaignTab channel="sms" />}
       {tab === "whatsapp" && <BlastCampaignTab channel="whatsapp" />}
+      {tab === "templates" && <CampaignTemplates onCreated={id => { setTemplateCampaignId(id); setTab("email"); }} />}
     </div>
   );
 }

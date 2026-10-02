@@ -1,5 +1,8 @@
 import { makePersonalize } from "./campaign-personalization";
-import { getOutreachReadiness, campaignWindowIssue } from "./outreach-readiness";
+import { TEMPLATE_OUTREACH_POLICY } from "@shared/campaign-templates";
+import { smsPermissionIssue, inTemplateSmsWindow, templateTouchAllowedAt, templateSmsContentIssue } from "./campaign-template-safety";
+import { getTemplateSmsPermission, templateRecipientReplied, templateRecipientOptedOut, templateSmsCapacity } from "./campaign-template-dispatch";
+import { getOutreachReadiness, campaignWindowIssue, sequenceIssue } from "./outreach-readiness";
 import { nextEmailAllowedAt, preferFirstContact } from "./drip-scheduling";
 import { campaignMessageId } from "./campaign-replies";
 import cron from "node-cron";
@@ -128,8 +131,8 @@ let dripRunInProgress = false;
 // until the next top-of-hour tick, defeating the prompt-start fix.
 let dripRerunRequested = false;
 
-export async function processDripEmails(opts: { force?: boolean; campaignId?: string } = {}) {
-  const { force = false, campaignId } = opts;
+export async function processDripEmails(opts: { force?: boolean; campaignId?: string; templateTextsOnly?: boolean } = {}) {
+  const { force = false, campaignId, templateTextsOnly = false } = opts;
   console.log(`[Drip] Processing scheduled emails...${campaignId ? ` (campaign ${campaignId} only)` : ""}${force ? " (manual override — bypassing window only)" : ""}`);
 
   if (dripRunInProgress) {
@@ -141,7 +144,7 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
 
   // Respect optimal send windows — skip if outside hours. A manual "Send Due
   // Now" passes force:true to send due emails immediately regardless of day/time.
-  if (!force && !isOptimalEmailWindow()) {
+  if (!force && !templateTextsOnly && !isOptimalEmailWindow()) {
     console.log(`[Drip] Outside optimal email window — ${nextWindowDescription("email")}. Skipping.`);
     return;
   }
@@ -169,11 +172,11 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
 
     await loadSenderHealth();
     const configuredSenders = getAvailableSenders().map((p) => p.email);
-    if (!getAvailableSenders().some(p => getSenderPassword(p))) {
+    if (!templateTextsOnly && !getAvailableSenders().some(p => getSenderPassword(p))) {
       console.error("[Drip] Dylan mailbox is not configured; no outreach sent.");
       return;
     }
-    if (allSendersDisabled(configuredSenders)) {
+    if (!templateTextsOnly && allSendersDisabled(configuredSenders)) {
       console.error("[Drip] All sending mailboxes are disabled (Gmail 535/534). Pausing until a mailbox is re-authed.");
       return;
     }
@@ -190,14 +193,14 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
     sentLastHour += testVolume[0].hourly;
 
     // Respect daily volume cap (a hard safety even on a manual override)
-    if (sentLast24h >= dailyCap) {
+    if (!templateTextsOnly && sentLast24h >= dailyCap) {
       console.log(`[Drip] Daily email cap reached (${sentLast24h}/${dailyCap} in last 24h). Deferring.`);
       return;
     }
     // Respect hourly cap — spreads the day's volume across business hours so we
     // never burst the whole quota in one run (a classic bulk-sender spam signal).
     // Manual overrides retain both volume caps.
-    if (sentLastHour >= hourlyCap) {
+    if (!templateTextsOnly && sentLastHour >= hourlyCap) {
       console.log(`[Drip] Hourly email cap reached (${sentLastHour}/${hourlyCap} in last hour). Resuming next hour.`);
       return;
     }
@@ -210,7 +213,7 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
     // a real kill switch — paused/inactive campaigns are skipped entirely even
     // if their enrollments are still marked active.
     const allCampaigns = await storage.getDripCampaigns();
-    const activeCampaignIds = new Set(allCampaigns.filter((c) => c.isActive).map((c) => c.id));
+    const activeCampaignIds = new Set(allCampaigns.filter((c) => c.isActive && (!templateTextsOnly || c.outreachPolicy === TEMPLATE_OUTREACH_POLICY || !!c.templateId)).map((c) => c.id));
 
     const activity = await storage.getDripEmailActivity();
     const lastSendByRecipient = new Map(activity.map(row => [row.email, row.lastSentAt]));
@@ -227,16 +230,16 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
       const preferNew = preferFirstContact(firstContactsLast24h, sentLast24h);
       const enrollment = (preferNew ? firstContacts.shift() ?? followUps.shift() : followUps.shift() ?? firstContacts.shift())!;
       const recipientKey = enrollment.prospectEmail.trim().toLowerCase();
-      if (allSendersDisabled(configuredSenders)) {
+      if (!templateTextsOnly && allSendersDisabled(configuredSenders)) {
         console.error("[Drip] All sending mailboxes are disabled mid-run — stopping.");
         break;
       }
       // Stop if either throttle is hit mid-run
-      if (sentLast24h >= dailyCap) {
+      if (!templateTextsOnly && sentLast24h >= dailyCap) {
         console.log("[Drip] Daily cap hit mid-run. Stopping early.");
         break;
       }
-      if (sentLastHour >= hourlyCap) {
+      if (!templateTextsOnly && sentLastHour >= hourlyCap) {
         console.log("[Drip] Hourly cap hit mid-run. Stopping — will resume next hour.");
         break;
       }
@@ -263,21 +266,52 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
       while (stepIdx < steps.length) {
         // Re-check the throttles before every send so a multi-step drain can't
         // burst past the daily/hourly caps.
-        if (sentLast24h >= dailyCap) break;
-        if (sentLastHour >= hourlyCap) break;
+        if (!templateTextsOnly && sentLast24h >= dailyCap) break;
+        if (!templateTextsOnly && sentLastHour >= hourlyCap) break;
 
         if ((await getDeliverabilitySettings()).outreachAutopilotPaused) return;
         const campaign = await storage.getDripCampaign(enrollment.campaignId);
         if (!campaign?.isActive) break;
+        const templateCampaign = !!campaign.templateId || campaign.outreachPolicy === TEMPLATE_OUTREACH_POLICY;
         const step = steps[stepIdx];
         const now = new Date();
         const existingSends = await storage.getDripSends(enrollment.id);
+        if (templateTextsOnly && step.stepType !== "sms") break;
+        if (templateCampaign) {
+          if (!["email", "sms"].includes(step.stepType)) {
+            await pool.query("UPDATE drip_enrollments SET hold_reason=$2 WHERE id=$1", [enrollment.id, "Template campaigns support email and text only. Remove this unsupported step."]);
+            break;
+          }
+          if (await templateRecipientOptedOut(enrollment.prospectEmail, prospect?.phone)) {
+            const normalizedPhone = toSmsE164(prospect?.phone);
+            await addToDnc(recipientKey, normalizedPhone.ok ? normalizedPhone.e164 : undefined, undefined, "Recorded marketing opt-out");
+            await pool.query("UPDATE campaign_sms_permissions SET revoked_at=now() WHERE email=$1 OR phone=$2", [recipientKey, normalizedPhone.ok ? normalizedPhone.e164 : ""]);
+            await storage.updateDripEnrollment(enrollment.id, { status: "suppressed" });
+            break;
+          }
+          const phoneForDnc = toSmsE164(prospect?.phone);
+          if (await isOnDnc(enrollment.prospectEmail, phoneForDnc.ok ? phoneForDnc.e164 : prospect?.phone, emailDomain(enrollment.prospectEmail))) {
+            await storage.updateDripEnrollment(enrollment.id, { status: "suppressed" });
+            break;
+          }
+          if (await templateRecipientReplied(enrollment.prospectEmail, prospect?.phone, enrollment.enrolledAt)) {
+            await storage.updateDripEnrollment(enrollment.id, { status: "paused" });
+            await pool.query("UPDATE drip_enrollments SET hold_reason=$2 WHERE id=$1", [enrollment.id, "A reply or meeting exists. Review the conversation before any further outreach."]);
+            break;
+          }
+          if ((await storage.getDripEnrollment(enrollment.id))?.status !== "active") break;
+          const ageIssue = sequenceIssue(enrollment.enrolledAt, 0, now, TEMPLATE_OUTREACH_POLICY);
+          if (ageIssue) {
+            await pool.query("UPDATE drip_enrollments SET hold_reason=$2 WHERE id=$1", [enrollment.id, ageIssue]);
+            break;
+          }
+        }
         // A force "Send Due Now" pushes the enrollment's CURRENT step immediately
         // (bypassing the delayDays gate), but the drain must NOT then leap through
         // every future-dated step — otherwise one click would blast the whole
         // sequence at one inbox. So force only overrides due-ness for the first
         // step of the drain; continuation always uses the natural schedule.
-        const forceThisStep = !!force && stepIdx === enrollment.currentStep;
+        const forceThisStep = !templateCampaign && !!force && stepIdx === enrollment.currentStep;
         const ready = evaluateTrigger(step, steps, enrolledAt, existingSends, now, forceThisStep);
         if (ready === "wait") break; // not due yet — leave the rest for a later run
         if (ready === "skip") {
@@ -287,7 +321,7 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
           continue;
         }
 
-        if (existingSends.some(s => s.stepId === step.id && s.channel === "email" && ["pending", "unknown"].includes(s.status))) {
+        if (existingSends.some(s => s.stepId === step.id && (s.channel === "email" || templateCampaign) && ["pending", "unknown"].includes(s.status))) {
           await pool.query("UPDATE drip_enrollments SET hold_reason=$2 WHERE id=$1", [enrollment.id, "An earlier send has an uncertain outcome; reconcile provider history before retrying."]);
           break;
         }
@@ -297,6 +331,7 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
           await storage.updateDripEnrollment(enrollment.id, { currentStep: stepIdx } as any);
           continue;
         }
+        if (templateCampaign && now.getTime() < templateTouchAllowedAt(step.delayDays, steps, existingSends)) break;
 
         const stepType = (step.stepType || "email").toLowerCase();
 
@@ -420,6 +455,33 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
           // instead of a cryptic carrier rejection — and a valid local-format number
           // (e.g. "416.800.7213") is normalized to "+14168007213" and actually sends.
           const phoneCheck = toSmsE164(prospect?.phone);
+          let textSkipReason: string | null = null;
+          if (templateCampaign && phoneCheck.ok) {
+            if (existingSends.filter(s => s.stepId === step.id && s.status === "failed").length >= 3) {
+              await pool.query("UPDATE drip_enrollments SET hold_reason=$2 WHERE id=$1", [enrollment.id, "Text delivery failed three times. Review provider and recipient details before retrying."]);
+              break;
+            }
+            const permission = await getTemplateSmsPermission(enrollment.prospectEmail, phoneCheck.e164);
+            textSkipReason = smsPermissionIssue(permission, now);
+            if (!textSkipReason && permission) {
+              const contentIssue = templateSmsContentIssue(personalize(step.bodyHtml));
+              if (contentIssue) {
+                await pool.query("UPDATE drip_enrollments SET hold_reason=$2 WHERE id=$1", [enrollment.id, contentIssue]);
+                break;
+              }
+              // Manual sending never bypasses recipient quiet hours or cross-channel spacing.
+              const capacity = await templateSmsCapacity(recipientKey, phoneCheck.e164);
+              if (capacity.exhausted) textSkipReason = "Text skipped: this recipient already received two texts in 45 days.";
+              else {
+                if (!inTemplateSmsWindow(permission.timezone, now) || now.getTime() < capacity.allowedAt || capacity.capped) break;
+                if (await isOnDnc(enrollment.prospectEmail, phoneCheck.e164, emailDomain(enrollment.prospectEmail))) break;
+                if (await templateRecipientReplied(enrollment.prospectEmail, phoneCheck.e164, enrollment.enrolledAt)) break;
+                if ((await storage.getDripEnrollment(enrollment.id))?.status !== "active") break;
+                const lastPermission = await getTemplateSmsPermission(enrollment.prospectEmail, phoneCheck.e164);
+                textSkipReason = smsPermissionIssue(lastPermission, new Date());
+              }
+            }
+          }
           const send = await storage.createDripSend({
             enrollmentId: enrollment.id,
             stepId: step.id,
@@ -432,11 +494,12 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
             status: "pending",
           });
 
-          if (!phoneCheck.ok) {
-            await storage.updateDripSend(send.id, { status: "skipped", errorMessage: phoneCheck.error } as any);
-            console.log(`[Drip] SMS step skipped for ${enrollment.prospectName}: ${phoneCheck.error}`);
+          if (!phoneCheck.ok || textSkipReason) {
+            const reason = !phoneCheck.ok ? phoneCheck.error : textSkipReason;
+            await storage.updateDripSend(send.id, { status: "skipped", errorMessage: reason });
+            console.log(`[Drip] SMS step skipped for ${enrollment.prospectName}: ${reason}`);
           } else {
-            const result = await sendSmsViaQuo(phoneCheck.e164, personalize(step.bodyHtml));
+            const result = await sendSmsViaQuo(phoneCheck.e164, personalize(step.bodyHtml), undefined, templateCampaign ? AbortSignal.timeout(15000) : undefined);
             if (result.success) {
               await storage.updateDripSend(send.id, { status: "sent", sentAt: new Date() } as any);
               console.log(`[Drip] Sent SMS step ${stepIdx + 1} to ${phoneCheck.e164}`);
@@ -445,8 +508,9 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
               // contact back-to-back — so pace each text (skipped on a force run).
               if (!force) await sleep(smartSmsDelay(activeEnrollments.length));
             } else {
-              await storage.updateDripSend(send.id, { status: "failed", errorMessage: result.error } as any);
+              await storage.updateDripSend(send.id, { status: templateCampaign && (result.uncertain || /timeout|timed out|socket|ECONNRESET|ETIMEDOUT/i.test(result.error || "")) ? "unknown" : "failed", errorMessage: result.error } as any);
               console.error(`[Drip] Failed to text ${phoneCheck.e164}: ${result.error}`);
+              if (templateCampaign) break;
             }
           }
         } else {
@@ -536,6 +600,10 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
 }
 
 export function scheduleDripProcessing() {
+  // Recipient-local text windows can fall outside the Central-time email schedule.
+  cron.schedule("0 * * * *", () => {
+    processDripEmails({ templateTextsOnly: true }).catch(error => console.error("[Drip] Template text sweep failed", error));
+  }, { timezone: "UTC" });
   // Run hourly during business hours (8 AM–6 PM ET) — window check inside prevents off-hours sends
   // This ensures late-enrolling prospects don't have to wait until the next day
   cron.schedule("0 8-18 * * 1-5", () => {

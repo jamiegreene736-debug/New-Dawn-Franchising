@@ -30,3 +30,13 @@ The existing content checker is labeled as a local heuristic checklist. It no lo
 
 - [Google email sender guidelines](https://support.google.com/mail/answer/81126): authentication, accurate headers/content, recipient expectations, gradual consistent volume, and user-reported spam targets below 0.10%, avoiding 0.30% or higher.
 - [Postmaster dashboards](https://support.google.com/mail/answer/14668346): personal Gmail scope, reporting delay, low-volume suppression, and user-reported spam rather than all automatic filtering.
+
+## Read-only reporting connection (October 2 follow-up)
+
+The ingestion code uses Google's Postmaster v2 `domainStats:query` endpoint with daily spam-rate and authentication metrics over the previous 30 complete UTC dates. It handles pagination and preserves missing values as unknown. V2 does not provide the old domain-reputation metric; new snapshots leave that value null. An empty successful report is shown as connected with no published data, separately from authorization, API or storage failures. Sync does not activate campaigns or send messages.
+
+Enable `gmailpostmastertools.googleapis.com` in the authorized Google Cloud project. Obtain offline OAuth authorization from the account with Postmaster domain access using `https://www.googleapis.com/auth/postmaster.traffic.readonly` (and `https://www.googleapis.com/auth/postmaster.domain` only if domain access must also be inspected). Store `POSTMASTER_CLIENT_ID`, `POSTMASTER_CLIENT_SECRET`, `POSTMASTER_REFRESH_TOKEN`, and `POSTMASTER_DOMAINS=newdawnfranchising.com` in the server's secret environment. Never put tokens in client configuration, source control, report files or logs. Existing service-account and static-token configurations remain supported; static access tokens expire and are unsuitable for unattended reporting.
+
+Verify with the authenticated admin sync endpoint and then read the overview. Credentials being present alone does not establish a working connection. The existing daily monitoring schedule renews OAuth access automatically. Revoked authorization requires reconnection. Reporting is for personal Gmail recipients and must remain separate from independent placement evidence. Browser domain verification and old compliance results do not clear campaign sending.
+
+References: [Google setup and scopes](https://developers.google.com/workspace/gmail/postmaster/guides/setup), [v2 migration](https://developers.google.com/workspace/gmail/postmaster/guides/migration-v2), [v2 query API](https://developers.google.com/workspace/gmail/postmaster/reference/rest/v2/domains.domainStats/query).

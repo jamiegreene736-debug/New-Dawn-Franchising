@@ -1139,7 +1139,7 @@ interface DmarcOverview {
 }
 interface PostmasterOverview {
   config: { configured: boolean; domains: string[] };
-  syncStatus: { at: string; stored: number; error: string | null };
+  syncStatus: { at: string; stored: number; error: string | null; state?: string };
   latest: { domain: string; day: string; spamRate: number | null; domainReputation: string | null; dkimRatio: number | null; spfRatio: number | null; dmarcRatio: number | null }[];
 }
 
@@ -1200,10 +1200,10 @@ function MonitoringPanel() {
           <h3 className="flex items-center gap-2 font-semibold"><Activity className="size-4" /> Google Postmaster Tools</h3>
           <Button size="sm" variant="outline" onClick={() => syncPm.mutate()} disabled={syncPm.isPending}><RefreshCw className={`mr-2 size-4 ${syncPm.isPending ? "animate-spin" : ""}`} /> Sync now</Button>
         </div>
-        {!pp?.config.configured ? (
-          <div className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Not configured. Add the domain in Google Postmaster Tools and set <code>POSTMASTER_ACCESS_TOKEN</code> or a service-account <code>POSTMASTER_SA_KEY</code>.</div>
+        {pm.isPending ? <div className="text-sm text-muted-foreground">Loading reporting status…</div> : !pp ? null : !pp.config.configured ? (
+          <div className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Reporting account is not connected. Connect the Google account that has access to this domain in Postmaster Tools.</div>
         ) : pp.latest.length === 0 ? (
-          <div className="text-sm text-muted-foreground">No data yet — Postmaster needs sustained volume before Gmail publishes stats.</div>
+          <div className="text-sm text-muted-foreground">{pp.syncStatus.state === "no_data" ? "Connected. Google has not published traffic statistics for the last 30 days. Low-volume data may be withheld; this does not mean a zero spam rate." : "No reports available yet. Sync to check the connection."}</div>
         ) : (
           <div className="space-y-2">
             {pp.latest.map((l) => (
@@ -1213,7 +1213,7 @@ function MonitoringPanel() {
                   <span className={`font-semibold ${repColor(l.domainReputation)}`}>{l.domainReputation || "—"}</span>
                 </div>
                 <div className="mt-1 flex flex-wrap gap-3 text-xs text-muted-foreground">
-                  <span>spam {l.spamRate == null ? "—" : `${(l.spamRate * 100).toFixed(2)}%`}</span>
+                  <span>User-reported spam {l.spamRate == null ? "—" : `${(l.spamRate * 100).toFixed(2)}%`}</span>
                   <span>SPF {l.spfRatio == null ? "—" : `${Math.round(l.spfRatio * 100)}%`}</span>
                   <span>DKIM {l.dkimRatio == null ? "—" : `${Math.round(l.dkimRatio * 100)}%`}</span>
                   <span>DMARC {l.dmarcRatio == null ? "—" : `${Math.round(l.dmarcRatio * 100)}%`}</span>
@@ -1223,6 +1223,10 @@ function MonitoringPanel() {
             ))}
           </div>
         )}
+        {pm.isError && <div role="alert" className="mt-2 text-sm text-red-600">Could not load reporting status. Please retry.</div>}
+        {pp?.syncStatus.error && <div role="alert" className="mt-2 text-sm text-red-600">{pp.syncStatus.error}</div>}
+        {pp && pp.syncStatus.at !== "1970-01-01T00:00:00.000Z" && <div className="mt-2 text-xs text-muted-foreground">Last checked: {new Date(pp.syncStatus.at).toLocaleString()}</div>}
+        <p className="mt-2 text-xs text-muted-foreground">Google reports complaints and authentication for personal Gmail traffic. These reports do not predict inbox placement; use an inbox placement test for that evidence.</p>
       </Card>
     </div>
   );

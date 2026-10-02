@@ -1,3 +1,4 @@
+import { CampaignSpamGauge } from "@/components/campaign-spam-gauge";
 import { OutreachReadiness } from "@/components/outreach-readiness";
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -1054,6 +1055,7 @@ function EmailCampaignTab() {
 
               <p className="text-sm text-muted-foreground mb-4">Accepted means the sending provider accepted the message, not that it reached an inbox. Open and click events may include automated activity. Positive replies are explicit requests for information or a call; opt-outs are separate. Historical bounce outcomes without message evidence remain unverified.</p>
               <OutreachReadiness campaignId={campaignDetail.id} />
+              <CampaignSpamGauge campaignId={campaignDetail.id} revision={JSON.stringify(campaignDetail.steps)} />
 
               {/* Automations summary — all active triggers/reactions for this campaign at a glance */}
               <AutomationsPanel steps={campaignDetail.steps ?? []} />

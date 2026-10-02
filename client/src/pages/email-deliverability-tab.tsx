@@ -793,6 +793,7 @@ interface SpamFinding {
   signals: "spam" | "promotions" | "inbox";
 }
 interface SpamReport {
+  contentRisk: "lower" | "review" | "high";
   score: number;
   spamScore: number;
   promoPoints: number;
@@ -812,9 +813,9 @@ interface CampaignSample {
 }
 
 const PLACEMENT: Record<string, { label: string; bg: string; text: string; ring: string; Icon: any }> = {
-  inbox: { label: "Primary Inbox", bg: "bg-emerald-50", text: "text-emerald-700", ring: "border-emerald-200", Icon: Inbox },
-  promotions: { label: "Promotions / At-risk", bg: "bg-amber-50", text: "text-amber-700", ring: "border-amber-200", Icon: Megaphone },
-  spam: { label: "Spam", bg: "bg-red-50", text: "text-red-700", ring: "border-red-200", Icon: Ban },
+  lower: { label: "Fewer local concerns — placement unknown", bg: "bg-emerald-50", text: "text-emerald-700", ring: "border-emerald-200", Icon: Inbox },
+  review: { label: "Content needs review", bg: "bg-amber-50", text: "text-amber-700", ring: "border-amber-200", Icon: Megaphone },
+  high: { label: "High content/authentication concern", bg: "bg-red-50", text: "text-red-700", ring: "border-red-200", Icon: Ban },
 };
 const SEV_COLOR: Record<string, string> = {
   critical: "text-red-600", high: "text-orange-600", medium: "text-amber-600", low: "text-slate-500", unknown: "text-slate-400",
@@ -862,7 +863,7 @@ function InboxPlacementTest() {
   });
 
   const canRun = !!(subject.trim() || html.trim()) && !run.isPending;
-  const p = report ? PLACEMENT[report.placement] : null;
+  const p = report ? PLACEMENT[report.contentRisk] : null;
 
   return (
     <Card className="p-4">
@@ -870,7 +871,7 @@ function InboxPlacementTest() {
         <FlaskConical className="size-4" /> Content checks (not measured inbox placement)
       </h3>
       <p className="mb-3 text-xs text-muted-foreground">
-        Content + authentication health score that predicts Inbox vs Promotions vs Spam — modelled on Mail-Tester / SpamAssassin. Optionally send a live copy to an inbox you control.
+        Local checks highlight wording, links and formatting to review. They are not Google’s spam score and cannot predict inbox placement. A live copy requires checking the receiving mailbox.
       </p>
 
       {/* Source toggle */}
@@ -931,8 +932,8 @@ function InboxPlacementTest() {
               </div>
             </div>
             <div className="text-right">
-              <div className={`text-3xl font-bold ${p.text}`}>{report.score}<span className="text-sm text-muted-foreground">/100</span></div>
-              <div className="text-xs text-muted-foreground">spam score {report.spamScore} (lower is better)</div>
+              <div className={`text-3xl font-bold ${p.text}`}>{report.score}<span className="text-sm text-muted-foreground">/100 checklist</span></div>
+              <div className="text-xs text-muted-foreground">local checklist points {report.spamScore}</div>
             </div>
           </div>
 
@@ -954,7 +955,7 @@ function InboxPlacementTest() {
 
           {report.findings.filter((f) => f.points !== 0).length > 0 && (
             <div>
-              <div className="mb-1 text-xs font-semibold text-muted-foreground">What's affecting placement</div>
+              <div className="mb-1 text-xs font-semibold text-muted-foreground">Local findings to review</div>
               <div className="space-y-1">
                 {report.findings.filter((f) => f.points !== 0).map((f) => (
                   <div key={f.id} className="flex items-start gap-2 text-sm">
@@ -972,7 +973,7 @@ function InboxPlacementTest() {
           {report.liveSend && (
             <div className={`rounded border p-2 text-sm ${report.liveSend.sent ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-800"}`}>
               {report.liveSend.sent
-                ? <>Live copy sent from {report.liveSend.from} to <strong>{report.liveSend.to}</strong> — open that inbox to see the real Gmail/Outlook placement.</>
+                ? <>Provider accepted a copy from {report.liveSend.from} to <strong>{report.liveSend.to}</strong> — open that inbox to see the real Gmail/Outlook placement.</>
                 : <>Live send failed: {report.liveSend.error}</>}
             </div>
           )}
@@ -984,7 +985,7 @@ function InboxPlacementTest() {
             {showNotEval && (
               <ul className="mt-1 space-y-0.5 pl-4 text-xs text-muted-foreground">
                 {report.notEvaluated.map((n) => <li key={n.id}>• {n.message}</li>)}
-                <li className="pt-1 italic">This is a content + auth prediction. For true per-provider placement, run a seed-list test (GlockApps / MailReach).</li>
+                <li className="pt-1 italic">This is a local checklist, not a placement prediction. Check the received message in an independent seed mailbox.</li>
               </ul>
             )}
           </div>

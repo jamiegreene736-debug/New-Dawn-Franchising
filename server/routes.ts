@@ -1,3 +1,4 @@
+import { getCampaignSpamRisk } from "./campaign-spam-risk-service";
 import { pool } from "./db";
 import { campaignOutcomes } from "./campaign-metrics";
 import { registerOutreachReviewRoutes } from "./outreach-review-routes";
@@ -3397,6 +3398,18 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
 
   // Per-step + overview analytics for the Seamless-style builder.
   registerOutreachReviewRoutes(app, requireAdminAuth);
+
+  app.get("/api/crm/campaigns/:id/spam-risk", requireAdminAuth, async (req, res) => {
+    try {
+      const campaign = await storage.getDripCampaign(String(req.params.id));
+      if (!campaign) return res.status(404).json({ message: "Campaign not found" });
+      res.setHeader("Cache-Control", "no-store");
+      res.json(await getCampaignSpamRisk(await storage.getDripSteps(campaign.id)));
+    } catch (error) {
+      console.error("Campaign spam risk check failed", error instanceof Error ? error.message : "Unknown error");
+      res.status(503).json({ message: "Spam risk checks are unavailable. Inbox placement is unverified." });
+    }
+  });
 
   app.get("/api/crm/campaigns/:id/stats", requireAdminAuth, async (req, res) => {
     try {

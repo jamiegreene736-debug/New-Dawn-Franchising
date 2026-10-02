@@ -1,3 +1,5 @@
+import { registerCampaignPlacementRoutes } from "./campaign-placement-routes";
+import { processPlacementTests } from "./campaign-placement-service";
 import { getCampaignSpamRisk } from "./campaign-spam-risk-service";
 import { pool } from "./db";
 import { campaignOutcomes } from "./campaign-metrics";
@@ -445,6 +447,7 @@ function scheduleWarmupCrons() {
 function scheduleDeliverabilityMonitoringCrons() {
   // Finish any seed test that's been awaiting placement long enough to read.
   cron.schedule("*/5 * * * *", () => {
+    processPlacementTests().catch((e) => console.error("[Placement Test]", e instanceof Error ? e.message : "Worker unavailable"));
     checkPendingSeedTests().catch((e) => console.error("[SeedTest Cron] error:", e?.message));
   });
   // Ingest new DMARC aggregate reports (gated on DMARC_IMAP_* env).
@@ -3398,6 +3401,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
 
   // Per-step + overview analytics for the Seamless-style builder.
   registerOutreachReviewRoutes(app, requireAdminAuth);
+  registerCampaignPlacementRoutes(app, requireAdminAuth);
 
   app.get("/api/crm/campaigns/:id/spam-risk", requireAdminAuth, async (req, res) => {
     try {

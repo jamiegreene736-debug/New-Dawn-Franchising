@@ -11,6 +11,21 @@ import { pool } from "./db";
  * every boot.
  */
 const STATEMENTS: string[] = [
+  `CREATE TABLE IF NOT EXISTS campaign_placement_tests (
+    id uuid PRIMARY KEY, campaign_id varchar NOT NULL, step_id varchar NOT NULL,
+    request_id uuid NOT NULL UNIQUE, content_hash text NOT NULL, snapshot jsonb NOT NULL,
+    reason text NOT NULL DEFAULT '', status text NOT NULL DEFAULT 'creating',
+    project_id text NOT NULL, provider_test_id text, provider_header text,
+    error text, created_at timestamptz NOT NULL DEFAULT now(), checked_at timestamptz
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_campaign_placement_tests ON campaign_placement_tests(campaign_id,created_at DESC)`,
+  `CREATE TABLE IF NOT EXISTS campaign_placement_messages (
+    test_id uuid NOT NULL REFERENCES campaign_placement_tests(id), email text NOT NULL,
+    send_status text NOT NULL DEFAULT 'queued', placement text NOT NULL DEFAULT 'pending',
+    attempted_at timestamptz, rendered_html text, authentication jsonb,
+    PRIMARY KEY(test_id,email)
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_placement_attempted ON campaign_placement_messages(attempted_at) WHERE attempted_at IS NOT NULL`,
   `CREATE TABLE IF NOT EXISTS email_delivery_reports (
     mailbox text NOT NULL, message_id text NOT NULL, recipient text NOT NULL,
     kind text NOT NULL, diagnostic text NOT NULL, original_ids jsonb NOT NULL,

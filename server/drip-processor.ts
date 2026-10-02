@@ -1,5 +1,6 @@
+import { makePersonalize } from "./campaign-personalization";
 import { getOutreachReadiness, campaignWindowIssue } from "./outreach-readiness";
-import { greetingName, nextEmailAllowedAt, preferFirstContact } from "./drip-scheduling";
+import { nextEmailAllowedAt, preferFirstContact } from "./drip-scheduling";
 import { campaignMessageId } from "./campaign-replies";
 import cron from "node-cron";
 import { storage } from "./storage";
@@ -46,17 +47,6 @@ async function linkedInTasksCreatedToday(): Promise<number> {
   } catch {
     return 0;
   }
-}
-
-function makePersonalize(name: string, email: string, firmHook: string) {
-  const { firstName, fullName } = greetingName(name || "");
-  return (s: string | null | undefined): string =>
-    (s || "")
-      .replace(/\[Contact First Name\]/gi, firstName)
-      .replace(/\{\{\s*firstName\s*\}\}/gi, firstName)
-      .replace(/\{\{\s*name\s*\}\}/gi, fullName)
-      .replace(/\{\{\s*email\s*\}\}/gi, email || "")
-      .replace(/\{\{\s*firmHook\s*\}\}/gi, firmHook || "");
 }
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -193,6 +183,11 @@ export async function processDripEmails(opts: { force?: boolean; campaignId?: st
     const now = Date.now();
     let sentLast24h = await storage.countSentEmailsSince(new Date(now - 24 * 60 * 60 * 1000));
     let sentLastHour = await storage.countSentEmailsSince(new Date(now - 60 * 60 * 1000));
+    const { rows: testVolume } = await pool.query<{ daily: number; hourly: number }>(
+      `SELECT count(*)::int AS daily, count(*) FILTER (WHERE attempted_at>now()-interval '1 hour')::int AS hourly
+       FROM campaign_placement_messages WHERE attempted_at>now()-interval '24 hours'`);
+    sentLast24h += testVolume[0].daily;
+    sentLastHour += testVolume[0].hourly;
 
     // Respect daily volume cap (a hard safety even on a manual override)
     if (sentLast24h >= dailyCap) {

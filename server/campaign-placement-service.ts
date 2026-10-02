@@ -111,7 +111,8 @@ export async function refreshPlacementTest(campaignId: string, testId: string) {
 }
 export async function cancelPlacementTest(campaignId: string, testId: string) {
   return withLock(async client => {
-    await client.query("UPDATE campaign_placement_tests SET status='cancelled',error='Stopped by administrator. Already accepted messages cannot be recalled; no credit refund is assumed.' WHERE id=$1 AND campaign_id=$2", [testId,campaignId]);
+    const result = await client.query("UPDATE campaign_placement_tests SET status='cancelled',error='Stopped by administrator. Already accepted messages cannot be recalled; no credit refund is assumed.' WHERE id=$1 AND campaign_id=$2", [testId,campaignId]);
+    if (!result.rowCount) throw new PlacementError("Placement test not found", 404);
   });
 }
 

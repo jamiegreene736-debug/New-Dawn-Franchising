@@ -116,6 +116,7 @@ test("paused outreach, rolling caps and cancellation prevent seed sends",{skip:!
   await pool.query("TRUNCATE drip_sends; UPDATE deliverability_settings SET outreach_autopilot_paused=false");
   await processPlacementTests();assert.equal(envelopes.length,0);
   await pool.query("UPDATE deliverability_settings SET outreach_autopilot_paused=true");
+  await assert.rejects(cancelPlacementTest(randomUUID(),id),/not found/);
   await cancelPlacementTest(campaignId,id); await processPlacementTests();assert.equal(envelopes.length,0);
 });
 test("uncertain SMTP acceptance stops the test, never automatically resends and remains distinct from placement",{skip:!dbEnabled},async()=>{

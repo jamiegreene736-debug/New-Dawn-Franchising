@@ -295,12 +295,23 @@ async function safeRows(sql: string, params: any[] = []): Promise<any[]> {
 
 const ATTEMPTED = `status IN ('sent','delivered','opened','clicked','replied','bounced','failed')`;
 
+export function summarizeSendWindow(r: { attempted: number; bounced: number; unverifiedBounced: number; failed: number; opened: number; clicked: number }) {
+  const accepted = r.attempted - r.failed;
+  return { ...r,
+    // Legacy bounce labels and pre-acceptance failures do not establish a recipient bounce rate.
+    bounceRate: accepted > 0 && r.unverifiedBounced === 0 ? +((r.bounced / accepted) * 100).toFixed(1) : null,
+    openRate: r.attempted ? +((r.opened / r.attempted) * 100).toFixed(1) : 0,
+    clickRate: r.attempted ? +((r.clicked / r.attempted) * 100).toFixed(1) : 0,
+  };
+}
+
 async function sendWindow(days: number | null) {
   const where = days == null ? "" : `AND created_at > now() - make_interval(days => ${days})`;
   const rows = await safeRows(
     `SELECT
        count(*) FILTER (WHERE ${ATTEMPTED}) AS attempted,
-       count(*) FILTER (WHERE status = 'bounced') AS bounced,
+       count(*) FILTER (WHERE bounce_verified_at IS NOT NULL) AS bounced,
+       count(*) FILTER (WHERE status = 'bounced' AND bounce_verified_at IS NULL) AS unverified_bounced,
        count(*) FILTER (WHERE status = 'failed') AS failed,
        count(*) FILTER (WHERE opened_at IS NOT NULL) AS opened,
        count(*) FILTER (WHERE clicked_at IS NOT NULL) AS clicked
@@ -313,22 +324,20 @@ async function sendWindow(days: number | null) {
   const failed = Number(r.failed || 0);
   const opened = Number(r.opened || 0);
   const clicked = Number(r.clicked || 0);
-  return {
+  return summarizeSendWindow({
     attempted,
     bounced,
+    unverifiedBounced: Number(r.unverified_bounced || 0),
     failed,
     opened,
     clicked,
-    bounceRate: attempted ? +(((bounced + failed) / attempted) * 100).toFixed(1) : 0,
-    openRate: attempted ? +((opened / attempted) * 100).toFixed(1) : 0,
-    clickRate: attempted ? +((clicked / attempted) * 100).toFixed(1) : 0,
-  };
+  });
 }
 
 export interface DeliverabilityMetrics {
   generatedAt: string;
   sendingDomain: string;
-  volume: { last24h: any; last7d: any; last30d: any; allTime: any };
+  volume: { last24h: ReturnType<typeof summarizeSendWindow>; last7d: ReturnType<typeof summarizeSendWindow>; last30d: ReturnType<typeof summarizeSendWindow>; allTime: ReturnType<typeof summarizeSendWindow> };
   suppression: { total: number; last7: number; last30: number; byReason: { reason: string; count: number }[] };
   topBounceDomains: { domain: string; attempted: number; bounced: number; rate: number }[];
   enrollments: { total: number; replied: number; bounced: number; replyRate: number };
@@ -369,11 +378,11 @@ export async function getDeliverabilityMetrics(): Promise<DeliverabilityMetrics>
     await safeRows(
       `SELECT split_part(recipient_email,'@',2) AS domain,
          count(*) FILTER (WHERE ${ATTEMPTED}) AS attempted,
-         count(*) FILTER (WHERE status='bounced') AS bounced
+         count(*) FILTER (WHERE bounce_verified_at IS NOT NULL) AS bounced
        FROM drip_sends
        WHERE channel='email' AND recipient_email LIKE '%@%'
        GROUP BY 1
-       HAVING count(*) FILTER (WHERE status='bounced') > 0
+       HAVING count(*) FILTER (WHERE bounce_verified_at IS NOT NULL) > 0
        ORDER BY bounced DESC, attempted DESC
        LIMIT 12`,
     )

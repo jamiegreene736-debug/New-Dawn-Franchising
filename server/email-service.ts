@@ -109,6 +109,7 @@ export interface EmailSendOptions {
   skipUnsubscribe?: boolean;
   cc?: string;
   messageId?: string;
+  placementTestHeader?: string;
   outreach?: boolean;
   minimalSignature?: boolean;
   previewText?: string;
@@ -254,6 +255,10 @@ ${innerHtml}${footerHtml}
       textBody += `\n\n—\nNot interested? Unsubscribe: ${unsubscribeUrl(recipientAddr)}`;
     }
 
+    if (options?.placementTestHeader) {
+      if (!/^[^\r\n]{1,200}$/.test(options.placementTestHeader)) throw new Error("Invalid placement test header");
+      extraHeaders["X-API-Campaign-id"] = options.placementTestHeader;
+    }
     await options?.onPrepared?.(finalHtml);
     const info = await transport.sendMail({
       from: `"${profile?.name || "New Dawn Franchising"}" <${fromEmail}>`,

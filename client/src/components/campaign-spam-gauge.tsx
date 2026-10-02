@@ -1,3 +1,4 @@
+import { CampaignPlacementTest } from "./campaign-placement-test";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import type { CampaignSpamRisk } from "@shared/campaign-spam-risk";
@@ -65,6 +66,7 @@ export function CampaignSpamGauge({ campaignId, revision }: { campaignId: string
           <a className="mt-2 inline-block underline" href="https://support.google.com/mail/answer/81126" target="_blank" rel="noreferrer">Google’s sender guidelines</a>
         </details>
       </>}
+      <CampaignPlacementTest campaignId={campaignId} revision={revision} steps={report?.steps || []} />
     </section>
   );
 }

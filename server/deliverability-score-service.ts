@@ -36,11 +36,11 @@ export async function getDeliverabilityScore() {
     factors.push({ key: "blacklist", label: "Blacklist status", score, weight: 15, detail: listed === 0 ? "Not listed on any monitored blocklist." : `Listed on ${listed} blocklist(s).` });
   }
 
-  if (metrics) {
+  if (metrics && metrics.volume.last30d.bounceRate !== null) {
     const rate = metrics.volume.last30d.bounceRate;
     // <=2% is healthy; degrade ~8 pts per point above 2%.
     const score = clamp(100 - Math.max(0, rate - 2) * 8);
-    factors.push({ key: "bounce", label: "Bounce rate (30d)", score, weight: 20, detail: `${rate}% bounce over ${metrics.volume.last30d.attempted} sends (target <2%).` });
+    factors.push({ key: "bounce", label: "Observed verified bounce rate (30d)", score, weight: 20, detail: `${rate}% verified bounces among accepted sends (target <2%).` });
   }
 
   // Inbox placement — latest completed seed test.

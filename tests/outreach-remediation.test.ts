@@ -4,8 +4,22 @@ import { qualificationIssue, sequenceIssue, campaignWindowIssue } from "../serve
 import { campaignOutcomes } from "../server/campaign-metrics";
 import { replyFolders, originalMessageIds } from "../server/mailbox-evidence";
 import { qualifyIntroducer } from "../server/introducer-qualify";
+import { summarizeSendWindow } from "../server/deliverability-service";
 const now = new Date("2026-10-01T16:00:00Z");
 const qualified = { status: "approved", audience: "broker", source_url: "https://firm.example/e2", reason: "Your firm's practice includes U.S. E-2 investors.", role: "Partner", firm_domain: "firm.example", reviewed_at: now };
+test("legacy bounce labels make the rate unknown instead of counting SMTP failures as bounces", () => {
+  const summary = summarizeSendWindow({attempted:1843,bounced:0,unverifiedBounced:235,failed:501,opened:0,clicked:0});
+  assert.equal(summary.bounceRate,null);
+  assert.equal(summary.failed,501);
+  assert.equal(summary.unverifiedBounced,235);
+});
+test("verified bounce rates use accepted sends and cannot be diluted by failed attempts", () => {
+  assert.equal(summarizeSendWindow({attempted:200,bounced:2,unverifiedBounced:0,failed:100,opened:0,clicked:0}).bounceRate,2);
+  assert.equal(summarizeSendWindow({attempted:200,bounced:2,unverifiedBounced:1,failed:100,opened:0,clicked:0}).bounceRate,null);
+});
+test("empty and entirely failed windows have no observable bounce rate", () => {
+  for (const attempted of [0,100]) assert.equal(summarizeSendWindow({attempted,bounced:0,unverifiedBounced:0,failed:attempted,opened:0,clicked:0}).bounceRate,null);
+});
 test("labels, stale reviews and wrong audiences do not qualify recipients", () => {
   assert.ok(qualificationIssue(undefined, "broker", now));
   assert.equal(qualificationIssue(qualified, "broker", now), null);

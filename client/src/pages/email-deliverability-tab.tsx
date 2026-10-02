@@ -51,10 +51,11 @@ interface AuthReport {
 interface SendWindow {
   attempted: number;
   bounced: number;
+  unverifiedBounced: number;
   failed: number;
   opened: number;
   clicked: number;
-  bounceRate: number;
+  bounceRate: number | null;
   openRate: number;
   clickRate: number;
 }
@@ -1436,15 +1437,15 @@ export default function EmailDeliverabilityTab() {
           <>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
               <StatCard
-                label="Bounce rate (30d)"
-                value={`${m.volume.last30d.bounceRate}%`}
-                valueClass={bounceColor(m.volume.last30d.bounceRate)}
-                sub={`${m.volume.last30d.bounced + m.volume.last30d.failed} of ${m.volume.last30d.attempted} sends · target <2%`}
+                label="Verified bounce rate (30d)"
+                value={m.volume.last30d.bounceRate === null ? "Unknown" : `${m.volume.last30d.bounceRate}%`}
+                valueClass={m.volume.last30d.bounceRate === null ? "text-amber-600" : bounceColor(m.volume.last30d.bounceRate)}
+                sub={`${m.volume.last30d.bounced} verified · ${m.volume.last30d.unverifiedBounced} unverified old bounces · ${m.volume.last30d.failed} failed sends`}
               />
               <StatCard
                 label="Open rate (30d)"
                 value={`${m.volume.last30d.openRate}%`}
-                sub="pixel-based — under-counts"
+                sub="Pixel events may include automated activity"
               />
               <StatCard label="Reply rate" value={`${m.enrollments.replyRate}%`} sub={`${m.enrollments.replied} of ${m.enrollments.total} enrolled`} />
               <StatCard
@@ -1455,27 +1456,27 @@ export default function EmailDeliverabilityTab() {
             </div>
 
             <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
-              <StatCard label="Sent (24h)" value={`${m.volume.last24h.attempted}`} />
-              <StatCard label="Sent (7d)" value={`${m.volume.last7d.attempted}`} />
-              <StatCard label="Sent (30d)" value={`${m.volume.last30d.attempted}`} />
-              <StatCard label="Sent (all-time)" value={`${m.volume.allTime.attempted}`} sub={`${m.volume.allTime.bounceRate}% lifetime bounce`} />
+              <StatCard label="Send attempts (24h)" value={`${m.volume.last24h.attempted}`} />
+              <StatCard label="Send attempts (7d)" value={`${m.volume.last7d.attempted}`} />
+              <StatCard label="Send attempts (30d)" value={`${m.volume.last30d.attempted}`} />
+              <StatCard label="Send attempts (all-time)" value={`${m.volume.allTime.attempted}`} sub={m.volume.allTime.bounceRate === null ? "Verified bounce rate unknown" : `${m.volume.allTime.bounceRate}% observed verified bounces`} />
             </div>
 
             {/* Per-domain bounce concentration */}
             <Card className="mt-3 p-4">
               <h4 className="mb-2 flex items-center gap-2 text-sm font-semibold">
-                <Ban className="size-4" /> Bounces by recipient domain
-                <span className="font-normal text-muted-foreground">— a domain with a high % is blocking you, not bad luck</span>
+                <Ban className="size-4" /> Verified bounces by recipient domain
+                <span className="font-normal text-muted-foreground">— review delivery reports to determine the cause</span>
               </h4>
               {m.topBounceDomains.length === 0 ? (
-                <div className="text-sm text-muted-foreground">No bounces recorded yet.</div>
+                <div className="text-sm text-muted-foreground">No verified bounces linked to campaign sends. This does not confirm delivery.</div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="text-left text-xs uppercase text-muted-foreground">
                         <th className="py-1 pr-3">Domain</th>
-                        <th className="py-1 pr-3 text-right">Sent</th>
+                        <th className="py-1 pr-3 text-right">Attempts</th>
                         <th className="py-1 pr-3 text-right">Bounced</th>
                         <th className="py-1 text-right">Rate</th>
                       </tr>

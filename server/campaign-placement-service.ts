@@ -83,17 +83,24 @@ async function refreshTest(client: PoolClient, test: TestRow) {
   if (!test.provider_test_id) throw new PlacementError("No provider report is available. Check GlockApps before starting another paid test.", 409);
   const report = await getGlockReport(test.project_id, test.provider_test_id);
   for (const result of report.inboxes) {
-    if (!result.finished) continue;
-    const placement = normalizePlacement(result.iType);
+    if (!result.finished && !report.finished) continue;
+    const placement = result.finished && result.visible === false ? "diagnostic" : normalizePlacement(result.iType);
     // The first observed placement is immutable: moving a message never turns a spam result into a pass.
     await client.query(`UPDATE campaign_placement_messages SET placement=$3,authentication=$4
       WHERE test_id=$1 AND email=$2 AND placement IN ('pending','unknown','missing') AND send_status IN ('accepted','unknown')`,
     [test.id,result.email.toLowerCase(),placement,JSON.stringify({ spf: result.spf || "unknown", dkim: result.dkim || "unknown", dmarc: result.dmarc || "unknown" })]);
   }
+  const authentication = report.authenticationResult;
+  if (authentication?.finished) {
+    // The authentication seed is not an inbox and is absent from report.inboxes.
+    await client.query(`UPDATE campaign_placement_messages SET placement='diagnostic',authentication=$3
+      WHERE test_id=$1 AND email=$2 AND placement IN ('pending','unknown','missing') AND send_status IN ('accepted','unknown')`,
+    [test.id,authentication.email.toLowerCase(),JSON.stringify({ spf: authentication.spfAuth || "unknown", dkim: authentication.dkimAuth || "unknown", dmarc: authentication.dmarcAuth || "unknown" })]);
+  }
   const age = Date.now() - new Date(test.created_at).getTime();
   const expired = age > 24 * 3600_000;
   const { rows } = await client.query<{ queued: number; unresolved: number }>(`SELECT count(*) FILTER(WHERE send_status='queued')::int AS queued,
-    count(*) FILTER(WHERE send_status <> 'accepted' OR placement NOT IN ('inbox','tabs','spam'))::int AS unresolved FROM campaign_placement_messages WHERE test_id=$1`, [test.id]);
+    count(*) FILTER(WHERE send_status <> 'accepted' OR placement NOT IN ('inbox','tabs','spam','diagnostic'))::int AS unresolved FROM campaign_placement_messages WHERE test_id=$1`, [test.id]);
   const status = test.status === "attention" ? "attention" : report.failedReport || expired ? "attention" : rows[0].queued ? "queued" : report.finished ? (rows[0].unresolved ? "attention" : "complete") : "awaiting_placement";
   await client.query("UPDATE campaign_placement_tests SET status=$2,checked_at=now(),error=$3 WHERE id=$1", [test.id,status,report.failedReport ? "GlockApps could not finish this report." : expired ? "Test timed out. Unobserved mail remains unknown; no messages will be resent." : status === "attention" ? "Some messages failed or have no confirmed placement. Review the mailbox results." : null]);
 }

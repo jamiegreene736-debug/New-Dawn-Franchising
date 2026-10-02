@@ -73,6 +73,15 @@ test("provider rejects malformed recipients, header injection, excessive panels 
   }
   resetProvider(); responseData={status:"success",result:{testId:"other",finished:true}}; await assert.rejects(getGlockReport("123",created.testId),/mismatched/);
 });
+test("paid creation accepts twelve selected seeds plus one diagnostic but rejects a larger panel",async()=>{
+  resetProvider();process.env.GLOCKAPPS_SEED_ACCOUNT_IDS=Array.from({length:12},(_,i)=>String(i+1)).join(",");
+  try {
+    responseData={...created,emails:Array.from({length:13},(_,i)=>`seed${i}@example.com`)};
+    assert.equal((await createGlockTest("test")).emails.length,13);
+    responseData={...created,emails:Array.from({length:14},(_,i)=>`seed${i}@example.com`)};
+    await assert.rejects(createGlockTest("test"),/invalid or oversized/);
+  } finally {process.env.GLOCKAPPS_SEED_ACCOUNT_IDS="1,2";}
+});
 test("auth, insufficient credits, rate limit and server errors are actionable without secret leakage",async()=>{
   for(const [status,pattern] of [[401,/access/],[402,/credits/],[429,/rate limiting/],[500,/HTTP 500/]] as const){
     resetProvider();responseStatus=status;await assert.rejects(createGlockTest("test"),pattern);assert.equal(calls.length,1);
@@ -80,7 +89,26 @@ test("auth, insufficient credits, rate limit and server errors are actionable wi
 });
 test("unknown placements never count as inbox and preview edits invalidate the snapshot",()=>{
   assert.equal(normalizePlacement("Spam"),"spam"); assert.equal(normalizePlacement("Other"),"tabs"); assert.equal(normalizePlacement("new-folder"),"unknown");
+  assert.equal(normalizePlacement("X"),"missing");
   assert.notEqual(placementHash(placementSnapshot(step)),placementHash(placementSnapshot({...step,previewText:"Changed"})));
+});
+test("provider diagnostic seeds finish separately and never count as inbox placement",{skip:!dbEnabled},async()=>{
+  await reset();const helper="auth@auth.glockdb.com";
+  responseData={...created,emails:[...created.emails,helper]};
+  const id=await startPlacementTest(campaignId,stepId,randomUUID(),"");
+  responseData={...report("Inbox",false),result:{...report("Inbox",false).result,
+    inboxes:[{email:created.emails[0],iType:"Inbox",finished:"true",visible:"true"},{email:created.emails[1],iType:"Inbox",finished:true,visible:false}],
+    authenticationResult:{email:helper,finished:"true",spfAuth:"pass",dkimAuth:"pass",dmarcAuth:"pass"}}};
+  for(let i=0;i<3;i++){
+    await processPlacementTests();
+    await pool.query("UPDATE campaign_placement_messages SET attempted_at=now()-interval '6 minutes' WHERE attempted_at IS NOT NULL");
+  }
+  const finalReport=responseData as {result:{finished:boolean}};finalReport.result.finished=true;
+  await ageCheck(id);await refreshPlacementTest(campaignId,id);
+  const test=(await placementOverview(campaignId)).tests[0];
+  assert.equal(test.status,"complete");assert.equal(test.messages.filter(m=>m.placement==="inbox").length,1);
+  assert.equal(test.messages.filter(m=>m.placement==="diagnostic").length,2);
+  assert.equal(test.messages.find(m=>m.email===helper)?.authentication?.dmarc,"pass");
 });
 test("placement lifecycle, idempotency, actual rendering and first observed spam are preserved",{skip:!dbEnabled},async()=>{
   await reset(); const request=randomUUID();

@@ -350,6 +350,8 @@ export const dripCampaigns = pgTable("drip_campaigns", {
   // pitch) or "client" (direct-to-E-2-investor pitch). Drives the Send-now track.
   audienceType: text("audience_type").notNull().default("broker"),
   outreachPolicy: text("outreach_policy").notNull().default("cold"),
+  templateId: text("template_id"),
+  templateRequestKey: text("template_request_key").unique(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

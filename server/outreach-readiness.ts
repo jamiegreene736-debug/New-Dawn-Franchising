@@ -25,6 +25,7 @@ export function qualificationIssue(q: Qualification | undefined, audience: strin
 export function sequenceLimits(policy = "cold") {
   return policy === "broker_nurture_10"
     ? { days: 120, emails: 10 }
+    : policy === "template_drip" ? { days: 45, emails: 4 }
     : { days: OUTREACH_SEQUENCE_DAYS, emails: OUTREACH_MAX_EMAILS };
 }
 

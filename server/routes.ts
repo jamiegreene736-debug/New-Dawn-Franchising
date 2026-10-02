@@ -1,4 +1,6 @@
 import { registerCampaignPlacementRoutes } from "./campaign-placement-routes";
+import { registerCampaignTemplateRoutes } from "./campaign-template-routes";
+import { TEMPLATE_OUTREACH_POLICY } from "@shared/campaign-templates";
 import { processPlacementTests } from "./campaign-placement-service";
 import { getCampaignSpamRisk } from "./campaign-spam-risk-service";
 import { pool } from "./db";
@@ -3379,6 +3381,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
   });
 
   // --- Drip Campaign routes ---
+  registerCampaignTemplateRoutes(app, requireAdminAuth);
   app.get("/api/crm/campaigns", requireAdminAuth, async (_req, res) => {
     try {
       const campaigns = await storage.getDripCampaigns();
@@ -3478,7 +3481,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
   app.post("/api/crm/campaigns", requireAdminAuth, async (req, res) => {
     try {
       const { name, description, isActive, steps, audienceType, outreachPolicy = "cold" } = req.body;
-      if (!["cold", "broker_nurture_10"].includes(outreachPolicy)) return res.status(400).json({ message: "Invalid outreach policy" });
+      if (!["cold", "broker_nurture_10", TEMPLATE_OUTREACH_POLICY].includes(outreachPolicy)) return res.status(400).json({ message: "Invalid outreach policy" });
       if (outreachPolicy === "broker_nurture_10" && audienceType === "client") return res.status(400).json({ message: "Broker nurture requires a broker audience" });
       if (!name) return res.status(400).json({ message: "Campaign name is required" });
       const track = audienceType === "client" ? "client" : "broker";
@@ -3505,9 +3508,10 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
   app.patch("/api/crm/campaigns/:id", requireAdminAuth, async (req, res) => {
     try {
       const campaignId = String(req.params.id);
-      if (req.body.outreachPolicy !== undefined && !["cold", "broker_nurture_10"].includes(req.body.outreachPolicy)) return res.status(400).json({ message: "Invalid outreach policy" });
+      if (req.body.outreachPolicy !== undefined && !["cold", "broker_nurture_10", TEMPLATE_OUTREACH_POLICY].includes(req.body.outreachPolicy)) return res.status(400).json({ message: "Invalid outreach policy" });
       const existing = await storage.getDripCampaign(campaignId);
       if (!existing) return res.status(404).json({ message: "Campaign not found" });
+      if (existing.templateId && ((req.body.outreachPolicy !== undefined && req.body.outreachPolicy !== TEMPLATE_OUTREACH_POLICY) || req.body.templateId !== undefined || req.body.templateRequestKey !== undefined)) return res.status(400).json({ message: "Template safety settings cannot be changed" });
       if ((req.body.outreachPolicy ?? existing.outreachPolicy) === "broker_nurture_10" && (req.body.audienceType ?? existing.audienceType) !== "broker") return res.status(400).json({ message: "Broker nurture requires a broker audience" });
       const updated = await storage.updateDripCampaign(campaignId, req.body);
       // Turning a campaign ON shouldn't wait for the next top-of-hour cron tick —
@@ -3545,6 +3549,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
         isActive: false,
         audienceType: src.audienceType ?? "broker",
         outreachPolicy: src.outreachPolicy,
+        templateId: src.templateId,
       } as any);
       for (const s of steps) {
         await storage.createDripStep({
@@ -3570,9 +3575,12 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
   app.post("/api/crm/campaigns/:id/steps", requireAdminAuth, async (req, res) => {
     if (req.body.previewText != null && (typeof req.body.previewText !== "string" || req.body.previewText.length > 150)) return res.status(400).json({ message: "Preview text must be at most 150 characters" });
     try {
+      const campaign = await storage.getDripCampaign(String(req.params.id));
+      if (!campaign) return res.status(404).json({ message: "Campaign not found" });
+      if (campaign.outreachPolicy === TEMPLATE_OUTREACH_POLICY && (!["email", "sms"].includes(req.body.stepType || "email") || (req.body.triggerType && req.body.triggerType !== "time"))) return res.status(400).json({ message: "Templates use timed email and text steps only" });
       const step = await storage.createDripStep({
-        campaignId: String(req.params.id) as string,
         ...req.body,
+        campaignId: String(req.params.id),
       });
       res.status(201).json(step);
     } catch (err) {
@@ -3583,6 +3591,10 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
   app.patch("/api/crm/steps/:id", requireAdminAuth, async (req, res) => {
     if (req.body.previewText != null && (typeof req.body.previewText !== "string" || req.body.previewText.length > 150)) return res.status(400).json({ message: "Preview text must be at most 150 characters" });
     try {
+      const existing = await storage.getDripStep(String(req.params.id));
+      if (!existing) return res.status(404).json({ message: "Step not found" });
+      const campaign = await storage.getDripCampaign(existing.campaignId);
+      if (campaign?.outreachPolicy === TEMPLATE_OUTREACH_POLICY && (req.body.campaignId !== undefined || (req.body.stepType && !["email", "sms"].includes(req.body.stepType)) || (req.body.triggerType && req.body.triggerType !== "time"))) return res.status(400).json({ message: "Templates use timed email and text steps only" });
       const updated = await storage.updateDripStep(String(req.params.id) as string, req.body);
       res.json(updated);
     } catch (err) {

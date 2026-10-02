@@ -11,6 +11,16 @@ import { pool } from "./db";
  * every boot.
  */
 const STATEMENTS: string[] = [
+  `ALTER TABLE drip_campaigns ADD COLUMN IF NOT EXISTS template_id text`,
+  `ALTER TABLE drip_campaigns ADD COLUMN IF NOT EXISTS template_request_key text`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_campaign_template_request ON drip_campaigns(template_request_key) WHERE template_request_key IS NOT NULL`,
+  `CREATE TABLE IF NOT EXISTS campaign_sms_permissions (
+    id uuid PRIMARY KEY, email text NOT NULL, phone text NOT NULL,
+    consented_at timestamptz NOT NULL, source text NOT NULL, disclosure text NOT NULL,
+    evidence text NOT NULL, timezone text NOT NULL, recorded_by text NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(), revoked_at timestamptz
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_campaign_sms_permission_recipient ON campaign_sms_permissions(email,phone,created_at DESC)`,
   `CREATE TABLE IF NOT EXISTS campaign_placement_tests (
     id uuid PRIMARY KEY, campaign_id varchar NOT NULL, step_id varchar NOT NULL,
     request_id uuid NOT NULL UNIQUE, content_hash text NOT NULL, snapshot jsonb NOT NULL,

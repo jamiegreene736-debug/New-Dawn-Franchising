@@ -1,21 +1,8 @@
 import type { AuthStatus } from "./deliverability-service";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Inbox-placement / spam-score analyzer
-//
-// A deterministic, no-API content + authentication health check modelled on what
-// Mail-Tester / GlockApps / SpamAssassin actually measure (researched). Given an
-// email's subject + HTML body + the sending domain's live SPF/DKIM/DMARC status,
-// it predicts a 0–100 score and a placement (inbox | promotions | spam).
-//
-// Two-stage design (mirrors how mailbox providers work):
-//   Stage 1 — SPAM GATE:   auth + content hygiene + obfuscation  → spamPoints (≈ SpamAssassin S)
-//   Stage 2 — TAB CLASSIFY (only if it clears the gate): promo markup → inbox vs promotions
-//
-// What it CANNOT see (documented in `notEvaluated`, surfaced in the UI): live IP/
-// domain blocklist status, reverse-DNS, your sending reputation/complaint rate,
-// and true per-provider seed placement. Those need a seed-mailbox network.
-// ─────────────────────────────────────────────────────────────────────────────
+// Local editorial heuristics, not Gmail's classifier or SpamAssassin.
+// Legacy placement fields remain for API compatibility; consumers should use
+// contentRisk and must not interpret score as an inbox probability.
 
 export interface SpamAuthInput {
   spf: AuthStatus;
@@ -36,8 +23,9 @@ export interface SpamFinding {
 }
 
 export interface SpamReport {
+  contentRisk: "lower" | "review" | "high";
   score: number; // 0–100, higher = cleaner
-  spamScore: number; // SpamAssassin-equivalent S (lower = better)
+  spamScore: number; // Local heuristic points (not a provider score)
   promoPoints: number;
   placement: "inbox" | "promotions" | "spam";
   placementReason: string;
@@ -197,26 +185,26 @@ export function analyzeEmail(
   // A. Authentication
   const authPts: Record<AuthStatus, number> = { pass: 0, warn: 2, fail: 4, info: 0 };
   if (auth.spf === "fail") add("auth.spf_fail", "Authentication", 4, "SPF fails — receiving servers can't verify your sending IP.", "spam");
-  else if (auth.spf === "warn") add("auth.spf_warn", "Authentication", 2, "SPF is soft/neutral (~all) — tighten once all senders are listed.", "spam");
+  else if (auth.spf === "warn") add("auth.spf_warn", "Authentication", 2, "SPF DNS check needs review; ~all alone does not mean an authorized message fails SPF.", "spam");
   if (auth.dkim === "fail") add("auth.dkim_fail", "Authentication", 4, "DKIM is missing/invalid — your mail isn't cryptographically signed.", "spam");
   else if (auth.dkim === "warn") add("auth.dkim_warn", "Authentication", 2, "DKIM not confirmed at common selectors.", "spam");
   if (auth.dmarc === "fail") add("auth.dmarc_fail", "Authentication", 3, "DMARC fails or is broken (e.g. duplicate records) — no enforcement.", "spam");
-  else if (auth.dmarc === "warn") add("auth.dmarc_warn", "Authentication", 1.5, "DMARC is monitor-only (p=none) — fine for now; ramp to quarantine later.", "spam");
+  else if (auth.dmarc === "warn") add("auth.dmarc_warn", "Authentication", 0, "Review DMARC policy. A valid p=none policy meets Gmail’s minimum policy requirement and does not imply message authentication failure.", "inbox");
   if (auth.spf === "pass" && auth.dkim === "pass" && auth.dmarc === "pass")
-    add("auth.all_pass_bonus", "Authentication", -2, "SPF, DKIM and DMARC all pass — strong authentication.", "inbox");
-  const authHardFail = auth.spf === "fail" || auth.dkim === "fail" || (auth.spf !== "pass" && auth.dkim !== "pass");
+    add("auth.all_pass_bonus", "Authentication", -2, "SPF, DKIM and DMARC DNS checks pass; received-message alignment still needs verification.", "inbox");
+  const authHardFail = auth.spf === "fail" || auth.dkim === "fail" || auth.dmarc === "fail";
 
   // B. Content / spam words
   const subjHits = findTriggers(ctx.subject);
   if (subjHits.length) {
     const pts = Math.min(subjHits.length * 1.5, 3);
-    add("content.spamword_subject", "Content", pts, `Subject contains spam-trigger phrasing: ${[...new Set(subjHits.map((h) => `"${h.term}"`))].slice(0, 4).join(", ")}.`, "spam");
+    add("content.spamword_subject", "Content", pts, `Subject wording worth reviewing (not a Gmail keyword rule): ${[...new Set(subjHits.map((h) => `"${h.term}"`))].slice(0, 4).join(", ")}.`, "spam");
   }
   const bodyHits = findTriggers(ctx.text);
   const highCats = new Set(bodyHits.filter((h) => HIGH_RISK_CATEGORIES.has(h.category)).map((h) => h.category));
   if (highCats.size) {
     const pts = Math.min(highCats.size * 2.5, 5);
-    add("content.high_risk_phrase", "Content", pts, `Body uses high-risk language (${[...highCats].join(", ").replace(/_/g, " ")}) that strongly correlates with spam.`, "spam");
+    add("content.high_risk_phrase", "Content", pts, `Body uses high-risk language (${[...highCats].join(", ").replace(/_/g, " ")}) that deserves an editorial review; this does not establish why Gmail filtered a message.`, "spam");
   }
   const medLowHits = bodyHits.filter((h) => !HIGH_RISK_CATEGORIES.has(h.category));
   if (medLowHits.length) {
@@ -251,7 +239,7 @@ export function analyzeEmail(
   if (!ctx.subject.trim()) add("fmt.subj_length", "Formatting", 1, "Empty subject line.", "promotions");
   else if (ctx.subject.length > 70) add("fmt.subj_length", "Formatting", 0.3, "Subject is long (>70 chars) and may be truncated.", "promotions");
   if (/(display\s*:\s*none|visibility\s*:\s*hidden|font-size\s*:\s*0(px)?|font-size\s*:\s*1px)/i.test(html))
-    add("fmt.hidden_text", "Formatting", 2, "Hidden text/elements (display:none / font-size:0) — a deceptive pattern filters punish.", "spam");
+    add("fmt.hidden_text", "Formatting", 2, "Hidden markup detected. Confirm it is a normal preview-text block or tracking pixel, not misleading content.", "spam");
 
   // D. Links & images
   const textLen = ctx.text.length;
@@ -261,7 +249,7 @@ export function analyzeEmail(
   if (imgCount === 1 && textLen < 200 && ctx.hasLinkedImage) add("img.single_linked_image", "Links & images", 2.2, "A single clickable image with little text is a known spam pattern.", "spam");
   if (ctx.imgs.some((i) => !i.hasAlt)) add("img.no_alt", "Links & images", 0.3, "Some images lack alt text.", "promotions");
   const shortenerLinks = ctx.links.filter((l) => LINK_SHORTENERS.includes(l.host));
-  if (shortenerLinks.length) add("link.shortener", "Links & images", Math.min(shortenerLinks.length * 1.5, 3), "Uses link shorteners (bit.ly etc.) — strong spam signal; link to your real domain instead.", "spam");
+  if (shortenerLinks.length) add("link.shortener", "Links & images", Math.min(shortenerLinks.length * 1.5, 3), "Uses link shorteners (bit.ly etc.). Prefer a recognizable destination so recipients know where the link leads.", "spam");
   if (ctx.links.some((l) => /^https?:\/\/(\d{1,3}\.){3}\d{1,3}/.test(l.href))) add("link.ip_literal", "Links & images", 2, "A link points to a raw IP address.", "spam");
   const mismatch = ctx.links.find((l) => {
     const t = l.text.match(/\b([a-z0-9-]+\.[a-z]{2,})\b/i);
@@ -274,12 +262,12 @@ export function analyzeEmail(
   // E. Compliance
   const bodyUnsub = /unsubscribe|opt.?out|email preferences/i.test(ctx.text) || /mailto:[^"']*unsubscribe/i.test(html) || /href=["'][^"']*unsubscrib/i.test(html);
   const hasUnsub = bodyUnsub || !!opts?.hasListUnsubHeader;
-  if (!hasUnsub) add("compliance.no_unsub_link", "Compliance", 1.5, "No unsubscribe mechanism — no body link and no List-Unsubscribe header. CAN-SPAM + Gmail/Yahoo require one.", "promotions");
-  else if (!bodyUnsub && opts?.hasListUnsubHeader) add("compliance.list_unsub_header", "Compliance", 0, "One-click List-Unsubscribe header is added on send — compliant. A visible body link can further help Promotions placement.", "inbox");
+  if (!hasUnsub) add("compliance.no_unsub_link", "Compliance", 1.5, "No unsubscribe mechanism detected in this input. Check the final visible opt-out link and one-click headers.", "promotions");
+  else if (!bodyUnsub && opts?.hasListUnsubHeader) add("compliance.list_unsub_header", "Compliance", 0, "The sending path is configured to add one-click headers; verify the received headers and visible unsubscribe link.", "inbox");
   else add("compliance.unsub_present_bonus", "Compliance", -0.3, "Unsubscribe link present in the body.", "promotions");
   if (!/\b\d{1,5}\s+[A-Za-z0-9.\s]+,\s*[A-Za-z\s]+,?\s*[A-Z]{2}\b|\b[A-Z]{2}\s*\d{5}\b/.test(ctx.text))
-    add("compliance.no_physical_address", "Compliance", 0.5, "No physical mailing address found — CAN-SPAM requires one in commercial email.", "promotions");
-  if (html.includes(GTUBE)) add("compliance.gtube", "Compliance", 1000, "Contains the GTUBE spam-test string — guaranteed spam.", "spam");
+    add("compliance.no_physical_address", "Compliance", 0.5, "No physical mailing address found in this input. Check the final commercial-email footer.", "promotions");
+  if (html.includes(GTUBE)) add("compliance.gtube", "Compliance", 1000, "Contains a standard spam-filter test string; remove before outreach.", "spam");
 
   // ── Aggregate ──
   const spamPoints = +F.reduce((s, f) => s + f.points, 0).toFixed(2);
@@ -293,19 +281,19 @@ export function analyzeEmail(
   const gateFlags = ["fmt.hidden_text", "link.href_text_mismatch", "link.ip_literal", "img.image_only"].filter((id) => fired.has(id));
   if (authHardFail) {
     placement = "spam";
-    placementReason = "Unauthenticated mail (SPF/DKIM not aligned) is filtered to spam by Gmail/Yahoo regardless of content.";
+    placementReason = "Authentication checks are incomplete or failing. DNS alone cannot establish message alignment or inbox placement.";
   } else if (spamPoints >= 5) {
     placement = "spam";
-    placementReason = "Content spam-score is above the filtering threshold.";
+    placementReason = "Multiple local content concerns need review; this is not a Gmail filtering threshold.";
   } else if (gateFlags.length) {
     placement = "spam";
-    placementReason = "A deceptive/obfuscation pattern was detected.";
+    placementReason = "Markup or link patterns need review; their effect on Gmail placement is unknown.";
   } else if (promoPoints >= 2 || spamPoints >= 2.5) {
     placement = "promotions";
-    placementReason = spamPoints >= 2.5 ? "Borderline content score — likely the Promotions tab, not the primary inbox." : "Marketing-shaped markup (links/images/CTAs) — likely the Promotions tab.";
+    placementReason = spamPoints >= 2.5 ? "Several local content concerns need review." : "Marketing-style markup detected. Promotions is an inbox category, not Spam.";
   } else {
     placement = "inbox";
-    placementReason = "Clean, well-authenticated, conversational content.";
+    placementReason = "Fewer local concerns found. Inbox placement and reputation remain unverified.";
   }
 
   const notEvaluated = [
@@ -313,11 +301,12 @@ export function analyzeEmail(
     { id: "rep.ptr", message: "Reverse-DNS / PTR of the sending IP — not visible from message content." },
     { id: "rep.uribl", message: "Whether your link domains are blocklisted (URIBL/SURBL) — needs a live DNS lookup." },
     { id: "rep.reputation", message: "Your sender reputation, complaint rate and warmup — needs Google Postmaster Tools / sending history." },
-    { id: "rep.seed", message: "True per-provider inbox/spam/Promotions placement — needs a seed-mailbox network (GlockApps/MailReach). Stage-2 here is a prediction, not a measurement." },
+    { id: "rep.seed", message: "True per-provider inbox/spam/Promotions placement — needs a seed-mailbox network (GlockApps/MailReach). Local rules cannot predict Gmail placement." },
     { id: "hdr.list_unsub", message: "List-Unsubscribe header (one-click) lives in headers, not the body — this app now adds it on cold sends; verify in your ESP." },
   ];
 
   return {
+    contentRisk: placement === "spam" ? "high" : placement === "promotions" ? "review" : "lower",
     score,
     spamScore: spamPoints,
     promoPoints,

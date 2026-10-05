@@ -1,6 +1,6 @@
 import { simpleParser } from "mailparser";
 import { randomUUID } from "crypto";
-import { ImapFlow } from "imapflow";
+import { createImapClient, closeImapClient } from "./imap-client";
 import { pool } from "./db";
 import { sendEmailFromSender } from "./email-service";
 
@@ -126,8 +126,8 @@ async function checkSeedPlacement(seed: SeedInbox, token: string): Promise<SeedP
   const cfg = PROVIDERS[seed.provider] || PROVIDERS.other;
   const host = seed.imapHost || cfg.host;
   if (!password || !host) return { placement: "unverified", error: "Receiving mailbox access is not configured." };
-  const client = new ImapFlow({ host, port: cfg.port, secure: true, auth: { user: seed.imapUser || seed.email, pass: password }, logger: false,
-    connectionTimeout: 15000, socketTimeout: 30000 });
+  const client = createImapClient({ host, port: cfg.port, secure: true, auth: { user: seed.imapUser || seed.email, pass: password }, logger: false,
+    connectionTimeout: 15000, socketTimeout: 30000 }, "SeedPlacement");
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
   try {
     await client.connect();
@@ -146,7 +146,7 @@ async function checkSeedPlacement(seed: SeedInbox, token: string): Promise<SeedP
     return { placement: "missing" };
   } catch {
     return { placement: "unverified", error: "Could not read the receiving mailbox; delivery is not established." };
-  } finally { try { await client.logout(); } catch { client.close(); } }
+  } finally { await closeImapClient(client, "SeedPlacement"); }
 }
 
 export async function checkSeedTest(testId: string): Promise<void> {

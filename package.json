@@ -21,7 +21,7 @@
     "mobile:staging:smoke": "tsx script/mobile-staging-smoke.ts",
     "db:push": "drizzle-kit push",
     "test:outreach-desk": "tsx --test tests/outreach-desk.test.ts tests/outreach-desk.integration.test.ts",
-    "test:outreach-email": "tsx --test tests/postmaster.test.ts && tsx --test tests/outreach-email-reliability.test.ts && tsx --test tests/drip-scheduling.test.ts && tsx --test tests/outreach-remediation.test.ts && tsx --test tests/campaign-spam-risk.test.ts && tsx --test tests/campaign-placement.test.ts"
+    "test:outreach-email": "tsx --test tests/imap-client.test.ts && tsx --test tests/postmaster.test.ts && tsx --test tests/outreach-email-reliability.test.ts && tsx --test tests/drip-scheduling.test.ts && tsx --test tests/outreach-remediation.test.ts && tsx --test tests/campaign-spam-risk.test.ts && tsx --test tests/campaign-placement.test.ts"
   },
   "dependencies": {
     "@fontsource-variable/dm-sans": "^5.2.8",

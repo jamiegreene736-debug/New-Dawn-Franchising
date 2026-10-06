@@ -7,7 +7,8 @@ import { lookupPhone } from "./twilio-lookup";
 import { extractPhoneFromText } from "./people-finder";
 import { seamlessFindPeople } from "./seamless-service";
 import { hunterFindEmail } from "./hunter-service";
-import { ImapFlow } from "imapflow";
+import type { ImapFlow } from "imapflow";
+import { createImapClient, closeImapClient } from "./imap-client";
 import { monitorReddit, monitorQuora } from "./apify-service";
 import { scanForumsForOpportunities } from "./forum-scanner";
 import {
@@ -660,13 +661,13 @@ export async function pollForApprovalReply(): Promise<void> {
 
   let client: ImapFlow | null = null;
   try {
-    client = new ImapFlow({
+    client = createImapClient({
       host: "imap.gmail.com",
       port: 993,
       secure: true,
       auth: { user: DYLAN_EMAIL, pass: password },
       logger: false,
-    });
+    }, "AgentApproval");
 
     await client.connect();
     const lock = await client.getMailboxLock("INBOX");
@@ -699,13 +700,10 @@ export async function pollForApprovalReply(): Promise<void> {
     } finally {
       lock.release();
     }
-
-    await client.logout();
   } catch (e) {
     console.error("[Agent] IMAP poll error:", e);
-    if (client) {
-      try { await client.logout(); } catch {}
-    }
+  } finally {
+    if (client) await closeImapClient(client, "AgentApproval");
   }
 }
 

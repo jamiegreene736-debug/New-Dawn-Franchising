@@ -1,5 +1,5 @@
 import zlib from "zlib";
-import { ImapFlow } from "imapflow";
+import { createImapClient, closeImapClient } from "./imap-client";
 import { pool } from "./db";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -146,7 +146,7 @@ export async function syncDmarcReports(): Promise<{ scanned: number; ingested: n
   const cfg = getDmarcConfig();
   if (!cfg.configured) { lastSync = { at: new Date().toISOString(), ingested: 0, scanned: 0, error: "DMARC_IMAP_USER/PASSWORD not set" }; return { scanned: 0, ingested: 0 }; }
 
-  const client = new ImapFlow({ host: cfg.host, port: 993, secure: true, auth: { user: cfg.user, pass: cfg.pass }, logger: false });
+  const client = createImapClient({ host: cfg.host, port: 993, secure: true, auth: { user: cfg.user, pass: cfg.pass }, logger: false }, "DMARC");
   let scanned = 0, ingested = 0;
   try {
     await client.connect();
@@ -180,7 +180,7 @@ export async function syncDmarcReports(): Promise<{ scanned: number; ingested: n
     console.error("[DMARC] sync failed:", e?.message);
     lastSync = { at: new Date().toISOString(), ingested, scanned, error: e?.message || "sync failed" };
   } finally {
-    try { await client.logout(); } catch {}
+    await closeImapClient(client, "DMARC");
   }
   if (ingested > 0) console.log(`[DMARC] ingested ${ingested} new report(s) from ${scanned} scanned`);
   return { scanned, ingested };

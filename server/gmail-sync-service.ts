@@ -14,7 +14,8 @@ import { suppressReplyOutreach } from "./call-queue-service";
 
 import { simpleParser } from "mailparser";
 import { findReplySend } from "./campaign-replies";
-import { ImapFlow } from "imapflow";
+import type { ImapFlow } from "imapflow";
+import { createImapClient, closeImapClient } from "./imap-client";
 import cron from "node-cron";
 import { storage } from "./storage";
 import { addToDnc, isOnDnc } from "./agent-service";
@@ -154,7 +155,7 @@ export async function syncSenderInbox(senderEmail: string, password: string, loo
   let bounced = 0;
 
   try {
-    client = new ImapFlow({
+    client = createImapClient({
       host: "imap.gmail.com",
       port: 993,
       secure: true,
@@ -163,7 +164,7 @@ export async function syncSenderInbox(senderEmail: string, password: string, loo
       connectionTimeout: 15_000,
       greetingTimeout: 15_000,
       socketTimeout: 30_000,
-    });
+    }, "GmailSync");
 
     await client.connect();
     const folders = replyFolders(await client.list());
@@ -357,15 +358,12 @@ export async function syncSenderInbox(senderEmail: string, password: string, loo
         lock.release();
       }
     }
-    await client.logout();
   } catch (e: any) {
     const error = e?.message || "IMAP sync error";
     console.error(`[GmailSync] ${senderEmail} poll error:`, error);
-    if (client) {
-      try { await client.logout(); } catch {}
-    }
     return { scanned, matched, stored, bounced, error, lastRunAt: new Date() };
   } finally {
+    if (client) await closeImapClient(client, "GmailSync");
     syncingMailboxes.delete(senderEmail);
   }
 

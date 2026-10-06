@@ -1,4 +1,5 @@
-import { ImapFlow } from "imapflow";
+import type { ImapFlow } from "imapflow";
+import { createImapClient, closeImapClient } from "./imap-client";
 import { pool } from "./db";
 import { sendEmailFromSender } from "./email-service";
 import {
@@ -74,13 +75,13 @@ async function engageMailbox(member: WarmupMember, settings: WarmupSettings, acc
     return;
   }
 
-  const client = new ImapFlow({
+  const client = createImapClient({
     host: "imap.gmail.com",
     port: 993,
     secure: true,
     auth: { user: member.email, pass: password },
     logger: false,
-  });
+  }, "Warmup");
 
   const since = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
   const handled = new Set<string>(); // tokens handled this run (avoid double-touch after a move)
@@ -154,7 +155,7 @@ async function engageMailbox(member: WarmupMember, settings: WarmupSettings, acc
   } catch (e: any) {
     acc.errors.push(`${member.email}: ${e?.message || "IMAP error"}`);
   } finally {
-    try { await client.logout(); } catch {}
+    await closeImapClient(client, "Warmup");
   }
 }
 

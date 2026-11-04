@@ -1,3 +1,4 @@
+import { isLegacyOutreachDisabled } from "./outreach-owner";
 import { makePersonalize } from "./campaign-personalization";
 import { TEMPLATE_OUTREACH_POLICY } from "@shared/campaign-templates";
 import { smsPermissionIssue, inTemplateSmsWindow, templateTouchAllowedAt, templateSmsContentIssue } from "./campaign-template-safety";
@@ -132,6 +133,7 @@ let dripRunInProgress = false;
 let dripRerunRequested = false;
 
 export async function processDripEmails(opts: { force?: boolean; campaignId?: string; templateTextsOnly?: boolean } = {}) {
+  if (isLegacyOutreachDisabled()) return;
   const { force = false, campaignId, templateTextsOnly = false } = opts;
   console.log(`[Drip] Processing scheduled emails...${campaignId ? ` (campaign ${campaignId} only)` : ""}${force ? " (manual override — bypassing window only)" : ""}`);
 

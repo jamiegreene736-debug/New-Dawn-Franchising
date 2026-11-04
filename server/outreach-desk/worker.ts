@@ -1,3 +1,4 @@
+import { isLegacyOutreachDisabled } from "../outreach-owner";
 import { pool } from "../db";
 import {
   sendEmailFromSender,
@@ -63,6 +64,7 @@ async function dispatch(action: DispatchAction): Promise<DispatchResult> {
 export async function processOneAction(
   send: Dispatch = dispatch,
 ): Promise<boolean> {
+  if (isLegacyOutreachDisabled()) return false;
   // Dispatch claims survive process crashes. An uncertain send is never retried automatically.
   await pool.query(`UPDATE outreach_desk_actions SET status='unknown',error='Dispatch interrupted; reconcile provider history before sending again.',updated_at=now()
     WHERE status='dispatching' AND dispatch_started_at<now()-interval '5 minutes'`);
@@ -249,7 +251,7 @@ export async function prepareDesk(): Promise<void> {
 export function startDeskWorker() {
   let running = false;
   const tick = async () => {
-    if (running) return;
+    if (running || isLegacyOutreachDisabled()) return;
     running = true;
     try {
       await ensureDeskSchema();

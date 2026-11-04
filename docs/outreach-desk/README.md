@@ -34,3 +34,9 @@ Then open `http://127.0.0.1:4179/mockups/`. The prototype uses only local assets
 Inspected GitHub repository: `jamiegreene736-debug/New-Dawn-Franchising`, `origin/main` at `1daa778`. Work is isolated in a managed worktree because the original local checkout was behind the remote. Existing mobile/Pathways functionality remains a separate product boundary.
 
 Assumptions pending Jamie's audience/tool preferences: one primary human outbound agent; buyer and professional-referral tracks; a US-first policy pilot with international markets enabled individually; Quo, Meta WhatsApp, existing email transport, and Calendly retained initially. Provider subscriptions, permissions, balances, and production configuration have not been verified.
+
+## Outreach retired in favor of Instantly (November 4, 2026)
+
+Production uses `OUTREACH_DISABLED=true`. This overrides the older autopilot and parallel-outreach flags, stops scheduled planning and campaign dispatch, rejects old plan/message approvals, and suppresses all agent phone texts (including SEO status texts). Instantly campaigns and transactional client email are unaffected. Keep the database global pause, Outreach Desk pause, campaign pauses, and enrollment pauses in place. Do not re-enable legacy sending without a new user request.
+
+Regression coverage: `npx tsx --test tests/outreach-shutdown.test.ts` verifies blocked entry points make no database, HTTP, or SMTP calls.

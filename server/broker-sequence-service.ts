@@ -1,3 +1,4 @@
+import { isLegacyOutreachDisabled, OUTREACH_DISABLED_REASON } from "./outreach-owner";
 /**
  * Broker Outreach Sequence Service
  * Manages the expanded omnichannel sequence for broker leads (more steps, earlier value + explicit commission follow-ups).
@@ -354,6 +355,7 @@ function draftWhatsApp(lead: OutreachLead, track: TrackId = "broker"): string {
 // ─── Execute individual event ─────────────────────────────────────────────────
 
 async function executeEvent(event: OutreachSequenceEvent, lead: OutreachLead): Promise<void> {
+  if (isLegacyOutreachDisabled()) throw new Error(OUTREACH_DISABLED_REASON);
   const meta = (event.metadata ?? {}) as any;
   const condition: string | null = meta.condition ?? null;
   const flow: string = meta.flow ?? lead.sequenceFlow ?? "";
@@ -605,6 +607,7 @@ export async function forceExecuteEvent(eventId: string): Promise<{ success: boo
 // ─── Process due events (cron) ────────────────────────────────────────────────
 
 export async function processSequenceEvents(): Promise<void> {
+  if (isLegacyOutreachDisabled()) return;
   const now = new Date();
 
   // Get all scheduled events that are due

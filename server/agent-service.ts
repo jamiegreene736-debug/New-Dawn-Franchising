@@ -1,3 +1,4 @@
+import { isLegacyOutreachDisabled, OUTREACH_DISABLED_REASON } from "./outreach-owner";
 import { db } from "./db";
 import { agentLeads, agentMessages, agentDailyBatches, agentForumPosts, agentSettings, agentRunLogs, agentDnc } from "../shared/schema";
 import { eq, and, sql, desc, lt, isNull, or } from "drizzle-orm";
@@ -531,6 +532,7 @@ export async function stageOutreachForToday(batchId: string): Promise<number> {
 // ─── Build & Send Briefing Email ─────────────────────────────────────────────
 
 export async function sendDailyBrief(batchId: string): Promise<boolean> {
+  if (isLegacyOutreachDisabled()) return false;
   // Idempotency: don't re-send if already sent
   const batchCheck = await db.select({ briefEmailSentAt: agentDailyBatches.briefEmailSentAt })
     .from(agentDailyBatches).where(eq(agentDailyBatches.id, batchId)).limit(1);
@@ -649,6 +651,7 @@ export async function sendDailyBrief(batchId: string): Promise<boolean> {
 const processedMessageIds = new Set<string>();
 
 export async function pollForApprovalReply(): Promise<void> {
+  if (isLegacyOutreachDisabled()) return;
   const today = todayStr();
   const batch = await db.select().from(agentDailyBatches)
     .where(and(eq(agentDailyBatches.batchDate, today), eq(agentDailyBatches.approvalStatus, "pending")))
@@ -756,6 +759,7 @@ async function parseAndActOnReply(batchId: string, upperBody: string, rawBody: s
 // ─── Execute Batch ───────────────────────────────────────────────────────────
 
 export async function executeBatch(batchId: string, skippedItems: number[] = []): Promise<void> {
+  if (isLegacyOutreachDisabled()) throw new Error(OUTREACH_DISABLED_REASON);
   const batch = await db.select().from(agentDailyBatches).where(eq(agentDailyBatches.id, batchId)).limit(1);
   if (!batch[0]) return;
 
@@ -887,6 +891,7 @@ async function sendExecutionConfirmation(batchId: string, sent: number, failed: 
 // ─── Main Preparation Run (6 AM) ─────────────────────────────────────────────
 
 export async function runDailyPreparation(): Promise<void> {
+  if (isLegacyOutreachDisabled()) return;
   const settings = await getSettings();
   if (settings?.agentPaused) {
     console.log("[Agent] Paused — skipping daily preparation");
@@ -1018,6 +1023,7 @@ export async function runDailyPreparation(): Promise<void> {
 // ─── Send Daily Brief (7 AM) ─────────────────────────────────────────────────
 
 export async function runDailyBrief(): Promise<void> {
+  if (isLegacyOutreachDisabled()) return;
   const today = todayStr();
   const batch = await db.select().from(agentDailyBatches)
     .where(and(eq(agentDailyBatches.batchDate, today), eq(agentDailyBatches.approvalStatus, "pending")))
@@ -1035,6 +1041,7 @@ export async function runDailyBrief(): Promise<void> {
 // ─── 2 PM Deadline ───────────────────────────────────────────────────────────
 
 export async function runApprovalDeadlineCheck(): Promise<void> {
+  if (isLegacyOutreachDisabled()) return;
   const today = todayStr();
   const batch = await db.select().from(agentDailyBatches)
     .where(and(eq(agentDailyBatches.batchDate, today), eq(agentDailyBatches.approvalStatus, "pending")))
@@ -1059,6 +1066,7 @@ export async function runApprovalDeadlineCheck(): Promise<void> {
 // ─── Portal Approval ─────────────────────────────────────────────────────────
 
 export async function portalApprove(batchId: string, skipItems: number[] = []): Promise<void> {
+  if (isLegacyOutreachDisabled()) throw new Error(OUTREACH_DISABLED_REASON);
   const batch = await db.select().from(agentDailyBatches).where(eq(agentDailyBatches.id, batchId)).limit(1);
   if (!batch[0] || batch[0].approvalStatus === "executed") return;
 
@@ -1081,6 +1089,7 @@ export async function portalHold(batchId: string): Promise<void> {
 // ─── Send a single agent message (used by approval inbox) ────────────────────
 
 export async function sendSingleAgentMessage(messageId: string): Promise<{ ok: boolean; channel: string }> {
+  if (isLegacyOutreachDisabled()) throw new Error(OUTREACH_DISABLED_REASON);
   const [msg] = await db.select().from(agentMessages).where(eq(agentMessages.id, messageId)).limit(1);
   if (!msg) throw new Error("Message not found");
   if (msg.status === "sent") return { ok: true, channel: msg.channel };

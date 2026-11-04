@@ -1,3 +1,4 @@
+import { isLegacyOutreachDisabled, OUTREACH_DISABLED_REASON } from "./outreach-owner";
 /**
  * Public approval routes — no auth required, secured by token.
  * GET  /api/approve/seo/:token       → preview SEO draft
@@ -126,6 +127,7 @@ router.get("/outreach/:token", async (req, res) => {
 
 // ── Outreach Touch: approve/reject ─────────────────────────────────────────────
 router.post("/outreach/:token", async (req, res) => {
+  if (isLegacyOutreachDisabled()) return res.status(409).json({ error: OUTREACH_DISABLED_REASON });
   const { action, notes } = req.body as { action: "approve" | "reject"; notes?: string };
   if (!["approve", "reject"].includes(action)) return res.status(400).json({ error: "action must be approve or reject" });
 
@@ -171,6 +173,7 @@ router.get("/plan/:token", async (req, res) => {
 
 // ── Outreach Daily Plan: approve/reject/pause-autopilot ───────────────────────
 router.post("/plan/:token", async (req, res) => {
+  if (isLegacyOutreachDisabled()) return res.status(409).json({ error: OUTREACH_DISABLED_REASON });
   const { action, notes } = req.body as {
     action: "approve" | "reject" | "pause_autopilot" | "resume_autopilot";
     notes?: string;
@@ -475,6 +478,7 @@ async function getPipelineHealthLine(): Promise<string | null> {
 }
 
 export async function sendMorningDigest(): Promise<void> {
+  if (isLegacyOutreachDisabled()) return;
   // Idempotency: only send once per calendar day regardless of server restarts
   const startOfDayET = new Date(
     new Date().toLocaleDateString("en-US", { timeZone: "America/New_York" }) + " 00:00:00"
@@ -634,6 +638,7 @@ const ATTEMPTED_STATUSES = `('sent','delivered','opened','clicked','replied','bo
  * judgeable without reading every daily report. Idempotent per week.
  */
 export async function sendWeeklyRollup(): Promise<void> {
+  if (isLegacyOutreachDisabled()) return;
   const dup = await db.select({ id: agentSmsMessages.id })
     .from(agentSmsMessages)
     .where(and(

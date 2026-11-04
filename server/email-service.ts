@@ -1,3 +1,4 @@
+import { isLegacyOutreachDisabled, OUTREACH_DISABLED_REASON } from "./outreach-owner";
 import nodemailer, { type Transporter } from "nodemailer";
 import type { CrmTemplateGroup } from "@shared/crm-template-groups";
 import { buildUnsubscribeHeaders, htmlToPlainText, unsubscribeUrl } from "./unsubscribe-service";
@@ -142,6 +143,7 @@ export async function sendEmailFromSender(
 ): Promise<{ success: boolean; error?: string; messageId?: string }> {
   try {
     if (options?.outreach) {
+      if (isLegacyOutreachDisabled()) return { success: false, error: OUTREACH_DISABLED_REASON };
       const { getDeliverabilitySettings } = await import("./deliverability-settings-service");
       if ((await getDeliverabilitySettings()).outreachAutopilotPaused) return { success: false, error: "Outreach sending is paused." };
       const { isOnDnc } = await import("./agent-service");

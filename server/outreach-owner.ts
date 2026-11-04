@@ -6,7 +6,15 @@
  * for manual use, but their crons are frozen unless PARALLEL_OUTREACH is on.
  */
 
+/** Instantly owns outreach; this switch also silences legacy agent phone alerts. */
+export const OUTREACH_DISABLED_REASON = "Automatic outreach is disabled; outreach is managed in Instantly.";
+
+export function isLegacyOutreachDisabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return ["1", "true", "on", "yes"].includes((env.OUTREACH_DISABLED ?? "").trim().toLowerCase());
+}
+
 export function isParallelOutreachEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  if (isLegacyOutreachDisabled(env)) return false;
   const v = (env.PARALLEL_OUTREACH ?? "").trim().toLowerCase();
   return v === "1" || v === "true" || v === "on" || v === "yes";
 }

@@ -83,7 +83,7 @@ import mobileRouter from "./mobile/routes";
 import { readRequiredEnvironmentValue } from "./runtime-config";
 import { processPartnerSequence } from "./partner-sequence-service";
 import { runDailyPreparation, runDailyBrief, pollForApprovalReply, runApprovalDeadlineCheck, addToDnc, isOnDnc } from "./agent-service";
-import { isParallelOutreachEnabled, logParallelSkip } from "./outreach-owner";
+import { isParallelOutreachEnabled, logParallelSkip, isLegacyOutreachDisabled, OUTREACH_DISABLED_REASON } from "./outreach-owner";
 import { verifyEmailForEnrollment, isFreshVerification, decisionFromStoredStatus } from "./email-verification-service";
 import { verifyUnsubToken, unsubscribeConfirmPage, unsubscribedPage, invalidUnsubscribeLinkPage } from "./unsubscribe-service";
 import { classifyTrackingHit, isBotUserAgent } from "./tracking-bot-filter";
@@ -5718,6 +5718,7 @@ First decide: is this person a REFERRAL PARTNER (attorney/broker/advisor who ref
     catch (e) { res.status(500).json({ error: (e as Error).message }); }
   });
   app.post("/api/outreach/intelligence/run", requireAdminAuth, async (_req, res) => {
+    if (isLegacyOutreachDisabled()) return res.status(409).json({ error: OUTREACH_DISABLED_REASON });
     res.json({ ok: true, message: "Intelligence planning started — you will receive an SMS shortly." });
     planDailyIntelligence().catch(e => console.error("[OutreachIntel] Manual trigger error:", e));
   });

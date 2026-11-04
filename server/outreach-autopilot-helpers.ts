@@ -1,3 +1,4 @@
+import { isLegacyOutreachDisabled } from "./outreach-owner";
 /**
  * outreach-autopilot-helpers.ts
  * ───────────────────────────────────────────────────────────────────────────
@@ -19,6 +20,7 @@ export const MAX_EXECUTION_ATTEMPTS = 2;
  * .outreach_autopilot_paused) is checked separately at run time.
  */
 export function isAutopilotEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  if (isLegacyOutreachDisabled(env)) return false;
   const v = (env.OUTREACH_AUTOPILOT ?? "").trim().toLowerCase();
   return v === "1" || v === "true" || v === "on" || v === "yes";
 }

@@ -1,3 +1,4 @@
+import { isLegacyOutreachDisabled, OUTREACH_DISABLED_REASON } from "./outreach-owner";
 /**
  * Autonomous Outreach Agent Service
  * Daily loop: Source → Score → Plan → Execute → Critique
@@ -606,6 +607,7 @@ export async function runOutreachCampaignLoop(campaignId: string): Promise<{
   steps: { step: string; result: string }[];
   error?: string;
 }> {
+  if (isLegacyOutreachDisabled()) return { success: false, steps: [], error: OUTREACH_DISABLED_REASON };
   const steps: { step: string; result: string }[] = [];
 
   const [campaign] = await db.select().from(leadCampaigns).where(eq(leadCampaigns.id, campaignId));
@@ -944,6 +946,7 @@ Include: what's working, what the reply rate suggests, top priority for tomorrow
 // ─── Approve & Send a Touch ───────────────────────────────────────────────────
 
 export async function approveAndSendTouch(touchId: string): Promise<{ sent: boolean; channel: string; error?: string }> {
+  if (isLegacyOutreachDisabled()) return { sent: false, channel: "", error: OUTREACH_DISABLED_REASON };
   const [touch] = await db.select().from(outreachTouches).where(eq(outreachTouches.id, touchId));
   if (!touch) throw new Error("Touch not found");
 

@@ -1,3 +1,4 @@
+import { isLegacyOutreachDisabled, OUTREACH_DISABLED_REASON } from "./outreach-owner";
 /**
  * Partner Outreach Sequence Service — v4.1
  * 8-touch sequence for professional partners: immigration attorneys, wealth managers,
@@ -414,6 +415,7 @@ function draftLinkedIn(lead: PartnerLead, isConnection: boolean): string {
 // ─── Execute individual event ─────────────────────────────────────────────────
 
 async function executeEvent(event: PartnerSequenceEvent, lead: PartnerLead): Promise<void> {
+  if (isLegacyOutreachDisabled()) throw new Error(OUTREACH_DISABLED_REASON);
   const meta = (event.metadata ?? {}) as any;
   const condition: string | null = meta.condition ?? null;
   const flow: string = meta.flow ?? lead.sequenceFlow ?? "standard";
@@ -514,6 +516,7 @@ async function executeEvent(event: PartnerSequenceEvent, lead: PartnerLead): Pro
 // ─── Main cron processor ──────────────────────────────────────────────────────
 
 export async function processPartnerSequence(): Promise<void> {
+  if (isLegacyOutreachDisabled()) return;
   const now = new Date();
 
   const dueEvents = await db.select({

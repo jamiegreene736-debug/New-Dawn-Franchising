@@ -1,3 +1,4 @@
+import { isLegacyOutreachDisabled, OUTREACH_DISABLED_REASON } from "./outreach-owner";
 /**
  * Outreach Intelligence Service
  * Daily autonomous lead intelligence for E-2 visa franchise outreach.
@@ -578,6 +579,7 @@ async function sendPlanFailureSmsThrottled(body: string): Promise<void> {
  * and an 8AM digest that confusingly nagged about old plans instead.
  */
 export async function runDailyPlanning(): Promise<void> {
+  if (isLegacyOutreachDisabled()) return;
   try {
     await planDailyIntelligence();
   } catch (e) {
@@ -646,6 +648,7 @@ async function getOutcomeHistoryBlock(): Promise<string> {
 // ─── Plan Daily Intelligence ──────────────────────────────────────────────────
 
 export async function planDailyIntelligence(): Promise<{ planId: string; approvalUrl: string }> {
+  if (isLegacyOutreachDisabled()) throw new Error(OUTREACH_DISABLED_REASON);
   const today = etToday();
   const autopilot = await getAutopilotState();
   const autopilotActive = autopilot.enabled && !autopilot.paused;
@@ -924,6 +927,7 @@ async function executePlanWithRetry(planId: string, approvalUrl: string): Promis
 // ─── Execute Approved Plan ────────────────────────────────────────────────────
 
 export async function executeApprovedPlan(planId: string): Promise<{ discovered: number; added: number }> {
+  if (isLegacyOutreachDisabled()) throw new Error(OUTREACH_DISABLED_REASON);
   const [plan] = await db.select().from(outreachDailyPlans).where(eq(outreachDailyPlans.id, planId));
   if (!plan) throw new Error("Plan not found");
   if (plan.status !== "approved") throw new Error(`Plan status is "${plan.status}", not approved`);

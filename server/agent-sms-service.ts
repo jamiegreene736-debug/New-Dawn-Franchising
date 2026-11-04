@@ -1,3 +1,4 @@
+import { isLegacyOutreachDisabled, OUTREACH_DISABLED_REASON } from "./outreach-owner";
 /**
  * Agent SMS Service
  * Two-way SMS notifications for the SEO and Outreach agents via QUO (OpenPhone).
@@ -72,6 +73,7 @@ export async function sendAgentSms(
     contextJson?: Record<string, unknown>;
   },
 ): Promise<{ success: boolean; id?: string; error?: string }> {
+  if (isLegacyOutreachDisabled()) return { success: false, error: OUTREACH_DISABLED_REASON };
   const fromNumber = AGENT_NUMBERS[agentType];
   if (!fromNumber) return { success: false, error: `Unknown agent type: ${agentType}` };
 
